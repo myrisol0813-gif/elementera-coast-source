@@ -1,0 +1,35 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+.dev.vars
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+*.der
+local.properties
+
+# JavaScript / web
+node_modules/
+dist/
+coverage/
+.wrangler/
+
+# Android / Gradle
+.gradle/
+**/build/
+*.apk
+*.aab
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
