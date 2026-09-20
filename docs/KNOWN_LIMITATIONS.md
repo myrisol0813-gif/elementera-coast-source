@@ -12,11 +12,12 @@ This source baseline is deliberately not a production replica.
 - RikkaHub import is not included.
 - Voice and realtime call entry points are not included.
 - Native is a source skeleton.
-- The repository currently does not include a Gradle Wrapper, so a clean-checkout debug APK build is not yet reproducibly verified.
+- The repository does not include a Gradle Wrapper; source CI installs a fixed Gradle version and verifies a clean-checkout debug APK build.
 - Model chat requires a self-configured OpenRouter key.
 - Provider-backed web search depends on the selected model/provider supporting the exposed tool.
 - There is no committed public Cloudflare preview URL.
-- Web/PWA runtime smoke testing requires a self-hosted D1 binding and local/preview environment.
+- CI includes a 390×844 headless mobile browser smoke, but it is not a substitute for physical-device visual QA.
+- Web/PWA runtime smoke testing uses a local-only D1 simulation in CI; real self-hosted deployments still need their own D1 binding.
 - GitHub / Notion source surfaces do not recreate private production remote-write behavior.
 - Model-autonomous cross-window tooling is not included; the source keeps cross-window access owner-driven/manual.
 - Attachment export contains metadata rather than embedded attachment bytes.
