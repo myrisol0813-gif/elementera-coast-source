@@ -33,7 +33,7 @@ Do not commit `.dev.vars`.
 The repository includes:
 
 ```text
-apps/web/wrangler.local.jsonc
+apps/web/wrangler.jsonc
 ```
 
 It binds `COAST_CHAT_DB` to a local D1 simulation using a placeholder id. It exists only for local preview and smoke testing.
@@ -46,7 +46,7 @@ From the repository root:
 
 ```bash
 npx wrangler pages dev apps/web \
-  --config apps/web/wrangler.local.jsonc \
+  --config apps/web/wrangler.jsonc \
   --env-file .dev.vars
 ```
 
