@@ -26,7 +26,7 @@ Cloudflare D1 binding used by source-backed stores.
 - expected binding name: `COAST_CHAT_DB`
 - it is **not** a normal string environment variable
 
-For local preview, `apps/web/wrangler.local.jsonc` binds this name to a local-only D1 simulation.
+For local preview, `apps/web/wrangler.jsonc` binds this name to a local-only D1 simulation.
 
 For a real self-hosted deployment, create a D1 database owned by that deployment and bind it as `COAST_CHAT_DB` through Cloudflare Pages configuration. Do not reuse a private/production database.
 
@@ -56,7 +56,7 @@ Start the local Pages runtime with the tracked local-only Wrangler configuration
 
 ```bash
 npx wrangler pages dev apps/web \
-  --config apps/web/wrangler.local.jsonc \
+  --config apps/web/wrangler.jsonc \
   --env-file .dev.vars
 ```
 
