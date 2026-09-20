@@ -176,10 +176,10 @@ export async function routeChatApi(request, env, session = null) {
   try {
     requireOwnerSession(session);
     if (!env?.COAST_CHAT_DB?.prepare) return apiError('chat_db_not_configured', 'Chat database is not configured.', 503);
-    if (url.pathname === ROOT) return formalChat(request, env);
-    if (url.pathname === METADATA) return modelMetadataApi(request, env);
-    if (url.pathname === LANDING) return landingExchange(request, env);
-    if (url.pathname === ATTACHMENTS || url.pathname.startsWith(`${ATTACHMENTS}/`)) return routeAttachmentRequest(request, env, url);
+    if (url.pathname === ROOT) return await formalChat(request, env);
+    if (url.pathname === METADATA) return await modelMetadataApi(request, env);
+    if (url.pathname === LANDING) return await landingExchange(request, env);
+    if (url.pathname === ATTACHMENTS || url.pathname.startsWith(`${ATTACHMENTS}/`)) return await routeAttachmentRequest(request, env, url);
     if (url.pathname === PROFILE) {
       if (request.method === 'GET') return json({ ok:true, profile:await readOwnerProfile(env.COAST_CHAT_DB) });
       if (request.method === 'PUT') { const value = await readJson(request); return json({ ok:true, profile:await writeOwnerProfile(env.COAST_CHAT_DB, value.profile || {}) }); }
