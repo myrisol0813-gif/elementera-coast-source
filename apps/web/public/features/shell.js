@@ -98,12 +98,17 @@ export function createShell({ storage }) {
   function activeAction(route) {
     const name = route?.name || '';
     if (DAILY_ROUTES.has(name)) return 'daily:home';
+    if (name === 'widgets-home') return 'sourcepages:open-widgets';
+    if (['owner-settings','theme-settings','run-settings','integrations'].includes(name)) return 'sourcepages:open-settings';
+    if (name === 'dev-hands-home') return 'devhands:open';
+    if (name === 'toolroom') return 'toolroom:open';
+    if (name === 'external-entry') return 'external:open';
     return '';
   }
 
   function updateActiveNavigation(route) {
     const active = activeAction(route);
-    for (const item of qa(`${ROOTS.sidebar} [data-action="daily:home"]`)) {
+    for (const item of qa(`${ROOTS.sidebar} [data-action="daily:home"], ${ROOTS.sidebar} [data-action="sourcepages:open-widgets"], ${ROOTS.sidebar} [data-action="sourcepages:open-settings"], ${ROOTS.sidebar} [data-action="devhands:open"], ${ROOTS.sidebar} [data-action="toolroom:open"], ${ROOTS.sidebar} [data-action="external:open"]`)) {
       const selected = item.dataset.action === active;
       item.classList.toggle('is-active', selected);
       if (selected) item.setAttribute('aria-current', 'page');

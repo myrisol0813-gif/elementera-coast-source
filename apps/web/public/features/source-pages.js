@@ -2,7 +2,7 @@ import { API, requestJson } from '../core/api.js';
 import { escapeAttribute, escapeHtml } from '../core/dom.js';
 import { THEME_PRESETS, themeLabel } from '../core/themes.js';
 
-const ROUTES=new Set(['owner-settings','theme-settings','widgets-home']);
+const ROUTES=new Set(['owner-settings','theme-settings','widgets-home','run-settings','integrations']);
 function row(title,note,action=''){
   const inner=`<span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(note)}</small></span>`;
   return action
@@ -28,6 +28,8 @@ export function createSourcePages({router,storage,shell,toast}){
           ${row('主题系统',`当前：${themeLabel(prefs.theme)}`,'themes')}
           ${row('聊天数据源','已配置共享历史。source 规则使用 COAST_CHAT_DB。')}
           ${row('聊天主链已连接','基础聊天、历史、记忆与工作台按 source 配置运行。')}
+          ${row('聊天与上下文设置','回答长度、流式输出、当前对话纸条、记忆与词典。','run-settings')}
+          ${row('GitHub / Notion 通用集成','查看 source adapter contract 与自托管配置状态。','integrations')}
           ${row('导出 source 快照','导出聊天、记忆、纸条、词典、外部入口与脱敏工具日志。','export-snapshot')}
         </div></section>`,
     };
@@ -43,6 +45,43 @@ export function createSourcePages({router,storage,shell,toast}){
           <span class="theme-preview" data-preview="${escapeAttribute(item.id)}"></span>
           <strong>${escapeHtml(item.label)}</strong><small>${item.id===current?'正在使用':'应用主题'}</small>
         </button>`).join('')}</div>`,
+    };
+  }
+  function runSettingsView(){
+    const run=storage.read().runControl;
+    const number=(name,label,min,step=1)=>`<label>${escapeHtml(label)}<input type="number" name="${escapeAttribute(name)}" min="${min}" step="${step}" value="${escapeAttribute(run[name])}"></label>`;
+    const yesNo=(name,label)=>`<label>${escapeHtml(label)}<select name="${escapeAttribute(name)}"><option value="true" ${run[name]?'selected':''}>开启</option><option value="false" ${!run[name]?'selected':''}>关闭</option></select></label>`;
+    return {
+      title:'聊天与上下文设置',
+      subtitle:'source 本机运行参数',
+      className:'source-pages',
+      body:`<form class="feature-card source-form" data-submit="sourcepages:run-settings">
+        ${number('recentTurns','最近聊天轮数',1)}
+        ${number('contextBudget','上下文 token budget',500,100)}
+        <label>回答长度<select name="outputLength"><option value="auto" ${run.outputLength==='auto'?'selected':''}>自然</option><option value="short" ${run.outputLength==='short'?'selected':''}>偏短</option><option value="long" ${run.outputLength==='long'?'selected':''}>偏长</option></select></label>
+        ${number('maxOutputTokens','最大输出 token',64,64)}
+        <label>表达倾向<select name="creativity"><option value="precise" ${run.creativity==='precise'?'selected':''}>克制</option><option value="balanced" ${run.creativity==='balanced'?'selected':''}>自然</option><option value="expansive" ${run.creativity==='expansive'?'selected':''}>发散</option></select></label>
+        ${yesNo('streamingEnabled','流式输出')}
+        ${number('soilBudget','当前对话纸条最多字数',300,100)}
+        ${number('seedCooldownTurns','线索冷却轮数',0)}
+        ${yesNo('worldbookEnabled','世界书 / 词典')}
+        ${number('worldbookLimit','每轮最多词条',0)}
+        ${number('memoryLimit','本轮记忆召回上限',0)}
+        <button class="primary-wide" type="submit">保存运行参数</button>
+      </form>
+      <p class="feature-note">清空当前对话纸条等数据操作仍放在记忆库中；这里仅编辑运行参数，不删除聊天、线索或记忆。</p>`,
+    };
+  }
+  async function integrationsView(){
+    try{sourceStatus=await requestJson(API.devSelfCheck);}catch{sourceStatus=null;}
+    const items=sourceStatus?.integrations||[];
+    return {
+      title:'通用集成',
+      subtitle:'GitHub / Notion · source adapter contract',
+      className:'source-pages',
+      headerAction:'<button class="feature-head-action" type="button" data-action="sourcepages:refresh-integrations">刷新</button>',
+      body:`<p class="feature-note">公开 source 不携带远端凭证或固定项目地址。接入时由部署者实现自己的 adapter，并在后端保持权限边界与脱敏。</p>
+        <div class="integration-grid">${items.length?items.map((item)=>`<section><header><strong>${escapeHtml(item.label||item.id)}</strong><span>${item.configured?'已配置':'未配置'}</span></header><p>${escapeHtml(item.reason||'adapter_not_connected')}</p><small>${(item.capabilities||[]).map(escapeHtml).join(' · ')}</small></section>`).join(''):'<p class="feature-empty">当前没有可报告的集成 contract。</p>'}</div>`,
     };
   }
   async function widgetsView(){
@@ -73,12 +112,15 @@ export function createSourcePages({router,storage,shell,toast}){
     if(name==='open-settings')return router.open('owner-settings');
     if(name==='themes')return router.open('theme-settings');
     if(name==='open-widgets')return router.open('widgets-home');
+    if(name==='run-settings')return router.open('run-settings');
+    if(name==='integrations')return router.open('integrations');
     if(name==='theme'){
       shell.setTheme(target?.dataset?.themeId||'default');
       toast('主题已更新');
       return router.refresh({preserveScroll:true});
     }
     if(name==='refresh-widgets'){sourceStatus=null;return router.refresh({preserveScroll:true});}
+    if(name==='refresh-integrations'){sourceStatus=null;return router.refresh({preserveScroll:true});}
     if(name==='export-snapshot'){globalThis.location?.assign?.(API.v1Snapshot);}
   }
   async function handleSubmit(name,target){
