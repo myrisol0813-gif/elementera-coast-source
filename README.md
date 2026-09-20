@@ -63,7 +63,7 @@ The repository includes `apps/web/wrangler.jsonc`, which binds `COAST_CHAT_DB` t
 From the repository root:
 
 ```bash
-cp .env.example .dev.vars
+cp .env.example apps/web/.dev.vars
 
 npx wrangler pages dev apps/web \
   --config apps/web/wrangler.jsonc \
