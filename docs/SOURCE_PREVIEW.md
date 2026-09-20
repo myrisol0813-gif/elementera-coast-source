@@ -1,28 +1,39 @@
 # Source preview setup
 
-This source baseline is isolated from the production Elementera Coast instance.
+This source baseline is isolated from the private production Elementera Coast instance.
 
 ## Web / PWA
 
-Use `apps/web` as the static + Pages Functions project root.
+Use `apps/web` as the static + Cloudflare Pages Functions project root.
 
-Required self-hosted bindings:
+There is no root JavaScript build step. For local development, use a current Wrangler CLI.
+
+Required source-owned configuration:
 
 - D1 binding: `COAST_CHAT_DB`
-- Secret: `COAST_SESSION_SECRET` — at least 32 characters
-- Secret: `SOURCE_ACCESS_PASSWORD` — at least 8 characters
+- secret: `COAST_SESSION_SECRET` — at least 32 characters
+- secret: `SOURCE_ACCESS_PASSWORD` — at least 8 characters
 
-Optional model provider binding:
+Optional model provider configuration:
 
-- Secret: `OPENROUTER_API_KEY`
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_MODEL`
 
-With an OpenRouter key, the basic chat route uses the source-safe formal chat core and chooses an
-available catalog model when no model is pinned. Without a provider key, the PWA shell, owner login,
-chat window storage, Visitor Mailbox, human thought chain, memory views, dictionary, context preview
-UI, and source workbench can still be inspected; model generation returns an explicit auth error.
+Example from the repository root:
 
-The source repository does not include production URLs, production database identifiers,
-production secrets, production signing material, private assets, or a production update chain.
+```bash
+cp .env.example .dev.vars
+
+npx wrangler pages dev apps/web \
+  --env-file .dev.vars \
+  --d1 COAST_CHAT_DB=<YOUR_D1_DATABASE_ID>
+```
+
+Without an OpenRouter key, the PWA shell and source-backed UI/storage surfaces can still be inspected; model generation returns an explicit configuration error.
+
+The source repository does not include private production URLs, database identifiers, secrets, signing material, private assets or an updater/release chain.
+
+See `SELF_HOSTING.md` and `ENVIRONMENT.md`.
 
 ## Native source shell
 
@@ -34,5 +45,6 @@ Source identity:
 - versionCode: `1`
 - versionName: `0.1.0-source`
 
-The Native project is intentionally a minimal Compose shell. It does not contain production
-signing configuration, updater wiring, release configuration, or private launcher assets.
+The Native project is intentionally a minimal Compose shell. It does not contain production signing configuration, updater wiring, release configuration or private launcher assets.
+
+A Gradle Wrapper is not currently committed, so a clean-checkout debug APK has not yet been reproducibly verified.
