@@ -27,7 +27,7 @@ async function initializeMemorySchema(db) {
     revision INTEGER NOT NULL DEFAULT 1,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
-    FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+    FOREIGN KEY (conversation_id) REFERENCES source_conversations(id)
   )`);
   await run(db, `CREATE TABLE IF NOT EXISTS memory_pockets (
     id TEXT PRIMARY KEY,
@@ -69,7 +69,7 @@ async function initializeMemorySchema(db) {
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER DEFAULT NULL,
-    FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+    FOREIGN KEY (conversation_id) REFERENCES source_conversations(id)
   )`);
   await run(db, `CREATE TABLE IF NOT EXISTS memory_entries (
     id TEXT PRIMARY KEY,
@@ -106,7 +106,7 @@ async function initializeMemorySchema(db) {
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER DEFAULT NULL,
-    FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+    FOREIGN KEY (conversation_id) REFERENCES source_conversations(id)
   )`);
   await run(db, `CREATE TABLE IF NOT EXISTS memory_custom_instructions (
     id TEXT PRIMARY KEY,
