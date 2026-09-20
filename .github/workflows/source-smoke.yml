@@ -88,7 +88,7 @@ jobs:
       - name: Prepare local source variables
         shell: bash
         run: |
-          cat > .dev.vars <<'EOF'
+          cat > apps/web/.dev.vars <<'EOF'
           SOURCE_ACCESS_PASSWORD=source-test-pass
           COAST_SESSION_SECRET=source-test-session-secret-0123456789abcdef
           EOF
@@ -98,7 +98,6 @@ jobs:
         run: |
           set -euo pipefail
           (cd apps/web && npx --yes wrangler@latest pages dev . \
-            --env-file ../../.dev.vars \
             --port 8788) > /tmp/wrangler.log 2>&1 &
           echo $! > /tmp/wrangler.pid
 
