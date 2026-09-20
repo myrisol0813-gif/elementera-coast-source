@@ -1,6 +1,7 @@
 import { apiError, isRequestBodyError, json, methodNotAllowed, readJson, requestBodyError, unexpectedApiError } from './http.js';
 import { OwnerAccessError, requireOwnerSession } from './owner-access.js';
 import { appendExternalMessage, listExternalMessages } from './external-entry-store.js';
+import { deliverExternalToRoom } from './room-bridge-service.js';
 
 const ROOT='/api/external/messages';
 const STATUS='/api/external/status';
@@ -20,7 +21,12 @@ export async function routeExternalEntryApi(request,env,session=null){
     }
     if(url.pathname===ROOT){
       if(request.method==='GET')return json({ok:true,messages:await listExternalMessages(env.COAST_CHAT_DB,{channel:url.searchParams.get('channel')||'',limit:url.searchParams.get('limit')||100})});
-      if(request.method==='POST')return json({ok:true,message:await appendExternalMessage(env.COAST_CHAT_DB,await readJson(request))},201);
+      if(request.method==='POST'){
+        const value=await readJson(request);
+        const message=await appendExternalMessage(env.COAST_CHAT_DB,value);
+        const delivery=value.deliver_to_room===false?null:await deliverExternalToRoom(env.COAST_CHAT_DB,value);
+        return json({ok:true,message,delivery},201);
+      }
       return methodNotAllowed('GET, POST');
     }
     return apiError('not_found','Not found.',404);
