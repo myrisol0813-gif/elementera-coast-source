@@ -232,7 +232,7 @@ export function createChatGeneration({
     const target = { room_scope: 'conversation', conversation_id: runtime.currentId };
     const turnPapers = { humanThoughtSubmission: humanThought?.submission(target, ui.humanThought), externalSubmission: humanThought?.externalSubmission?.(target, ui.humanThought) };
     const appended = appendTurn(currentHistory(), content, {
-      humanThought_snapshot_id: turnPapers.humanThoughtSubmission?.snapshot_id,
+      human_thought_snapshot_id: turnPapers.humanThoughtSubmission?.snapshot_id,
       message_source: 'owner_web',
       display_author: 'Owner',
       attachments: attachmentList,
@@ -242,7 +242,7 @@ export function createChatGeneration({
     composerState();
     renderMessages();
     const conversation = runtime.conversations.find((item) => item.id === runtime.currentId);
-    if (conversation?.room_type === 'bridge') await saveHistory(runtime.currentId, appended.state).catch(() => undefined);
+    if (['bridge', 'lighthouse'].includes(conversation?.room_type)) await saveHistory(runtime.currentId, appended.state).catch(() => undefined);
     else await generate(runtime.currentId, appended.turn.id, turnPapers);
     humanThought?.mountComposer(ui.humanThought, target);
     return true;
