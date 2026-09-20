@@ -28,6 +28,7 @@ export function createSourcePages({router,storage,shell,toast}){
           ${row('主题系统',`当前：${themeLabel(prefs.theme)}`,'themes')}
           ${row('聊天数据源','已配置共享历史。source 规则使用 COAST_CHAT_DB。')}
           ${row('聊天主链已连接','基础聊天、历史、记忆与工作台按 source 配置运行。')}
+          ${row('导出 source 快照','导出聊天、记忆、纸条、词典、外部入口与脱敏工具日志。','export-snapshot')}
         </div></section>`,
     };
   }
@@ -78,6 +79,7 @@ export function createSourcePages({router,storage,shell,toast}){
       return router.refresh({preserveScroll:true});
     }
     if(name==='refresh-widgets'){sourceStatus=null;return router.refresh({preserveScroll:true});}
+    if(name==='export-snapshot'){globalThis.location?.assign?.(API.v1Snapshot);}
   }
   async function handleSubmit(name,target){
     if(name!=='names')return;
