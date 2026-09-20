@@ -10,6 +10,16 @@ import {
 import { formatThinkingSoil } from './thinking-soil.js';
 import { matchWorldbook } from './worldbook.js';
 
+const SOURCE_WEB_SEARCH_TOOL = Object.freeze({
+  type: 'openrouter:web_search',
+  parameters: Object.freeze({
+    engine: 'auto',
+    max_results: 5,
+    max_total_results: 10,
+    search_context_size: 'medium',
+  }),
+});
+
 const BASE_PROMPT = [
   '你是这个长期对话空间中的 Model Partner。',
   '请依据本轮提供的上下文自然回应屋主。',
@@ -158,6 +168,7 @@ export async function assembleSourceChatContext(env, {
   return {
     modelMessages: comfort.modelMessages,
     selectedMemoryIds: selectedMemory.map((entry) => String(entry.id || '')).filter(Boolean),
+    tools: [SOURCE_WEB_SEARCH_TOOL],
     deskSlip: {
       ...slip,
       summary: '本轮上下文',

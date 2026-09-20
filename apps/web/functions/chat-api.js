@@ -13,6 +13,7 @@ import {
 import { modelMetadataApi } from './model-metadata-api.js';
 import { writeMessageModelMetadata } from './model-metadata-store.js';
 import { streamSourceChat } from './source-chat-stream.js';
+import { assembleSourceChatContext } from './source-context-assembler.js';
 
 const ROOT = '/api/chat';
 const CONVERSATIONS = '/api/chat/conversations';
@@ -58,13 +59,50 @@ async function formalChat(request, env) {
   const messageId = String(value.message_id || '');
   const sourceTurnId = String(value.source_turn_id || '');
   const attachmentIds = (Array.isArray(value.attachment_ids) ? value.attachment_ids : []).slice(0, 12);
+
+  const context = conversationId
+    ? await assembleSourceChatContext(env, {
+      conversationId,
+      messages: value.messages,
+      settings: value.settings,
+      recentEntryIds: value.recent_entry_ids,
+      humanThoughtSubmission: value.humanThought,
+    })
+    : {
+      modelMessages: Array.isArray(value.messages) ? value.messages : [],
+      selectedMemoryIds: [],
+      tools: [],
+      deskSlip: { summary:'本轮上下文', comfort:'未使用长期上下文' },
+    };
+
   const resolved = attachmentIds.length ? await resolveChatAttachmentsForModel(env, env.COAST_CHAT_DB, {
     conversationId, turnId:sourceTurnId, attachmentIds, modelId:String(value.model || ''),
   }) : null;
   const attachmentReceipt = attachmentDeskReceipt(resolved);
-  const input = { ...value, messages:resolved ? applyChatAttachmentsToMessages(value.messages, resolved) : value.messages };
-  if (value.stream === true) return streamSourceChat(request, env, input, { conversationId, messageId, attachmentReceipt });
-  const result = await performFormalChat(env, input, { allowSystem:false, captureMetadata:true });
+  const deskSlip = {
+    ...(context.deskSlip || {}),
+    ...(attachmentReceipt ? { attachments:attachmentReceipt } : {}),
+  };
+  const input = {
+    ...value,
+    messages: resolved ? applyChatAttachmentsToMessages(context.modelMessages, resolved) : context.modelMessages,
+    tools: context.tools,
+  };
+
+  if (value.stream === true) {
+    return streamSourceChat(request, env, input, {
+      conversationId,
+      messageId,
+      deskSlip,
+      selectedMemoryIds: context.selectedMemoryIds,
+      allowSystem: Boolean(conversationId),
+    });
+  }
+
+  const result = await performFormalChat(env, input, {
+    allowSystem:Boolean(conversationId),
+    captureMetadata:true,
+  });
   if (conversationId && messageId && result.model_metadata) {
     await writeMessageModelMetadata(env.COAST_CHAT_DB, conversationId, messageId, result.model_metadata).catch(() => undefined);
   }
@@ -72,8 +110,11 @@ async function formalChat(request, env) {
   return json({
     ...publicResult,
     tool_runs:[],
-    memory:{ selected_entry_ids:[] },
-    ...(attachmentReceipt ? { desk_slip:{ summary:'本轮上下文', comfort:'source-safe', attachments:attachmentReceipt } } : {}),
+    memory:{ selected_entry_ids:context.selectedMemoryIds },
+    desk_slip:{
+      ...deskSlip,
+      ...(publicResult.server_tools?.web_search ? { web_search:publicResult.server_tools.web_search } : {}),
+    },
   });
 }
 function activeHistoryMessages(state) {
