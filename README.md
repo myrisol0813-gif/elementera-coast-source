@@ -58,7 +58,7 @@ Requirements:
 - Node.js with `npx`
 - a current Wrangler CLI
 
-The repository includes `apps/web/wrangler.local.jsonc`, which binds `COAST_CHAT_DB` to a **local-only D1 simulation** using a non-production placeholder id. It exists for preview/smoke testing and must not be treated as deployment configuration.
+The repository includes `apps/web/wrangler.jsonc`, which binds `COAST_CHAT_DB` to a **local-only D1 simulation** using a non-production placeholder id. It exists for preview/smoke testing and must not be treated as deployment configuration.
 
 From the repository root:
 
@@ -66,7 +66,7 @@ From the repository root:
 cp .env.example .dev.vars
 
 npx wrangler pages dev apps/web \
-  --config apps/web/wrangler.local.jsonc \
+  --config apps/web/wrangler.jsonc \
   --env-file .dev.vars
 ```
 
@@ -103,7 +103,7 @@ Provider-backed web search depends on the selected model/provider supporting the
 
 Use `apps/web` as the Cloudflare Pages static asset + Functions root. Configure a new self-hosted Pages project, a D1 binding named `COAST_CHAT_DB`, and your own secrets/variables.
 
-Do **not** deploy `wrangler.local.jsonc` as real project configuration; it is intentionally local-only.
+Do **not** deploy `wrangler.jsonc` as real project configuration; it is intentionally local-only.
 
 No public preview URL or production domain is committed to this repository.
 
