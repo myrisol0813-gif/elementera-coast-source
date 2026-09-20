@@ -3,6 +3,10 @@ name: Source smoke
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - ".env.example"
   workflow_dispatch:
 
 permissions:
@@ -93,10 +97,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes wrangler@latest pages dev apps/web \
-            --config apps/web/wrangler.local.jsonc \
-            --env-file .dev.vars \
-            --port 8788 > /tmp/wrangler.log 2>&1 &
+          (cd apps/web && npx --yes wrangler@latest pages dev . \
+            --env-file ../../.dev.vars \
+            --port 8788) > /tmp/wrangler.log 2>&1 &
           echo $! > /tmp/wrangler.pid
 
           for _ in $(seq 1 60); do
