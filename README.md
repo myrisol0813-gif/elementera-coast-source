@@ -57,7 +57,8 @@ Requirements:
 
 - Node.js with `npx`
 - a current Wrangler CLI
-- a self-hosted Cloudflare D1 database binding named `COAST_CHAT_DB`
+
+The repository includes `apps/web/wrangler.local.jsonc`, which binds `COAST_CHAT_DB` to a **local-only D1 simulation** using a non-production placeholder id. It exists for preview/smoke testing and must not be treated as deployment configuration.
 
 From the repository root:
 
@@ -65,11 +66,11 @@ From the repository root:
 cp .env.example .dev.vars
 
 npx wrangler pages dev apps/web \
-  --env-file .dev.vars \
-  --d1 COAST_CHAT_DB=<YOUR_D1_DATABASE_ID>
+  --config apps/web/wrangler.local.jsonc \
+  --env-file .dev.vars
 ```
 
-Use your own D1 database. Do not point the source project at private or production resources.
+Wrangler normally serves the Pages project at `http://localhost:8788`.
 
 The source stores create their own tables lazily with `CREATE TABLE IF NOT EXISTS`; no old production migration is required.
 
@@ -81,7 +82,7 @@ Required:
 
 - `SOURCE_ACCESS_PASSWORD` — source deployment access password; minimum 8 characters
 - `COAST_SESSION_SECRET` — session HMAC secret; minimum 32 characters
-- `COAST_CHAT_DB` — D1 binding name used by the application; configure as a D1 binding, not a secret string
+- `COAST_CHAT_DB` — D1 binding name used by the application
 
 Optional:
 
@@ -100,7 +101,9 @@ Provider-backed web search depends on the selected model/provider supporting the
 
 ## PWA deployment
 
-Use `apps/web` as the Cloudflare Pages static asset + Functions root. Configure a new self-hosted Pages project, a new D1 binding named `COAST_CHAT_DB`, and your own secrets/variables.
+Use `apps/web` as the Cloudflare Pages static asset + Functions root. Configure a new self-hosted Pages project, a D1 binding named `COAST_CHAT_DB`, and your own secrets/variables.
+
+Do **not** deploy `wrangler.local.jsonc` as real project configuration; it is intentionally local-only.
 
 No public preview URL or production domain is committed to this repository.
 
@@ -118,7 +121,7 @@ versionName = 0.1.0-source
 
 Native is currently a **source skeleton**. It does not include release signing, a production updater, private launcher assets, or a production URL.
 
-The repository currently does not ship a Gradle Wrapper, so a clean-checkout debug APK build has not yet been reproducibly verified.
+The repository currently does not ship a Gradle Wrapper; CI performs the source build with an explicitly installed Gradle version instead.
 
 ## Generic integration contracts
 
