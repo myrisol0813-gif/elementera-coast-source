@@ -1,8 +1,6 @@
 export const API = Object.freeze({
-  health: '/api/health',
   v1Snapshot: '/api/export/v1-snapshot',
   fullArchive: '/api/export/full-archive',
-  session: '/api/session',
   models: '/api/models',
   chat: '/api/chat',
   attachments: '/api/chat/attachments',
