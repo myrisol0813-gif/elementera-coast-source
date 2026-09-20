@@ -19,7 +19,7 @@ Optional model provider configuration:
 - `OPENROUTER_API_KEY`
 - `OPENROUTER_MODEL`
 
-The repository includes `apps/web/wrangler.local.jsonc` for a local-only D1 simulation. It contains no real database id and must not be used as deployment configuration.
+The repository includes `apps/web/wrangler.jsonc` for a local-only D1 simulation. It contains no real database id and must not be used as deployment configuration.
 
 Example from the repository root:
 
@@ -27,7 +27,7 @@ Example from the repository root:
 cp .env.example .dev.vars
 
 npx wrangler pages dev apps/web \
-  --config apps/web/wrangler.local.jsonc \
+  --config apps/web/wrangler.jsonc \
   --env-file .dev.vars
 ```
 
