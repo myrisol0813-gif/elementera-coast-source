@@ -43,7 +43,7 @@ export function createChatActions({
       if (sent) attachments?.clearSent?.();
       return sent;
     }
-    return toast('通话模式还没接入。先输入文字或添加附件。');
+    return;
   }
 
   function handleSubmit(name) {
@@ -71,7 +71,6 @@ export function createChatActions({
     if (name === 'open') return loadConversation(conversationId);
     if (name === 'rename') return renameConversation(conversationId).catch((error) => toast(`改名失败：${error.message}`));
     if (name === 'delete-conversation') return deleteConversation(conversationId).catch((error) => toast(`删除失败：${error.message}`));
-    if (name === 'mic') return toast('语音输入还没接入。');
 
     const turnId = turnIdFrom(target);
     if (name === 'generation-detail') {

@@ -54,7 +54,6 @@ export function createChat({ storage, toast, humanThought }) {
     ui.form = q('#composer');
     ui.input = q('#promptInput');
     ui.primary = q('#composerActionButton');
-    ui.mic = q('#micButton');
     ui.attachmentButton = q('#attachmentButton');
     ui.attachmentMenu = q('#attachmentMenu');
     ui.attachmentTray = q('#composerAttachmentTray');
@@ -143,17 +142,13 @@ export function createChat({ storage, toast, humanThought }) {
     );
     const uploading = runtime.attachmentUploading === true;
     const canSend = hasText || hasAttachments;
-    const name = generating ? 'stop' : canSend ? 'send' : 'call';
+    const name = generating ? 'stop' : 'send';
     ui.primary.innerHTML = icon(name);
-    ui.primary.disabled = generating ? false : (!runtime.composerReady || uploading);
+    ui.primary.disabled = generating ? false : (!runtime.composerReady || uploading || !canSend);
     ui.primary.setAttribute('aria-label', !runtime.composerReady && !generating
       ? '聊天正在载入'
       : uploading ? '附件正在上传'
-        : generating ? '停止生成' : canSend ? '发送' : '通话');
-    if (ui.mic) {
-      ui.mic.hidden = generating || canSend || uploading;
-      ui.mic.disabled = !runtime.composerReady || uploading;
-    }
+        : generating ? '停止生成' : '发送');
     if (ui.attachmentButton) ui.attachmentButton.disabled = !runtime.composerReady || generating || uploading;
   }
 
