@@ -16,23 +16,6 @@ const DAILY_ROUTES = new Set([
   'daily-home', 'moments', 'moments-compose', 'diary', 'diary-compose', 'daily-placeholder',
 ]);
 
-function startOfToday() {
-  const date = new Date();
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function daysSince(year, month, day) {
-  const start = new Date(year, month - 1, day);
-  return Math.max(1, Math.floor((startOfToday() - start) / 86400000) + 1);
-}
-
-function daysUntil(month, day) {
-  const today = startOfToday();
-  let target = new Date(today.getFullYear(), month - 1, day);
-  if (target < today) target = new Date(today.getFullYear() + 1, month - 1, day);
-  return Math.ceil((target - today) / 86400000);
-}
-
 export function createShell({ storage }) {
   let viewportCleanup = null;
 
@@ -48,15 +31,6 @@ export function createShell({ storage }) {
     if (label) label.textContent = THEME_LABELS[theme];
     const themeMeta = q('meta[name="theme-color"]');
     if (themeMeta) themeMeta.content = theme === 'light' ? '#ffffff' : theme === 'gold' ? '#0b0b0c' : '#171717';
-  }
-
-  function updateStatus() {
-    const orbit = q('#orbitDays');
-    const august12 = q('#august12Days');
-    const august13 = q('#august13Days');
-    if (orbit) orbit.textContent = String(daysSince(2025, 8, 13));
-    if (august12) august12.textContent = String(daysUntil(8, 12));
-    if (august13) august13.textContent = String(daysUntil(8, 13));
   }
 
   function syncViewportHeight() {
@@ -155,7 +129,6 @@ export function createShell({ storage }) {
   function mount(context = {}) {
     bindViewportHeight();
     applyPreferences();
-    updateStatus();
     updateActiveNavigation(context.router?.current?.());
   }
 

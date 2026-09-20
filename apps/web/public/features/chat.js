@@ -17,7 +17,7 @@ import { createCoastSseParser } from './chat/chat-stream.js';
 
 export { createCoastSseParser, shortModelName };
 
-const ROOM_TYPE_LABELS = Object.freeze({ main: '主聊天', radio: '无线电波', lighthouse: '灯塔来信' });
+const ROOM_TYPE_LABELS = Object.freeze({ main: '主聊天', radio: '共通聊天室', lighthouse: 'MCP 对话区' });
 const HANDLER_NAMES = Object.freeze({
   click: 'handleAction',
   submit: 'handleSubmit',
@@ -124,7 +124,7 @@ export function createChat({ storage, toast, humanThought }) {
     }
     if (ui.input) {
       ui.input.disabled = !runtime.composerReady;
-      ui.input.placeholder = runtime.composerReady ? '询问任何问题' : (placeholder || '正在连接海岸…');
+      ui.input.placeholder = runtime.composerReady ? '询问任何问题' : (placeholder || '正在连接当前模型…');
     }
     composerState();
   }
@@ -219,7 +219,7 @@ export function createChat({ storage, toast, humanThought }) {
 
   async function refreshFromSource() {
     if (runtime.generation) {
-      toast('当前回复还在生成，完成后再刷新海岸。');
+      toast('当前回复还在生成，完成后再刷新当前状态。');
       return false;
     }
     setStatus('正在刷新当前状态…', 'loading');
@@ -332,7 +332,7 @@ export function createChat({ storage, toast, humanThought }) {
 
   async function mount() {
     bindUi();
-    setComposerReady(false, '正在连接海岸…');
+    setComposerReady(false, '正在连接当前模型…');
     await bootstrap();
     chatAttachments.refresh();
     composerState();

@@ -50,7 +50,7 @@ function crossWindowDeskDetails(section = {}) {
   const estimatedTokens = Math.max(0, Number(section.attempted_estimated_tokens) || 0);
   const sourceList = sources.length
     ? `<div class="desk-record-list">${sources.map((source) => {
-      const kind = source.source === 'external' ? '外部入口消息' : source.room_type === 'radio' ? '电波' : source.room_type === 'lighthouse' ? '灯塔' : '主聊天';
+      const kind = source.source === 'external' ? '外部入口消息' : source.room_type === 'radio' ? '共通聊天室' : source.room_type === 'lighthouse' ? 'MCP 对话区' : '主聊天';
       const title = source.source === 'external' ? `【外部】${source.title || '未命名窗口'}` : source.title || '未命名窗口';
       const sourceRequested = Math.max(0, Number(source.requested_turns) || 0);
       const sourceLoaded = Math.max(0, Number(source.loaded_turns) || 0);
