@@ -253,7 +253,7 @@ export function boundedSoilContext(context) {
     ...context,
     previous_turn_excerpt: context.previous_turn_excerpt ? soilTurnDigest({
       turn_id: context.previous_turn_excerpt.turn_id,
-      user: context.previous_turn_excerpt.user,
+      owner: context.previous_turn_excerpt.owner,
       model_partner: context.previous_turn_excerpt.model_partner,
     }, 400) : null,
     missed_since_success: (context.missed_since_success || []).slice(-1),
@@ -410,7 +410,7 @@ export async function organizeConversationSoil(env, conversationId, value) {
 
   const latestTurn = turns.at(-1);
   const allowedTurnIds = new Set(turns.map((turn) => turn.turn_id).filter(Boolean));
-  const fallbackExcerpt = [latestTurn?.user?.content, latestTurn?.model_partner?.content]
+  const fallbackExcerpt = [latestTurn?.owner?.content, latestTurn?.model_partner?.content]
     .map((part) => String(part || '').replace(/\s+/g, ' ').trim())
     .filter(Boolean).join(' / ').slice(0, 360);
   const handSeedsMode = normalizeSoilMode(organized.hand_seeds_mode);
