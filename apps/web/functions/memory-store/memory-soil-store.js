@@ -55,7 +55,7 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
   const conversationId = sanitizeId(id, 'conversation');
   const current = await readSoil(db, conversationId);
   if (automatic && (current.manual_locked || !current.auto_refresh_enabled)) {
-    throw new MemoryStoreError('soil_locked', '思维壤已由屋主手动锁定。', 409);
+    throw new MemoryStoreError('soil_locked', '当前对话纸条已由屋主手动锁定。', 409);
   }
   const has = (name) => Object.prototype.hasOwnProperty.call(value, name);
   const next = {
@@ -110,7 +110,7 @@ export async function writeSoilCurrentText(db, id, value = {}, { provenance = {}
   await ensureSoilRow(db, conversationId);
   const currentText = String(value.current_text ?? '').trim();
   if (!currentText || currentText.length > MAX_SOURCE_TEXT) {
-    throw new MemoryStoreError('invalid_request', 'Chat Bridge 思维壤 current_text 必须为 1 到 12000 个字符。');
+    throw new MemoryStoreError('invalid_request', 'Chat Bridge 当前对话纸条 current_text 必须为 1 到 12000 个字符。');
   }
   const identity = validateCoastIdentity(provenance.identity);
   const sourceConversationId = clip(
@@ -154,7 +154,7 @@ export async function writeSoilCurrentText(db, id, value = {}, { provenance = {}
   const changes = Number(result?.meta?.changes || 0);
   const idempotent = Boolean(toolCallId && changes === 0);
   if (changes === 0 && !idempotent) {
-    throw new MemoryStoreError('room_soil_write_failed', 'Chat Bridge 思维壤没有完成写入。', 500);
+    throw new MemoryStoreError('room_soil_write_failed', 'Chat Bridge 当前对话纸条没有完成写入。', 500);
   }
   return { soil, idempotent };
 }

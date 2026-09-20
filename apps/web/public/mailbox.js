@@ -105,7 +105,7 @@ function systemMessage(message) {
 function thoughtSoilEntry() {
   const soil = state.memory.thought_soil || emptyThoughtSoil(state.visitor?.visitor_id);
   const handSeeds = Array.isArray(soil.hand_seeds) ? soil.hand_seeds : [];
-  return `<div class="thought-soil-row"><button class="thought-soil-entry" type="button" data-panel="soil">思维壤 · ${Math.min(handSeeds.length, 7)} 粒手持种 <span aria-hidden="true">›</span></button></div>`;
+  return `<div class="thought-soil-row"><button class="thought-soil-entry" type="button" data-panel="soil">整理当前对话的纸条 · ${Math.min(handSeeds.length, 7)} 条当前活跃线索 <span aria-hidden="true">›</span></button></div>`;
 }
 
 function renderMessages() {
@@ -255,7 +255,7 @@ function thoughtSoilBody() {
   const candidates = Array.isArray(soil.pocket_candidates) ? soil.pocket_candidates : [];
   const seedBody = seeds.length
     ? seeds.map((seed) => `<div class="feature-row static"><span><strong>${escapeHtml(seed.name || seed.life_core)}</strong><small>${escapeHtml(seed.life_core || '')}${seed.usage_hint ? `<br>使用：${escapeHtml(seed.usage_hint)}` : ''}${seed.avoid_hint ? `<br>避免：${escapeHtml(seed.avoid_hint)}` : ''}</small></span></div>`).join('')
-    : '<p>还没有手持种。</p>';
+    : '<p>还没有当前活跃线索。</p>';
   const candidateBody = candidates.length
     ? `${candidates.map((candidate) => `<div class="feature-row static"><span><strong>${escapeHtml(candidate.title || candidate.life_core || '可落袋内容')}</strong><small>${escapeHtml(candidate.life_core || '')}${candidate.source_excerpt ? `<br>来源：${escapeHtml(candidate.source_excerpt)}` : ''}</small></span></div>`).join('')}<p class="feature-note">这些内容只在当前访客的待确认区里；确认前不会成为访客记事。</p>`
     : '<p>还没有可落袋内容。</p>';
@@ -266,7 +266,7 @@ function thoughtSoilBody() {
   const model = [soil.model_label, soil.model_nickname].filter(Boolean).join(' · ') || '尚未整理';
   const provenance = `<p class="feature-note generation-provenance">revision ${Number(soil.revision || 1)} · 整理来源 · ${escapeHtml(model)}${soil.updated_at ? ` · ${escapeHtml(timeLabel(soil.updated_at))}` : ''}</p>`;
   return `${section('当前', textBlock(soil.current_text, '还没有整理当前方向。'))}
-    ${section(`手持种 · ${seeds.length}/7`, seedBody)}
+    ${section(`当前活跃线索 · ${seeds.length}/7`, seedBody)}
     ${section('勿复读', textBlock(soil.do_not_repeat))}
     ${section('可落袋', candidateBody)}
     ${pendingEntry}${provenance}`;
@@ -305,7 +305,7 @@ function memoryEntryCard(entry) {
 
 function notebookBody() {
   if (state.visitor && !state.visitor.allow_memory) {
-    return '<p class="feature-empty">你登记时没有开启访客记事本；思维壤仍只作为当前房间的滚动工作上下文。</p>';
+    return '<p class="feature-empty">你登记时没有开启访客记事本；当前对话纸条仍只作为当前房间的滚动工作上下文。</p>';
   }
   const pending = state.memory.pending_pockets || [];
   const entries = state.memory.entries || [];
@@ -340,7 +340,7 @@ async function openPanel(kind) {
   const body = q('#mailboxPanelBody');
   if (!panel || !title || !subtitle || !body) return;
   const panelMeta = {
-    soil: ['思维壤', '当前访客房间的滚动工作上下文'],
+    soil: ['整理当前对话的纸条', '当前访客房间的滚动工作上下文'],
     notebook: ['访客记事本', '待确认区与长期轻量记忆'],
     pockets: ['待确认区', '确认前不会进入访客记事本'],
   }[kind];
@@ -476,7 +476,7 @@ async function deleteAccount() {
   closeConversationMenu();
   const confirmed = await confirmDanger({
     title: '删除整个访客信箱对话？',
-    message: '你的暗号、全部来信与回信、思维壤、待确认区和访客记事本都会永久删除，无法恢复。',
+    message: '你的暗号、全部来信与回信、当前对话纸条、待确认区和访客记事本都会永久删除，无法恢复。',
     confirmText: '删除全部数据',
   });
   if (!confirmed) return;

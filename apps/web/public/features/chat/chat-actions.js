@@ -116,7 +116,7 @@ export function createChatActions({
     }
     if (name === 'regenerate') {
       const conversation = runtime.conversations.find((item) => item.id === runtime.currentId);
-      if (conversation?.room_type === 'bridge') return toast('灯塔来信只保存文字，不调用 API 另一位屋主 回复。');
+      if (conversation?.room_type === 'bridge') return toast('这个桥接房间只保存文字，不调用模型 API 回复。');
       return generate(runtime.currentId, turnId);
     }
     if (name === 'copy') {

@@ -153,7 +153,7 @@ export function createDeskSlip({
     cross_window: cross,
     workbench: {
       label: '工具调用记录', description: DESCRIPTIONS.workbench, status: workbenchStatus, prompt_delivered: Boolean(workbenchPrompt), prompt: privateDetails && workbenchPrompt ? workbenchText : '',
-      labels: { model_visible_tools: '模型可见工具', backend_tools: '后端可用工具', core: '常用工具', side: '海岸日报小工具' },
+      labels: { model_visible_tools: '模型可见工具', backend_tools: '后端可用工具', core: '常用工具', side: '小组件工具' },
       model_visible_tools: privateDetails ? selectedModelTools : [], backend_tools: privateDetails ? availableBackendTools : [], core_tools: privateDetails ? coreTools : [], side_tools: privateDetails ? sideTools : [],
       used_count: usedTools.length, tools_used: privateDetails ? usedTools : [], tool_results: privateDetails ? deliveredToolResults : [],
     },

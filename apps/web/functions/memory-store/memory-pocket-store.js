@@ -78,7 +78,7 @@ export async function requirePocketRow(db, id) {
   const pocketId = sanitizeId(id, 'pocket');
   const row = await first(db, `SELECT * FROM memory_pockets
     WHERE id = ? AND user_id = ? AND deleted_at IS NULL`, [pocketId, MEMORY_OWNER_ID]);
-  if (!row) throw new MemoryStoreError('pocket_not_found', '待确认袋条目不存在。', 404);
+  if (!row) throw new MemoryStoreError('pocket_not_found', '待确认区条目不存在。', 404);
   return row;
 }
 
@@ -94,7 +94,7 @@ export async function createPocket(db, value = {}) {
   const sourceType = String(value.source_type || 'turn');
   if (!POCKET_SOURCE_TYPES.has(sourceType)) throw new MemoryStoreError('invalid_source_type', '待确认候选来源无效。');
   const sourceText = clip(value.source_text, MAX_SOURCE_TEXT);
-  if (!sourceText) throw new MemoryStoreError('source_text_required', '没有可以进入待确认袋的内容。');
+  if (!sourceText) throw new MemoryStoreError('source_text_required', '没有可以进入待确认区的内容。');
   const reference = sourceRef(value.source_ref);
   let sourceRefs = (Array.isArray(value.source_refs) ? value.source_refs : [])
     .map(normalizeCandidateSourceRef)
@@ -135,7 +135,7 @@ export async function listPockets(db, { conversation_id: conversationIdValue, st
   const conversationId = sanitizeId(conversationIdValue, 'conversation');
   await getConversation(db, conversationId);
   const pocketStatus = String(status || 'pending');
-  if (!POCKET_STATUSES.has(pocketStatus)) throw new MemoryStoreError('invalid_pocket_status', '待确认袋状态无效。');
+  if (!POCKET_STATUSES.has(pocketStatus)) throw new MemoryStoreError('invalid_pocket_status', '待确认区状态无效。');
   const rows = await all(db, `SELECT * FROM memory_pockets
     WHERE user_id = ? AND conversation_id = ? AND status = ? AND deleted_at IS NULL
     ORDER BY created_at DESC`, [MEMORY_OWNER_ID, conversationId, pocketStatus]);
@@ -247,10 +247,10 @@ export async function upsertSoilPocketCandidates(db, conversationIdValue, value)
 export async function resolvePocket(db, id, value = {}) {
   await ensureMemorySchema(db);
   const pocket = await requirePocketRow(db, id);
-  if (pocket.status !== 'pending') throw new MemoryStoreError('pocket_already_resolved', '这条内容已经离开待确认袋。', 409);
+  if (pocket.status !== 'pending') throw new MemoryStoreError('pocket_already_resolved', '这条内容已经离开待确认区。', 409);
   const action = String(value.action || '');
   if (!['memory', 'seed', 'discard'].includes(action)) {
-    throw new MemoryStoreError('invalid_pocket_action', '待确认袋只接受 memory / seed / discard。');
+    throw new MemoryStoreError('invalid_pocket_action', '待确认区只接受 memory / seed / discard。');
   }
   const timestamp = Date.now();
   if (action === 'discard') {

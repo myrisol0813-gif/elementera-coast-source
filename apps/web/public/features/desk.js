@@ -144,8 +144,8 @@ function toolsLine(label, items) {
 function currentModelPartner(history) {
   const turns = normalizeState(history).turns;
   for (let index = turns.length - 1; index >= 0; index -= 1) {
-    const assistant = activeBranch(turns[index]).assistant;
-    if (assistant) return assistant;
+    const modelPartner = activeBranch(turns[index]).modelPartner;
+    if (modelPartner) return modelPartner;
   }
   return null;
 }
@@ -331,19 +331,19 @@ export function createDesk({ router, toast }) {
   function captureSlip(slip) { state.slip = slip && typeof slip === 'object' ? slip : null; renderStatus(); }
   async function captureModelEcho(history = {}, conversationId = '') {
     const revision = ++modelEchoRevision;
-    const assistant = currentModelPartner(history);
-    const source = String(assistant?.generation_source || '');
-    if (!conversationId || !assistant?.id || !['chat', 'landing'].includes(source)) {
+    const modelPartner = currentModelPartner(history);
+    const source = String(modelPartner?.generation_source || '');
+    if (!conversationId || !modelPartner?.id || !['chat', 'landing'].includes(source)) {
       state.modelEcho = emptyModelEcho();
       return state.modelEcho;
     }
-    state.modelEcho = { ...emptyModelEcho(), status_label: '读取中', message_id: assistant.id, conversation_id: conversationId };
+    state.modelEcho = { ...emptyModelEcho(), status_label: '读取中', message_id: modelPartner.id, conversation_id: conversationId };
     try {
-      const echo = await readModelMetadataStatus(conversationId, assistant.id);
+      const echo = await readModelMetadataStatus(conversationId, modelPartner.id);
       if (revision !== modelEchoRevision) return state.modelEcho;
       state.modelEcho = {
         ...echo,
-        message_id: assistant.id,
+        message_id: modelPartner.id,
         conversation_id: conversationId,
       };
     } catch {
@@ -351,7 +351,7 @@ export function createDesk({ router, toast }) {
       state.modelEcho = {
         ...emptyModelEcho(),
         status_label: '读取失败',
-        message_id: assistant.id,
+        message_id: modelPartner.id,
         conversation_id: conversationId,
       };
     }
