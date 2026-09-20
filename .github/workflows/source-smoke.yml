@@ -130,6 +130,18 @@ jobs:
           console.log('Business-file legacy/private concept scan: OK');
           NODE
 
+      - name: Report repository risk-term locations
+        shell: bash
+        run: |
+          set -euo pipefail
+          for term in token secret keystore jks signing updater release production; do
+            echo "### $term"
+            grep -RIl -i --exclude-dir=.git --exclude-dir=node_modules -- "$term" . \
+              | sed 's#^./##' \
+              | sort -u \
+              | head -n 80 || true
+          done
+
       - name: Prepare local source variables
         shell: bash
         run: |
@@ -274,7 +286,7 @@ jobs:
           test -n "$CHROME_PATH"
           npm install --no-save --no-package-lock playwright-core@latest >/dev/null 2>&1
           CHROME_PATH="$CHROME_PATH" node <<'NODE'
-          const { chromium } = require('playwright-core');
+          const { chromium } = await import('playwright-core');
 
           const base = 'http://127.0.0.1:8788';
           const errors = [];
