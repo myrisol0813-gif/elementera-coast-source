@@ -1,0 +1,13 @@
+/
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+/index.html
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+/app.html
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+/service-worker.js
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+/manifest.json
+  Cache-Control: no-cache, must-revalidate, max-age=0
+  Content-Type: application/manifest+json; charset=utf-8
+/public/*
+  Cache-Control: no-cache, must-revalidate, max-age=0

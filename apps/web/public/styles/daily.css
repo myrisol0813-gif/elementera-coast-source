@@ -1,0 +1,30 @@
+.moment-author-edit {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.moment-author-edit:hover,
+.moment-author-edit:focus-visible {
+  color: var(--accent);
+}
+
+.moment-author-edit.is-comment {
+  font-weight: 700;
+}
+
+.moment-model-usage {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+  text-align: right;
+  overflow-wrap: anywhere;
+  opacity: .72;
+}

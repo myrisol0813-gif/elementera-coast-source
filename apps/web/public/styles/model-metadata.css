@@ -1,0 +1,133 @@
+.model-metadata-trace {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-soft) 82%, transparent);
+  color: var(--text);
+  overflow: hidden;
+}
+
+.model-metadata-trace > summary,
+.model-metadata-raw > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.model-metadata-trace > summary::-webkit-details-marker,
+.model-metadata-raw > summary::-webkit-details-marker {
+  display: none;
+}
+
+.model-metadata-trace > summary {
+  padding: 9px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.model-metadata-raw > summary::before {
+  content: '⌄';
+  display: inline-block;
+  width: 1.35em;
+  transition: transform 140ms ease;
+}
+
+.model-metadata-raw[open] > summary::before {
+  transform: rotate(180deg);
+}
+
+.model-metadata-body {
+  padding: 0 12px 12px;
+}
+
+.model-metadata-status,
+.model-metadata-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.model-metadata-status {
+  padding: 1px 0 9px;
+}
+
+.model-metadata-section {
+  border-top: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  padding: 10px 0 4px;
+}
+
+.model-metadata-section h4 {
+  margin: 0 0 7px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.model-metadata-row {
+  display: grid;
+  grid-template-columns: minmax(86px, .34fr) minmax(0, .66fr);
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.model-metadata-row b {
+  color: var(--muted);
+  font-weight: 550;
+}
+
+.model-metadata-row span,
+.model-metadata-row pre {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  color: var(--text);
+}
+
+.model-metadata-row pre,
+.model-metadata-json {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.model-metadata-raw {
+  margin-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  padding-top: 6px;
+}
+
+.model-metadata-raw > summary {
+  padding: 5px 0;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.model-metadata-raw-body {
+  padding: 5px 0 2px;
+}
+
+.model-metadata-json {
+  max-height: 300px;
+  overflow: auto;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 620px) {
+  .model-metadata-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
