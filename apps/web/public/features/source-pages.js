@@ -9,7 +9,7 @@ function row(title,note,action=''){
     ? `<button class="feature-row" type="button" data-action="sourcepages:${escapeAttribute(action)}">${inner}<span>›</span></button>`
     : `<div class="feature-row static">${inner}</div>`;
 }
-export function createSourcePages({router,storage,shell,toast}){
+export function createSourcePages({router,storage,shell,toast,chat}){
   let sourceStatus=null;
   function ownerView(){
     const prefs=storage.read().preferences;
@@ -74,7 +74,7 @@ export function createSourcePages({router,storage,shell,toast}){
     };
   }
   async function crossWindowView(){
-    const current='';
+    const current=chat?.getCurrentConversationId?.()||'';
     const data=await requestJson(`${API.crossWindowMessages}?current_conversation_id=${encodeURIComponent(current)}`);
     const sources=Array.isArray(data.sources)?data.sources:[];
     return {
@@ -136,7 +136,7 @@ export function createSourcePages({router,storage,shell,toast}){
     if(name==='cross-window')return router.open('cross-window-index');
     if(name==='cross-read'){
       const id=target?.dataset?.id||'';
-      const data=await requestJson(API.crossWindowRead,{method:'POST',body:JSON.stringify({mode:'manual',sources:[{conversation_id:id,turns:4}]})});
+      const data=await requestJson(API.crossWindowRead,{method:'POST',body:JSON.stringify({mode:'manual',current_conversation_id:chat?.getCurrentConversationId?.()||'',sources:[{conversation_id:id,turns:4}]})});
       const text=(data.items||[]).flatMap((item)=>item.messages||[]).map((message)=>`${message.role==='owner'?'屋主':'另一位屋主'}：${message.content}`).join('\n\n');
       toast(text?text.slice(0,1200):'这个窗口没有可读取内容。',5200);
       return;

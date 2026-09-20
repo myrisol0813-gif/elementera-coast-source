@@ -35,11 +35,11 @@ function registerServiceWorker() {
 const overlayRoot = q('#overlayRoot');
 const shell = createShell({ storage });
 const router = createRouter(overlayRoot);
-const sourcePages = createSourcePages({ router, storage, shell, toast });
 const devHands = createDevHands({ router, toast });
 const externalEntry = createExternalEntry({ router, toast });
 const humanThought = createHumanThought({ toast });
 const chat = createChat({ storage, toast, humanThought });
+const sourcePages = createSourcePages({ router, storage, shell, toast, chat });
 const toolroom = createToolroom({ router, chat });
 const models = createModels({ chat, router, toast });
 const widgets = createWidgets({ router, toast });
