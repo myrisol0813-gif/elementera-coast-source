@@ -11,6 +11,7 @@ import { listExternalMessages } from './external-entry-store.js';
 import { integrationCatalog } from './source-integrations.js';
 import { listChatAttachmentMetadata } from './chat-attachments.js';
 import { listWidgetDiaries, listWidgetMoments } from './widget-store.js';
+import { listOwnerMailboxVisitors, ownerMailboxSummary } from './mailbox-repository.js';
 
 const V1='/api/export/v1-snapshot';
 const FULL='/api/export/full-archive';
@@ -29,6 +30,26 @@ async function allEntries(db){
 async function safePockets(db,conversationId){
   try{return await listPockets(db,{conversation_id:conversationId,status:'pending'});}catch{return [];}
 }
+function turnContextPreviews(history){
+  const previews=[];
+  for(const turn of Array.isArray(history?.turns)?history.turns:[]){
+    const variantsByOwnerVariant=turn?.model_partner?.variantsByOwnerVariant;
+    if(!variantsByOwnerVariant||typeof variantsByOwnerVariant!=='object')continue;
+    for(const [ownerVariantIndex,variants] of Object.entries(variantsByOwnerVariant)){
+      for(const variant of Array.isArray(variants)?variants:[]){
+        if(!variant?.desk_slip||typeof variant.desk_slip!=='object')continue;
+        previews.push({
+          turn_id:String(turn?.id||''),
+          owner_variant_index:Number(ownerVariantIndex)||0,
+          message_id:String(variant?.id||''),
+          model_id:String(variant?.model_id||''),
+          desk_slip:variant.desk_slip,
+        });
+      }
+    }
+  }
+  return previews;
+}
 async function conversationBundle(db,conversation){
   const [history,humanThought,soil,pockets]=await Promise.all([
     readConversationState(db,conversation.id),
@@ -36,11 +57,11 @@ async function conversationBundle(db,conversation){
     readSoil(db,conversation.id),
     safePockets(db,conversation.id),
   ]);
-  return {conversation,history,human_thought:humanThought,current_conversation_paper:soil,pending_area:pockets};
+  return {conversation,history,turn_context_previews:turnContextPreviews(history),human_thought:humanThought,current_conversation_paper:soil,pending_area:pockets};
 }
 async function buildSnapshot(db,{kind='v1_snapshot'}={}){
   const conversations=await listConversations(db);
-  const [profile,memoryEntries,customInstructions,globalExcerpt,worldbook,toolRuns,externalMessages,attachments,widgetMoments,widgetDiaries]=await Promise.all([
+  const [profile,memoryEntries,customInstructions,globalExcerpt,worldbook,toolRuns,externalMessages,attachments,widgetMoments,widgetDiaries,mailboxVisitors,mailboxSummary]=await Promise.all([
     readOwnerProfile(db),
     allEntries(db),
     readCustomInstructions(db),
@@ -51,6 +72,8 @@ async function buildSnapshot(db,{kind='v1_snapshot'}={}){
     listChatAttachmentMetadata(db),
     listWidgetMoments(db),
     listWidgetDiaries(db),
+    listOwnerMailboxVisitors(db),
+    ownerMailboxSummary(db),
   ]);
   const conversationData=[];
   for(const conversation of conversations)conversationData.push(await conversationBundle(db,conversation));
@@ -65,6 +88,8 @@ async function buildSnapshot(db,{kind='v1_snapshot'}={}){
       'No secrets, access tokens, cookies, authorization headers, remote credentials, or private service configuration are included.',
       'Attachment information remains metadata inside chat history; file bytes are not embedded by this source skeleton.',
       'Tool call records are exported as redacted summaries.',
+      'Visitor Mailbox export contains owner-visible metadata only; message bodies are not included by the snapshot endpoint.',
+      'Turn Context Preview entries are exported from desk_slip snapshots already stored with source chat history.',
     ],
     owner_profile:profile,
     conversations:conversationData,
@@ -75,6 +100,7 @@ async function buildSnapshot(db,{kind='v1_snapshot'}={}){
     external_entry_messages:externalMessages,
     attachment_metadata:attachments,
     widgets:{moments:widgetMoments,diaries:widgetDiaries},
+    visitor_mailbox:{summary:mailboxSummary,visitors:mailboxVisitors},
     tool_run_summaries:toolRuns,
     integration_contracts:integrationCatalog(),
   };
