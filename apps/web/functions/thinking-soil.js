@@ -24,7 +24,7 @@ function soilLines(soil, { currentLimit, maxHandSeeds, includeLabel = false } = 
     .map(seedText)
     .filter(Boolean)
     .slice(0, maxHandSeeds);
-  if (seeds.length) lines.push('手持种：', ...seeds.map((seed) => `- ${seed}`));
+  if (seeds.length) lines.push('当前活跃线索：', ...seeds.map((seed) => `- ${seed}`));
   const doNotRepeat = clip(soil.do_not_repeat, 600);
   if (doNotRepeat) lines.push(`勿复读：${doNotRepeat}`);
   return lines;
@@ -49,5 +49,5 @@ export function formatThinkingSoil(value, {
     lines = soilLines(soil, { currentLimit: limit, maxHandSeeds });
   }
   if (!lines.length) return '';
-  return `【思维壤】\n${lines.join('\n')}`.slice(0, limit);
+  return `【整理当前对话的纸条】\n${lines.join('\n')}`.slice(0, limit);
 }

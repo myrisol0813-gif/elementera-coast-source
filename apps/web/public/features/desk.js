@@ -24,7 +24,7 @@ function scopeLabel(value) { return SCOPE_LABELS[String(value || '')] || String(
 function recentDeskDetails(messages) {
   const list = Array.isArray(messages) ? messages : [];
   if (!list.length) return emptyNote();
-  return `<div class="desk-message-list">${list.map((message) => `<section><b>${message.role === 'assistant' ? '另一位屋主回复' : '用户消息'}</b>${deskText(message.content)}</section>`).join('')}</div><p class="desk-slip-note">当前消息已单独列在上方，不在这里重复。</p>`;
+  return `<div class="desk-message-list">${list.map((message) => `<section><b>${message.role === 'assistant' ? '另一位屋主回复' : '屋主消息'}</b>${deskText(message.content)}</section>`).join('')}</div><p class="desk-slip-note">当前消息已单独列在上方，不在这里重复。</p>`;
 }
 function memoryDeskDetails(items) {
   const list = Array.isArray(items) ? items : [];
@@ -180,7 +180,7 @@ export function createDesk({ router, toast }) {
     const soil = slip.thinking_soil || { label: '整理当前对话的纸条', status: '未递给', context: '', current_text: '', hand_seeds: [], pocket_candidates_count: 0 };
     const memory = slip.related_memory || { label: '相关记忆', status: '未命中', items: [] };
     const worldbook = slip.worldbook || { label: '世界书', status: '未命中', entries: [] };
-    const dogtalk = slip.dogtalk || { label: '人类思考链', status: '未递给', context: '' };
+    const humanThought = slip.humanThought || { label: '人类思考链', status: '未递给', context: '' };
     const crossWindow = slip.cross_window || { label: '跨窗口取信', status: '未递给', mode: 'off', sources: [], messages: [] };
     const workbench = slip.workbench || { label: '工具调用记录', status: '未递给', model_visible_tools: [], backend_tools: [], core_tools: [], side_tools: [], furniture: [], prompt_delivered: false, prompt: '', tool_results: [], labels: {} };
     const attachments = slip.attachments || null;
@@ -216,9 +216,9 @@ export function createDesk({ router, toast }) {
       toolsLine(labels.backend_tools || '后端可用工具', workbench.backend_tools),
       `<p><b>工作台提示：</b>${workbench.prompt_delivered ? '已递给' : '未递给'}</p>`,
       workbench.prompt ? deskText(workbench.prompt, '工作台提示') : '',
-      workbench.furniture?.length ? `<p><b>本轮使用：</b>${escapeHtml(workbench.furniture.join('、'))}</p>` : '',
+      workbench.tools_used?.length ? `<p><b>本轮工具：</b>${escapeHtml(workbench.tools_used.join('、'))}</p>` : '',
       toolResultDetails(workbench.tool_results),
-      !workbench.prompt_delivered && !workbench.furniture?.length && !workbench.tool_results?.length ? emptyNote() : '',
+      !workbench.prompt_delivered && !workbench.tools_used?.length && !workbench.tool_results?.length ? emptyNote() : '',
     ].join('');
     return {
       title: '本轮上下文预览', subtitle: slip.comfort || '只看这一轮实际递给模型的内容', className: 'desk-slip-panel',
@@ -238,7 +238,7 @@ export function createDesk({ router, toast }) {
         ${deskRow(soil.label || '整理当前对话的纸条', soil.status, soilDetail)}
         ${deskRow(memory.label || '相关记忆', memoryStatus, [sourceNote(memory.description), memoryDeskDetails(memory.items)].join(''))}
         ${deskRow(worldbook.label || '世界书', worldbookStatus, [sourceNote(worldbook.description), worldbookDeskDetails(worldbook.entries)].join(''))}
-        ${deskRow(dogtalk.label || '人类思考链', dogtalk.status, [sourceNote(dogtalk.description), dogtalk.delivered ? deskText(dogtalk.context) : emptyNote()].join(''))}
+        ${deskRow(humanThought.label || '人类思考链', humanThought.status, [sourceNote(humanThought.description), humanThought.delivered ? deskText(humanThought.context) : emptyNote()].join(''))}
         ${deskRow(crossWindow.label || '跨窗口取信', crossWindowStatus, crossWindowDeskDetails(crossWindow))}
         ${attachments ? deskRow('本轮附件', `上传 ${Number(attachments.uploaded || 0)} · 递给 ${Number(attachments.delivered_to_model || 0)}`, attachmentDeskDetails(attachments)) : ''}
         ${webSearch ? deskRow('本轮搜索', webSearch.available === false
