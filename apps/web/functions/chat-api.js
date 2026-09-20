@@ -1,5 +1,6 @@
 import { apiError, isRequestBodyError, json, methodNotAllowed, readJson, requestBodyError, unexpectedApiError } from './http.js';
 import { OwnerAccessError, requireOwnerSession } from './owner-access.js';
+import { ModelRequestError, performFormalChat } from './models.js';
 import {
   ChatStoreError, createConversation, deleteConversation, listConversations,
   readConversationState, readOwnerProfile, setGeneratedTitle, updateConversation,
@@ -28,7 +29,13 @@ export async function routeChatApi(request, env, session = null) {
 
     if (url.pathname === ROOT) {
       if (request.method !== 'POST') return methodNotAllowed('POST');
-      return apiError('model_provider_not_configured', 'Source preview has no model provider configured yet.', 503);
+      const value = await readJson(request);
+      const result = await performFormalChat(env, value, { allowSystem: false, captureMetadata: false });
+      return json({
+        ...result,
+        tool_runs: [],
+        memory: { selected_entry_ids: [] },
+      });
     }
     if (url.pathname === PROFILE) {
       if (request.method === 'GET') return json({ ok: true, profile: await readOwnerProfile(env.COAST_CHAT_DB) });
@@ -63,7 +70,7 @@ export async function routeChatApi(request, env, session = null) {
     }
     return apiError('not_found', 'Not found.', 404);
   } catch (error) {
-    if (error instanceof ChatStoreError || error instanceof OwnerAccessError) return apiError(error.type, error.message, error.status);
+    if (error instanceof ChatStoreError || error instanceof OwnerAccessError || error instanceof ModelRequestError) return apiError(error.type, error.message, error.status, error.details || {});
     if (isRequestBodyError(error)) {
       const mapped = requestBodyError(error);
       return apiError(mapped.type, mapped.message, mapped.status);

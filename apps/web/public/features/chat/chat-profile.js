@@ -1,4 +1,4 @@
-export const DEFAULT_MODEL = 'openai/gpt-4.1-nano';
+export const DEFAULT_MODEL = '';
 
 export { shortModelName } from '../../core/model-format.js';
 

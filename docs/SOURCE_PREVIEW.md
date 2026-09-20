@@ -16,9 +16,10 @@ Optional model provider binding:
 
 - Secret: `OPENROUTER_API_KEY`
 
-Without a model provider key, the PWA shell, owner login, chat window storage, Visitor Mailbox,
-human thought chain, memory views, dictionary, context preview UI, and source workbench can still
-be inspected. Sending a model-generation request returns an explicit provider-not-configured error.
+With an OpenRouter key, the basic chat route uses the source-safe formal chat core and chooses an
+available catalog model when no model is pinned. Without a provider key, the PWA shell, owner login,
+chat window storage, Visitor Mailbox, human thought chain, memory views, dictionary, context preview
+UI, and source workbench can still be inspected; model generation returns an explicit auth error.
 
 The source repository does not include production URLs, production database identifiers,
 production secrets, production signing material, private assets, or a production update chain.
