@@ -8,6 +8,7 @@ import { isOwnerMailboxApiPath, routeOwnerMailboxApi } from './owner-mailbox-api
 import { isSnapshotApiPath, routeSnapshotApi } from './snapshot-api.js';
 import { isWorkbenchApiPath, routeWorkbenchApi } from './workbench-api.js';
 import { isWorldbookApiPath, routeWorldbookApi } from './worldbook-api.js';
+import { isWidgetApiPath, routeWidgetApi } from './widget-api.js';
 import { handleModels } from './models.js';
 
 export async function routeApi(request, env, session) {
@@ -22,5 +23,6 @@ export async function routeApi(request, env, session) {
   if (isSnapshotApiPath(pathname)) return routeSnapshotApi(request, env, session);
   if (isWorkbenchApiPath(pathname)) return routeWorkbenchApi(request, env, session);
   if (isWorldbookApiPath(pathname)) return routeWorldbookApi(request, env, session);
+  if (isWidgetApiPath(pathname)) return routeWidgetApi(request, env, session);
   return apiError('not_found', 'Not found.', 404);
 }
