@@ -108,6 +108,8 @@ export function createSourcePages({router,storage,shell,toast}){
   router.register('owner-settings',ownerView);
   router.register('theme-settings',themeView);
   router.register('widgets-home',widgetsView);
+  router.register('run-settings',runSettingsView);
+  router.register('integrations',integrationsView);
   async function handleAction(name,target){
     if(name==='open-settings')return router.open('owner-settings');
     if(name==='themes')return router.open('theme-settings');
@@ -124,8 +126,23 @@ export function createSourcePages({router,storage,shell,toast}){
     if(name==='export-snapshot'){globalThis.location?.assign?.(API.v1Snapshot);}
   }
   async function handleSubmit(name,target){
-    if(name!=='names')return;
     const data=new FormData(target);
+    if(name==='run-settings'){
+      storage.update((state)=>{
+        const integerFields=['recentTurns','contextBudget','maxOutputTokens','soilBudget','seedCooldownTurns','worldbookLimit','memoryLimit'];
+        for(const field of integerFields){
+          const value=Number(data.get(field));
+          if(Number.isFinite(value)&&value>=0)state.runControl[field]=Math.trunc(value);
+        }
+        state.runControl.outputLength=['auto','short','long'].includes(String(data.get('outputLength')))?String(data.get('outputLength')):'auto';
+        state.runControl.creativity=['precise','balanced','expansive'].includes(String(data.get('creativity')))?String(data.get('creativity')):'balanced';
+        state.runControl.streamingEnabled=String(data.get('streamingEnabled'))==='true';
+        state.runControl.worldbookEnabled=String(data.get('worldbookEnabled'))==='true';
+      });
+      toast('运行参数已保存');
+      return router.refresh({preserveScroll:true});
+    }
+    if(name!=='names')return;
     storage.update((state)=>{
       state.preferences.ownerName=String(data.get('ownerName')||'Owner').trim().slice(0,80)||'Owner';
       state.preferences.modelPartnerName=String(data.get('modelPartnerName')||'Model Partner').trim().slice(0,80)||'Model Partner';

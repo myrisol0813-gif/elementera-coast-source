@@ -24,7 +24,7 @@ export function pickRunSettings(value = {}) {
 export function chatRequestContext(runSettings, recallHistory, conversationId) {
   const current = pickRunSettings(runSettings() || {});
   const maxTokens = replyTokenBudget(current.outputLength);
-  const temperature = current.creativity === 'stable' ? 0.3 : current.creativity === 'expansive' ? 1 : 0.7;
+  const temperature = ['stable','precise'].includes(current.creativity) ? 0.3 : current.creativity === 'expansive' ? 1 : 0.7;
   const cooldown = Math.min(8, Math.max(0, Number(current.seedCooldownTurns ?? 2)));
   return {
     settings: { ...current, max_tokens: maxTokens, temperature },
