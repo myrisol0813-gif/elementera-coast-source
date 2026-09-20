@@ -28,17 +28,17 @@ Set your own:
 
 Do not commit `.dev.vars`.
 
-`COAST_CHAT_DB` is not a secret string. It is the D1 binding name expected by the source code.
+## 2. Local-only D1
 
-## 2. Create a source D1 database
+The repository includes:
 
-Create a new D1 database you control:
-
-```bash
-npx wrangler d1 create elementera-coast-source-local
+```text
+apps/web/wrangler.local.jsonc
 ```
 
-Keep the resulting database id for your own deployment. Do not substitute a private production database.
+It binds `COAST_CHAT_DB` to a local D1 simulation using a placeholder id. It exists only for local preview and smoke testing.
+
+Do not replace it with, or point it at, a private/production database. Do not deploy it as the real Pages project configuration.
 
 ## 3. Run locally
 
@@ -46,8 +46,8 @@ From the repository root:
 
 ```bash
 npx wrangler pages dev apps/web \
-  --env-file .dev.vars \
-  --d1 COAST_CHAT_DB=<YOUR_D1_DATABASE_ID>
+  --config apps/web/wrangler.local.jsonc \
+  --env-file .dev.vars
 ```
 
 Wrangler normally serves the Pages project at `http://localhost:8788`.
@@ -71,7 +71,7 @@ Check:
 
 Use `apps/web` as the Pages static + Functions root.
 
-Configure a new D1 binding named `COAST_CHAT_DB`. Configure owner access secrets and optional OpenRouter values for the deployment.
+Create a new D1 database for the self-hosted deployment and bind it as `COAST_CHAT_DB` in the Cloudflare Pages project. Configure owner access secrets and optional OpenRouter values for that deployment.
 
 Preview and production environments should use resources created for that self-hosted project.
 
