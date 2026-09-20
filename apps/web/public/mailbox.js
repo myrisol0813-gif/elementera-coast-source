@@ -1,7 +1,10 @@
 import { API, ApiError, requestJson } from './core/api.js';
-import { confirmDanger } from './core/danger.js';
 import { escapeAttribute, escapeHtml, formatRichText, q } from './core/dom.js';
 import { hydrateIconSlots, icon } from './core/icons.js';
+
+async function confirmDanger({ title = '', message = '' } = {}) {
+  return window.confirm([title, message].filter(Boolean).join('\n\n'));
+}
 
 function emptyThoughtSoil(visitorId = '') {
   return {
