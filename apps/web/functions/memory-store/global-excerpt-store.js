@@ -1,11 +1,11 @@
 import { MemoryStoreError, all, bool, first, iso, run } from './memory-db.js';
 
 export const GLOBAL_EXCERPT_ID = 'global';
-export const GLOBAL_EXCERPT_WRITE_GUIDANCE = `Global Excerpt / Core Reflection is a long-form, user-approved document for stable, high-priority context. It may describe the assistant's long-term conversational presence, values, tone, boundaries, memory rules, and understanding of the user or project.
+export const GLOBAL_EXCERPT_WRITE_GUIDANCE = `Global Excerpt / Core Reflection is a long-form, user-approved document for stable, high-priority context. It may describe the model partner's long-term conversational presence, values, tone, boundaries, memory rules, and understanding of the user or project.
 
-It is not a chat summary, a memory list, or a place for temporary jokes and ordinary preferences. The assistant may propose changes only when a conversation creates a meaningful long-term shift. Changes should be reviewed by the user before they become part of the main text.`;
+It is not a chat summary, a memory list, or a place for temporary jokes and ordinary preferences. The model partner may propose changes only when a conversation creates a meaningful long-term shift. Changes should be reviewed by the user before they become part of the main text.`;
 
-export const GLOBAL_EXCERPT_INITIAL_TEXT = `This is a placeholder for your assistant's Core Reflection.
+export const GLOBAL_EXCERPT_INITIAL_TEXT = `This is a placeholder for your model partner's Core Reflection.
 
 Write the stable context that this model should be able to read across sessions: how it speaks, what it values, how it handles distance or closeness, how it should treat the user, how it uses memory, and what boundaries it should keep.
 

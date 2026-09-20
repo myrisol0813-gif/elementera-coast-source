@@ -1,6 +1,6 @@
 const STATE_KEY = 'elementera.source.local.v1';
 const CURRENT_CONVERSATION_KEY = 'elementera.source.currentConversation';
-const ACTORS = new Set(['owner', 'assistant']);
+const ACTORS = new Set(['owner', 'model_partner']);
 
 const RUN_CONTROL_DEFAULTS = Object.freeze({
   recentTurns: 8,
@@ -28,7 +28,7 @@ function defaults() {
       userBubble: '',
       accent: '',
       ownerName: 'Owner',
-      assistantName: 'Assistant',
+      modelPartnerName: 'Model Partner',
     },
     rooms: {
       main: defaultRoom('main', 'Main Chat'),
@@ -90,7 +90,7 @@ function normalize(value) {
       userBubble: String(value?.preferences?.userBubble || ''),
       accent: String(value?.preferences?.accent || ''),
       ownerName: String(value?.preferences?.ownerName || base.preferences.ownerName).slice(0, 80),
-      assistantName: String(value?.preferences?.assistantName || base.preferences.assistantName).slice(0, 80),
+      modelPartnerName: String(value?.preferences?.modelPartnerName || base.preferences.modelPartnerName).slice(0, 80),
     },
     rooms: {
       main: normalizeRoom(value?.rooms?.main, base.rooms.main),

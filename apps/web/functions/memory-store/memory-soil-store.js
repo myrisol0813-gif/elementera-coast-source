@@ -1,5 +1,5 @@
 import { getConversation, sanitizeId } from '../chat-store.js';
-import { apiAssistantIdentity, ownerIdentity, validateCoastIdentity } from '../coast-identity.js';
+import { apiModelPartnerIdentity, ownerIdentity, validateCoastIdentity } from '../coast-identity.js';
 import { MemoryStoreError, bool, clip, first, iso, parseJson, run } from './memory-db.js';
 import {
   MAX_SOIL_TEXT,
@@ -69,8 +69,8 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
   };
   const identity = provenance.identity
     ? validateCoastIdentity(provenance.identity)
-    : automatic ? apiAssistantIdentity({
-      model_label: provenance.model_label || current.model_label || 'Assistant',
+    : automatic ? apiModelPartnerIdentity({
+      model_label: provenance.model_label || current.model_label || 'Model Partner',
       model_nickname: provenance.model_nickname,
     })
     : ownerIdentity();

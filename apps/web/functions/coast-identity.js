@@ -1,4 +1,4 @@
-const ACTORS = new Set(['owner', 'assistant']);
+const ACTORS = new Set(['owner', 'model_partner']);
 const SURFACES = new Set(['web_manual', 'source_api', 'official_mcp']);
 const SURFACE_SYMBOLS = Object.freeze({
   web_manual: '',
@@ -19,14 +19,14 @@ function officialDisplayName(modelLabel, modelNickname = '') {
   if (nickname && !core.toLocaleLowerCase('en-US').includes(nickname.toLocaleLowerCase('en-US'))) {
     core = `${core} ${nickname}`;
   }
-  return `Assistant-${core}≋`;
+  return `Model Partner-${core}≋`;
 }
 
 export function officialMcpIdentity(value = {}) {
   const modelLabel = clip(value.model_label ?? value.modelLabel, 120);
   const modelNickname = clip(value.model_nickname ?? value.modelNickname, 60);
   return Object.freeze({
-    actor: 'assistant',
+    actor: 'model_partner',
     surface: 'official_mcp',
     model_label: modelLabel,
     model_nickname: modelNickname || null,
@@ -35,16 +35,16 @@ export function officialMcpIdentity(value = {}) {
   });
 }
 
-export function apiAssistantIdentity(value = {}) {
+export function apiModelPartnerIdentity(value = {}) {
   const modelLabel = clip(value.model_label ?? value.modelLabel, 180);
   if (!modelLabel) throw new TypeError('source_api requires model_label');
   return Object.freeze({
-    actor: 'assistant',
+    actor: 'model_partner',
     surface: 'source_api',
     model_label: modelLabel,
     model_nickname: clip(value.model_nickname ?? value.modelNickname, 60) || null,
     symbol: SURFACE_SYMBOLS.source_api,
-    display_author: 'Assistant',
+    display_author: 'Model Partner',
   });
 }
 
@@ -67,8 +67,8 @@ export function validateCoastIdentity(value = {}) {
   if (!ACTORS.has(actor) || !SURFACES.has(surface)) throw new TypeError('invalid source identity');
   if (SURFACE_SYMBOLS[surface] !== symbol) throw new TypeError('surface symbol mismatch');
   if (surface === 'web_manual' && actor !== 'owner') throw new TypeError('web_manual must be owner');
-  if (surface !== 'web_manual' && actor !== 'assistant') throw new TypeError(`${surface} must be assistant`);
-  if (surface === 'official_mcp' && (!value.model_label || !displayAuthor.startsWith('Assistant-') || !displayAuthor.endsWith('≋'))) {
+  if (surface !== 'web_manual' && actor !== 'model_partner') throw new TypeError(`${surface} must be model_partner`);
+  if (surface === 'official_mcp' && (!value.model_label || !displayAuthor.startsWith('Model Partner-') || !displayAuthor.endsWith('≋'))) {
     throw new TypeError('invalid official_mcp signature');
   }
   if (surface === 'source_api' && (!value.model_label || symbol !== '✦')) {

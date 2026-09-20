@@ -66,7 +66,7 @@ export function normalizeCandidateSourceRef(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const turnId = clip(value.turn_id ?? value.turnId, 160);
   const role = String(value.role || '').trim();
-  if (!turnId || !['user', 'assistant', 'turn'].includes(role)) return null;
+  if (!turnId || !['owner', 'model_partner', 'turn'].includes(role)) return null;
   return { turn_id: turnId, role };
 }
 
