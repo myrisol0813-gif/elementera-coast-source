@@ -1,4 +1,4 @@
-import { readConversationState, readProfile } from '../chat-store.js';
+import { readConversationState, readOwnerProfile } from '../chat-store.js';
 import { safeLogError } from '../http.js';
 import { soilSettings } from '../memory-config.js';
 import {
@@ -348,7 +348,7 @@ export async function organizeConversationSoil(env, conversationId, value) {
   let organizedBy = null;
   let degradedReason = '';
   try {
-    const profile = await readProfile(env.COAST_CHAT_DB);
+    const profile = await readOwnerProfile(env.COAST_CHAT_DB);
     const modelId = requestedModel || profile.current_chat_model || 'openai/gpt-4.1-nano';
     const basePrompt = soilPrompt(turns, oldSoil, settings.maxHandSeeds, { landing });
     let lastJsonError = null;
