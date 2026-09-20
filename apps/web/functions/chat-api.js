@@ -21,10 +21,11 @@ const PROFILE = '/api/chat/profile';
 const TITLE = '/api/chat/title';
 const ATTACHMENTS = '/api/chat/attachments';
 const METADATA = '/api/chat/message-metadata';
+const LANDING = '/api/chat/landing-letter';
 
 export function isChatApiPath(pathname) {
   return pathname === ROOT || pathname === CONVERSATIONS || pathname === HISTORY
-    || pathname === PROFILE || pathname === TITLE || pathname === METADATA
+    || pathname === PROFILE || pathname === TITLE || pathname === METADATA || pathname === LANDING
     || pathname === ATTACHMENTS || pathname.startsWith(`${ATTACHMENTS}/`)
     || pathname.startsWith(`${CONVERSATIONS}/`);
 }
@@ -75,6 +76,60 @@ async function formalChat(request, env) {
     ...(attachmentReceipt ? { desk_slip:{ summary:'本轮上下文', comfort:'source-safe', attachments:attachmentReceipt } } : {}),
   });
 }
+function activeHistoryMessages(state) {
+  const messages = [];
+  for (const turn of Array.isArray(state?.turns) ? state.turns : []) {
+    const owners = Array.isArray(turn?.owner?.variants) ? turn.owner.variants : [];
+    const ownerIndex = Math.min(Math.max(0, Number(turn?.owner?.active || 0)), Math.max(0, owners.length - 1));
+    const owner = owners[ownerIndex];
+    const partners = turn?.model_partner?.variantsByOwnerVariant?.[String(ownerIndex)] || [];
+    const partnerIndex = Math.min(Math.max(0, Number(turn?.model_partner?.activeByOwnerVariant?.[String(ownerIndex)] || 0)), Math.max(0, partners.length - 1));
+    const modelPartner = partners[partnerIndex];
+    if (owner?.content) messages.push({ role:'user', content:owner.content });
+    if (modelPartner?.content) messages.push({ role:'assistant', content:modelPartner.content });
+  }
+  return messages.slice(-40);
+}
+async function landingExchange(request, env) {
+  if (request.method !== 'POST') return methodNotAllowed('POST');
+  const value = await readJson(request);
+  const conversationId = String(value.conversation_id || '');
+  const letterText = String(value.letter_text || '').trim().slice(0, 12000);
+  if (!conversationId || !letterText) return apiError('invalid_request', '请提供聊天窗口与启动说明。', 400);
+  const state = await readConversationState(env.COAST_CHAT_DB, conversationId);
+  const result = await performFormalChat(env, {
+    model:value.model,
+    messages:[...activeHistoryMessages(state), { role:'user', content:letterText }],
+    settings:value.settings || {},
+  }, { allowSystem:false, captureMetadata:true });
+  const now = new Date().toISOString();
+  const turnId = `turn_${crypto.randomUUID()}`;
+  const ownerId = `owner_${crypto.randomUUID()}`;
+  const modelPartnerId = `model_partner_${crypto.randomUUID()}`;
+  const turns = Array.isArray(state?.turns) ? [...state.turns] : [];
+  turns.push({
+    id:turnId,
+    turn_type:'landing',
+    model_id:String(result.model || value.model || ''),
+    owner:{ active:0, variants:[{ id:ownerId, content:letterText, created_at:now, input_type:'landing_letter', message_source:'owner_web', display_author:'Owner' }] },
+    model_partner:{ activeByOwnerVariant:{0:0}, variantsByOwnerVariant:{0:[{ id:modelPartnerId, content:result.message?.content || '', created_at:now, model_id:String(result.model || ''), usage:result.usage || undefined, finish_reason:result.finish_reason || '', generation_source:'landing' }] } },
+  });
+  const history = { version:4, updated_at:now, turns:turns.slice(-400) };
+  await writeConversationState(env.COAST_CHAT_DB, conversationId, history);
+  if (result.model_metadata) await writeMessageModelMetadata(env.COAST_CHAT_DB, conversationId, modelPartnerId, result.model_metadata).catch(() => undefined);
+  const conversation = (await listConversations(env.COAST_CHAT_DB)).find((item) => item.id === conversationId) || null;
+  return json({
+    ok:true,
+    conversation,
+    history,
+    model:result.model || value.model || '',
+    model_partner:{ id:modelPartnerId, content:result.message?.content || '', model_id:String(result.model || '') },
+    usage:result.usage || null,
+    finish_reason:result.finish_reason || null,
+    memory:{ selected_entry_ids:[] },
+    desk_slip:{ summary:'本轮上下文', comfort:'source-safe landing exchange' },
+  });
+}
 export async function routeChatApi(request, env, session = null) {
   const url = new URL(request.url);
   try {
@@ -82,6 +137,7 @@ export async function routeChatApi(request, env, session = null) {
     if (!env?.COAST_CHAT_DB?.prepare) return apiError('chat_db_not_configured', 'Chat database is not configured.', 503);
     if (url.pathname === ROOT) return formalChat(request, env);
     if (url.pathname === METADATA) return modelMetadataApi(request, env);
+    if (url.pathname === LANDING) return landingExchange(request, env);
     if (url.pathname === ATTACHMENTS || url.pathname.startsWith(`${ATTACHMENTS}/`)) return routeAttachmentRequest(request, env, url);
     if (url.pathname === PROFILE) {
       if (request.method === 'GET') return json({ ok:true, profile:await readOwnerProfile(env.COAST_CHAT_DB) });
