@@ -21,7 +21,7 @@ export function createChatActions({
   send,
   newConversation,
   openRoomType,
-  refreshFromCoast,
+  refreshFromSource,
   toggleMenu,
   loadConversation,
   renameConversation,
@@ -62,7 +62,7 @@ export function createChatActions({
     const conversationId = target.dataset.id;
     if (name === 'composer-primary') return submitComposer();
     if (name === 'new') return newConversation();
-    if (name === 'refresh') return refreshFromCoast();
+    if (name === 'refresh') return refreshFromSource();
     if (name === 'open-type') return openRoomType(target.dataset.kind || 'main');
     if (['attachments-menu', 'attachment-image', 'attachment-file', 'attachment-remove'].includes(name)) {
       return attachments?.handleAction?.(name, target);
@@ -93,8 +93,8 @@ export function createChatActions({
     if (name === 'edit-owner') {
       const turn = currentHistory().turns.find((item) => item.id === turnId);
       const branch = turn ? activeBranch(turn) : null;
-      const content = prompt('编辑消息', branch?.user?.content || '');
-      if (content == null || content === branch?.user?.content) return;
+      const content = prompt('编辑消息', branch?.owner?.content || '');
+      if (content == null || content === branch?.owner?.content) return;
       const edited = editOwnerVariant(currentHistory(), turnId, content);
       setHistory(runtime.currentId, edited.state);
       renderMessages();

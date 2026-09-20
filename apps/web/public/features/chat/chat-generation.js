@@ -114,7 +114,7 @@ export function createChatGeneration({
       local_datetime: localDateTimeKey(),
       model: modelId,
       messages: contextMessages(appended.state, turnId),
-      attachment_ids: (activeBranch(appended.turn).user?.attachments || []).map((item) => item.id),
+      attachment_ids: (activeBranch(appended.turn).owner?.attachments || []).map((item) => item.id),
       recent_entry_ids: requestContext.recentEntryIds,
       settings: requestContext.settings,
       ...(humanThoughtSubmission ? { humanThought: humanThoughtSubmission } : {}),

@@ -16,12 +16,12 @@ export function createChatTitleLanding({
     if (!conversation || conversation.title_manual || conversation.title_generated_at) return;
     const turn = history.turns.find((item) => item.id === turnId);
     const branch = turn ? activeBranch(turn) : null;
-    if (branch?.user?.hidden) return;
+    if (branch?.owner?.hidden) return;
     const data = await requestJson(API.title, {
       method: 'POST',
       body: JSON.stringify({
         conversation_id: conversationId,
-        user: branch?.user?.content || '',
+        owner: branch?.owner?.content || '',
         model_partner: branch?.modelPartner?.content || '',
       }),
     });

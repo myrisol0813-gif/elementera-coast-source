@@ -140,17 +140,17 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
         && runtime.generation.turnId === turn.id
         && runtime.generation.ownerIndex === branch.ownerIndex
         && runtime.generation.modelPartnerIndex === branch.modelPartnerIndex;
-      const userAttachment = [
+      const ownerAttachment = [
         renderMessageAttachments(branch.owner?.attachments || [], conversationId),
         branch.owner?.id ? '' : '',
       ].join('');
       const modelPartnerAttachment = '';
-      const userImported = branch.owner?.message_source === 'rikkahub';
+      const ownerImported = branch.owner?.message_source === 'external';
       const modelPartnerImported = branch.modelPartner?.message_source === 'external';
       const owner = branch.owner && !branch.owner.hidden
         ? branch.owner.message_source === 'official_mcp'
-          ? officialMcpLetter(branch.owner, turn.id, userAttachment)
-          : `<article class="message owner ${userImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}"><div class="content">${branch.owner.content ? `<div class="user-bubble">${escapeHtml(branch.owner.content)}</div>` : ''}${userAttachment}${userImported ? '<span class="message-humanThought-mark">外部入口消息</span>' : ''}${branch.owner.humanThought_snapshot_id ? '<span class="message-humanThought-mark">人类思考链 · 随本轮</span>' : ''}<div class="message-actions">${actionButton('edit-owner', '编辑')}${actionButton('delete-owner', '删除')}${variantControl('owner', turn.id, branch.ownerIndex, turn.owner.variants.length)}</div></div></article>`
+          ? officialMcpLetter(branch.owner, turn.id, ownerAttachment)
+          : `<article class="message owner ${ownerImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}"><div class="content">${branch.owner.content ? `<div class="user-bubble">${escapeHtml(branch.owner.content)}</div>` : ''}${ownerAttachment}${ownerImported ? '<span class="message-humanThought-mark">外部入口消息</span>' : ''}${branch.owner.humanThought_snapshot_id ? '<span class="message-humanThought-mark">人类思考链 · 随本轮</span>' : ''}<div class="message-actions">${actionButton('edit-owner', '编辑')}${actionButton('delete-owner', '删除')}${variantControl('owner', turn.id, branch.ownerIndex, turn.owner.variants.length)}</div></div></article>`
         : '';
       const modelPartner = branch.modelPartner ? `<article class="message model-partner ${modelPartnerImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}" data-message-id="${escapeAttribute(branch.modelPartner.id || '')}"><button class="avatar" type="button" data-action="settings:avatar" aria-label="更换另一位屋主头像"></button><div class="content">${renderToolRuns(branch.modelPartner.tool_runs, { conversationId })}<div class="model-partner-text">${formatRichText(branch.modelPartner.content)}${branch.modelPartner.errorDetail ? `<span class="message-error">${escapeHtml(branch.modelPartner.errorDetail)}</span>` : ''}${loading ? '<span class="typing-cursor"></span>' : ''}</div>${modelPartnerAttachment}${modelPartnerImported ? `<span class="message-humanThought-mark">外部入口消息${branch.modelPartner.model_id ? ` · ${escapeHtml(shortModelName(branch.modelPartner.model_id))}` : ''}</span>` : ''}<div class="message-actions">${actionButton('copy', '复制')}${actionButton('like', '点赞', { active: branch.modelPartner.liked, reaction: 'liked' })}${actionButton('regenerate', '重新生成')}${actionButton('favorite', '收藏', { active: branch.modelPartner.favorite, reaction: 'favorite' })}${actionButton('delete-model-partner', '删除')}${variantControl('model_partner', turn.id, branch.modelPartnerIndex, branch.modelPartners.length)}${generationFootprint(branch.modelPartner, turn.id)}</div>${loading ? '' : renderModelMetadataTrace(branch.modelPartner, conversationId)}</div></article>` : '';
       const soil = branch.modelPartner && turn.id === latestModelPartnerTurnId ? runtime.memory?.renderSoilEntry(conversationId) || '' : '';
