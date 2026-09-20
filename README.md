@@ -29,3 +29,8 @@ See `LICENSE` for the license reference.
 ## Production isolation
 
 This source repository must not connect to the production Elementera Coast instance by default. Production application identifiers, update chains, release tags, signing configuration, signing secrets, private assets, private data, and production deployment settings are not part of the public source baseline.
+
+
+## Source preview
+
+See `docs/SOURCE_PREVIEW.md` for the current self-hosted PWA and Native source baseline.
