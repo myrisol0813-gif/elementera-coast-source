@@ -47,7 +47,7 @@ Optional default model id. It is used when a chat request does not explicitly ch
 Copy the root template:
 
 ```bash
-cp .env.example .dev.vars
+cp .env.example apps/web/.dev.vars
 ```
 
 Do not commit `.dev.vars`, `.env`, keys, database identifiers or other deployment credentials.
