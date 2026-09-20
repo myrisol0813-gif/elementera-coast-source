@@ -98,7 +98,7 @@ export function createShell({ storage }) {
   function activeAction(route) {
     const name = route?.name || '';
     if (DAILY_ROUTES.has(name)) return 'daily:home';
-    if (name === 'widgets-home') return 'sourcepages:open-widgets';
+    if (name === 'widgets-home' || name.startsWith('widget-')) return 'sourcepages:open-widgets';
     if (['owner-settings','theme-settings','run-settings','integrations'].includes(name)) return 'sourcepages:open-settings';
     if (name === 'dev-hands-home') return 'devhands:open';
     if (name === 'toolroom') return 'toolroom:open';

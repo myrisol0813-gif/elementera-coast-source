@@ -110,7 +110,7 @@ export function createSourcePages({router,storage,shell,toast}){
       subtitle:'source 运行概览',
       className:'source-pages',
       headerAction:'<button class="feature-head-action" type="button" data-action="sourcepages:refresh-widgets">刷新</button>',
-      body:`<div class="widget-grid">
+      body:`<section class="daily-grid"><button type="button" data-action="widgets:moments"><span>◌</span><strong>短帖</strong><small>简短记录</small></button><button type="button" data-action="widgets:diaries"><span>□</span><strong>日记</strong><small>长文本记录</small></button></section><div class="widget-grid">
         <section><small>聊天数据源</small><strong>${sourceStatus?.database?'已连接':'未连接'}</strong><p>COAST_CHAT_DB</p></section>
         <section><small>主题</small><strong>${escapeHtml(themeLabel(state.preferences.theme))}</strong><p>本机界面配置</p></section>
         <section><small>上下文预算</small><strong>${escapeHtml(run.contextBudget)} tokens</strong><p>本轮上下文 · 已在预算内</p></section>

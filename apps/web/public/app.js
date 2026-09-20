@@ -13,6 +13,7 @@ import { createToolroom } from './features/toolroom.js';
 import { createDevHands } from './features/dev-hands.js';
 import { createExternalEntry } from './features/external-entry.js';
 import { createModels } from './features/models.js';
+import { createWidgets } from './features/widgets.js';
 
 const storage = createStorage();
 let toastTimer = 0;
@@ -41,6 +42,7 @@ const humanThought = createHumanThought({ toast });
 const chat = createChat({ storage, toast, humanThought });
 const toolroom = createToolroom({ router, chat });
 const models = createModels({ chat, router, toast });
+const widgets = createWidgets({ router, toast });
 const memory = createMemory({ chat, router, toast, storage });
 const desk = createDesk({ chat, router, toast });
 chat.setMemoryController(memory);
@@ -55,7 +57,7 @@ const routerOwner = Object.freeze({
   mount() {}, refresh() {}, destroy() {},
 });
 const eventSpine = createEventSpine({
-  owners: Object.freeze([routerOwner, shell, chat, models, memory, desk, devHands, toolroom, externalEntry, sourcePages, humanThought]),
+  owners: Object.freeze([routerOwner, shell, chat, models, memory, desk, widgets, devHands, toolroom, externalEntry, sourcePages, humanThought]),
   onError(error, context) {
     console.error(`[${context.route || context.eventType || 'event-spine'}]`, error);
     toast(error?.message || '操作失败，请稍后重试。');
