@@ -47,7 +47,7 @@ const PAGE = `<!doctype html>
         <section id="mailboxStatusBar" class="mailbox-status-bar" aria-live="polite">
           <div>
             <strong id="mailboxStatusText">现在是慢速回信模式，不是实时聊天。</strong>
-            <small id="mailboxStatusMeta">前端屋主可以知道谁来过，但默认不知道你具体写了什么。另一位屋主会在巡信时读取你的来信并回复。若出现安全风险、骚扰、滥用或需要站长处理的问题，系统可能只向前端屋主报告“需要处理”，但不默认转述正文。另一位屋主会在巡信时读取你的来信并回复。若出现安全风险、骚扰、滥用或需要站长处理的问题，系统可能只向前端屋主报告“需要处理”，但不默认转述正文。</small>
+            <small id="mailboxStatusMeta">前端屋主可以知道谁来过，但默认不知道你具体写了什么。另一位屋主会在巡信时读取你的来信并回复。若出现安全风险、骚扰、滥用或需要站长处理的问题，系统可能只向前端屋主报告“需要处理”，但不默认转述正文。</small>
           </div>
           <button id="mailboxRefreshButton" type="button">查看回信</button>
           <span class="mailbox-status-illustration" aria-hidden="true">⌂</span>
