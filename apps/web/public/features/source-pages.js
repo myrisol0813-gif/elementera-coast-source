@@ -2,7 +2,7 @@ import { API, requestJson } from '../core/api.js';
 import { escapeAttribute, escapeHtml } from '../core/dom.js';
 import { THEME_PRESETS, themeLabel } from '../core/themes.js';
 
-const ROUTES=new Set(['owner-settings','theme-settings','widgets-home','run-settings','integrations']);
+const ROUTES=new Set(['owner-settings','theme-settings','widgets-home','run-settings','integrations','cross-window-index']);
 function row(title,note,action=''){
   const inner=`<span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(note)}</small></span>`;
   return action
@@ -29,6 +29,7 @@ export function createSourcePages({router,storage,shell,toast}){
           ${row('聊天数据源','已配置共享历史。source 规则使用 COAST_CHAT_DB。')}
           ${row('聊天主链已连接','基础聊天、历史、记忆与工作台按 source 配置运行。')}
           ${row('聊天与上下文设置','回答长度、流式输出、当前对话纸条、记忆与词典。','run-settings')}
+          ${row('跨窗口索引','手动查看其他 source 聊天窗口与近期内容。','cross-window')}
           ${row('GitHub / Notion 通用集成','查看 source adapter contract 与自托管配置状态。','integrations')}
           ${row('导出 source 快照','导出聊天、记忆、纸条、词典、外部入口与脱敏工具日志。','export-snapshot')}
         </div></section>`,
@@ -72,6 +73,21 @@ export function createSourcePages({router,storage,shell,toast}){
       <p class="feature-note">清空当前对话纸条等数据操作仍放在记忆库中；这里仅编辑运行参数，不删除聊天、线索或记忆。</p>`,
     };
   }
+  async function crossWindowView(){
+    const current='';
+    const data=await requestJson(`${API.crossWindowMessages}?current_conversation_id=${encodeURIComponent(current)}`);
+    const sources=Array.isArray(data.sources)?data.sources:[];
+    return {
+      title:'跨窗口索引',
+      subtitle:'屋主 · 人类思考链 / 跨窗口索引',
+      className:'source-pages',
+      body:`<p class="feature-note">${escapeHtml(data.description||'')}</p>
+        <div class="cross-window-list">${sources.length?sources.map((source)=>`<section>
+          <header><span><strong>${escapeHtml(source.title||'未命名窗口')}</strong><small>${escapeHtml(source.room_type||'main')} · ${escapeHtml(source.updated_at||'')}</small></span><button type="button" data-action="sourcepages:cross-read" data-id="${escapeAttribute(source.conversation_id)}" ${source.readable?'':'disabled'}>读取最近 4 轮</button></header>
+          <div class="cross-window-preview">${(source.turns||[]).slice(-2).flatMap((turn)=>turn.messages||[]).map((message)=>`<p><b>${message.role==='owner'?'屋主':'另一位屋主'}</b> ${escapeHtml(message.preview||'')}</p>`).join('')||'<p>暂无可读取内容。</p>'}</div>
+        </section>`).join(''):'<p class="feature-empty">还没有其他聊天窗口。</p>'}</div>`,
+    };
+  }
   async function integrationsView(){
     try{sourceStatus=await requestJson(API.devSelfCheck);}catch{sourceStatus=null;}
     const items=sourceStatus?.integrations||[];
@@ -110,12 +126,21 @@ export function createSourcePages({router,storage,shell,toast}){
   router.register('widgets-home',widgetsView);
   router.register('run-settings',runSettingsView);
   router.register('integrations',integrationsView);
+  router.register('cross-window-index',crossWindowView);
   async function handleAction(name,target){
     if(name==='open-settings')return router.open('owner-settings');
     if(name==='themes')return router.open('theme-settings');
     if(name==='open-widgets')return router.open('widgets-home');
     if(name==='run-settings')return router.open('run-settings');
     if(name==='integrations')return router.open('integrations');
+    if(name==='cross-window')return router.open('cross-window-index');
+    if(name==='cross-read'){
+      const id=target?.dataset?.id||'';
+      const data=await requestJson(API.crossWindowRead,{method:'POST',body:JSON.stringify({mode:'manual',sources:[{conversation_id:id,turns:4}]})});
+      const text=(data.items||[]).flatMap((item)=>item.messages||[]).map((message)=>`${message.role==='owner'?'屋主':'另一位屋主'}：${message.content}`).join('\n\n');
+      toast(text?text.slice(0,1200):'这个窗口没有可读取内容。',5200);
+      return;
+    }
     if(name==='theme'){
       shell.setTheme(target?.dataset?.themeId||'default');
       toast('主题已更新');

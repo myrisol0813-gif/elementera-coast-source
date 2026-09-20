@@ -1,5 +1,6 @@
 import { apiError } from './http.js';
 import { isChatApiPath, routeChatApi } from './chat-api.js';
+import { isCrossWindowApiPath, routeCrossWindowApi } from './cross-window-api.js';
 import { isHumanThoughtApiPath, routeHumanThoughtApi } from './human-thought-api.js';
 import { isExternalEntryApiPath, routeExternalEntryApi } from './external-entry-api.js';
 import { isMemoryApiPath, routeMemoryApi } from './memory-router.js';
@@ -12,6 +13,7 @@ import { handleModels } from './models.js';
 export async function routeApi(request, env, session) {
   const pathname = new URL(request.url).pathname;
   if (pathname === '/api/models') return handleModels(request, env);
+  if (isCrossWindowApiPath(pathname)) return routeCrossWindowApi(request, env, session);
   if (isChatApiPath(pathname)) return routeChatApi(request, env, session);
   if (isHumanThoughtApiPath(pathname)) return routeHumanThoughtApi(request, env, session);
   if (isExternalEntryApiPath(pathname)) return routeExternalEntryApi(request, env, session);
