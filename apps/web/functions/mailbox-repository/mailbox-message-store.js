@@ -90,8 +90,6 @@ function detachMessageStatements(db, visitorId, messageId) {
       WHERE visitor_id = ? AND source_message_id = ?`).bind(visitorId, messageId),
     db.prepare(`UPDATE visitor_notebook_entries SET source_message_id = NULL
       WHERE visitor_id = ? AND source_message_id = ?`).bind(visitorId, messageId),
-    db.prepare(`UPDATE mailbox_thinking_notes SET source_message_id = NULL
-      WHERE visitor_id = ? AND source_message_id = ?`).bind(visitorId, messageId),
   ];
 }
 
