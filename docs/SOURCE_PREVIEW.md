@@ -24,7 +24,7 @@ The repository includes `apps/web/wrangler.jsonc` for a local-only D1 simulation
 Example from the repository root:
 
 ```bash
-cp .env.example .dev.vars
+cp .env.example apps/web/.dev.vars
 
 npx wrangler pages dev apps/web \
   --config apps/web/wrangler.jsonc \
