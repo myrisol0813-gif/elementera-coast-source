@@ -9,6 +9,8 @@ import { listWorldbookEntries } from './worldbook.js';
 import { listToolRuns } from './tool-run-log.js';
 import { listExternalMessages } from './external-entry-store.js';
 import { integrationCatalog } from './source-integrations.js';
+import { listChatAttachmentMetadata } from './chat-attachments.js';
+import { listWidgetDiaries, listWidgetMoments } from './widget-store.js';
 
 const V1='/api/export/v1-snapshot';
 const FULL='/api/export/full-archive';
@@ -38,7 +40,7 @@ async function conversationBundle(db,conversation){
 }
 async function buildSnapshot(db,{kind='v1_snapshot'}={}){
   const conversations=await listConversations(db);
-  const [profile,memoryEntries,customInstructions,globalExcerpt,worldbook,toolRuns,externalMessages]=await Promise.all([
+  const [profile,memoryEntries,customInstructions,globalExcerpt,worldbook,toolRuns,externalMessages,attachments,widgetMoments,widgetDiaries]=await Promise.all([
     readOwnerProfile(db),
     allEntries(db),
     readCustomInstructions(db),
@@ -46,6 +48,9 @@ async function buildSnapshot(db,{kind='v1_snapshot'}={}){
     listWorldbookEntries(db,{include_disabled:true}),
     listToolRuns(db,{limit:100}),
     listExternalMessages(db,{limit:200}),
+    listChatAttachmentMetadata(db),
+    listWidgetMoments(db),
+    listWidgetDiaries(db),
   ]);
   const conversationData=[];
   for(const conversation of conversations)conversationData.push(await conversationBundle(db,conversation));
@@ -68,6 +73,8 @@ async function buildSnapshot(db,{kind='v1_snapshot'}={}){
     global_excerpt:globalExcerpt,
     worldbook,
     external_entry_messages:externalMessages,
+    attachment_metadata:attachments,
+    widgets:{moments:widgetMoments,diaries:widgetDiaries},
     tool_run_summaries:toolRuns,
     integration_contracts:integrationCatalog(),
   };

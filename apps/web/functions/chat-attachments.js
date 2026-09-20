@@ -34,6 +34,17 @@ function normalizeIds(ids = []) {
   if (output.length > MAX_ATTACHMENTS_PER_TURN) throw new ChatAttachmentError('too_many_attachments', `每轮最多 ${MAX_ATTACHMENTS_PER_TURN} 个附件。`);
   return output;
 }
+export async function listChatAttachmentMetadata(db) {
+  await ensureChatAttachmentSchema(db);
+  const rows = await all(db, 'SELECT id, conversation_id, turn_id, kind, name, mime, size, created_at, updated_at FROM source_chat_attachments ORDER BY created_at ASC');
+  return rows.map((row) => ({
+    ...metadata(row),
+    conversation_id: String(row.conversation_id || ''),
+    turn_id: String(row.turn_id || ''),
+    updated_at: iso(row.updated_at),
+  }));
+}
+
 export async function ensureChatAttachmentSchema(db) {
   let ready = schemaPromises.get(db);
   if (!ready) {
