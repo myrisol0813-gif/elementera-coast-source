@@ -16,7 +16,7 @@ There is no root `package.json` and no Web build command in the current source b
 From the repository root:
 
 ```bash
-cp .env.example .dev.vars
+cp .env.example apps/web/.dev.vars
 ```
 
 Set your own:
