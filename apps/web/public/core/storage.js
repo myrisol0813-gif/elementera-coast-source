@@ -24,7 +24,7 @@ function defaults() {
   return {
     version: 1,
     preferences: {
-      theme: 'light',
+      theme: 'default',
       userBubble: '',
       accent: '',
       ownerName: 'Owner',

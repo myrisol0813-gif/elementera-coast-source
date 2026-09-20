@@ -1,7 +1,8 @@
 import { q, qa } from '../core/dom.js';
+import { THEME_PRESETS, normalizeThemeId, themeLabel } from '../core/themes.js';
 
-const THEMES = Object.freeze(['light', 'dark', 'gold']);
-const THEME_LABELS = Object.freeze({ light: '浅色', dark: '深色', gold: '黑金' });
+const THEME_IDS = Object.freeze(THEME_PRESETS.map((item)=>item.id));
+const THEME_LABELS = Object.freeze(Object.fromEntries(THEME_PRESETS.map((item)=>[item.id,item.label])));
 const ROOTS = Object.freeze({
   sidebar: '#sidebar',
   scrim: '#scrim',
@@ -21,16 +22,16 @@ export function createShell({ storage }) {
 
   function applyPreferences() {
     const preferences = storage.read().preferences;
-    const theme = THEMES.includes(preferences.theme) ? preferences.theme : 'light';
+    const theme = normalizeThemeId(preferences.theme);
     document.documentElement.dataset.theme = theme;
     if (preferences.userBubble) document.documentElement.style.setProperty('--user', preferences.userBubble);
     else document.documentElement.style.removeProperty('--user');
     if (preferences.accent) document.documentElement.style.setProperty('--accent', preferences.accent);
     else document.documentElement.style.removeProperty('--accent');
     const label = q('#themeLabel');
-    if (label) label.textContent = THEME_LABELS[theme];
+    if (label) label.textContent = themeLabel(theme);
     const themeMeta = q('meta[name="theme-color"]');
-    if (themeMeta) themeMeta.content = theme === 'light' ? '#ffffff' : theme === 'gold' ? '#0b0b0c' : '#171717';
+    if (themeMeta) themeMeta.content = ['navy-gold','aurora-night','retro-pixel','purple-tide'].includes(theme) ? '#101827' : '#ffffff';
   }
 
   function syncViewportHeight() {
@@ -74,15 +75,16 @@ export function createShell({ storage }) {
 
   function cycleTheme() {
     storage.update((state) => {
-      const index = THEMES.indexOf(state.preferences.theme);
-      state.preferences.theme = THEMES[(index + 1) % THEMES.length];
+      const current=normalizeThemeId(state.preferences.theme);
+      const index=THEME_IDS.indexOf(current);
+      state.preferences.theme=THEME_IDS[(index+1)%THEME_IDS.length];
     });
     applyPreferences();
   }
 
   function setTheme(theme) {
-    if (!THEMES.includes(theme)) return;
-    storage.update((state) => { state.preferences.theme = theme; });
+    const normalized=normalizeThemeId(theme);
+    storage.update((state)=>{state.preferences.theme=normalized;});
     applyPreferences();
   }
 

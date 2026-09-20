@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/public/styles/features.css">
   <link rel="stylesheet" href="/public/styles/desk.css">
   <link rel="stylesheet" href="/public/styles/model-metadata.css">
+  <link rel="stylesheet" href="/public/styles/source-pages.css">
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -33,6 +34,7 @@
           <button class="history-item" type="button" data-action="chat:open-type" data-kind="lighthouse"><span data-icon="letter"></span>MCP 对话区</button>
           <button class="history-item" type="button" data-action="memory:open"><span data-icon="memory"></span>记忆库</button>
           <button class="history-item" type="button" data-action="desk:worldbook"><span>⌁</span>词典</button>
+          <button class="history-item" type="button" data-action="sourcepages:open-widgets"><span>▦</span>小组件</button>
         </section>
         <section id="chatConversationSection" class="sidebar-section" data-owner="chat-conversations">
           <h2>聊天窗口</h2>
@@ -40,8 +42,11 @@
         </section>
       </nav>
       <div class="sidebar-footer">
-        <button type="button" class="account-row" data-action="shell:cycle-theme">
-          <span class="account-avatar" data-icon="theme"></span><span><strong>主题</strong><small id="themeLabel">浅色</small></span>
+        <button type="button" class="account-row" data-action="sourcepages:themes">
+          <span class="account-avatar" data-icon="theme"></span><span><strong>主题</strong><small id="themeLabel">默认</small></span>
+        </button>
+        <button type="button" class="account-row" data-action="sourcepages:open-settings">
+          <span class="account-avatar">⌂</span><span><strong>屋主设置</strong><small>人类屋主设置</small></span>
         </button>
         <button type="button" class="account-row" data-action="desk:open">
           <span class="account-avatar">⌘</span><span><strong>模型工作台</strong><small>本轮上下文与工具调用记录</small></span>

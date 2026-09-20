@@ -8,6 +8,7 @@ import { createDesk } from './features/desk.js';
 import { createHumanThought } from './features/human-thought.js';
 import { createMemory } from './features/memory.js';
 import { createShell } from './features/shell.js';
+import { createSourcePages } from './features/source-pages.js';
 
 const storage = createStorage();
 let toastTimer = 0;
@@ -29,6 +30,7 @@ function registerServiceWorker() {
 const overlayRoot = q('#overlayRoot');
 const shell = createShell({ storage });
 const router = createRouter(overlayRoot);
+const sourcePages = createSourcePages({ router, storage, shell, toast });
 const humanThought = createHumanThought({ toast });
 const chat = createChat({ storage, toast, humanThought });
 const memory = createMemory({ chat, router, toast, storage });
@@ -45,7 +47,7 @@ const routerOwner = Object.freeze({
   mount() {}, refresh() {}, destroy() {},
 });
 const eventSpine = createEventSpine({
-  owners: Object.freeze([routerOwner, shell, chat, memory, desk, humanThought]),
+  owners: Object.freeze([routerOwner, shell, chat, memory, desk, sourcePages, humanThought]),
   onError(error, context) {
     console.error(`[${context.route || context.eventType || 'event-spine'}]`, error);
     toast(error?.message || '操作失败，请稍后重试。');
