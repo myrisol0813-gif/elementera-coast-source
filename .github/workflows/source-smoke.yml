@@ -85,6 +85,51 @@ jobs:
           console.log('Service worker assets: ' + assets.length + ' / ' + assets.length + ' present');
           NODE
 
+      - name: Check source hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+
+          const roots = ['apps/web', 'apps/android'];
+          const legacy = [
+            '小寒','Myri','Myrisol','Myraes','先生','狗话','小狼窝','小蛇书桌','小蛇行动日志',
+            '海岸信箱','海岸屋主','同轨','8.12','8.13','模型回波','本轮桌面','家具',
+            '粉嫩 Myri','白狼雪野','雪地来信','mailbox-snake','horned','serpent','wolf',
+            'RikkaHub','app.elementeracoast.com','com.elementeracoast.app','Assistant','助手',
+          ];
+          const textExtensions = new Set([
+            '.js','.mjs','.cjs','.ts','.tsx','.jsx','.html','.css','.json','.jsonc','.xml',
+            '.kt','.kts','.gradle','.properties','.toml','.txt','.md',
+          ]);
+          function walk(dir) {
+            const out = [];
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+              const full = path.join(dir, entry.name);
+              if (entry.isDirectory()) out.push(...walk(full));
+              else out.push(full);
+            }
+            return out;
+          }
+          const findings = [];
+          for (const root of roots) {
+            for (const file of walk(root)) {
+              if (!textExtensions.has(path.extname(file))) continue;
+              const content = fs.readFileSync(file, 'utf8');
+              for (const term of legacy) {
+                if (content.includes(term)) findings.push({ file, term });
+              }
+            }
+          }
+          if (findings.length) {
+            console.error('Legacy/private concept findings in business files:', findings);
+            process.exit(1);
+          }
+          console.log('Business-file legacy/private concept scan: OK');
+          NODE
+
       - name: Prepare local source variables
         shell: bash
         run: |
@@ -171,6 +216,11 @@ jobs:
           const fs = require('fs');
           const value = JSON.parse(fs.readFileSync('/tmp/snapshot.json', 'utf8'));
           if (value.format !== 'elementera-coast-source-snapshot' || value.source_only !== true) process.exit(1);
+          if (!value.visitor_mailbox || !Array.isArray(value.visitor_mailbox.visitors)) process.exit(1);
+          if (!Array.isArray(value.conversations)) process.exit(1);
+          for (const item of value.conversations) {
+            if (!Array.isArray(item.turn_context_previews)) process.exit(1);
+          }
           const raw = JSON.stringify(value);
           if (raw.includes('source-test-session-secret-0123456789abcdef')) process.exit(1);
           NODE
@@ -215,6 +265,90 @@ jobs:
 
           mailbox_curl "$base/mailbox" >/tmp/mailbox-page.html
           grep -q "访客信箱" /tmp/mailbox-page.html
+
+      - name: Mobile browser smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHROME_PATH="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME_PATH"
+          npm install --no-save --no-package-lock playwright-core@latest >/dev/null 2>&1
+          CHROME_PATH="$CHROME_PATH" node <<'NODE'
+          const { chromium } = require('playwright-core');
+
+          const base = 'http://127.0.0.1:8788';
+          const errors = [];
+          const browser = await chromium.launch({
+            headless: true,
+            executablePath: process.env.CHROME_PATH,
+            args: ['--no-sandbox'],
+          });
+          const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+          const page = await context.newPage();
+          page.on('pageerror', (error) => errors.push(String(error?.stack || error)));
+
+          await page.goto(base + '/login', { waitUntil: 'domcontentloaded' });
+          await page.locator('input[name="password"]').fill('source-test-pass');
+          await Promise.all([
+            page.waitForURL(base + '/'),
+            page.locator('form[action="/login"] button[type="submit"]').click(),
+          ]);
+          await page.waitForSelector('#composer[data-ready="true"]', { timeout: 15000 });
+
+          async function reloadReady() {
+            await page.goto(base + '/', { waitUntil: 'domcontentloaded' });
+            await page.waitForSelector('#composer[data-ready="true"]', { timeout: 15000 });
+          }
+
+          async function invoke(selector) {
+            await page.evaluate((value) => {
+              const node = document.querySelector(value);
+              if (!node) throw new Error('Missing selector: ' + value);
+              node.click();
+            }, selector);
+            await page.waitForTimeout(250);
+            if (errors.length) throw new Error(errors.join('\n'));
+          }
+
+          const surfaces = [
+            'button[data-action="chat:open-type"][data-kind="main"]',
+            'button[data-action="chat:open-type"][data-kind="radio"]',
+            'button[data-action="chat:open-type"][data-kind="lighthouse"]',
+            'button[data-action="external:open"]',
+            'button[data-action="memory:open"]',
+            'button[data-action="desk:worldbook"]',
+            'button[data-action="sourcepages:open-widgets"]',
+            'button[data-action="devhands:open"]',
+            'button[data-action="toolroom:open"]',
+            'button[data-action="sourcepages:themes"]',
+            'button[data-action="sourcepages:open-settings"]',
+            'button[data-action="desk:open"]',
+            '#modelButton',
+          ];
+
+          for (const selector of surfaces) {
+            await reloadReady();
+            await invoke(selector);
+          }
+
+          await reloadReady();
+          await invoke('#attachmentButton');
+          const attachmentOpen = await page.locator('#attachmentMenu').evaluate((node) => !node.hidden);
+          if (!attachmentOpen) throw new Error('Attachment menu did not open.');
+
+          const metrics = await page.evaluate(() => ({
+            width: innerWidth,
+            height: innerHeight,
+            hasApp: Boolean(document.querySelector('#app')),
+            bodyText: document.body.innerText.length,
+          }));
+          if (metrics.width !== 390 || metrics.height !== 844 || !metrics.hasApp || metrics.bodyText < 20) {
+            throw new Error('Unexpected mobile shell metrics: ' + JSON.stringify(metrics));
+          }
+          if (errors.length) throw new Error(errors.join('\n'));
+          console.log('Mobile browser smoke: OK', metrics);
+          await browser.close();
+          NODE
 
       - name: Print Wrangler log on failure
         if: failure()
