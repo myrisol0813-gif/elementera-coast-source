@@ -63,7 +63,7 @@
     <main class="main-panel">
       <header class="topbar">
         <button id="menuButton" class="icon-button" type="button" data-action="shell:open-sidebar" data-icon="menu" aria-label="打开侧边栏"></button>
-        <div class="model-button" aria-label="当前模型"><span class="model-title">Model Partner</span><span id="modelName" class="model-name">载入中</span></div>
+        <button id="modelButton" class="model-button" type="button" data-action="models:quick" aria-label="当前模型" aria-haspopup="dialog" aria-expanded="false"><span class="model-title">Model Partner</span><span id="modelName" class="model-name">载入中</span></button><div id="modelQuickPicker" class="model-quick-picker" hidden></div>
         <div id="chatTopbarActions" class="topbar-actions">
           <button id="refreshCoastButton" class="icon-button" type="button" data-action="chat:refresh" data-icon="refresh" aria-label="刷新当前状态"></button>
           <button id="newChatButton" class="icon-button" type="button" data-action="chat:new" data-icon="new-chat" aria-label="新建当前类型聊天"></button>
