@@ -465,20 +465,20 @@
   color: var(--muted);
 }
 
-.message-dogtalk-mark {
+.message-human-thought-mark {
   display: inline-block;
   margin-left: 7px;
   color: color-mix(in srgb, var(--accent) 62%, var(--muted));
 }
 
-.dogtalk-composer-slot {
+.human-thought-composer-slot {
   grid-column: 1 / -1;
   width: 100%;
   min-width: 0;
   padding-bottom: 6px;
 }
 
-.dogtalk-composer-slot--chat-shell {
+.human-thought-composer-slot--chat-shell {
   width: min(780px, 100%);
   min-height: 48px;
   margin: 0 auto;
@@ -486,7 +486,7 @@
   background: var(--bg);
 }
 
-.dogtalk-composer-placeholder {
+.human-thought-composer-placeholder {
   display: grid;
   align-items: center;
   min-height: 42px;
@@ -496,28 +496,28 @@
   background: color-mix(in srgb, var(--surface-soft) 78%, var(--bg));
 }
 
-.dogtalk-composer-placeholder strong,
-.dogtalk-composer-placeholder small {
+.human-thought-composer-placeholder strong,
+.human-thought-composer-placeholder small {
   display: block;
 }
 
-.dogtalk-composer-placeholder strong {
+.human-thought-composer-placeholder strong {
   font-size: 12px;
 }
 
-.dogtalk-composer-placeholder small {
+.human-thought-composer-placeholder small {
   margin-top: 2px;
   color: var(--muted);
   font-size: 10px;
 }
 
-.dogtalk-composer {
+.human-thought-composer {
   border: 1px solid color-mix(in srgb, var(--accent) 13%, var(--line));
   border-radius: 16px;
   background: color-mix(in srgb, var(--surface-soft) 78%, var(--bg));
 }
 
-.dogtalk-composer > summary {
+.human-thought-composer > summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -528,20 +528,20 @@
   cursor: pointer;
 }
 
-.dogtalk-composer > summary::-webkit-details-marker {
+.human-thought-composer > summary::-webkit-details-marker {
   display: none;
 }
 
-.dogtalk-composer > summary strong,
-.dogtalk-composer > summary small {
+.human-thought-composer > summary strong,
+.human-thought-composer > summary small {
   display: block;
 }
 
-.dogtalk-composer > summary strong {
+.human-thought-composer > summary strong {
   font-size: 12px;
 }
 
-.dogtalk-composer > summary small {
+.human-thought-composer > summary small {
   margin-top: 2px;
   overflow: hidden;
   color: var(--muted);
@@ -550,11 +550,11 @@
   white-space: nowrap;
 }
 
-.dogtalk-composer[open] .dogtalk-chevron {
+.human-thought-composer[open] .human-thought-chevron {
   transform: rotate(180deg);
 }
 
-.dogtalk-fields {
+.human-thought-fields {
   display: grid;
   gap: 8px;
   max-height: min(46vh, 420px);
@@ -562,16 +562,16 @@
   overflow-y: auto;
 }
 
-.dogtalk-fields label {
+.human-thought-fields label {
   display: grid;
   gap: 5px;
   color: var(--text-soft);
   font-size: 11px;
 }
 
-.dogtalk-fields textarea,
-.dogtalk-fields input,
-.dogtalk-fields select {
+.human-thought-fields textarea,
+.human-thought-fields input,
+.human-thought-fields select {
   width: 100%;
   padding: 7px 10px;
   border: 0;
@@ -582,31 +582,31 @@
   font: inherit;
 }
 
-.dogtalk-fields textarea {
+.human-thought-fields textarea {
   resize: vertical;
   line-height: 1.55;
 }
 
-.dogtalk-grid {
+.human-thought-grid {
   display: grid;
   grid-template-columns: minmax(0, .75fr) minmax(0, 1.25fr);
   gap: 9px;
 }
 
-.dogtalk-intro,
-.dogtalk-fields .dogtalk-boundary {
+.human-thought-intro,
+.human-thought-fields .human-thought-boundary {
   margin: 0;
   color: var(--muted);
   font-size: 10px;
   line-height: 1.5;
 }
 
-.dogtalk-actions {
+.human-thought-actions {
   display: block;
   margin: 0;
 }
 
-.dogtalk-actions button {
+.human-thought-actions button {
   width: 100%;
   min-height: 32px;
   padding: 6px 9px;
@@ -618,7 +618,7 @@
   cursor: pointer;
 }
 
-.dogtalk-unfolded {
+.human-thought-unfolded {
   display: grid;
   gap: 4px;
   padding: 12px;
@@ -626,16 +626,16 @@
   background: var(--surface-raised);
 }
 
-.dogtalk-unfolded[hidden] {
+.human-thought-unfolded[hidden] {
   display: none;
 }
 
-.dogtalk-unfolded strong {
+.human-thought-unfolded strong {
   margin-top: 5px;
   font-size: 11px;
 }
 
-.dogtalk-unfolded p {
+.human-thought-unfolded p {
   margin: 0;
   color: var(--text-soft);
   font-size: 12px;
@@ -747,7 +747,7 @@
     padding-inline: 14px;
   }
 
-  .dogtalk-grid {
+  .human-thought-grid {
     grid-template-columns: 1fr;
   }
 }
