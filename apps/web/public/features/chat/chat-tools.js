@@ -7,7 +7,7 @@ function safeToolRuns(value) {
 function toolRunLine(run) {
   const ok = run.status !== 'error';
   const runtime = String(run.id || '').startsWith('runtime:');
-  const label = ok || runtime ? run.label : '某件家具没有摆好';
+  const label = ok || runtime ? run.label : '某个工具没有正常完成';
   const count = Number(run.count || 0);
   const suffix = run.tool_key === 'memory.search' && count
     ? `：${count} 条`
@@ -30,10 +30,10 @@ export function renderToolRuns(value, { conversationId = '' } = {}) {
     .map((run) => String(run.id))
     .filter(Boolean);
   const actionLog = loggableIds.length
-    ? `<button type="button" data-action="toolroom:open" data-run-ids="${escapeAttribute(loggableIds.join(','))}" data-conversation-id="${escapeAttribute(conversationId)}">查看模型行动记录</button>`
+    ? `<button type="button" data-action="toolroom:open" data-run-ids="${escapeAttribute(loggableIds.join(','))}" data-conversation-id="${escapeAttribute(conversationId)}">查看工具调用记录</button>`
     : '';
   return `<details class="chat-tool">
-    <summary><span>本轮家具</span><strong>小蛇摆弄了 ${runs.length} 件家具</strong></summary>
+    <summary><span>本轮工具</span><strong>使用了 ${runs.length} 件工具</strong></summary>
     <div class="tool-body">${runs.map(toolRunLine).join('')}${actionLog}</div>
   </details>`;
 }
