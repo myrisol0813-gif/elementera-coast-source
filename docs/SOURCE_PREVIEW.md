@@ -19,14 +19,16 @@ Optional model provider configuration:
 - `OPENROUTER_API_KEY`
 - `OPENROUTER_MODEL`
 
+The repository includes `apps/web/wrangler.local.jsonc` for a local-only D1 simulation. It contains no real database id and must not be used as deployment configuration.
+
 Example from the repository root:
 
 ```bash
 cp .env.example .dev.vars
 
 npx wrangler pages dev apps/web \
-  --env-file .dev.vars \
-  --d1 COAST_CHAT_DB=<YOUR_D1_DATABASE_ID>
+  --config apps/web/wrangler.local.jsonc \
+  --env-file .dev.vars
 ```
 
 Without an OpenRouter key, the PWA shell and source-backed UI/storage surfaces can still be inspected; model generation returns an explicit configuration error.
@@ -47,4 +49,4 @@ Source identity:
 
 The Native project is intentionally a minimal Compose shell. It does not contain production signing configuration, updater wiring, release configuration or private launcher assets.
 
-A Gradle Wrapper is not currently committed, so a clean-checkout debug APK has not yet been reproducibly verified.
+The repository does not commit a Gradle Wrapper. Source CI installs a fixed Gradle version to verify the debug build without introducing a release chain.
