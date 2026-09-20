@@ -36,7 +36,7 @@ export function chatPayload(modelId, messages, maxTokens, temperature, model, op
 export async function prepareFormalChat(env, input, allowSystem) {
   if (!openRouterKey(env)) throw new ModelRequestError('auth_error', 'OpenRouter key 未配置。', 503);
   const catalog = await fetchModelCatalog(env);
-  const modelId = String(input.model || catalog.defaults.chat || DEFAULT_MODEL);
+  const modelId = String(input.model || env?.OPENROUTER_MODEL || catalog.defaults.chat || DEFAULT_MODEL);
   if ((catalog.groups.openai_image || []).some((model) => model.id === modelId) || /gpt-image-|dall-e|image/i.test(modelId)) {
     throw new ModelRequestError('image_model_not_supported', '当前是生图模型，不能用于文字聊天。请切换聊天模型。', 400, { model: modelId });
   }
