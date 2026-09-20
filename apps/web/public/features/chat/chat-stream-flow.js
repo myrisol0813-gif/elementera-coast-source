@@ -51,7 +51,7 @@ function annotateCrossWindowError(error, slip, runtime) {
     ...(error.details && typeof error.details === 'object' ? error.details : {}),
     cross_window: section,
   };
-  error.message = `这轮跨窗口取信递送失败。海岸没有偷偷裁剪，也没有自动缩短后重试。requested=${section.requested_turns}轮，loaded=${section.loaded_turns}轮，attempted=${section.attempted_delivered_turns}轮，attempted_chars=${section.attempted_chars}；${section.provider_error_type || error.type}：${section.provider_error_message || error.message}`;
+  error.message = `这轮外部入口取信递送失败。系统没有静默裁剪，也没有自动缩短后重试。requested=${section.requested_turns}轮，loaded=${section.loaded_turns}轮，attempted=${section.attempted_delivered_turns}轮，attempted_chars=${section.attempted_chars}；${section.provider_error_type || error.type}：${section.provider_error_message || error.message}`;
   return error;
 }
 
@@ -63,7 +63,7 @@ function hostOf(value) {
   }
 }
 
-function runtimeFurniture(deskSlip) {
+function runtimeTool(deskSlip) {
   if (!deskSlip || typeof deskSlip !== 'object') return [];
   const runs = [];
   const attachments = deskSlip.attachments;
@@ -108,8 +108,8 @@ function runtimeFurniture(deskSlip) {
   return runs;
 }
 
-function mergeFurniture(existing, deskSlip) {
-  const merged = [...(Array.isArray(existing) ? existing : []), ...runtimeFurniture(deskSlip)];
+function mergeTool(existing, deskSlip) {
+  const merged = [...(Array.isArray(existing) ? existing : []), ...runtimeTool(deskSlip)];
   const seen = new Set();
   return merged.filter((run) => {
     const id = String(run?.id || '');
@@ -137,7 +137,7 @@ export async function runChatStreamFlow({
     partialContent: '',
     streamModelId: '',
     streamUsage: null,
-    furnitureRuns: [],
+    toolRuns: [],
     deskSlip: null,
   };
 
@@ -182,8 +182,8 @@ export async function runChatStreamFlow({
           showWebSearchStatus(item.data);
           return;
         }
-        if (item.event === 'furniture_runs') {
-          streamState.furnitureRuns = Array.isArray(item.data) ? item.data : [];
+        if (item.event === 'tool_runs') {
+          streamState.toolRuns = Array.isArray(item.data) ? item.data : [];
           return;
         }
         if (item.event === 'usage') {
@@ -222,7 +222,7 @@ export async function runChatStreamFlow({
     throw annotateCrossWindowError(error, streamState.deskSlip, runtime);
   }
 
-  const furnitureRuns = mergeFurniture(streamState.furnitureRuns, streamState.deskSlip);
+  const toolRuns = mergeTool(streamState.toolRuns, streamState.deskSlip);
   return {
     patch: {
       content: streamState.partialContent,
@@ -231,9 +231,9 @@ export async function runChatStreamFlow({
       ...(streamState.streamUsage ? { usage: streamState.streamUsage } : {}),
       finish_reason: streamState.finishReason,
       generation_source: 'chat',
-      ...(furnitureRuns.length ? { furniture_runs: furnitureRuns } : {}),
+      ...(toolRuns.length ? { tool_runs: toolRuns } : {}),
       ...(streamState.deskSlip ? { desk_slip: streamState.deskSlip } : {}),
     },
-    state: { ...streamState, furnitureRuns },
+    state: { ...streamState, toolRuns },
   };
 }
