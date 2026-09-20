@@ -2,15 +2,21 @@ import { apiError, isRequestBodyError, json, methodNotAllowed, readJson, request
 import { OwnerAccessError, requireOwnerSession } from './owner-access.js';
 import { appendExternalMessage, listExternalMessages } from './external-entry-store.js';
 import { deliverExternalToRoom } from './room-bridge-service.js';
+import { sourceMcpContract } from './source-mcp-contract.js';
 
 const ROOT='/api/external/messages';
 const STATUS='/api/external/status';
-export function isExternalEntryApiPath(pathname){return pathname===ROOT||pathname===STATUS;}
+const MCP_CONTRACT='/api/external/mcp-contract';
+export function isExternalEntryApiPath(pathname){return pathname===ROOT||pathname===STATUS||pathname===MCP_CONTRACT;}
 export async function routeExternalEntryApi(request,env,session=null){
   const url=new URL(request.url);
   try{
     requireOwnerSession(session);
     if(!env?.COAST_CHAT_DB?.prepare)return apiError('chat_db_not_configured','Chat database is not configured.',503);
+    if(url.pathname===MCP_CONTRACT){
+      if(request.method!=='GET')return methodNotAllowed('GET');
+      return json({ok:true,contract:sourceMcpContract()});
+    }
     if(url.pathname===STATUS){
       if(request.method!=='GET')return methodNotAllowed('GET');
       return json({ok:true,mode:'source',ingress:'owner_session_only',channels:[

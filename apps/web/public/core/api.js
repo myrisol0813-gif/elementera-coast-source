@@ -30,6 +30,7 @@ export const API = Object.freeze({
   humanThought: '/api/human-thought',
   externalMessages: '/api/external/messages',
   externalStatus: '/api/external/status',
+  externalMcpContract: '/api/external/mcp-contract',
   mailboxMe: '/api/mailbox/me',
   mailboxMessages: '/api/mailbox/messages',
   mailboxSend: '/api/mailbox/send',
