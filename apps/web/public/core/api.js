@@ -28,6 +28,8 @@ export const API = Object.freeze({
   dailyDiaries: '/api/daily/diaries',
   dailyProfile: '/api/daily/profile',
   humanThought: '/api/human-thought',
+  externalMessages: '/api/external/messages',
+  externalStatus: '/api/external/status',
   mailboxMe: '/api/mailbox/me',
   mailboxMessages: '/api/mailbox/messages',
   mailboxSend: '/api/mailbox/send',
