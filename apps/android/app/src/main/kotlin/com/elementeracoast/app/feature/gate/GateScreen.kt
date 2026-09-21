@@ -115,7 +115,7 @@ fun GateScreen(
                 if (BuildConfig.SOURCE_PREVIEW_PASSWORD_HINT.isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        text = "source debug 默认预览密码：${BuildConfig.SOURCE_PREVIEW_PASSWORD_HINT} · 部署时请修改",
+                        text = "默认预览密码：${BuildConfig.SOURCE_PREVIEW_PASSWORD_HINT} · 仅用于查看 source 空壳；部署时请自行更改",
                         modifier = Modifier.width(GateVisualTokens.PasswordWidth),
                         color = CoastMuted,
                         style = MaterialTheme.typography.bodySmall,
