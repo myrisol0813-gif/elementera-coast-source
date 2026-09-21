@@ -23,7 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-internal const val ModelPartnerCommentActionLabel = "另一位屋主留言"
+internal const val ModelPartnerCommentActionLabel = "模型伙伴留言"
 
 @Composable
 internal fun MomentActionRows(

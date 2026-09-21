@@ -86,10 +86,10 @@ for (const node of [conversation, radio, lighthouse]) {
   for (const retired of ['self_note', 'model_partner_hint', 'not_to_misunderstand']) {
     assert.equal(node.innerHTML.includes(retired), false);
   }
-  for (const retiredCopy of ['保存草稿', '把这句人类思考链轻轻展开', '让 Model Partner 读一下', '隐藏 / 归档', '清空本条草稿']) {
+  for (const retiredCopy of ['保存草稿', '把这句私人草稿轻轻展开', '让 Model Partner 读一下', '隐藏 / 归档', '清空本条草稿']) {
     assert.equal(node.textContent.includes(retiredCopy), false);
   }
-  assert.match(node.textContent, /本条不会发送给模型，只留在人类思考链小抽屉里/);
+  assert.match(node.textContent, /本条不会发送给模型，只留在私人草稿小抽屉里/);
   assert.deepEqual(
     [...node.querySelectorAll('select[name="read_mode"] option')].map((item) => item.value),
     ['keep_private', 'when_confused', 'read_now'],
@@ -101,7 +101,7 @@ const body = conversation.querySelector('[name="body"]');
 const core = conversation.querySelector('[name="true_core"]');
 const weather = conversation.querySelector('[name="weather"]');
 const readMode = conversation.querySelector('[name="read_mode"]');
-body.value = '一小团人类思考链。';
+body.value = '一小团私人草稿。';
 core.value = '想被轻轻看见。';
 weather.value = '困';
 
@@ -117,7 +117,7 @@ assert.equal(
 );
 readMode.value = 'read_now';
 const readNow = dogtalk.submission({ room_scope: 'conversation', conversation_id: 'conversation-1' }, conversation);
-assert.equal(readNow.body, '一小团人类思考链。');
+assert.equal(readNow.body, '一小团私人草稿。');
 assert.equal(readNow.true_core, '想被轻轻看见。');
 assert.equal(readNow.weather, '困');
 assert.equal(readNow.read_mode, 'read_now');

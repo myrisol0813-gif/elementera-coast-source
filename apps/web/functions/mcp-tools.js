@@ -395,8 +395,8 @@ async function executeTool(name, rawArgs, request, env, requestMeta, auth) {
     }, registryContext(auth, 'official_mcp', { external_tool: true }));
     const result = dogtalkMcpResult(raw);
     return resultContent(result, result.available
-      ? '当前窗口人类思考链已取回。'
-      : '当前窗口没有可读人类思考链。');
+      ? '当前窗口私人草稿已取回。'
+      : '当前窗口没有可读私人草稿。');
   }
   if (name === 'search_authorized_memory') {
     const result = await executeRegisteredTool(env.COAST_CHAT_DB, 'memory.authorized_search', {

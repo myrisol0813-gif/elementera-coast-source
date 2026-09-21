@@ -73,7 +73,7 @@ class DefaultCrossWindowRepository(
                                     messageId = message.messageId,
                                     role = message.role,
                                     displayAuthor = message.displayAuthor?.takeIf(String::isNotBlank)
-                                        ?: if (message.role == "assistant") "另一位屋主" else "user",
+                                        ?: if (message.role == "assistant") "模型伙伴" else "user",
                                     createdAt = message.createdAt,
                                     length = message.length,
                                     preview = message.preview

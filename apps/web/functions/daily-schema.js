@@ -87,13 +87,13 @@ async function initialize(db) {
     owner_avatar_dataurl TEXT NOT NULL DEFAULT '',
     model_partner_avatar_dataurl TEXT NOT NULL DEFAULT '',
     moment_cover_dataurl TEXT NOT NULL DEFAULT '',
-    model_partner_display_name TEXT NOT NULL DEFAULT '另一位屋主',
+    model_partner_display_name TEXT NOT NULL DEFAULT '模型伙伴',
     updated_at INTEGER NOT NULL
   )`);
 
   await ensureColumn(db, 'daily_moment_comments', 'model_id', 'TEXT DEFAULT NULL');
   await ensureColumn(db, 'daily_moment_comments', 'usage_json', 'TEXT DEFAULT NULL');
-  await ensureColumn(db, 'daily_profile', 'model_partner_display_name', "TEXT NOT NULL DEFAULT '另一位屋主'");
+  await ensureColumn(db, 'daily_profile', 'model_partner_display_name', "TEXT NOT NULL DEFAULT '模型伙伴'");
   for (const table of ['daily_moments', 'daily_diaries']) {
     await ensureColumn(db, table, 'actor', 'TEXT DEFAULT NULL');
     await ensureColumn(db, table, 'surface', 'TEXT DEFAULT NULL');

@@ -1,7 +1,7 @@
 const TOOL_LABELS = Object.freeze({
   'memory.search': '搜索记忆',
   'memory.write_candidate': '放入待确认区',
-  'dogtalk.read': '读取人类思考链',
+  'dogtalk.read': '读取私人草稿',
   'daily.create_moment': '写碳硅圈',
   'daily.create_diary': '写日记',
   'daily.moment_comment': '评论碳硅圈',

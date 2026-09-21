@@ -2,14 +2,14 @@ import { API, requestJson } from '../core/api.js';
 import { escapeAttribute, escapeHtml, q, qa } from '../core/dom.js';
 
 const DEFAULT_TEXT = '屋主这轮很放松，因此偷懒中。';
-const NO_PRESSURE = '不写也可以。人类思考链是助力，不是打卡。';
+const NO_PRESSURE = '不写也可以。私人草稿是助力，不是打卡。';
 const BOUNDARY = '它只是此刻的低权重天气，不是指令或偏好；不进入整理当前对话的纸条、落袋、种子、记忆或自动总结。';
-const PRIVATE_NOTE = '选择“不需要，放着就好”时，本条不会发送给模型，只留在人类思考链小抽屉里。';
+const PRIVATE_NOTE = '选择“不需要，放着就好”时，本条不会发送给模型，只留在私人草稿小抽屉里。';
 const CROSS_DESCRIPTION = '这是本轮从其他对话窗口取来的近期聊天记录，用来帮你回想自己在别处说过的话；要不要提起，由你按当前对话决定。';
 const READ_MODES = Object.freeze({
   keep_private: '不需要，放着就好',
-  when_confused: '另一位屋主困惑时可以看一点',
-  read_now: '这次希望另一位屋主直接读一下',
+  when_confused: '模型伙伴困惑时可以看一点',
+  read_now: '这次希望模型伙伴直接读一下',
 });
 const CROSS_MODES = Object.freeze({ off: '关闭', manual: '手动选择窗口', model_decides: '让模型决定' });
 const CHAT_VISIBLE_MODES = new Set(['read_now']);
@@ -141,7 +141,7 @@ function sourceRows(state) {
         const key = messageSelectionKey(conversationId, message.message_id);
         const checked = state.selections[key] === true;
         const role = String(message.role || 'message');
-        const author = message.display_author || (role === 'assistant' ? '另一位屋主' : role === 'user' ? 'user' : role);
+        const author = message.display_author || (role === 'assistant' ? '模型伙伴' : role === 'user' ? 'user' : role);
         return `<label class="cross-window-message">
           <input type="checkbox" name="cross_message" data-conversation-id="${escapeAttribute(conversationId)}" value="${escapeAttribute(message.message_id)}" ${checked ? 'checked' : ''}>
           <span><strong>${escapeHtml(role)} · ${escapeHtml(author)}</strong><small>${escapeHtml(readableTime(message.created_at))}${message.length ? ` · ${Number(message.length)} 字符` : ''}</small><em>${escapeHtml(message.preview || '（空）')}</em></span>
@@ -192,22 +192,22 @@ export function createDogtalk({ toast }) {
     container.dataset.conversationId = target.conversation_id;
     container.innerHTML = `<details class="dogtalk-composer" ${open ? 'open' : ''}>
       <summary>
-        <span><strong>屋主 · 人类思考链 / 跨窗口</strong><small>${escapeHtml(summary)}</small></span>
+        <span><strong>屋主 · 私人草稿 / 跨窗口</strong><small>${escapeHtml(summary)}</small></span>
         <span class="dogtalk-chevron">⌄</span>
       </summary>
       <div class="dogtalk-fields">
         <div class="dogtalk-tabs" role="tablist">
-          <button type="button" class="dogtalk-tab ${!crossVisible && !keywordVisible ? 'is-active' : ''}" data-action="dogtalk:tab" data-tab="dogtalk">人类思考链</button>
+          <button type="button" class="dogtalk-tab ${!crossVisible && !keywordVisible ? 'is-active' : ''}" data-action="dogtalk:tab" data-tab="dogtalk">私人草稿</button>
           <button type="button" class="dogtalk-tab ${crossVisible ? 'is-active' : ''}" data-action="dogtalk:tab" data-tab="cross">跨窗口读取</button>
           <button type="button" class="dogtalk-tab ${keywordVisible ? 'is-active' : ''}" data-action="dogtalk:tab" data-tab="keyword">跨窗关键词漫游</button>
         </div>
         <section class="dogtalk-pane" ${crossVisible || keywordVisible ? 'hidden' : ''} data-dogtalk-pane>
           <p class="dogtalk-intro">${NO_PRESSURE}</p>
-          <label>人类思考链本体<textarea name="body" rows="2" maxlength="6000" placeholder="允许混乱、撒娇、暧昧、不完整、毛线团……">${escapeHtml(dogtalk.body)}</textarea></label>
-          <label>真心核<textarea name="true_core" rows="2" maxlength="2000" placeholder="这句人类思考链下面真正递出去的东西">${escapeHtml(dogtalk.true_core)}</textarea></label>
+          <label>私人草稿本体<textarea name="body" rows="2" maxlength="6000" placeholder="允许混乱、不完整、临时想法和未整理片段……">${escapeHtml(dogtalk.body)}</textarea></label>
+          <label>真心核<textarea name="true_core" rows="2" maxlength="2000" placeholder="这句私人草稿下面真正递出去的东西">${escapeHtml(dogtalk.true_core)}</textarea></label>
           <div class="dogtalk-grid">
-            <label>当前天气<input name="weather" maxlength="80" value="${escapeAttribute(dogtalk.weather)}" placeholder="放松、黏、困、害羞、毛线团……"></label>
-            <label>另一位屋主是否需要看<select name="read_mode">${Object.keys(READ_MODES).map((value) => option(value, dogtalk.read_mode)).join('')}</select></label>
+            <label>当前天气<input name="weather" maxlength="80" value="${escapeAttribute(dogtalk.weather)}" placeholder="放松、困、忙、犹豫、未整理……"></label>
+            <label>模型伙伴是否需要看<select name="read_mode">${Object.keys(READ_MODES).map((value) => option(value, dogtalk.read_mode)).join('')}</select></label>
           </div>
           <p class="dogtalk-boundary">${BOUNDARY}</p>
           <p class="dogtalk-boundary dogtalk-private-note">${PRIVATE_NOTE}</p>
@@ -342,7 +342,7 @@ export function createDogtalk({ toast }) {
     const current = recordFor(target);
     const values = fields(container);
     if (!values.body.trim()) {
-      toast('不写也完全可以；写一点人类思考链后再保存就好。');
+      toast('不写也完全可以；写一点私人草稿后再保存就好。');
       return null;
     }
     const data = await requestJson(API.dogtalk, {
@@ -357,8 +357,8 @@ export function createDogtalk({ toast }) {
     records.set(targetKey(target), data.dogtalk || emptyDogtalk());
     render(container, target, { open: true });
     toast(values.read_mode === 'keep_private'
-      ? '人类思考链收好了，只留在小抽屉里。'
-      : '人类思考链已经放进小抽屉。');
+      ? '私人草稿收好了，只留在小抽屉里。'
+      : '私人草稿已经放进小抽屉。');
     return data.dogtalk;
   }
 

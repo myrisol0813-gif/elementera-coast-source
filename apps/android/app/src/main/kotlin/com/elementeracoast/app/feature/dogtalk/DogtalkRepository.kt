@@ -100,7 +100,7 @@ class DefaultDogtalkRepository(
                 val text = response.body?.string().orEmpty()
                 if (!response.isSuccessful) throw responseError(response.code, text)
                 runCatching { json.decodeFromString(serializer, text) }.getOrElse { cause ->
-                    throw CoastApiException(CoastApiErrorKind.Decode, "invalid_json", "人类思考链返回的数据格式无法读取。", response.code, cause)
+                    throw CoastApiException(CoastApiErrorKind.Decode, "invalid_json", "私人草稿返回的数据格式无法读取。", response.code, cause)
                 }
             }
         } catch (error: CoastApiException) {
@@ -112,7 +112,7 @@ class DefaultDogtalkRepository(
 
     private fun responseError(status: Int, text: String): CoastApiException {
         var type = if (status == 401) "unauthorized" else "request_failed"
-        var message = if (status == 401) "登录状态已失效。" else "人类思考链请求失败（$status）。"
+        var message = if (status == 401) "登录状态已失效。" else "私人草稿请求失败（$status）。"
         runCatching {
             val error = json.parseToJsonElement(text).jsonObject["error"]
             if (error is JsonObject) {

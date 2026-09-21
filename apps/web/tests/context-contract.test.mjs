@@ -57,7 +57,7 @@ assert.equal(owner.paper_slips.includes(OWNER_CUSTOM), true);
 assert.equal(system.includes(OLD_OWNER_IDENTITY), false);
 assert.equal(system.includes('HIDDEN_OWNER_PERSONA_SHOULD_NOT_WIN'), false);
 for (const label of DELIVERED_SOURCE_LABELS) assert.ok(visiblePrompt.includes(label), `missing delivered source label ${label}`);
-assert.equal(visiblePrompt.includes('【人类思考链】'), false, 'empty dogtalk must not be injected just to display a label');
+assert.equal(visiblePrompt.includes('【私人草稿】'), false, 'empty dogtalk must not be injected just to display a label');
 assert.ok(system.includes('本轮没有递入外部材料。'));
 assert.ok(system.includes('透明记忆'));
 assert.ok(system.includes('透明词典'));

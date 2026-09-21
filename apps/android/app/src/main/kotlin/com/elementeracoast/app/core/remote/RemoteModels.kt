@@ -62,7 +62,7 @@ data class RemoteDailyProfile(
     @SerialName("owner_avatar_dataurl") val ownerAvatarDataUrl: String = "",
     @SerialName("model_partner_avatar_dataurl") val modelPartnerAvatarDataUrl: String = "",
     @SerialName("moment_cover_dataurl") val momentCoverDataUrl: String = "",
-    @SerialName("model_partner_display_name") val modelPartnerDisplayName: String = "另一位屋主",
+    @SerialName("model_partner_display_name") val modelPartnerDisplayName: String = "模型伙伴",
     @SerialName("updated_at") val updatedAt: String? = null
 )
 

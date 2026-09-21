@@ -320,9 +320,9 @@ class CoastShellViewModel(
             try {
                 val profile = backend.profile.setAssistantAvatar(dataUrl)
                 applyProfile(profile, backend.daily.cachedProfile())
-                _state.update { it.copy(backendOffline = false, snackbarMessage = "另一位屋主头像已写回后端") }
+                _state.update { it.copy(backendOffline = false, snackbarMessage = "模型伙伴头像已写回后端") }
             } catch (error: CoastApiException) {
-                handleBackendError(error, "另一位屋主头像更新失败")
+                handleBackendError(error, "模型伙伴头像更新失败")
             }
         }
     }

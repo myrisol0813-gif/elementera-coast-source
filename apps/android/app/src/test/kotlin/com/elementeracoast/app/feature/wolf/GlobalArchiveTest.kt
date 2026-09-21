@@ -26,7 +26,7 @@ class GlobalArchiveTest {
               "model_echo_summaries":[],
               "tools":{"runs":[]},
               "attachments":{"count":1,"items":[{"name":"一封信.txt","mime":"text/plain"}],"binary_included":false},
-              "versions":{"pwa_cache_version":"elementera-coast-app-87"}
+              "versions":{"pwa_cache_version":"elementera-coast-source-app-01"}
             }"""
         )
 

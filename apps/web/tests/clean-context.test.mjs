@@ -25,7 +25,7 @@ const messages = [
 await createWorldbookEntry(db, { title: '整理当前对话的纸条', content: '这是一条测试中手动写入、而不是系统预置的海岸词条。', keywords: ['整理当前对话的纸条'], scope: 'owner', priority: 100 });
 const assembled = await assembleCleanContext({ COAST_CHAT_DB: db }, {
   surface: 'main_chat', conversationId: conversation.id, messages, lastUser: messages.at(-1), localDate: '2026-01-10',
-  settings: { contextBudget: 6000, recentTurns: 6, soilBudget: 1800 }, permission: 'owner', preview: true, initialFurniture: ['收好一张人类思考链纸条'],
+  settings: { contextBudget: 6000, recentTurns: 6, soilBudget: 1800 }, permission: 'owner', preview: true, initialFurniture: ['收好一张私人草稿纸条'],
 });
 assert.deepEqual(assembled.modelMessages.at(-1), messages.at(-1));
 assert.equal(assembled.modelMessages[0].role, 'system');
@@ -54,7 +54,7 @@ assert.equal(slip.thinking_soil.delivered, true);
 assert.match(slip.thinking_soil.current_text, /潮蓝苹果/);
 assert.ok(slip.related_memory.count >= 1);
 assert.ok(slip.worldbook.delivered_titles.includes('整理当前对话的纸条'));
-assert.deepEqual(slip.workbench.furniture, ['收好一张人类思考链纸条']);
+assert.deepEqual(slip.workbench.furniture, ['收好一张私人草稿纸条']);
 assert.equal(slip.workbench.labels.model_visible_tools, '模型可见工具');
 assert.equal(slip.workbench.labels.backend_tools, '后端可用工具');
 assert.ok(slip.workbench.model_visible_tools.some((tool) => tool.name === 'memory_search'));

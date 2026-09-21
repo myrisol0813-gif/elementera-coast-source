@@ -24,7 +24,7 @@ const runs = [
   {
     id: 'run-dogtalk',
     tool_key: 'dogtalk.read',
-    label: '读取了人类思考链',
+    label: '读取了私人草稿',
     status: 'success',
     count: 1,
     items: [],
@@ -41,7 +41,7 @@ assert.ok(html.includes('关系｜海鸟与岸'));
 assert.ok(html.includes('工程技术｜SSE 编解码统一'));
 assert.ok(html.includes('偏好｜不要虫子意象'));
 assert.ok(html.includes('另有 2 条'));
-assert.ok(html.includes('读取了人类思考链'));
+assert.ok(html.includes('读取了私人草稿'));
 assert.ok(html.includes('data-run-ids="run-memory,run-dogtalk"'));
 assert.ok(html.includes('data-conversation-id="conv-1"'));
 assert.ok(html.includes('查看工具调用记录'));
@@ -93,7 +93,7 @@ const normalized = normalizeVariant({
 }, 'assistant');
 assert.equal(normalized.furniture_runs.length, 2);
 assert.equal(normalized.furniture_runs[0].items.length, 5);
-assert.equal(normalized.furniture_runs[1].label, '读取了人类思考链');
+assert.equal(normalized.furniture_runs[1].label, '读取了私人草稿');
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const render = await readFile(resolve(root, 'elementera-mcp/deploy-pages/public/features/chat/chat-render.js'), 'utf8');

@@ -19,7 +19,7 @@ const memoryContent = `记忆 content 全文：${'这是被选中记录的完整
 const usageHint = `使用时机全文：${'只有谈到透明桌面与记忆收据时使用。'.repeat(12)}`;
 const avoidHint = `勿误用全文：${'不要把 seed 或候选当成强事实。'.repeat(12)}`;
 const worldbookContent = `世界书全文：${'只有“桌面透明词典”命中时才进入本轮上下文。'.repeat(38)}`;
-const dogtalkBody = `人类思考链全文：${'这一轮请把真正递给模型的人类思考链原样放进透明收据。'.repeat(32)}`;
+const dogtalkBody = `私人草稿全文：${'这一轮请把真正递给模型的私人草稿原样放进透明收据。'.repeat(32)}`;
 const pendingSecret = 'PENDING_DETAIL_MUST_NOT_APPEAR';
 
 await writeCustomInstructions(db, { content: customContent });
@@ -39,7 +39,7 @@ const messages = [
   { role: 'user', content: '最旧的一轮，最近两轮不该再带它。' }, { role: 'assistant', content: '最旧回应。' },
   { role: 'user', content: '最近第二轮用户消息。' }, { role: 'assistant', content: '最近第二轮助手消息。' },
   { role: 'user', content: '最近第三轮用户消息。' }, { role: 'assistant', content: '最近第三轮助手消息。' },
-  { role: 'user', content: '请看全量透明记忆、桌面透明词典和这次人类思考链，并告诉我本轮上下文预览详情。' },
+  { role: 'user', content: '请看全量透明记忆、桌面透明词典和这次私人草稿，并告诉我本轮上下文预览详情。' },
 ];
 const assembled = await assembleCleanContext(env, {
   surface: 'main_chat', conversationId: conversation.id, messages, lastUser: messages.at(-1),
@@ -122,7 +122,7 @@ const deskSource = await readFile(new URL('../elementera-mcp/deploy-pages/public
 assert.equal(deskSource.includes('custom.preview'), false);
 for (const token of ['custom.content', 'recent.messages', 'worldbook.entries', 'dogtalk.context', 'workbench.tool_results', 'workbench.model_visible_tools']) assert.ok(deskSource.includes(token));
 for (const token of ['requested_turns', 'loaded_turns', 'delivered_to_model_turns', 'attempted_delivered_turns', 'attempted_chars', 'attempted_estimated_tokens', 'provider_error_type', 'provider_error_message']) assert.ok(deskSource.includes(token), `cross-window desk UI must expose ${token}`);
-for (const label of ['用户消息', '另一位屋主回复', '核心', '使用时机', '勿误用', '当前整理', '当前活跃线索', '待确认候选', '工具结果 JSON', '本轮总计', '尝试递送字符', 'Provider 错误类型', 'Provider 错误摘要']) assert.ok(deskSource.includes(label));
+for (const label of ['用户消息', '模型伙伴回复', '核心', '使用时机', '勿误用', '当前整理', '当前活跃线索', '待确认候选', '工具结果 JSON', '本轮总计', '尝试递送字符', 'Provider 错误类型', 'Provider 错误摘要']) assert.ok(deskSource.includes(label));
 assert.equal(deskSource.includes('source.delivered_turns'), false, 'PWA desk must not read retired cross-window source fields');
 for (const retired of ['今日海岸', 'today_coast', 'calendar.', '/api/calendar']) assert.equal(deskSource.includes(retired), false);
 

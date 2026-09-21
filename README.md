@@ -17,7 +17,7 @@ It may be useful if you are exploring:
 - visitor mailboxes and controlled external input;
 - model workspaces and tool-call records;
 - early MCP / OpenAI-compatible interface experiments;
-- the process of turning a private AI companion workspace into a public source release.
+- the process of turning a private long-term conversation workspace into a public source release.
 
 ## Table of contents
 

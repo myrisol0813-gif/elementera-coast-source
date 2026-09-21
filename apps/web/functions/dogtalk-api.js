@@ -84,6 +84,6 @@ export async function routeDogtalkApi(request, env, session = null) {
       const mapped = requestBodyError(error);
       return apiError(mapped.type, mapped.message, mapped.status);
     }
-    return unexpectedApiError('dogtalk-api', error, 'dogtalk_failed', '人类思考链暂时没有收好');
+    return unexpectedApiError('dogtalk-api', error, 'dogtalk_failed', '私人草稿暂时没有收好');
   }
 }

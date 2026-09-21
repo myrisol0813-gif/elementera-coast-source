@@ -15,8 +15,8 @@ const env = {
   COAST_GITHUB_ALLOWED_REPOS: 'example-owner/example-web-app,example-owner/example-android-app',
 };
 
-assert.equal(PWA_CACHE_VERSION, 'coast-app-87');
-assert.equal(DEV_HANDS_RELEASE, 'COAST-DEV-HANDS-DIRECT-03');
+assert.equal(PWA_CACHE_VERSION, 'coast-source-app-01');
+assert.equal(DEV_HANDS_RELEASE, 'COAST-SOURCE-DEV-HANDS-01');
 assert.deepEqual(allowedRepos(env), [
   'example-owner/example-web-app',
   'example-owner/example-android-app',

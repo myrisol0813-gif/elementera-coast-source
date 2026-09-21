@@ -300,7 +300,7 @@ export function formatCrossWindowContext(result) {
     const sourceLabel = item.source === 'rikkahub'
       ? `【Rikka】${item.title}`
       : (item.room_type === 'radio' || item.room_type === 'lighthouse' ? item.title : `主聊天｜${item.title}`);
-    const lines = item.messages.map((message) => `${message.role === 'assistant' ? '另一位屋主' : '用户'}：${message.content}`);
+    const lines = item.messages.map((message) => `${message.role === 'assistant' ? '模型伙伴' : '用户'}：${message.content}`);
     return `来源窗口：${sourceLabel}｜${item.loaded_turns ?? item.delivered_turns}轮｜更新于 ${item.updated_at}\n${lines.join('\n')}`;
   });
   return `【跨窗口读取】\n${CROSS_WINDOW_DESCRIPTION}\n\n${blocks.join('\n\n')}`;

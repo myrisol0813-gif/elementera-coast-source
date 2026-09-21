@@ -31,12 +31,12 @@ function edgeDiagnostic(error) {
 
 function modelPartnerCommentError(error) {
   if (error?.type === 'missing_comment_model') return '先去主页选择一个聊天模型。';
-  if (error?.type === 'empty_model_comment') return '另一位屋主这次没有生成可写入的评论。';
+  if (error?.type === 'empty_model_comment') return '模型伙伴这次没有生成可写入的评论。';
   if (error?.status === 502 && error?.type === 'request_failed') {
-    return `另一位屋主留言失败：502（${edgeDiagnostic(error)}）。`;
+    return `模型伙伴留言失败：502（${edgeDiagnostic(error)}）。`;
   }
   const stage = commentStageLabel(error);
-  return `另一位屋主留言失败${stage ? `（${stage}阶段）` : ''}：${error?.message || '服务器没有完成回复。'}`;
+  return `模型伙伴留言失败${stage ? `（${stage}阶段）` : ''}：${error?.message || '服务器没有完成回复。'}`;
 }
 
 export function createDailyActions({
@@ -83,11 +83,11 @@ export function createDailyActions({
         try {
           const generated = await client.modelPartnerCommentMoment(savedMoment.id, { mode: 'instant' });
           replaceMoment(generated.moment);
-          toast('碳硅圈已经写下，另一位屋主也留了一句。');
+          toast('碳硅圈已经写下，模型伙伴也留了一句。');
         } catch (error) {
           console.warn('[daily-instant-comment]', error);
           const message = modelPartnerCommentError(error);
-          toast(message.startsWith('另一位屋主留言失败') ? `碳硅圈已经写下，但 ${message}` : message, 4200);
+          toast(message.startsWith('模型伙伴留言失败') ? `碳硅圈已经写下，但 ${message}` : message, 4200);
         }
       }
       return router.open('moments', {}, { replace: true });
@@ -104,7 +104,7 @@ export function createDailyActions({
     try {
       const generated = await client.modelPartnerCommentMoment(id, { mode: 'instant' });
       replaceMoment(generated.moment);
-      toast('另一位屋主已经在下面留了一句。');
+      toast('模型伙伴已经在下面留了一句。');
     } catch (error) {
       console.warn('[daily-model-partner-comment]', error);
       toast(modelPartnerCommentError(error), 4200);
@@ -116,7 +116,7 @@ export function createDailyActions({
 
   async function editModelPartnerDisplayName() {
     const current = profile.modelPartnerDisplayName();
-    const next = globalThis.prompt?.('另一位屋主在碳硅圈里的显示名称', current);
+    const next = globalThis.prompt?.('模型伙伴在碳硅圈里的显示名称', current);
     if (next == null) return;
     try {
       await profile.saveModelPartnerDisplayName(next);

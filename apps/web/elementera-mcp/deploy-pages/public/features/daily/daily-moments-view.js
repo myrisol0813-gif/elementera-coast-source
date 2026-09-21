@@ -23,7 +23,7 @@ export function createDailyMomentsView({ state, ensureLoad, syncNotice, profile 
   }
 
   function editableModelPartnerName(label, className = '') {
-    return `<button class="moment-author-edit${className ? ` ${className}` : ''}" type="button" data-action="daily:edit-model-partner-name" aria-label="编辑 另一位屋主 在碳硅圈里的显示名称">${escapeHtml(label)}</button>`;
+    return `<button class="moment-author-edit${className ? ` ${className}` : ''}" type="button" data-action="daily:edit-model-partner-name" aria-label="编辑 模型伙伴 在碳硅圈里的显示名称">${escapeHtml(label)}</button>`;
   }
 
   function postAuthor(post) {

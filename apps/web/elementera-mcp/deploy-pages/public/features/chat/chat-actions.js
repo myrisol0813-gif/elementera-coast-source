@@ -120,7 +120,7 @@ export function createChatActions({
     }
     if (name === 'regenerate') {
       const conversation = runtime.conversations.find((item) => item.id === runtime.currentId);
-      if (conversation?.room_type === 'lighthouse') return toast('MCP 对话区只保存文字，不调用 API 另一位屋主回复。');
+      if (conversation?.room_type === 'lighthouse') return toast('MCP 对话区只保存文字，不调用 API 模型伙伴回复。');
       return generate(runtime.currentId, turnId);
     }
     if (name === 'copy') {

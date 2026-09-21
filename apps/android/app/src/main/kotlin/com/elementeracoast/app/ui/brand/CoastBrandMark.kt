@@ -20,15 +20,15 @@ fun CoastBrandMark(
     loopAProgress: Float = 1f,
     loopBProgress: Float = 1f,
     loopCProgress: Float = 1f,
-    hornProgress: Float = 1f,
-    wolfProgress: Float = 1f,
+    primaryMarkProgress: Float = 1f,
+    secondaryMarkProgress: Float = 1f,
     markScale: Float = 1f
 ) {
     Canvas(modifier = modifier.aspectRatio(390f / 300f)) {
         val sx = size.width / 390f
         val sy = size.height / 300f
         fun p(x: Float, y: Float) = Offset(x * sx, y * sy)
-        val alpha = max(max(loopAProgress, loopBProgress), max(loopCProgress, max(hornProgress, wolfProgress))).coerceIn(0f, 1f)
+        val alpha = max(max(loopAProgress, loopBProgress), max(loopCProgress, max(primaryMarkProgress, secondaryMarkProgress))).coerceIn(0f, 1f)
         val stroke = Stroke(width = 7f * sx, cap = StrokeCap.Round, join = StrokeJoin.Round)
         withTransform({ scale(markScale, markScale, p(195f, 150f)) }) {
             val house = Path().apply {

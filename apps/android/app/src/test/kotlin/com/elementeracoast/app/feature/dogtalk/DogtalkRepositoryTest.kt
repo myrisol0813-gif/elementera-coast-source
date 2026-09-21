@@ -16,7 +16,7 @@ class DogtalkRepositoryTest {
         try {
             server.enqueue(
                 MockResponse().setResponseCode(200).setBody(
-                    """{"ok":true,"dogtalk":{"id":"dogtalk-1","room_scope":"conversation","conversation_id":"main-1","body":"服务器人类思考链","true_core":"真心核","weather":"晴","read_mode":"read_now","status":"saved"}}"""
+                    """{"ok":true,"dogtalk":{"id":"dogtalk-1","room_scope":"conversation","conversation_id":"main-1","body":"服务器私人草稿","true_core":"真心核","weather":"晴","read_mode":"read_now","status":"saved"}}"""
                 ).addHeader("Content-Type", "application/json")
             )
             server.enqueue(
@@ -31,7 +31,7 @@ class DogtalkRepositoryTest {
             )
 
             val loaded = kotlinx.coroutines.runBlocking { repository.refresh(DogtalkScope.Main, "main-1") }
-            assertEquals("服务器人类思考链", loaded.body)
+            assertEquals("服务器私人草稿", loaded.body)
             assertEquals("真心核", loaded.trueCore)
             assertEquals("晴", loaded.weather)
             assertEquals(DogtalkReadMode.ReadNow, loaded.readMode)

@@ -23,8 +23,8 @@ class DogtalkContractTest {
         assertEquals(
             listOf(
                 "不需要，放着就好",
-                "另一位屋主困惑时可以看一点",
-                "这次希望另一位屋主直接读一下"
+                "模型伙伴困惑时可以看一点",
+                "这次希望模型伙伴直接读一下"
             ),
             DogtalkReadMode.entries.map { it.label }
         )

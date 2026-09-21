@@ -17,10 +17,10 @@ object CoastGateMotionSpec {
     const val LoopAStartMs = 50
     const val LoopBStartMs = 160
     const val LoopCStartMs = 270
-    const val HornStartMs = 620
-    const val HornDurationMs = 400
-    const val WolfStartMs = 760
-    const val WolfDurationMs = 450
+    const val PrimaryMarkStartMs = 620
+    const val PrimaryMarkDurationMs = 400
+    const val SecondaryMarkStartMs = 760
+    const val SecondaryMarkDurationMs = 450
     const val SettleStartMs = 980
     const val SettleDurationMs = 500
     const val BrandStartMs = 1020
@@ -35,8 +35,8 @@ data class CoastGateMotion(
     val loopA: Float,
     val loopB: Float,
     val loopC: Float,
-    val horn: Float,
-    val wolf: Float,
+    val primaryMark: Float,
+    val secondaryMark: Float,
     val markScale: Float,
     val brand: Float,
     val tagline: Float,
@@ -44,8 +44,8 @@ data class CoastGateMotion(
 )
 
 private val LoopEasing = CubicBezierEasing(.3f, .75f, .25f, 1f)
-private val HornEasing = CubicBezierEasing(.2f, .9f, .3f, 1.25f)
-private val WolfEasing = CubicBezierEasing(.2f, .85f, .25f, 1.15f)
+private val PrimaryMarkEasing = CubicBezierEasing(.2f, .9f, .3f, 1.25f)
+private val SecondaryMarkEasing = CubicBezierEasing(.2f, .85f, .25f, 1.15f)
 private val CssEaseOut = CubicBezierEasing(0f, 0f, .58f, 1f)
 
 private fun segment(
@@ -85,8 +85,8 @@ fun rememberCoastGateMotion(): CoastGateMotion {
         loopA = segment(elapsed, CoastGateMotionSpec.LoopAStartMs, CoastGateMotionSpec.LoopDurationMs, LoopEasing),
         loopB = segment(elapsed, CoastGateMotionSpec.LoopBStartMs, CoastGateMotionSpec.LoopDurationMs, LoopEasing),
         loopC = segment(elapsed, CoastGateMotionSpec.LoopCStartMs, CoastGateMotionSpec.LoopDurationMs, LoopEasing),
-        horn = segment(elapsed, CoastGateMotionSpec.HornStartMs, CoastGateMotionSpec.HornDurationMs, HornEasing),
-        wolf = segment(elapsed, CoastGateMotionSpec.WolfStartMs, CoastGateMotionSpec.WolfDurationMs, WolfEasing),
+        primaryMark = segment(elapsed, CoastGateMotionSpec.PrimaryMarkStartMs, CoastGateMotionSpec.PrimaryMarkDurationMs, PrimaryMarkEasing),
+        secondaryMark = segment(elapsed, CoastGateMotionSpec.SecondaryMarkStartMs, CoastGateMotionSpec.SecondaryMarkDurationMs, SecondaryMarkEasing),
         markScale = settleScale(elapsed),
         brand = segment(elapsed, CoastGateMotionSpec.BrandStartMs, CoastGateMotionSpec.TextDurationMs, CssEaseOut),
         tagline = segment(elapsed, CoastGateMotionSpec.TaglineStartMs, CoastGateMotionSpec.TextDurationMs, CssEaseOut),
@@ -106,8 +106,8 @@ fun CoastBrandMarkAnimation(
         loopAProgress = motion.loopA,
         loopBProgress = motion.loopB,
         loopCProgress = motion.loopC,
-        hornProgress = motion.horn,
-        wolfProgress = motion.wolf,
+        hornProgress = motion.primaryMark,
+        wolfProgress = motion.secondaryMark,
         markScale = motion.markScale
     )
 }

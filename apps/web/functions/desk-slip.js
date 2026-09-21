@@ -149,7 +149,7 @@ export function createDeskSlip({
     thinking_soil: { label: '整理当前对话的纸条', description: DESCRIPTIONS.thinking_soil, status: soil ? '已递给' : '未递给', delivered: Boolean(soil), empty: !soilVisible, context: privateDetails && soil ? soilText : '', current_text: privateDetails && soil ? soilCurrent : '', hand_seeds: privateDetails && soil ? handSeeds : [], hand_seeds_count: handSeeds.length, pocket_candidates_count: Math.max(0, Number(soilPocketCandidatesCount) || 0), pocket_candidates_status: Number(soilPocketCandidatesCount) > 0 ? '待确认' : '未递入', pocket_candidates_delivered: false },
     related_memory: { label: '相关记忆', description: DESCRIPTIONS.related_memory, status: memories.length ? '已递给' : '未命中', confirmation_status: memories.length ? '已确认' : '', count: memories.length, items: privateDetails ? memories : [] },
     worldbook: { label: '世界书', description: DESCRIPTIONS.worldbook, status: deliveredWorldbookCount > 0 ? '已递给' : words.length ? '未递给' : '未命中', matched_count: words.length, delivered_count: deliveredWorldbookCount, entries: privateDetails ? words : [], matched_titles: words.map((item) => item.title), delivered_titles: words.filter((item) => item.delivered).map((item) => item.title) },
-    dogtalk: { label: '人类思考链', description: DESCRIPTIONS.dogtalk, status: dogtalk ? '已递给' : '未递给', delivered: Boolean(dogtalk), context: privateDetails && dogtalk ? dogtalkText : '' },
+    dogtalk: { label: '私人草稿', description: DESCRIPTIONS.dogtalk, status: dogtalk ? '已递给' : '未递给', delivered: Boolean(dogtalk), context: privateDetails && dogtalk ? dogtalkText : '' },
     cross_window: cross,
     workbench: {
       label: '工作台 / 工具回执', description: DESCRIPTIONS.workbench, status: workbenchStatus, prompt_delivered: Boolean(workbenchPrompt), prompt: privateDetails && workbenchPrompt ? workbenchText : '',
@@ -173,7 +173,7 @@ export function createDeskSlip({
         ...(soil ? ['整理当前对话的纸条'] : []),
         ...(memories.length ? ['记忆'] : []),
         ...(deliveredWorldbookCount ? ['世界书'] : []),
-        ...(dogtalk ? ['人类思考链'] : []),
+        ...(dogtalk ? ['私人草稿'] : []),
         ...(cross.delivered ? ['跨窗口'] : []),
         ...(workbenchStatus !== '未递给' ? ['本轮上下文预览 / 工具'] : []),
       ],

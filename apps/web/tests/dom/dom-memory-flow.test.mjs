@@ -32,7 +32,7 @@ export async function runMemoryFlow() {
   assert.ok([...document.querySelectorAll('#memoryFilterValueMenu button')].some((button) => button.disabled && button.textContent.includes('暂无日期')));
   document.querySelector('[data-action="memory:filter-kind"][data-value="tag"]').click();
   await waitFor(() => document.querySelector('.memory-filter-kind')?.textContent.includes('标签'), 'return empty library filter to tag');
-  assert.equal(document.querySelector('#overlayRoot').textContent.includes('屋主 · 人类思考链'), false, 'dogtalk belongs beside the composer, not inside the trajectory page');
+  assert.equal(document.querySelector('#overlayRoot').textContent.includes('屋主 · 私人草稿'), false, 'dogtalk belongs beside the composer, not inside the trajectory page');
   document.querySelector('[data-action="memory:tab"][data-scope="custom"]').click();
   await waitFor(() => document.querySelector('[data-action="memory:tab"][data-scope="custom"]').classList.contains('is-active'), 'custom instructions tab');
   assert.ok(document.querySelector('[data-submit="memory:custom-instructions-save"]'));

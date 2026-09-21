@@ -39,7 +39,7 @@ internal fun ProfileScreen(
         item {
             Text("个人资料", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(
-                "这些显示资料不会自动进入 另一位屋主的记忆或系统提示词。真正长期参与理解的内容仍属于自定义指令或记忆库。",
+                "这些显示资料不会自动进入 模型伙伴的记忆或系统提示词。真正长期参与理解的内容仍属于自定义指令或记忆库。",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall
             )

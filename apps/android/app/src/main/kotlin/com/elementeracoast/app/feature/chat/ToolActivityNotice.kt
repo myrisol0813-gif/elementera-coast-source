@@ -45,7 +45,7 @@ internal fun friendlyToolActivity(name: String, success: Boolean): String {
     val label = when (name.trim()) {
         "memory_search" -> "搜索记忆"
         "memory_write_candidate" -> "放入待确认区"
-        "read_mystic_dogtalk" -> "读取人类思考链"
+        "read_mystic_dogtalk" -> "读取私人草稿"
         "create_moment" -> "写碳硅圈"
         "create_diary" -> "写日记"
         "moment_comment" -> "评论碳硅圈"

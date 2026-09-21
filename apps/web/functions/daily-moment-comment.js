@@ -90,7 +90,7 @@ function commentText(value) {
     .replace(/\s*```$/i, '')
     .trim()
     .replace(/^["'“”‘’]+|["'“”‘’]+$/g, '')
-    .replace(/^(?:另一位屋主|模型伙伴)\s*[:：]\s*/i, '')
+    .replace(/^模型伙伴\s*[:：]\s*/i, '')
     .replace(/^Model Partner\s*[:：]\s*/i, '')
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -140,7 +140,7 @@ function sourceCounts(daily, organized) {
 
 function authorLabel(author) {
   if (author === 'owner') return '屋主';
-  if (author === 'model_partner') return '另一位屋主';
+  if (author === 'model_partner') return '模型伙伴';
   if (author === 'mcp') return 'ChatGPT';
   return '模型伙伴';
 }

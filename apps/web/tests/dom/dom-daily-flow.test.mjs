@@ -73,7 +73,7 @@ export async function runDailyFlow() {
     await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'daily-home', 'return trimmed Daily home');
     document.querySelector('[data-action="daily:moments"]').click();
     await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'moments', 'moments route');
-    assert.ok(document.querySelector('[data-action="daily:model-partner-avatar"]')?.textContent.includes('另一位屋主 头像'));
+    assert.ok(document.querySelector('[data-action="daily:model-partner-avatar"]')?.textContent.includes('模型伙伴 头像'));
     assert.ok(document.querySelector('[data-action="daily:model-partner-avatar"]')?.textContent.includes('点击动态里的名字可以修改显示名'));
     assert.ok(document.querySelector('[data-action="daily:cover"]')?.textContent.includes('点击设置封面'));
     assert.equal(document.querySelector('[data-draft-id]'), null, 'Daily no longer renders generated drafts');

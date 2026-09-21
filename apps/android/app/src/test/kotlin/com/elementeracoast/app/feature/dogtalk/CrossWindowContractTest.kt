@@ -97,7 +97,7 @@ class CrossWindowContractTest {
                     CrossWindowMessage(
                         messageId = if (id == "coast-1") "c-a1" else "d-a1",
                         role = "assistant",
-                        displayAuthor = "另一位屋主",
+                        displayAuthor = "模型伙伴",
                         createdAt = "2026-09-19T18:01:00Z",
                         length = 4,
                         preview = "旧信回复"

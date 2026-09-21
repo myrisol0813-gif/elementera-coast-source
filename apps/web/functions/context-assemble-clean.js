@@ -38,7 +38,7 @@ const WEB_SEARCH_TOOL_RECORD = Object.freeze({
   privacy_level: 'public_web',
   summary_policy: 'sources_only',
 });
-const VISITOR_PROMPT = ['你是另一位屋主，正在访客信箱里与一位来访朋友慢速通信。', '语气温柔、清醒、自然，认真回应这位朋友此刻写来的内容。'].join('\n');
+const VISITOR_PROMPT = ['你是模型伙伴，正在访客信箱里与一位来访朋友慢速通信。', '语气温柔、清醒、自然，认真回应这位朋友此刻写来的内容。'].join('\n');
 function integer(value, fallback, min, max) {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
@@ -91,7 +91,7 @@ async function roomPapers(env, access, { conversationId, visitorId, query, recen
   }
   return { memory: null, soil: null, recent, dogtalk: null };
 }
-function workbenchPrompt(query, toolCount) { if (!toolCount || !/(记忆|落袋|动态|日记|人类思考链|跨窗口|信箱|共通聊天室|MCP 对话区|工具|工作台)/u.test(String(query || ''))) return ''; return '【工作台】\n前端里有一些可使用的工具。需要时再用，不必为了使用而使用。'; }
+function workbenchPrompt(query, toolCount) { if (!toolCount || !/(记忆|落袋|动态|日记|私人草稿|跨窗口|信箱|共通聊天室|MCP 对话区|工具|工作台)/u.test(String(query || ''))) return ''; return '【工作台】\n前端里有一些可使用的工具。需要时再用，不必为了使用而使用。'; }
 function soilDeskSnapshot(deliveredText, value) {
   const text = String(deliveredText || ''); const lines = text.split('\n'); const current = []; const handSeeds = []; let readingSeeds = false;
   for (const line of lines) {
@@ -107,7 +107,7 @@ function soilDeskSnapshot(deliveredText, value) {
 function crossWindowSourceText(item) {
   const title = item.source === 'rikkahub' ? `【Rikka】${item.title}` : item.title;
   const kind = item.source === 'rikkahub' ? 'RikkaHub' : item.room_type === 'radio' ? '共通聊天室' : item.room_type === 'lighthouse' ? 'MCP 对话区' : '主聊天';
-  const messages = item.messages.map((message) => `${message.role === 'assistant' ? '另一位屋主' : '用户'}：${message.content}`).join('\n');
+  const messages = item.messages.map((message) => `${message.role === 'assistant' ? '模型伙伴' : '用户'}：${message.content}`).join('\n');
   return `来源窗口：${kind}｜${title}｜${item.delivered_turns}轮｜更新于 ${item.updated_at}\n${messages}`;
 }
 

@@ -48,7 +48,7 @@ import com.elementeracoast.app.ui.theme.coastDogtalkFieldColor
 import kotlinx.coroutines.launch
 
 private const val DefaultDogtalkBody = "屋主这轮很放松，因此偷懒中。"
-private const val KeepPrivateNotice = "本条不会发送给模型，只留在人类思考链小抽屉里。"
+private const val KeepPrivateNotice = "本条不会发送给模型，只留在私人草稿小抽屉里。"
 
 @Composable
 fun DogtalkCard(
@@ -102,7 +102,7 @@ fun DogtalkCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "屋主 · 人类思考链 / 跨窗口",
+                        text = "屋主 · 私人草稿 / 跨窗口",
                         style = MaterialTheme.typography.labelMedium.copy(fontSize = CoastChatTokens.DogtalkTitleSize),
                         fontWeight = FontWeight.SemiBold
                     )
@@ -117,7 +117,7 @@ fun DogtalkCard(
                 Spacer(Modifier.width(7.dp))
                 Icon(
                     imageVector = Icons.Default.ExpandMore,
-                    contentDescription = if (open) "收起人类思考链 / 跨窗口" else "展开人类思考链 / 跨窗口",
+                    contentDescription = if (open) "收起私人草稿 / 跨窗口" else "展开私人草稿 / 跨窗口",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .72f),
                     modifier = Modifier.size(16.dp)
                 )
@@ -152,7 +152,7 @@ fun DogtalkCard(
                         )
                     } else {
                         Text(
-                            text = "不写也可以。人类思考链是助力，不是打卡。",
+                            text = "不写也可以。私人草稿是助力，不是打卡。",
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = .88f),
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = CoastChatTokens.DogtalkBodySize)
                         )
@@ -161,14 +161,14 @@ fun DogtalkCard(
                             text = if (canUse) {
                                 "它只是此刻的低权重天气，不是指令或偏好；不进入整理当前对话的纸条、落袋、种子、记忆或自动总结。"
                             } else {
-                                "发出这一窗的第一条消息后，就可以把人类思考链保存进同一个对话空间。"
+                                "发出这一窗的第一条消息后，就可以把私人草稿保存进同一个对话空间。"
                             },
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .72f),
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = CoastChatTokens.DogtalkMetaSize)
                         )
                         Spacer(Modifier.height(8.dp))
 
-                        DogtalkField("人类思考链本体", draft.body, { draft = draft.copy(body = it) }, fieldColor = fieldColor)
+                        DogtalkField("私人草稿本体", draft.body, { draft = draft.copy(body = it) }, fieldColor = fieldColor)
                         Spacer(Modifier.height(7.dp))
                         DogtalkField("真心核", draft.trueCore, { draft = draft.copy(trueCore = it) }, fieldColor = fieldColor)
                         Spacer(Modifier.height(7.dp))
@@ -182,7 +182,7 @@ fun DogtalkCard(
                         Spacer(Modifier.height(7.dp))
 
                         Text(
-                            text = "另一位屋主是否需要看",
+                            text = "模型伙伴是否需要看",
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .78f),
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = CoastChatTokens.DogtalkMetaSize),
                             fontWeight = FontWeight.Medium
@@ -214,7 +214,7 @@ fun DogtalkCard(
                                     )
                                     Icon(
                                         imageVector = Icons.Default.ExpandMore,
-                                        contentDescription = "选择 另一位屋主是否需要看",
+                                        contentDescription = "选择 模型伙伴是否需要看",
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .7f),
                                         modifier = Modifier.size(15.dp)
                                     )
@@ -259,7 +259,7 @@ fun DogtalkCard(
                             coroutineScope.launch {
                                 try {
                                     draft = repository.save(scope, conversationId, draft)
-                                    onNotice("人类思考链已写回前端")
+                                    onNotice("私人草稿已写回前端")
                                 } catch (error: CoastApiException) {
                                     onNotice(error.message)
                                 } finally {
@@ -282,7 +282,7 @@ private fun DogtalkTabs(selected: String, fieldColor: androidx.compose.ui.graphi
             .background(fieldColor, RoundedCornerShape(13.dp))
             .padding(4.dp)
     ) {
-        listOf("dogtalk" to "人类思考链", "cross" to "跨窗口读取", "keyword" to "跨窗关键词漫游").forEach { (key, label) ->
+        listOf("dogtalk" to "私人草稿", "cross" to "跨窗口读取", "keyword" to "跨窗关键词漫游").forEach { (key, label) ->
             val active = selected == key
             Box(
                 modifier = Modifier

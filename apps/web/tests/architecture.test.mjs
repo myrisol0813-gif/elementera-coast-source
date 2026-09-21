@@ -22,8 +22,8 @@ const read = (path) => readFile(path, 'utf8');
 const index = await read(resolve(pages, 'index.html'));
 const scripts = [...index.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)].map((match) => match[1]);
 assert.deepEqual(scripts, [`/public/app.js?v=${APP_CACHE_VERSION}`]);
-assert.equal(APP_CACHE_VERSION, 'coast-app-87');
-assert.equal(MAILBOX_CACHE_VERSION, 'coast-mailbox-05');
+assert.equal(APP_CACHE_VERSION, 'coast-source-app-01');
+assert.equal(MAILBOX_CACHE_VERSION, 'coast-source-mailbox-01');
 for (const duplicate of ['app.html', 'gptlike.html', 'index-next.html']) assert.equal(await exists(resolve(pages, duplicate)), false);
 
 const applicationContract = await read(resolve(root, 'ARCHITECTURE.md'));

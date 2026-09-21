@@ -36,7 +36,7 @@ export function createDaily({ storage, router, toast, chat }) {
       ownerAvatarDataurl: preferences.ownerAvatar || '',
       modelPartnerAvatarDataurl: chat?.getProfile?.()?.assistant_avatar_dataurl || preferences.modelPartnerAvatar || '',
       momentCoverDataurl: saved.momentCover || '',
-      modelPartnerDisplayName: '另一位屋主',
+      modelPartnerDisplayName: '模型伙伴',
       updatedAt: null,
     },
     loaded: false,
@@ -95,7 +95,7 @@ export function createDaily({ storage, router, toast, chat }) {
           ownerAvatarDataurl: serverProfile.ownerAvatarDataurl || state.profile.ownerAvatarDataurl || '',
           modelPartnerAvatarDataurl: canonicalModelPartnerAvatar || priorModelPartnerAvatar || state.profile.modelPartnerAvatarDataurl || '',
           momentCoverDataurl: serverProfile.momentCoverDataurl || state.profile.momentCoverDataurl || '',
-          modelPartnerDisplayName: serverProfile.modelPartnerDisplayName || state.profile.modelPartnerDisplayName || '另一位屋主',
+          modelPartnerDisplayName: serverProfile.modelPartnerDisplayName || state.profile.modelPartnerDisplayName || '模型伙伴',
           updatedAt: serverProfile.updatedAt || state.profile.updatedAt || null,
         };
         state.loaded = true;

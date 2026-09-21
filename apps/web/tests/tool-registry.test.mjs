@@ -12,7 +12,7 @@ import { listToolRuns, summarizeToolValue } from '../functions/tool-run-log.js';
 import { D1Database } from './d1-helper.mjs';
 
 const db = new D1Database();
-const conversation = await createConversation(db, 'Registry 人类思考链');
+const conversation = await createConversation(db, 'Registry 私人草稿');
 const backendTools = listRegisteredTools({ permission: 'owner', surface: 'main_chat' });
 assert.equal(backendTools.some((tool) => tool.tool_key.startsWith('calendar.')), false);
 assert.ok(backendTools.some((tool) => tool.tool_key === 'memory.search'));
@@ -76,13 +76,13 @@ assert.equal(visitorTools.some((tool) => tool.owner_only), false);
 assert.equal(visitorTools.some((tool) => tool.tool_key.startsWith('calendar.')), false);
 
 await executeRegisteredTool(db, 'dogtalk.save', {
-  body: '这句人类思考链不能进工具日志。', true_core: '只留此刻温度。', read_mode: 'keep_private',
+  body: '这句私人草稿不能进工具日志。', true_core: '只留此刻温度。', read_mode: 'keep_private',
 }, {
   permission: 'owner', surface: 'main_chat', room_scope: 'conversation', actor: 'owner', conversation_id: conversation.id, source_turn_id: 'registry-dogtalk-turn',
 });
 const dogtalkRun = (await listToolRuns(db)).find((run) => run.tool_key === 'dogtalk.save');
 assert.match(JSON.stringify(dogtalkRun.input_summary), /dogtalk_content_redacted/);
-assert.doesNotMatch(JSON.stringify(dogtalkRun), /这句人类思考链|只留此刻温度/);
+assert.doesNotMatch(JSON.stringify(dogtalkRun), /这句私人草稿|只留此刻温度/);
 
 await assert.rejects(() => executeRegisteredTool(db, 'mailbox.reply', { content: '这是不得进入日志的访客正文' }, {
   permission: 'owner', surface: 'official_mcp', room_scope: 'mailbox', actor: 'official_mcp',

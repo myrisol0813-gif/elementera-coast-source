@@ -26,7 +26,7 @@ internal object TurnDeskMapper {
                 status = withDetail(value.recentContext.status, value.recentContext.statusDetail),
                 description = value.recentContext.description,
                 details = value.recentContext.messages.map { message ->
-                    TurnDeskDetail(if (message.role == "assistant") "另一位屋主回复" else "用户消息", message.content)
+                    TurnDeskDetail(if (message.role == "assistant") "模型伙伴回复" else "用户消息", message.content)
                 }
             ),
             section(
@@ -100,7 +100,7 @@ internal object TurnDeskMapper {
                 }
             ),
             section(
-                title = value.dogtalk.label.ifBlank { "人类思考链" },
+                title = value.dogtalk.label.ifBlank { "私人草稿" },
                 status = value.dogtalk.status,
                 description = value.dogtalk.description,
                 details = if (value.dogtalk.delivered) detail("实际递给模型", value.dogtalk.context) else emptyList()
@@ -143,7 +143,7 @@ internal object TurnDeskMapper {
                         val source = sourceById[group.conversationId]
                         val label = source?.let(::crossWindowSourceLabel).orEmpty().ifBlank { "来源窗口" }
                         group.messages.forEach { message ->
-                            add(TurnDeskDetail("$label · ${if (message.role == "assistant") "另一位屋主" else "用户"}", message.content))
+                            add(TurnDeskDetail("$label · ${if (message.role == "assistant") "模型伙伴" else "用户"}", message.content))
                         }
                     }
                 }
