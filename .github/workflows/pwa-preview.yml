@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - candidate/ui-parity-source-v0.1
+    paths:
+      - .github/preview-trigger
   workflow_dispatch:
 
 permissions:
