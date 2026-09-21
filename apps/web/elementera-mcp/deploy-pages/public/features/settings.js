@@ -59,7 +59,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
         row('个人资料', '昵称、聊天署名与显示资料', 'settings:profile')
         + row('外观', '主题、用户气泡与重点色', 'settings:appearance')
         + row('账户', '当前登录状态与主动退出', 'settings:account')
-        + row('聊天记录', '完整海岸包 / 当前窗口导出 / 导入', 'settings:chat-records')
+        + row('聊天记录', '完整前端包 / 当前窗口导出 / 导入', 'settings:chat-records')
         + row('模型箱', `当前：${shortModelName(currentModel || '未选择')}`, 'models:open')
         + row('基本设置', '回答长度、流式输出、记忆召回与世界书', 'tools:basic-settings')
         + row('版本与更新', 'PWA / Native / GitHub Release / SHA-256', 'devhands:update')
@@ -78,9 +78,9 @@ export function createSettings({ storage, shell, chat, router, toast }) {
 
   router.register('settings-profile', () => ({
     title: '个人资料',
-    subtitle: '屋主在海岸里的显示资料',
+    subtitle: '屋主在前端的显示资料',
     className: 'settings-form',
-    body: `<p class="feature-note">这里保存屋主在海岸里的显示资料。这些显示资料不会自动进入另一位屋主的记忆或系统提示词。真正影响另一位屋主理解你的长期内容，请写入自定义指令或记忆库。</p>
+    body: `<p class="feature-note">这里保存屋主在前端的显示资料。这些显示资料不会自动进入另一位屋主的记忆或系统提示词。真正影响另一位屋主理解你的长期内容，请写入自定义指令或记忆库。</p>
       <div class="form-stack">
         <label>昵称<input id="xiaohanName" value="${escapeAttribute(preferences().xiaohanName)}" maxlength="80"></label>
         <label>聊天署名 / 导出时显示名<input id="xiaohanSignature" value="${escapeAttribute(preferences().xiaohanSignature)}" maxlength="80"></label>
@@ -96,20 +96,20 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     const account = data.account || {};
     return {
       title: '账户',
-      subtitle: '海岸登录态',
+      subtitle: '前端登录态',
       className: 'settings-panel',
       body: group('当前账户',
         line('登录状态', data.authenticated ? '已登录' : '未登录')
         + line('账号', account.display_name || account.type || '前端屋主')
         + line('登录保持', session.persistence === 'until_logout' ? '持续保持，直到主动退出' : (session.expires_at ? `旧会话 · 到期 ${session.expires_at}` : '当前会话'))
         + line('本次登录', session.issued_at || '未记录'))
-        + group('退出', '<button class="danger-row" type="button" data-action="settings:logout"><strong>退出账号</strong><small>只在确认后清除当前海岸登录态，并回到登录前页面。</small></button>'),
+        + group('退出', '<button class="danger-row" type="button" data-action="settings:logout"><strong>退出账号</strong><small>只在确认后清除当前前端登录态，并回到登录前页面。</small></button>'),
     };
   });
 
   router.register('settings-appearance', () => ({
     title: '外观',
-    subtitle: '海岸本机显示',
+    subtitle: '前端本机显示',
     className: 'settings-panel',
     body: group('外观',
       row('主题', '浅色 / 深色 / 黑金', 'settings:theme')
@@ -119,10 +119,10 @@ export function createSettings({ storage, shell, chat, router, toast }) {
 
   router.register('settings-chat-records', () => ({
     title: '聊天记录',
-    subtitle: '整座海岸与当前窗口 · 本机导入导出',
+    subtitle: '完整前端与当前窗口 · 本机导入导出',
     className: 'settings-panel',
-    body: group('整座海岸',
-      row('导出完整海岸包', '主海岸完整数据 · 朋友信箱只含隐私摘要，不含访客正文 / 暗号材料', 'settings:export-full-archive')
+    body: group('完整前端',
+      row('导出完整前端包', '前端完整数据 · 朋友信箱只含隐私摘要，不含访客正文 / 暗号材料', 'settings:export-full-archive')
       + row('导出 V1 防丢快照', '轻量 JSON · 附件只存索引 · 朋友信箱只含隐私摘要', 'settings:export-v1-snapshot')
       + row('导出全局 HTML', '与 V1 JSON 同源 · 朋友信箱仅隐私摘要 · 不含访客正文', 'settings:export-html'))
       + group('当前窗口',
@@ -174,7 +174,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
   });
 
   async function exportFullArchive() {
-    toast('正在把整座海岸收进一个包里…附件多时会慢一点。', 3200);
+    toast('正在把完整前端收进一个包里…附件多时会慢一点。', 3200);
     const data = await requestJson(API.fullArchive);
     const archive = {
       ...(data.archive || {}),
@@ -188,7 +188,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     const body = JSON.stringify(archive, null, 2);
     const bytes = new Blob([body], { type: 'application/json' }).size;
     downloadFile(body, `elementera-coast-full-${timestampLabel()}.coastpack.json`, 'application/json');
-    toast(`完整海岸包已生成 · ${sizeLabel(bytes)} · 模型后端返回原文 ${Number(archive.model_echoes?.length || 0)} 条 · 附件原件 ${Number(archive.attachments?.payloads?.length || 0)} 个`, 5200);
+    toast(`完整前端包已生成 · ${sizeLabel(bytes)} · 模型后端返回原文 ${Number(archive.model_echoes?.length || 0)} 条 · 附件原件 ${Number(archive.attachments?.payloads?.length || 0)} 个`, 5200);
   }
 
   async function exportV1Snapshot() {
@@ -248,7 +248,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
   }
 
   async function exportHtml() {
-    toast('正在把整座海岸整理成 HTML…', 2600);
+    toast('正在把完整前端整理成 HTML…', 2600);
     const signature = preferences().xiaohanSignature || preferences().xiaohanName || '屋主';
     const data = await requestJson(API.v1Snapshot);
     const snapshot = {
@@ -260,7 +260,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
       snapshotDataSection('整理当前对话的纸条', snapshot.thinking_soil),
       snapshotDataSection('记忆系统 / 全局摘录 / 自定义指令', snapshot.memory),
       snapshotDataSection('世界书', snapshot.worldbook),
-      snapshotDataSection('朋友信箱 / 海岸来信（隐私摘要）', snapshot.mailbox),
+      snapshotDataSection('访客信箱 / 来信（隐私摘要）', snapshot.mailbox),
       snapshotDataSection('日记与动态', snapshot.daily),
       snapshotDataSection('模型资料与回波摘要', { model_profile: snapshot.model_profile, model_echo_summaries: snapshot.model_echo_summaries }),
       snapshotDataSection('工具日志摘要', snapshot.tools),
@@ -347,7 +347,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
       return;
     }
     if (name === 'export-full-archive') {
-      return exportFullArchive().catch((error) => toast(`完整海岸包导出失败：${error.message}`, 5200));
+      return exportFullArchive().catch((error) => toast(`完整前端包导出失败：${error.message}`, 5200));
     }
     if (name === 'export-v1-snapshot') {
       return exportV1Snapshot().catch((error) => toast(`V1 快照导出失败：${error.message}`, 4200));
