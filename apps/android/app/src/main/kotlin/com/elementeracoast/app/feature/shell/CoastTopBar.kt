@@ -124,7 +124,7 @@ internal fun CoastTopBar(
                 IconButton(onClick = onRefresh) {
                     Icon(
                         Icons.Default.Refresh,
-                        contentDescription = "刷新海岸状态",
+                        contentDescription = "刷新前端状态",
                         modifier = Modifier.size(CoastChatTokens.TopBarActionGlyph)
                     )
                 }

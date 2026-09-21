@@ -18,7 +18,7 @@ enum class DogtalkReadMode(
     ReadNow(
         wireValue = "read_now",
         label = "这次希望另一位屋主直接读一下",
-        futureSemantics = "只带入下一次发送一次，随后由海岸后端降回不需要。"
+        futureSemantics = "只带入下一次发送一次，随后由后端降回不需要。"
     );
 
     companion object {

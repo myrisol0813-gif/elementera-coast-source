@@ -268,7 +268,7 @@ class CoastShellViewModel(
                         currentModel = profile.currentChatModel.ifBlank { model },
                         showModelPicker = false,
                         backendOffline = false,
-                        snackbarMessage = "当前模型已同步到海岸后端"
+                        snackbarMessage = "当前模型已同步到后端"
                     )
                 }
                 logAction("model.switch", "切换模型", "当前：${model.substringAfterLast('/')}")
@@ -283,7 +283,7 @@ class CoastShellViewModel(
             try {
                 val catalog = backend.profile.refreshModels(force = true)
                 applyModels(catalog)
-                _state.update { it.copy(backendOffline = false, snackbarMessage = "模型目录已从海岸刷新") }
+                _state.update { it.copy(backendOffline = false, snackbarMessage = "模型目录已刷新") }
             } catch (error: CoastApiException) {
                 handleBackendError(error, "模型目录刷新失败")
             }
@@ -310,7 +310,7 @@ class CoastShellViewModel(
             _state.update { it.copy(conversations = list, backendOffline = false) }
             val target = list.firstOrNull { it.id == _state.value.activeConversationId }
             if (target != null) loadConversation(target)
-            _state.update { it.copy(snackbarMessage = "海岸状态已刷新") }
+            _state.update { it.copy(snackbarMessage = "前端状态已刷新") }
         }
     }
 
@@ -320,7 +320,7 @@ class CoastShellViewModel(
             try {
                 val profile = backend.profile.setAssistantAvatar(dataUrl)
                 applyProfile(profile, backend.daily.cachedProfile())
-                _state.update { it.copy(backendOffline = false, snackbarMessage = "另一位屋主头像已写回海岸") }
+                _state.update { it.copy(backendOffline = false, snackbarMessage = "另一位屋主头像已写回后端") }
             } catch (error: CoastApiException) {
                 handleBackendError(error, "另一位屋主头像更新失败")
             }
@@ -344,7 +344,7 @@ class CoastShellViewModel(
         val pendingAttachments = _state.value.pendingAttachments
         if ((clean.isBlank() && pendingAttachments.isEmpty()) || generationJob?.isActive == true || _state.value.isStreaming || _state.value.attachmentUploading) return
         if (_state.value.currentModel.isBlank() && _state.value.activeRoomType != RoomType.Lighthouse) {
-            showPlaceholder("当前模型还没有从海岸载入，暂时不能发送。")
+            showPlaceholder("当前模型还没有从后端载入，暂时不能发送。")
             return
         }
         generationJob = viewModelScope.launch(workDispatcher) {
@@ -379,7 +379,7 @@ class CoastShellViewModel(
                 if (conversation.roomType == RoomType.Lighthouse) {
                     resetCrossWindow()
                     showHistory(conversationId, persistedUser)
-                    _state.update { it.copy(snackbarMessage = "MCP 对话区已写入海岸；这里按房间规则不触发模型回复") }
+                    _state.update { it.copy(snackbarMessage = "MCP 对话区已写入后端；这里按房间规则不触发模型回复") }
                     return@launch
                 }
                 generateTurn(
@@ -406,7 +406,7 @@ class CoastShellViewModel(
             _state.update {
                 it.copy(snackbarMessage = when {
                     bytes.isEmpty() -> "附件是空文件。"
-                    bytes.size > 8 * 1024 * 1024 -> "附件超过海岸当前 8 MB 上传上限。"
+                    bytes.size > 8 * 1024 * 1024 -> "附件超过当前 8 MB 上传上限。"
                     else -> "一轮最多发送 12 个附件。"
                 })
             }
@@ -842,7 +842,7 @@ class CoastShellViewModel(
         }
         val model = _state.value.currentModel
         if (model.isBlank()) {
-            showPlaceholder("当前模型还没有从海岸载入，暂时不能重试。")
+            showPlaceholder("当前模型还没有从后端载入，暂时不能重试。")
             return
         }
         generationJob = viewModelScope.launch(workDispatcher) {
@@ -871,7 +871,7 @@ class CoastShellViewModel(
 
     private fun deleteMessage(message: ChatMessage) {
         val turnId = message.turnId ?: return
-        mutateMessageHistory("删除消息失败", "消息已从海岸删除") { history ->
+        mutateMessageHistory("删除消息失败", "消息已删除") { history ->
             when (message.role) {
                 MessageRole.User -> ChatHistoryMutations.deleteActiveUser(history, turnId)
                 MessageRole.Assistant -> ChatHistoryMutations.deleteActiveAssistant(history, turnId)
@@ -904,7 +904,7 @@ class CoastShellViewModel(
                 showHistory(conversationId, persisted)
                 val conversation = _state.value.conversations.firstOrNull { it.id == conversationId }
                 if (conversation?.roomType == RoomType.Lighthouse) {
-                    _state.update { it.copy(snackbarMessage = "编辑版本已写回海岸") }
+                    _state.update { it.copy(snackbarMessage = "编辑版本已写回后端") }
                     return@launch
                 }
                 val model = _state.value.currentModel
@@ -943,7 +943,7 @@ class CoastShellViewModel(
         }
         val model = _state.value.currentModel
         if (model.isBlank()) {
-            showPlaceholder("当前模型还没有从海岸载入，暂时不能重新生成。")
+            showPlaceholder("当前模型还没有从后端载入，暂时不能重新生成。")
             return
         }
         generationJob = viewModelScope.launch(workDispatcher) {

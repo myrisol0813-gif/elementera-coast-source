@@ -76,7 +76,7 @@ class DefaultDevHandsRepository(
         } catch (error: CoastApiException) {
             throw error
         } catch (error: IOException) {
-            throw CoastApiException(CoastApiErrorKind.Network, "network_unreachable", "无法连接海岸后端。", cause = error)
+            throw CoastApiException(CoastApiErrorKind.Network, "network_unreachable", "无法连接后端。", cause = error)
         }
     }
 
