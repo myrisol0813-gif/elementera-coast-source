@@ -45,7 +45,7 @@ internal fun ThemeWardrobeSheet(
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
             Text("主题衣柜", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(
-                "只换 Native 小身体的衣服。默认海岸永远保留。",
+                "只换 Native 小身体的衣服。默认主题永远保留。",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall
             )
