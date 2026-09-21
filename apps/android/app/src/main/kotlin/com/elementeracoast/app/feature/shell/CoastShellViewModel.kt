@@ -26,6 +26,7 @@ import com.elementeracoast.app.feature.chat.ChatBranchNavigator
 import com.elementeracoast.app.feature.chat.ChatHistoryMutations
 import com.elementeracoast.app.feature.chat.ChatProgress
 import com.elementeracoast.app.feature.chat.ChatSyncMapper
+import com.elementeracoast.app.feature.chat.ToolActivityBus
 import com.elementeracoast.app.feature.daily.DailyProfile
 import com.elementeracoast.app.feature.daily.DailyRepository
 import com.elementeracoast.app.feature.dogtalk.CrossWindowRepository
@@ -101,7 +102,7 @@ class CoastShellViewModel(
                     snackbarMessage = "source preview：当前仅用于查看空壳，未连接后端。"
                 )
             }
-            applyCachedBootstrap()
+            loadSourcePreviewDemo()
             return
         }
 
@@ -137,6 +138,37 @@ class CoastShellViewModel(
     private fun sourcePreviewShellEnabled(): Boolean =
         BuildConfig.COAST_API_BASE_URL == "https://elementera-coast-source.invalid" &&
             BuildConfig.SOURCE_PREVIEW_PASSWORD_HINT.isNotBlank()
+
+    private fun loadSourcePreviewDemo(snackbar: String? = null) {
+        _state.update { state ->
+            state.copy(
+                authenticated = true,
+                authBusy = false,
+                authMessage = null,
+                backendOffline = true,
+                historyLoading = false,
+                activeRoomType = RoomType.Main,
+                conversations = listOf(SourcePreviewDemo.conversation),
+                activeConversationId = SourcePreviewDemo.conversationId,
+                messages = SourcePreviewDemo.messages,
+                pendingAttachments = emptyList(),
+                attachmentUploading = false,
+                thoughtSoil = SourcePreviewDemo.thoughtSoil,
+                turnDeskReceipt = SourcePreviewDemo.messages.last().deskReceipt,
+                currentModel = SourcePreviewDemo.models.first(),
+                models = SourcePreviewDemo.models,
+                isStreaming = false,
+                streamingMessageId = null,
+                streamingVariantIndex = null,
+                snackbarMessage = snackbar ?: "source preview：本地样板窗口，未连接真实模型或后端。"
+            )
+        }
+        ToolActivityBus.publish(
+            id = "source-preview-demo-tool",
+            text = SourcePreviewDemo.toolPopupText,
+            success = true
+        )
+    }
 
     fun logout() {
         stopGeneration()
@@ -185,6 +217,10 @@ class CoastShellViewModel(
 
     fun selectConversation(id: String) {
         stopGeneration()
+        if (sourcePreviewShellEnabled() && id == SourcePreviewDemo.conversationId) {
+            loadSourcePreviewDemo()
+            return
+        }
         if (id != _state.value.activeConversationId) discardPendingAttachments()
         val conversation = _state.value.conversations.firstOrNull { it.id == id } ?: return
         activateCachedConversation(conversation)
@@ -193,6 +229,10 @@ class CoastShellViewModel(
 
     fun newConversation() {
         stopGeneration()
+        if (sourcePreviewShellEnabled()) {
+            showPlaceholder("source preview 只保留这一间样板窗口；配置后端后即可新建真实窗口。")
+            return
+        }
         discardPendingAttachments()
         val roomType = _state.value.activeRoomType
         viewModelScope.launch(workDispatcher) {
@@ -324,6 +364,10 @@ class CoastShellViewModel(
 
     fun refreshCoastState() {
         if (!_state.value.authenticated || generationJob?.isActive == true || _state.value.isStreaming) return
+        if (sourcePreviewShellEnabled()) {
+            loadSourcePreviewDemo("source preview：已重置为本地样板窗口。")
+            return
+        }
         viewModelScope.launch(workDispatcher) {
             val remoteProfile = remoteOrNull("读取个人资料") { backend.profile.refreshProfile() }
             val remoteDaily = remoteOrNull("读取小组件") { backend.daily.refresh() }
@@ -373,6 +417,12 @@ class CoastShellViewModel(
 
     fun sendMessage(text: String) {
         val clean = text.trim()
+        if (sourcePreviewShellEnabled()) {
+            if (clean.isNotBlank()) {
+                showPlaceholder("source preview 不会伪造新回复；配置模型后端后即可真实发送。")
+            }
+            return
+        }
         val pendingAttachments = _state.value.pendingAttachments
         if ((clean.isBlank() && pendingAttachments.isEmpty()) || generationJob?.isActive == true || _state.value.isStreaming || _state.value.attachmentUploading) return
         if (_state.value.currentModel.isBlank() && _state.value.activeRoomType != RoomType.Lighthouse) {
@@ -430,6 +480,10 @@ class CoastShellViewModel(
     }
 
     fun uploadAttachment(name: String, mime: String, bytes: ByteArray) {
+        if (sourcePreviewShellEnabled()) {
+            showPlaceholder("source preview 已内置一组示例附件；配置后端后即可真实上传。")
+            return
+        }
         if (
             bytes.isEmpty() ||
             bytes.size > 8 * 1024 * 1024 ||
@@ -519,6 +573,10 @@ class CoastShellViewModel(
     fun handleMessageAction(action: MessageAction) {
         val current = _state.value
         val message = current.messages.firstOrNull { it.id == action.messageId } ?: return
+        if (sourcePreviewShellEnabled() && action !is MessageAction.Copy) {
+            showPlaceholder("source preview 的这轮消息是只读样板；配置后端后即可写回真实会话。")
+            return
+        }
         when (action) {
             is MessageAction.Copy -> logAction(
                 "message.copy",
