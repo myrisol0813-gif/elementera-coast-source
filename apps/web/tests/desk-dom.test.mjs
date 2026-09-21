@@ -59,7 +59,7 @@ for (const scope of ['conversation', 'radio', 'lighthouse', 'global']) {
 }
 for (const action of ['revision_supplement', 'revision_replace', 'revision_new_version', 'revision_downgrade', 'confirm_pocket']) assert.equal(memoryCluster.includes(action), false);
 for (const action of ['data-destination="memory"', 'data-destination="seed"', 'memory:pocket-discard']) assert.ok(memoryCluster.includes(action));
-for (const tag of ['关系', '历史锚点', '偏好', '人物档案', '海岸世界观', '工程技术']) assert.ok(memoryCluster.includes(`'${tag}'`));
+for (const tag of ['关系', '历史锚点', '偏好', '人物档案', '世界观', '工程技术']) assert.ok(memoryCluster.includes(`'${tag}'`));
 assert.match(memoryCluster, /记忆修订候选/);
 assert.match(memoryCluster, /旧版保留/);
 assert.match(memoryCluster, /memory-retrieval-card/);
