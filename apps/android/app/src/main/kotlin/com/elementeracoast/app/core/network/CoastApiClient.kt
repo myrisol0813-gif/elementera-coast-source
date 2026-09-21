@@ -115,7 +115,7 @@ class CoastApiClient(
             ?: throw CoastApiException(
                 CoastApiErrorKind.Decode,
                 "snapshot_missing",
-                "海岸全局快照没有返回 snapshot 正文。"
+                "全局快照没有返回 snapshot 正文。"
             )
     }
 
@@ -177,7 +177,7 @@ class CoastApiClient(
             .build()
         return execute(request) { response ->
             if (!response.isSuccessful) throw responseError(response)
-            val source = response.body?.source() ?: throw CoastApiException(CoastApiErrorKind.Stream, "empty_stream", "海岸没有返回可读取的朋友圈留言流。")
+            val source = response.body?.source() ?: throw CoastApiException(CoastApiErrorKind.Stream, "empty_stream", "后端没有返回可读取的朋友圈留言流。")
             val parser = SseParser(json)
             var result: RemoteDailyModelPartnerCommentResult? = null
             while (!source.exhausted()) {
@@ -237,7 +237,7 @@ class CoastApiClient(
     ): RemoteAttachment {
         if (bytes.isEmpty()) throw CoastApiException(CoastApiErrorKind.Request, "attachment_empty", "附件是空文件。", 400)
         if (bytes.size > 8 * 1024 * 1024) {
-            throw CoastApiException(CoastApiErrorKind.Request, "file_too_large", "附件超过海岸当前 8 MB 上传上限。", 413)
+            throw CoastApiException(CoastApiErrorKind.Request, "file_too_large", "附件超过当前 8 MB 限制。", 413)
         }
         val mediaType = runCatching { mime.ifBlank { "application/octet-stream" }.toMediaType() }
             .getOrElse { "application/octet-stream".toMediaType() }
@@ -287,7 +287,7 @@ class CoastApiClient(
             try {
                 call.execute().use { response ->
                     if (!response.isSuccessful) throw responseError(response)
-                    val source = response.body?.source() ?: throw CoastApiException(CoastApiErrorKind.Stream, "empty_stream", "海岸没有返回可读取的回复流。")
+                    val source = response.body?.source() ?: throw CoastApiException(CoastApiErrorKind.Stream, "empty_stream", "后端没有返回可读取的回复流。")
                     val parser = SseParser(json)
                     while (!source.exhausted()) {
                         val event = parser.acceptLine(source.readUtf8Line()) ?: continue
@@ -331,26 +331,26 @@ class CoastApiClient(
         if (!response.isSuccessful) throw responseError(response)
         val text = response.body?.string().orEmpty()
         try { json.decodeFromString(serializer, text) }
-        catch (cause: Throwable) { throw CoastApiException(CoastApiErrorKind.Decode, "invalid_json", "海岸返回的数据格式无法读取。", response.code, cause) }
+        catch (cause: Throwable) { throw CoastApiException(CoastApiErrorKind.Decode, "invalid_json", "后端返回的数据格式无法读取。", response.code, cause) }
     }
 
     private suspend fun jsonRequestElement(request: Request): JsonElement = execute(request) { response ->
         if (!response.isSuccessful) throw responseError(response)
         val text = response.body?.string().orEmpty()
         try { json.parseToJsonElement(text) }
-        catch (cause: Throwable) { throw CoastApiException(CoastApiErrorKind.Decode, "invalid_json", "海岸返回的数据格式无法读取。", response.code, cause) }
+        catch (cause: Throwable) { throw CoastApiException(CoastApiErrorKind.Decode, "invalid_json", "后端返回的数据格式无法读取。", response.code, cause) }
     }
 
     private suspend fun <T> execute(request: Request, block: (Response) -> T): T = kotlinx.coroutines.withContext(Dispatchers.IO) {
         try { client.newCall(request).execute().use(block) }
         catch (error: CoastApiException) { throw error }
-        catch (error: IOException) { throw CoastApiException(CoastApiErrorKind.Network, "network_unreachable", "无法连接海岸后端。", cause = error) }
+        catch (error: IOException) { throw CoastApiException(CoastApiErrorKind.Network, "network_unreachable", "无法连接后端。", cause = error) }
     }
 
     private fun responseError(response: Response): CoastApiException {
         val text = response.body?.string().orEmpty()
         var type = if (response.code == 401) "unauthorized" else "request_failed"
-        var message = if (response.code == 401) "登录状态已失效。" else "海岸请求失败（${response.code}）。"
+        var message = if (response.code == 401) "登录状态已失效。" else "请求失败（${response.code}）。"
         runCatching {
             val root = json.parseToJsonElement(text).jsonObject
             val error = root["error"]
@@ -366,7 +366,7 @@ class CoastApiClient(
 
     private fun asApiException(error: Throwable): CoastApiException = when (error) {
         is CoastApiException -> error
-        is IOException -> CoastApiException(CoastApiErrorKind.Network, "network_unreachable", "无法连接海岸后端。", cause = error)
+        is IOException -> CoastApiException(CoastApiErrorKind.Network, "network_unreachable", "无法连接后端。", cause = error)
         else -> CoastApiException(CoastApiErrorKind.Stream, "stream_error", "流式生成中断。", cause = error)
     }
 
