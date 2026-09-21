@@ -148,7 +148,7 @@ data class RemoteDeskDogtalk(
 
 @Serializable
 data class RemoteDeskCrossWindow(
-    val label: String = "跨窗口取信",
+    val label: String = "跨窗口读取",
     val description: String = "",
     val status: String = "未递给",
     val mode: String = "off",
