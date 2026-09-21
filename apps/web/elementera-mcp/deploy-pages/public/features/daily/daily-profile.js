@@ -59,7 +59,7 @@ export function createDailyProfile({ state, client, chat, persistCache, router, 
           state.profile = await client.saveProfile({ [field]: image });
         }
         persistCache();
-        toast('已经保存在海岸。');
+        toast('已经保存在前端。');
         await router.refresh({ preserveScroll: true });
       } catch (error) {
         console.warn('[daily-profile-save]', error);
