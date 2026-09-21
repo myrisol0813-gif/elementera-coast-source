@@ -124,7 +124,7 @@ function escapeHtml(value) {
 
 function loginPage(message = '', previewPasswordHint = '') {
   const notice = message ? `<p class="gate-notice" role="alert">${escapeHtml(message)}</p>` : '';
-  const previewHint = previewPasswordHint ? `<p class="gate-notice">source debug 默认预览密码：${escapeHtml(previewPasswordHint)} · 部署时请修改</p>` : '';
+  const previewHint = previewPasswordHint ? `<p class="gate-notice">默认预览密码：${escapeHtml(previewPasswordHint)} · 仅用于查看 source 空壳；部署时请自行更改</p>` : '';
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
