@@ -118,5 +118,5 @@ async function boot() {
 
 boot().catch((error) => {
   console.error('[bootstrap]', error);
-  toast('海岸载入失败，请刷新重试。');
+  toast('前端载入失败，请刷新重试。');
 });
