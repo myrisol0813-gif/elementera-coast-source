@@ -358,10 +358,10 @@ export async function runChatTypedRooms() {
   assert.equal(formalChatBodies.at(-1).conversation_id, radioConversationId);
   assert.equal(formalChatBodies.at(-1).messages.at(-1).content, 'radio typed DOM');
 
-  appendOfficialTurn(radioConversationId, 'radio-official-turn-dom', '官端从 ChatGPT 向同一个电波窗口发来一条消息。');
+  appendOfficialTurn(radioConversationId, 'radio-official-turn-dom', '官端从 ChatGPT 向同一个共通聊天室发来一条消息。');
   await openType('main');
   await openType('radio');
-  await waitFor(() => document.querySelector('#messages').textContent.includes('官端从 ChatGPT 向同一个电波窗口发来一条消息。'), 'official MCP radio turn reload');
+  await waitFor(() => document.querySelector('#messages').textContent.includes('官端从 ChatGPT 向同一个共通聊天室发来一条消息。'), 'official MCP radio turn reload');
   const radioOfficialMark = [...document.querySelectorAll('#messages .message.user .message-dogtalk-mark')]
     .find((node) => node.textContent.includes('official_mcp'));
   assert.ok(radioOfficialMark?.textContent.includes('ChatGPT-5.6 Thinking sol≋'));
@@ -384,10 +384,10 @@ export async function runChatTypedRooms() {
   const lighthouseConversationId = await openType('lighthouse');
   assert.ok(document.querySelector('.conversation-title.is-active').textContent.startsWith('MCP 对话区｜'));
   assert.equal(conversations.find((item) => item.id === lighthouseConversationId)?.room_type, 'lighthouse');
-  appendOfficialTurn(lighthouseConversationId, 'lighthouse-official-turn-dom', '官端写来一封低频灯塔信。');
+  appendOfficialTurn(lighthouseConversationId, 'lighthouse-official-turn-dom', '官端写来一封低频 MCP 对话区消息。');
   await openType('main');
   await openType('lighthouse');
-  await waitFor(() => document.querySelector('#messages').textContent.includes('官端写来一封低频灯塔信。'), 'official MCP lighthouse turn reload');
+  await waitFor(() => document.querySelector('#messages').textContent.includes('官端写来一封低频 MCP 对话区消息。'), 'official MCP lighthouse turn reload');
   const lighthouseOfficialMark = [...document.querySelectorAll('#messages .message.user .message-dogtalk-mark')]
     .find((node) => node.textContent.includes('official_mcp'));
   assert.ok(lighthouseOfficialMark?.textContent.includes('ChatGPT-5.6 Thinking sol≋'));
@@ -396,13 +396,13 @@ export async function runChatTypedRooms() {
   const lighthouseRequestsBeforeSend = formalChatRequests;
   const lighthouseHistoryWritesBeforeSend = historyWrites;
   const lighthouseAssistantsBeforeSend = document.querySelectorAll('#messages .message.assistant').length;
-  document.querySelector('#promptInput').value = '继续这封灯塔信。';
+  document.querySelector('#promptInput').value = '继续这封 MCP 对话区消息。';
   document.querySelector('#composer').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
   await waitFor(() => historyWrites > lighthouseHistoryWritesBeforeSend
-    && document.querySelector('#messages').textContent.includes('继续这封灯塔信。'), 'Human Owner lighthouse turn is saved without generation');
+    && document.querySelector('#messages').textContent.includes('继续这封 MCP 对话区消息。'), 'Human Owner lighthouse turn is saved without generation');
   assert.equal(formalChatRequests, lighthouseRequestsBeforeSend, 'lighthouse web send must not call formal chat generation');
   assert.equal(document.querySelectorAll('#messages .message.assistant').length, lighthouseAssistantsBeforeSend, 'lighthouse web send must not create an assistant bubble');
-  assert.equal(document.querySelector('#messages').textContent.includes('mock: 继续这封灯塔信。'), false);
+  assert.equal(document.querySelector('#messages').textContent.includes('mock: 继续这封 MCP 对话区消息。'), false);
   assert.equal(document.querySelector('#roomWindow'), null);
   assert.ok(document.querySelector('#mainDogtalkComposer'));
 }
