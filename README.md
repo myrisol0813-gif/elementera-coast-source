@@ -41,7 +41,22 @@ See `docs/ENVIRONMENT.md`. No credentials, tokens, production database IDs, prod
 
 ## Verification status
 
-See `docs/SANITIZATION_REPORT.md` and `docs/KNOWN_LIMITATIONS.md`. Tagging or release publication must wait until PWA and Android real-device acceptance are complete.
+`v0.1-source` has been released as the MIT source release.
+
+Before publication, both the PWA and the source debug Android APK were checked on real devices.
+
+The Android preview APK is available from the GitHub Release:
+
+- release: `v0.1-source`
+- applicationId: `com.elementeracoast.source`
+- versionCode: `1`
+- versionName: `0.1.0-source`
+- build type: `debug`
+- official_production_apk: `false`
+- preview password: `123456`
+- SHA-256: `9f8f8bc3337c2c083db9b205cc6cab10ad61c2596178852c1cad4d59544135c0`
+
+See `docs/SANITIZATION_REPORT.md` and `docs/KNOWN_LIMITATIONS.md` for details.
 
 ## License
 
