@@ -37,13 +37,13 @@ class DefaultCrossWindowRepository(
                 val text = response.body?.string().orEmpty()
                 if (!response.isSuccessful) throw responseError(response.code, text)
                 runCatching { json.decodeFromString(RemoteCrossWindowSourcesResponse.serializer(), text) }.getOrElse { cause ->
-                    throw CoastApiException(CoastApiErrorKind.Decode, "invalid_json", "跨窗口旧信索引的数据格式无法读取。", response.code, cause)
+                    throw CoastApiException(CoastApiErrorKind.Decode, "invalid_json", "跨窗口历史索引的数据格式无法读取。", response.code, cause)
                 }
             }
         } catch (error: CoastApiException) {
             throw error
         } catch (error: IOException) {
-            throw CoastApiException(CoastApiErrorKind.Network, "network_unreachable", "无法连接海岸后端。", cause = error)
+            throw CoastApiException(CoastApiErrorKind.Network, "network_unreachable", "无法连接后端。", cause = error)
         }
         val limits = remote.limits
         CrossWindowSourceSnapshot(
@@ -88,7 +88,7 @@ class DefaultCrossWindowRepository(
 
     private fun responseError(status: Int, text: String): CoastApiException {
         var type = if (status == 401) "unauthorized" else "request_failed"
-        var message = if (status == 401) "登录状态已失效。" else "跨窗口旧信索引请求失败（$status）。"
+        var message = if (status == 401) "登录状态已失效。" else "跨窗口历史索引请求失败（$status）。"
         runCatching {
             val error = json.parseToJsonElement(text).jsonObject["error"]
             if (error is JsonObject) {
