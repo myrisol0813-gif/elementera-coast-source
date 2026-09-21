@@ -85,7 +85,7 @@ assert.equal(memoryCluster.includes('memory-maintenance'), false);
 assert.equal(memoryCluster.includes('旧数据整理 dry-run'), false);
 assert.equal(memoryCluster.includes('重新检查旧数据'), false);
 assert.equal(desk.includes('旧数据整理 dry-run'), false, '世界书不能出现 dry-run 调试块');
-assert.match(desk, /这里还没有词条。以后聊到某个海岸名词时，再整理进来。/);
+assert.match(desk, /这里还没有词条。以后聊到某个专有名词时，再整理进来。/);
 assert.match(desk, /＋ 词条/);
 assert.match(chatRender, /renderSoilEntry\(conversationId\)/);
 assert.match(chatActions, /name === 'open-type'/);
