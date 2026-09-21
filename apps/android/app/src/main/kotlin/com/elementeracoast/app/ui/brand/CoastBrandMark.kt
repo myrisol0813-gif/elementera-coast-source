@@ -58,10 +58,10 @@ fun CoastBrandMark(
             drawPath(sea1, CoastInk, alpha = alpha, style = stroke)
             drawPath(sea2, CoastInk, alpha = alpha, style = stroke)
             val skyStroke = Stroke(width = 5f * sx, cap = StrokeCap.Round)
-            drawLine(CoastMuted, p(120f, 26f), p(120f, 40f), 5f * sx, StrokeCap.Round, alpha)
-            drawLine(CoastMuted, p(113f, 33f), p(127f, 33f), 5f * sx, StrokeCap.Round, alpha)
-            drawLine(CoastMuted, p(270f, 12f), p(270f, 24f), 5f * sx, StrokeCap.Round, alpha)
-            drawLine(CoastMuted, p(264f, 18f), p(276f, 18f), 5f * sx, StrokeCap.Round, alpha)
+            drawLine(color = CoastMuted, start = p(120f, 26f), end = p(120f, 40f), strokeWidth = 5f * sx, cap = StrokeCap.Round, alpha = alpha)
+            drawLine(color = CoastMuted, start = p(113f, 33f), end = p(127f, 33f), strokeWidth = 5f * sx, cap = StrokeCap.Round, alpha = alpha)
+            drawLine(color = CoastMuted, start = p(270f, 12f), end = p(270f, 24f), strokeWidth = 5f * sx, cap = StrokeCap.Round, alpha = alpha)
+            drawLine(color = CoastMuted, start = p(264f, 18f), end = p(276f, 18f), strokeWidth = 5f * sx, cap = StrokeCap.Round, alpha = alpha)
         }
     }
 }

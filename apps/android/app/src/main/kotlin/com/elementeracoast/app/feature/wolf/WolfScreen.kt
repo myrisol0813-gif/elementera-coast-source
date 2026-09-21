@@ -272,7 +272,6 @@ private fun WolfUpdateScreen(
                         Button(onClick = ::refresh, enabled = !busy) {
                             Text(if (busy) "处理中" else "刷新")
                         }
-                        }
                     }
                 }
             }
