@@ -69,7 +69,7 @@ fun GateScreen(
 
             Spacer(Modifier.height(GateVisualTokens.MarkToTitle))
             Text(
-                text = "Elementera Coast",
+                text = "一个开源前端",
                 modifier = Modifier.graphicsLayer {
                     alpha = motion.brand.coerceIn(0f, 1f)
                     translationY = textOffsetPx * (1f - motion.brand.coerceIn(0f, 1f))
@@ -114,7 +114,7 @@ fun GateScreen(
                 if (authBusy || !authMessage.isNullOrBlank()) {
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        text = if (authBusy) "正在连接海岸…" else authMessage.orEmpty(),
+                        text = if (authBusy) "正在连接…" else authMessage.orEmpty(),
                         modifier = Modifier.width(GateVisualTokens.PasswordWidth),
                         color = if (authBusy) CoastMuted else MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
