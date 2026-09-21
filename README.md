@@ -39,6 +39,21 @@ The production signing chain, APK updater, production release publishing and pro
 
 See `docs/ENVIRONMENT.md`. No credentials, tokens, production database IDs, production project IDs or private data are included.
 
+### Source preview and real deployments
+
+The checked-in source build deliberately includes a public preview path so the UI can be inspected before a backend is configured.
+
+- Android: with the default non-routable `https://elementera-coast-source.invalid` backend, password `123456` opens a local one-turn demo window. The demo shows representative chat, attachment, tool, model-echo and thought-soil surfaces, but it does not call a real model or backend.
+- PWA: when no auth configuration and no `COAST_CHAT_DB` binding are present, the public preview gate uses `123456` for shell inspection.
+
+You do **not** need to delete the demo code before connecting real data. Point Android at a real `COAST_API_BASE_URL`, and configure the PWA auth/database bindings; those real configurations disable the source-preview fallback automatically.
+
+If you prefer to remove the Android sample data from your fork entirely, its fixture lives in:
+
+`apps/android/app/src/main/kotlin/com/elementeracoast/app/feature/shell/SourcePreviewDemo.kt`
+
+The preview-only activation path is kept separate from normal backend behavior so real deployments do not mix demo content with real conversations.
+
 ## Verification status
 
 See `docs/SANITIZATION_REPORT.md` and `docs/KNOWN_LIMITATIONS.md`. Tagging or release publication must wait until PWA and Android real-device acceptance are complete.
