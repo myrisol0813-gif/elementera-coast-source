@@ -28,12 +28,12 @@ object GlobalArchive {
             ?: return basicHtml("Elementera Coast 全局快照", "快照格式无法展开。", exportJson(snapshot))
 
         val titles = mapOf(
-            "chat" to "聊天窗口 · 主聊天 / 共通聊天室 / 灯塔",
+            "chat" to "聊天窗口 · 主聊天 / 共通聊天室 / MCP 对话区",
             "thinking_soil" to "整理当前对话的纸条",
             "memory" to "记忆系统 · 全局摘录 · 自定义指令",
             "worldbook" to "世界书",
             "dogtalk" to "人类思考链 / 跨窗口相关数据",
-            "mailbox" to "朋友信箱 / 海岸来信（隐私摘要）",
+            "mailbox" to "访客信箱 / 来信（隐私摘要）",
             "daily" to "日常 / 日记",
             "model_profile" to "模型资料",
             "model_echo_summaries" to "模型后端返回原文摘要",
