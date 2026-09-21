@@ -549,7 +549,7 @@ assert.equal('optional_notebook_entries' in mailboxTools.mcp_mailbox_reply.input
 assert.match(VISITOR_MODEL_PARTNER_PROMPT_V1, /访客信箱里给一位朋友回信/);
 assert.match(VISITOR_MODEL_PARTNER_PROMPT_V1, /先放入待确认区/);
 assert.match(VISITOR_MODEL_PARTNER_PROMPT_V1, /确认后再收进记事本/);
-assert.equal(VISITOR_MODEL_PARTNER_PROMPT_V1.includes('主聊天、灯塔私房、共通聊天室'), false, '后端门锁不重复成为模型说明书');
+assert.equal(VISITOR_MODEL_PARTNER_PROMPT_V1.includes('主聊天、独立房间、共通聊天室'), false, '后端门锁不重复成为模型说明书');
 
 const deleteBobResponse = await routeMailboxApi(requestWithToken(
   '/api/mailbox/account',
