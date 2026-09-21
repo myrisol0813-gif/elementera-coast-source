@@ -18,7 +18,7 @@ class CrossWindowContractTest {
             CrossWindowMode.entries.map { it.wireValue }
         )
         assertEquals(
-            listOf("关闭", "手动选择", "让模型决定", "旧信关键词"),
+            listOf("关闭", "手动选择", "让模型决定", "跨窗关键词漫游"),
             CrossWindowMode.entries.map { it.label }
         )
     }
