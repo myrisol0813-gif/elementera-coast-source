@@ -48,11 +48,13 @@ The checked-in source build deliberately includes a public preview path so the U
 
 You do **not** need to delete the demo code before connecting real data. Point Android at a real `COAST_API_BASE_URL`, and configure the PWA auth/database bindings; those real configurations disable the source-preview fallback automatically.
 
-If you prefer to remove the Android sample data from your fork entirely, its fixture lives in:
+If you prefer to remove the Android preview fixture from your fork entirely, remove the fixture and its preview-only references together:
 
-`apps/android/app/src/main/kotlin/com/elementeracoast/app/feature/shell/SourcePreviewDemo.kt`
+- `apps/android/app/src/main/kotlin/com/elementeracoast/app/feature/shell/SourcePreviewDemo.kt`
+- the `sourcePreviewMode` / `loadSourcePreviewDemo` branches in `CoastShellViewModel.kt`
+- the `source-preview-demo` local metadata branch in `ModelMetadataRemoteDataSource.kt`
 
-The preview-only activation path is kept separate from normal backend behavior so real deployments do not mix demo content with real conversations.
+This cleanup is optional. The preview-only activation path is kept separate from normal backend behavior, so real deployments do not mix demo content with real conversations.
 
 ## Verification status
 
