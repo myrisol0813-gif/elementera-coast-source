@@ -91,7 +91,7 @@ fun DailyLanding(
             )
             DailyPage.Moments -> FeaturePageTopBar(
                 title = "碳硅圈",
-                subtitle = "海岸内部朋友圈",
+                subtitle = "前端内部朋友圈",
                 onBack = { page = DailyPage.Home },
                 actionLabel = "+ 动态",
                 onAction = { page = DailyPage.MomentCompose },
@@ -154,7 +154,7 @@ fun DailyLanding(
 @Composable
 private fun DailyHome(onOpen: (DailyPage) -> Unit, onFutureWidgets: () -> Unit) {
     val mapping = listOf(
-        Triple(DailyPage.Moments, DailyLandingItem("碳硅圈", "海岸内部朋友圈"), Icons.Default.FavoriteBorder),
+        Triple(DailyPage.Moments, DailyLandingItem("碳硅圈", "前端内部朋友圈"), Icons.Default.FavoriteBorder),
         Triple(DailyPage.Diary, DailyLandingItem("日记", "留下今天的纸页"), Icons.Default.Edit),
         Triple(DailyPage.Pet, DailyLandingItem("宠物系统", "还在准备休憩箱"), Icons.Default.Pets)
     )
@@ -198,7 +198,7 @@ private fun DailyHomeCard(item: DailyLandingItem, icon: ImageVector, onClick: ()
 
 /** Active Daily destinations. Future widgets is a visual PWA-mother placeholder, not an active page. */
 internal fun dailyLandingItems(): List<DailyLandingItem> = listOf(
-    DailyLandingItem("碳硅圈", "海岸内部朋友圈"),
+    DailyLandingItem("碳硅圈", "前端内部朋友圈"),
     DailyLandingItem("日记", "留下今天的纸页"),
     DailyLandingItem("宠物系统", "还在准备休憩箱")
 )
