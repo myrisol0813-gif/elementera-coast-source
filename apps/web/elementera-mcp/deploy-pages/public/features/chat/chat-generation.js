@@ -42,8 +42,8 @@ function visibleCrossWindowFailure(error, deskSlip) {
   const message = String(section.provider_error_message || error?.message || '模型请求失败。');
   const tooLong = ['provider_context_limit', 'provider_body_limit'].includes(String(section.failure_reason || ''));
   const head = tooLong
-    ? '这轮跨窗口取信内容太长，provider / 模型未能完成回复。海岸没有偷偷裁剪内容，也没有假装递完。'
-    : '这轮跨窗口取信没有完成递送。海岸没有偷偷裁剪内容，也没有假装递完。';
+    ? '这轮跨窗口读取内容太长，provider / 模型未能完成回复。前端没有偷偷裁剪内容，也没有假装递完。'
+    : '这轮跨窗口读取没有完成递送。前端没有偷偷裁剪内容，也没有假装递完。';
   return [
     head,
     `requested_turns=${requested}`,
