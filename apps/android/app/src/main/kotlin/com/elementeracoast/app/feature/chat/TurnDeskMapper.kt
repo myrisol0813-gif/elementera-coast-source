@@ -106,7 +106,7 @@ internal object TurnDeskMapper {
                 details = if (value.dogtalk.delivered) detail("实际递给模型", value.dogtalk.context) else emptyList()
             ),
             section(
-                title = value.crossWindow.label.ifBlank { "跨窗口取信" },
+                title = value.crossWindow.label.ifBlank { "跨窗口读取" },
                 status = crossWindowStatus(value.crossWindow),
                 description = value.crossWindow.description,
                 details = buildList {
@@ -245,7 +245,7 @@ internal object TurnDeskMapper {
             description = "",
             details = buildList {
                 if (value.requestedQuery.isNotBlank()) add(TurnDeskDetail("本轮触发语句", value.requestedQuery))
-                if (!value.providerQueryReturned) add(TurnDeskDetail("搜索 query", "provider 未回传内部原始 query；海岸不伪造。"))
+                if (!value.providerQueryReturned) add(TurnDeskDetail("搜索 query", "provider 未回传内部原始 query；前端不伪造。"))
                 value.reason?.takeIf(String::isNotBlank)?.let { add(TurnDeskDetail("不可用原因", it)) }
                 value.results.forEach { item ->
                     val body = listOf(item.url, item.content).filter(String::isNotBlank).joinToString("\n")
@@ -271,8 +271,8 @@ internal object TurnDeskMapper {
 
     private fun crossWindowSourceLabel(source: RemoteDeskCrossWindowSource): String = when {
         source.source == "rikkahub" -> "【Rikka】${source.title}"
-        source.roomType == "radio" -> "电波｜${source.title}"
-        source.roomType == "lighthouse" -> "灯塔｜${source.title}"
+        source.roomType == "radio" -> source.title
+        source.roomType == "lighthouse" -> source.title
         else -> "主聊天｜${source.title}"
     }
 
