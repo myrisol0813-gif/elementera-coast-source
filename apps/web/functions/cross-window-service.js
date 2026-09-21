@@ -4,7 +4,7 @@ import {
   sanitizeId,
 } from './chat-store.js';
 
-export const CROSS_WINDOW_DESCRIPTION = '这是本轮从其他海岸窗口取来的近期聊天记录，用来帮你回想自己在别处说过的话；要不要提起，由你按当前对话决定。';
+export const CROSS_WINDOW_DESCRIPTION = '这是本轮从其他对话窗口取来的近期聊天记录，用来帮你回想自己在别处说过的话；要不要提起，由你按当前对话决定。';
 
 export const CROSS_WINDOW_LIMITS = Object.freeze({
   default_turns: 4,
@@ -299,17 +299,17 @@ export function formatCrossWindowContext(result) {
   const blocks = result.items.map((item) => {
     const sourceLabel = item.source === 'rikkahub'
       ? `【Rikka】${item.title}`
-      : `${item.room_type === 'radio' ? '电波' : item.room_type === 'lighthouse' ? '灯塔' : '主聊天'}｜${item.title}`;
+      : (item.room_type === 'radio' || item.room_type === 'lighthouse' ? item.title : `主聊天｜${item.title}`);
     const lines = item.messages.map((message) => `${message.role === 'assistant' ? '另一位屋主' : '用户'}：${message.content}`);
     return `来源窗口：${sourceLabel}｜${item.loaded_turns ?? item.delivered_turns}轮｜更新于 ${item.updated_at}\n${lines.join('\n')}`;
   });
-  return `【跨窗口取信】\n${CROSS_WINDOW_DESCRIPTION}\n\n${blocks.join('\n\n')}`;
+  return `【跨窗口读取】\n${CROSS_WINDOW_DESCRIPTION}\n\n${blocks.join('\n\n')}`;
 }
 
 function emptyDesk(mode, status = '未递给') {
   return {
-    label: mode === 'keyword' ? '旧信关键词' : '跨窗口取信',
-    description: mode === 'keyword' ? '本轮只检索海岸本地跨窗口旧信，不搜索互联网。' : CROSS_WINDOW_DESCRIPTION,
+    label: mode === 'keyword' ? '跨窗关键词漫游' : '跨窗口读取',
+    description: mode === 'keyword' ? '本轮只检索本地跨窗口历史，不搜索互联网。' : CROSS_WINDOW_DESCRIPTION,
     status,
     mode,
     delivered: false,
@@ -405,7 +405,7 @@ export function crossWindowDeskSection(result, {
 
   const delivered = loadedTurns > 0;
   return {
-    label: '跨窗口取信',
+    label: '跨窗口读取',
     description: CROSS_WINDOW_DESCRIPTION,
     status: modelRead ? (delivered ? '已由模型读取' : '未递给') : (delivered ? '已递给' : '未递给'),
     mode: normalizedMode,
