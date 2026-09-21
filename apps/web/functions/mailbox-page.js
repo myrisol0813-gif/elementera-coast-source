@@ -40,7 +40,7 @@ const PAGE = `<!doctype html>
       <section class="window-surface mailbox-window">
         <section id="mailboxMessageScroller" class="message-scroller" aria-label="访客信箱消息">
           <div id="mailboxMessages" class="messages mailbox-messages">
-            <div class="empty-state">正在打开你的海岸房间…</div>
+            <div class="empty-state">正在打开访客信箱…</div>
           </div>
         </section>
 
@@ -54,7 +54,7 @@ const PAGE = `<!doctype html>
 
         <form id="mailboxComposer" class="composer composer--room mailbox-composer" autocomplete="off">
           <div class="input-pill">
-            <textarea id="mailboxPromptInput" rows="1" maxlength="40000" placeholder="把一封信投进海岸" aria-label="写给另一位屋主的来信"></textarea>
+            <textarea id="mailboxPromptInput" rows="1" maxlength="40000" placeholder="写一封来信" aria-label="写给另一位屋主的来信"></textarea>
           </div>
           <button id="mailboxSendButton" class="composer-primary" type="submit" data-icon="send" aria-label="投入信箱"></button>
         </form>
