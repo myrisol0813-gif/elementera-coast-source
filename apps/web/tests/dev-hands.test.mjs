@@ -122,7 +122,7 @@ for (const forbidden of ["delivery_source: 'github_release'", 'list_releases', '
 }
 
 const pwaSource = await readFile(new URL('../elementera-mcp/deploy-pages/public/features/dev-hands.js', import.meta.url), 'utf8');
-for (const label of ['海岸开发手', '模型随身工具 · 观察窗', '开发手默认随身', '模型当前可见', '施工脚印', '版本与更新']) {
+for (const label of ['前端开发手', '模型随身工具 · 观察窗', '开发手默认随身', '模型当前可见', '施工脚印', '版本与更新']) {
   assert.ok(pwaSource.includes(label), `PWA observer missing ${label}`);
 }
 for (const retiredSymbol of ['confirmationText', 'modeMutationLoading', 'constructionLoading', 'constructionMode', 'devSettings', 'devGithub', 'devNotion', 'pending_actions']) {
