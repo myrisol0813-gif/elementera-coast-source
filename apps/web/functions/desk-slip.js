@@ -35,7 +35,7 @@ const DESCRIPTIONS = Object.freeze({
   dogtalk: '这是属于屋主的心绪草稿；只有本轮开启并实际递入时才成为理解线索。',
   cross_window: '这是本轮从其他对话窗口取来的近期聊天记录，用来帮你回想自己在别处说过的话；要不要提起，由你按当前对话决定。',
   workbench: '这是代码、文件、接口、真机、GitHub 等技术领域的话题与事实结果。',
-  external_tide: '这是从海岸外部临时读入、且尚未归档成海岸内部窗口的材料；本轮没有接入外部入口消息。',
+  external_tide: '这是从应用外部临时读入、且尚未归档成内部对话窗口的材料；本轮没有接入外部入口消息。',
 });
 
 function safeCrossWindow(value, ownerVisible) {
