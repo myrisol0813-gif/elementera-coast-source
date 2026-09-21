@@ -76,7 +76,7 @@ internal fun MomentScreen(
             try {
                 val dataUrl = DailyImageCodec.encodeForProfile(context, uri, field)
                 repository.updateProfile(field, dataUrl)
-                onSnackbar("$label 已写回海岸")
+                onSnackbar("$label 已写回前端")
             } catch (error: Throwable) {
                 reportFailure("$label 更新失败", error)
             }
@@ -156,8 +156,8 @@ internal fun MomentScreen(
                             scope.launch {
                                 try {
                                     repository.requestModelPartnerComment(moment.id)
-                                    onActionLogged("daily.moment.myri-comment", "另一位屋主留言", "海岸已生成并保存 1 条真实留言")
-                                    onSnackbar("另一位屋主已在海岸留下回复")
+                                    onActionLogged("daily.moment.myri-comment", "另一位屋主留言", "前端已生成并保存 1 条真实留言")
+                                    onSnackbar("另一位屋主已在前端留下回复")
                                 } catch (error: Throwable) {
                                     reportFailure("另一位屋主留言失败", error)
                                 } finally {
@@ -183,7 +183,7 @@ internal fun MomentScreen(
                     try {
                         repository.updateModelPartnerDisplayName(raw)
                         editingModelPartnerName = false
-                        onSnackbar("另一位屋主的碳硅圈名字已写回海岸")
+                        onSnackbar("另一位屋主的碳硅圈名字已写回前端")
                     } catch (error: Throwable) {
                         reportFailure("另一位屋主名字保存失败", error)
                     }
@@ -197,7 +197,7 @@ internal fun MomentScreen(
             if (text.isBlank()) onSnackbar("评论还是空的") else scope.launch {
                 try {
                     repository.addMomentComment(moment.id, text)
-                    onActionLogged("daily.moment.comment", "评论了一条碳硅圈", "海岸新增 1 条屋主评论")
+                    onActionLogged("daily.moment.comment", "评论了一条碳硅圈", "前端新增 1 条屋主评论")
                     commenting = null
                 } catch (error: Throwable) { reportFailure("评论写回失败", error) }
             }
@@ -208,8 +208,8 @@ internal fun MomentScreen(
             if (text.isBlank()) onSnackbar("正文还是空的") else scope.launch {
                 try {
                     repository.patchMoment(moment.id, text = text)
-                    onActionLogged("daily.moment.edit", "编辑了一条碳硅圈", "海岸更新 1 条动态")
-                    onSnackbar("动态已写回海岸")
+                    onActionLogged("daily.moment.edit", "编辑了一条碳硅圈", "前端更新 1 条动态")
+                    onSnackbar("动态已写回前端")
                     editing = null
                 } catch (error: Throwable) { reportFailure("动态更新失败", error) }
             }
@@ -218,14 +218,14 @@ internal fun MomentScreen(
     deleting?.let { moment ->
         DailyDeleteConfirmDialog(
             title = "删除这条动态？",
-            body = "这是海岸里的正式动态；删除后 PWA 与 Native 都不会再看到它。",
+            body = "这是前端里的正式动态；删除后 PWA 与 Native 都不会再看到它。",
             onDismiss = { deleting = null },
             onConfirm = {
                 scope.launch {
                     try {
                         repository.deleteMoment(moment.id)
-                        onActionLogged("daily.moment.delete", "删除了一条碳硅圈", "海岸删除 1 条动态")
-                        onSnackbar("动态已从海岸删除")
+                        onActionLogged("daily.moment.delete", "删除了一条碳硅圈", "前端删除 1 条动态")
+                        onSnackbar("动态已从前端删除")
                         deleting = null
                     } catch (error: Throwable) { reportFailure("动态删除失败", error) }
                 }
@@ -253,7 +253,7 @@ internal fun MomentComposeScreen(
                 Spacer(Modifier.height(18.dp))
                 DailyField("正文", body, { body = it }, "今天想留什么？", minLines = 10, maxLines = 18)
                 Spacer(Modifier.height(18.dp))
-                DailyPrimaryButton(if (saving) "正在写回海岸…" else "发布动态") {
+                DailyPrimaryButton(if (saving) "正在写回前端…" else "发布动态") {
                     if (body.isBlank()) {
                         onSnackbar("正文还是空的")
                     } else if (!saving) {
@@ -261,11 +261,11 @@ internal fun MomentComposeScreen(
                         scope.launch {
                             try {
                                 val created = repository.createMoment(date, body)
-                                onActionLogged("daily.moment.write", "写了一条碳硅圈", "海岸新增 1 条屋主动态")
+                                onActionLogged("daily.moment.write", "写了一条碳硅圈", "前端新增 1 条屋主动态")
                                 try {
                                     repository.requestModelPartnerComment(created.id)
-                                    onActionLogged("daily.moment.myri-comment", "另一位屋主即时留言", "海岸已生成并保存 1 条真实留言")
-                                    onSnackbar("动态已发布，另一位屋主也在海岸留下了回复")
+                                    onActionLogged("daily.moment.myri-comment", "另一位屋主即时留言", "前端已生成并保存 1 条真实留言")
+                                    onSnackbar("动态已发布，另一位屋主也在前端留下了回复")
                                 } catch (commentError: Throwable) {
                                     val detail = if (commentError is CoastApiException) commentError.message else commentError.message ?: "未知错误"
                                     onSnackbar("动态已发布；另一位屋主即时留言暂未完成：$detail")
