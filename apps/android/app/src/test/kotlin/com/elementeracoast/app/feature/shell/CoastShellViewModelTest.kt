@@ -110,14 +110,14 @@ class CoastShellViewModelTest {
         assertEquals("", vm.state.value.activeConversationId)
         assertFalse(vm.state.value.conversations.any { it.roomType == RoomType.Radio })
 
-        vm.sendMessage("电波测试")
+        vm.sendMessage("共通聊天室测试")
 
         val state = vm.state.value
         assertEquals(RoomType.Radio, state.activeRoomType)
         assertTrue(state.activeConversationId.isNotBlank())
         assertTrue(state.conversations.any { it.id == state.activeConversationId && it.roomType == RoomType.Radio })
         assertEquals(listOf(MessageRole.User, MessageRole.Assistant), state.messages.map { it.role })
-        assertEquals("电波测试", state.messages.first().text)
+        assertEquals("共通聊天室测试", state.messages.first().text)
         assertEquals("真实流回复", state.messages.last().text)
         assertEquals(1, fixture.chat.streamCalls)
         assertEquals(13, fixture.chat.lastRecentTurns)
@@ -178,14 +178,14 @@ class CoastShellViewModelTest {
         val vm = fixture.vm()
 
         vm.openRoomType(RoomType.Lighthouse)
-        vm.sendMessage("灯塔只收信")
+        vm.sendMessage("MCP 对话区只收信")
 
         val state = vm.state.value
         assertEquals(RoomType.Lighthouse, state.activeRoomType)
         assertTrue(state.activeConversationId.isNotBlank())
         assertEquals(1, state.messages.size)
         assertEquals(MessageRole.User, state.messages.single().role)
-        assertEquals("灯塔只收信", state.messages.single().text)
+        assertEquals("MCP 对话区只收信", state.messages.single().text)
         assertEquals(0, fixture.chat.streamCalls)
         assertEquals(1, fixture.chat.persistCalls)
     }
