@@ -69,7 +69,7 @@ const summary = safeDevSummary({
 });
 assert.equal(summary.includes('do-not-log-me'), false);
 assert.equal(summary.includes('also-secret'), false);
-assert.equal(summary.includes('elementera-coast'), true);
+assert.equal(summary.includes('example-web-app'), true);
 
 const shaped = devLogShape({
   repo: 'example-owner/example-web-app',
