@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   preview:
@@ -98,6 +100,19 @@ jobs:
             sleep 2
           done
           exit 1
+
+      - name: Publish preview address to draft PR
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER="$(gh pr list --head "$GITHUB_REF_NAME" --state open --json number --jq '.[0].number')"
+          if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+            echo "No open PR found for $GITHUB_REF_NAME"
+            exit 1
+          fi
+          gh pr comment "$PR_NUMBER" --body "Candidate PWA preview is live: $PREVIEW_URL"
 
       - name: Keep preview alive for real-device acceptance
         shell: bash
