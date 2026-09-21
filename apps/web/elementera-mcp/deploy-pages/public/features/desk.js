@@ -6,7 +6,7 @@ import { readModelMetadataStatus } from './chat/chat-model-metadata.js';
 const DESK_ROUTES = new Set(['desk-slip', 'desk-worldbook', 'desk-worldbook-editor']);
 const HANDLER_NAMES = Object.freeze({ click: 'handleAction', submit: 'handleSubmit' });
 const SCOPE_LABELS = Object.freeze({
-  owner: '屋主', visitor: '访客', both: '双方', mailbox: '信箱', lighthouse: '灯塔', radio: '共通聊天室', official_mcp: '官端 MCP', daily: '小组件',
+  owner: '屋主', visitor: '访客', both: '双方', mailbox: '信箱', lighthouse: 'MCP 对话区', radio: '共通聊天室', official_mcp: '官端 MCP', daily: '小组件',
 });
 const ENTRY_TYPE_LABELS = Object.freeze({ memory: '记忆', seed: '种子' });
 
@@ -50,7 +50,7 @@ function crossWindowDeskDetails(section = {}) {
   const estimatedTokens = Math.max(0, Number(section.attempted_estimated_tokens) || 0);
   const sourceList = sources.length
     ? `<div class="desk-record-list">${sources.map((source) => {
-      const kind = source.source === 'rikkahub' ? 'RikkaHub' : source.room_type === 'radio' ? '电波' : source.room_type === 'lighthouse' ? '灯塔' : '主聊天';
+      const kind = source.source === 'rikkahub' ? 'RikkaHub' : (source.room_type === 'radio' || source.room_type === 'lighthouse') ? '' : '主聊天';
       const title = source.source === 'rikkahub' ? `【Rikka】${source.title || '未命名窗口'}` : source.title || '未命名窗口';
       const sourceRequested = Math.max(0, Number(source.requested_turns) || 0);
       const sourceLoaded = Math.max(0, Number(source.loaded_turns) || 0);
@@ -58,7 +58,7 @@ function crossWindowDeskDetails(section = {}) {
       const messageStatus = Number(source.loaded_messages || 0)
         ? ` · 消息 ${Number(source.loaded_messages || 0)} 条`
         : '';
-      return `<section class="desk-record"><header><strong>${escapeHtml(`${kind}｜${title}`)}</strong><small>请求 ${sourceRequested} 轮 · 读取 ${sourceLoaded} 轮 · 递给 ${sourceDelivered} 轮${messageStatus}</small></header>${paragraph('更新：', source.updated_at)}</section>`;
+      return `<section class="desk-record"><header><strong>${escapeHtml(kind ? `${kind}｜${title}` : title)}</strong><small>请求 ${sourceRequested} 轮 · 读取 ${sourceLoaded} 轮 · 递给 ${sourceDelivered} 轮${messageStatus}</small></header>${paragraph('更新：', source.updated_at)}</section>`;
     }).join('')}</div>`
     : section.mode === 'model_decides' && section.status !== '递送失败' ? '<p class="desk-slip-note">实际读取：暂无</p>' : emptyNote();
   const messageGroups = Array.isArray(section.messages) ? section.messages : [];
@@ -181,7 +181,7 @@ export function createDesk({ router, toast }) {
     const memory = slip.related_memory || { label: '相关记忆', status: '未命中', items: [] };
     const worldbook = slip.worldbook || { label: '世界书', status: '未命中', entries: [] };
     const dogtalk = slip.dogtalk || { label: '人类思考链', status: '未递给', context: '' };
-    const crossWindow = slip.cross_window || { label: '跨窗口取信', status: '未递给', mode: 'off', sources: [], messages: [] };
+    const crossWindow = slip.cross_window || { label: '跨窗口读取', status: '未递给', mode: 'off', sources: [], messages: [] };
     const workbench = slip.workbench || { label: '工作台 / 工具回执', status: '未递给', model_visible_tools: [], backend_tools: [], core_tools: [], side_tools: [], furniture: [], prompt_delivered: false, prompt: '', tool_results: [], labels: {} };
     const attachments = slip.attachments || null;
     const webSearch = slip.web_search && typeof slip.web_search === 'object' ? slip.web_search : null;
@@ -239,7 +239,7 @@ export function createDesk({ router, toast }) {
         ${deskRow(memory.label || '相关记忆', memoryStatus, [sourceNote(memory.description), memoryDeskDetails(memory.items)].join(''))}
         ${deskRow(worldbook.label || '世界书', worldbookStatus, [sourceNote(worldbook.description), worldbookDeskDetails(worldbook.entries)].join(''))}
         ${deskRow(dogtalk.label || '人类思考链', dogtalk.status, [sourceNote(dogtalk.description), dogtalk.delivered ? deskText(dogtalk.context) : emptyNote()].join(''))}
-        ${deskRow(crossWindow.label || '跨窗口取信', crossWindowStatus, crossWindowDeskDetails(crossWindow))}
+        ${deskRow(crossWindow.label || '跨窗口读取', crossWindowStatus, crossWindowDeskDetails(crossWindow))}
         ${attachments ? deskRow('本轮附件', `上传 ${Number(attachments.uploaded || 0)} · 递给 ${Number(attachments.delivered_to_model || 0)}`, attachmentDeskDetails(attachments)) : ''}
         ${webSearch ? deskRow('本轮搜索', webSearch.available === false
           ? '不可用'
