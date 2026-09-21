@@ -130,7 +130,7 @@ function loginPage(message = '') {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>Elementera Coast</title>
+  <title>一个开源前端</title>
   <style>
     :root {
       color-scheme: light;
@@ -583,7 +583,7 @@ function loginPage(message = '') {
         role="img"
         aria-labelledby="coast-mark-title coast-mark-desc"
       >
-        <title id="coast-mark-title">Elementera Coast 开屏符号</title>
+        <title id="coast-mark-title">一个开源前端开屏符号</title>
         <desc id="coast-mark-desc">岸上的入口与两道海浪。</desc>
         <g class="mark" fill="none" stroke="#24252b" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
           <path d="M120 96v14M113 103h14M270 78v12M264 84h12" stroke="#9c8872" stroke-width="5" />
@@ -594,7 +594,7 @@ function loginPage(message = '') {
           <path d="M90 337Q122 324 154 337Q186 350 218 337Q250 324 282 337Q306 347 322 340" />
         </g>
         <g text-anchor="middle">
-          <text id="coast-brand" class="brand" x="195" y="430" fill="#24252b" font-size="25" font-weight="650" letter-spacing=".8">Elementera Coast</text>
+          <text id="coast-brand" class="brand" x="195" y="430" fill="#24252b" font-size="25" font-weight="650" letter-spacing=".8">一个开源前端</text>
           <text class="tagline" x="195" y="466" fill="#9c8872" font-size="14" font-weight="450" letter-spacing="2.4">进入你的长期对话空间</text>
         </g>
       </svg>
@@ -611,7 +611,7 @@ function loginPage(message = '') {
             placeholder="输入访问密码"
             aria-label="输入访问密码"
           >
-          <button class="password-submit" type="submit" aria-label="进入海岸">
+          <button class="password-submit" type="submit" aria-label="进入">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M5 12h13" />
               <path d="m13 6 6 6-6 6" />
@@ -636,7 +636,7 @@ function loginPage(message = '') {
                 <span class="mailbox-choice-arrow" aria-hidden="true">›</span>
               </button>
               <button type="button" data-mailbox-choice="register">
-                <span class="mailbox-choice-copy"><strong>填记名册</strong><small>第一次来到海岸？先登记称呼与专属暗号。</small></span>
+                <span class="mailbox-choice-copy"><strong>填记名册</strong><small>第一次来访？先登记称呼与专属暗号。</small></span>
                 <span class="mailbox-choice-arrow" aria-hidden="true">›</span>
               </button>
             </div>
@@ -655,7 +655,7 @@ function loginPage(message = '') {
           </form>
 
           <form id="mailboxRegisterForm" class="mailbox-entry-form" hidden autocomplete="off">
-            <p class="mailbox-entry-copy">暗号就是轻量身份门。海岸只保存加密后的验证值，不保存暗号明文。</p>
+            <p class="mailbox-entry-copy">暗号就是轻量身份门。前端只保存加密后的验证值，不保存暗号明文。</p>
             <label>称呼
               <input name="display_name" type="text" maxlength="80" required autocomplete="nickname">
             </label>
