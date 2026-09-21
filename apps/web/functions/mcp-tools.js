@@ -493,8 +493,8 @@ export async function callCoastMcpTool(name, args, request, env, requestMeta = {
 }
 
 export const coastMcpInstructions = [
-  'Elementera Coast 是屋主的私有海岸。只在确有需要时使用对应工具，没有成功执行的动作不要声称已完成。',
-  '主聊天、共通聊天室与MCP 对话区共用统一 conversation、整理当前对话的纸条与 Memory v2；Daily 只保留碳硅圈与日记。旧草稿、相册、一日总结、日历、官端巡迹与独立灯塔房整理当前对话的纸条均不存在或不再开放。',
+  'Elementera Coast 是一个个人长期对话前端。只在确有需要时使用对应工具，没有成功执行的动作不要声称已完成。',
+  '主聊天、共通聊天室与MCP 对话区共用统一 conversation、整理当前对话的纸条与 Memory v2；Daily 只保留碳硅圈与日记。旧草稿、相册、一日总结、日历、官端巡迹与独立 MCP 对话区整理当前对话的纸条均不存在或不再开放。',
   '待确认候选在屋主或当前访客明确确认前不是长期记忆。',
 ].join('');
 
