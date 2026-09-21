@@ -11,8 +11,8 @@ enum class RoomType(
     val titlePrefix: String
 ) {
     Main("main", "主聊天", ""),
-    Radio("radio", "共通聊天室", "【电波】"),
-    Lighthouse("lighthouse", "MCP 对话区", "【灯塔】");
+    Radio("radio", "共通聊天室", "【共通聊天室】"),
+    Lighthouse("lighthouse", "MCP 对话区", "【MCP 对话区】");
 
     companion object {
         fun fromWire(value: String?): RoomType =
