@@ -256,7 +256,7 @@ async function sendOfficialRoomMessage(env, roomType, value = {}) {
   });
   const text = clip(generated?.message?.content, 12000);
   if (!text) {
-    const error = new Error(`海岸 API 模型伙伴 没有生成可写入${TITLES[roomType] || roomType}的回复。`);
+    const error = new Error(`API 模型伙伴没有生成可写入${TITLES[roomType] || roomType}的回复。`);
     error.type = `empty_${roomType}_reply`;
     error.status = 502;
     throw error;
