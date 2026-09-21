@@ -6,7 +6,8 @@ The copied PWA expects Cloudflare Pages/Workers-style bindings.
 
 Source preview:
 
-- With no auth configuration and no `COAST_CHAT_DB` binding, the source PWA exposes only its empty shell behind the public preview password `123456`.
+- With no auth configuration and no `COAST_CHAT_DB` binding, the source PWA exposes its shell behind the public preview password `123456`.
+- This fallback turns off automatically once real auth configuration or a real data binding is present.
 - The login page labels this password as preview-only. Before connecting real data or deploying a real service, configure your own password hash and session secret.
 
 Required for a real/self-hosted deployment:
@@ -33,6 +34,16 @@ The checked-in default API base is the non-routable placeholder:
 
 `https://elementera-coast-source.invalid`
 
-With the checked-in non-routable placeholder backend, the source debug APK accepts `123456` locally and opens the empty application shell for inspection. The gate labels it as a public preview password. Once a real backend is configured, authentication returns to that backend.
+With the checked-in non-routable placeholder backend, the source debug APK accepts `123456` locally and opens a deterministic one-turn demo window for inspection. The demo contains local sample chat, attachments, tool traces, model-echo metadata and thought-soil data. It does not call a real model or backend.
+
+The demo is enabled only while the Android build still points at:
+
+`https://elementera-coast-source.invalid`
+
+As soon as `COAST_API_BASE_URL` is set to a real backend, the local demo path is bypassed and authentication/data loading use that backend instead. No demo file needs to be deleted.
+
+For maintainers who want to remove the fixture entirely, the Android sample data is isolated in:
+
+`apps/android/app/src/main/kotlin/com/elementeracoast/app/feature/shell/SourcePreviewDemo.kt`
 
 Self-hosters should set their own source-build backend endpoint at build time and change the password before connecting real data. Production signing material and production updater/release configuration are intentionally absent.
