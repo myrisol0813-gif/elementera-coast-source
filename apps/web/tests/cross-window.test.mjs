@@ -222,7 +222,7 @@ assert.ok(modelKeywordHits.hits.length <= 10);
 assert.equal(modelKeywordHits.status, 'matched');
 const noKeywordHits = await executeCrossWindowModelTool(db, 'keyword_search', { query: '绝对不存在的旧信关键词', limit: 10 }, recallToolContext);
 assert.equal(noKeywordHits.status, 'no_match');
-assert.equal(noKeywordHits.message, '本地旧信无命中。');
+assert.equal(noKeywordHits.message, '本地历史无命中。');
 const modelExact = await executeCrossWindowModelTool(db, 'read_messages', {
   messages: [{ conversation_id: 'work-main', message_id: selectedMessageId }],
 }, recallToolContext);
@@ -304,7 +304,7 @@ assert.equal(dogtalkSource.includes('Math.min(max, Math.trunc(number))'), false,
 assert.match(dogtalkSource, /窗口默认收起，展开到单条消息后可分别勾选/);
 assert.match(dogtalkSource, /data-action="dogtalk:cross-source-toggle"/);
 assert.match(dogtalkSource, /data-action="dogtalk:cross-turn-toggle"/);
-assert.match(dogtalkSource, /旧信关键词/);
+assert.match(dogtalkSource, /跨窗关键词漫游/);
 assert.match(dogtalkSource, /不会搜索互联网/);
 assert.match(dogtalkSource, /state\.mode === 'keyword'/);
 assert.match(dogtalkSource, /name="cross_message"/);
@@ -316,7 +316,7 @@ assert.equal(/\.cross-window-sources\s*\{[^}]*overflow-y:\s*auto/s.test(crossCss
 const streamFlow = fs.readFileSync(new URL('../elementera-mcp/deploy-pages/public/features/chat/chat-stream-flow.js', import.meta.url), 'utf8');
 assert.match(streamFlow, /empty_model_reply/);
 const generationSource = fs.readFileSync(new URL('../elementera-mcp/deploy-pages/public/features/chat/chat-generation.js', import.meta.url), 'utf8');
-assert.match(generationSource, /这轮跨窗口取信内容太长/);
+assert.match(generationSource, /这轮跨窗口读取内容太长/);
 assert.match(generationSource, /failedDeskSlip \? \{ desk_slip: failedDeskSlip \} : \{\}/);
 assert.match(generationSource, /partialContent \|\| \(cancelled \? '已停止生成。' : visibleFailure \|\| '消息生成失败，请稍后重试。'\)/, 'a first-byte provider failure must become visible text instead of an empty assistant message');
 
