@@ -47,7 +47,7 @@ globalThis.fetch = async (input, options = {}) => {
   if (url.includes('/chat/completions')) {
     const payload = JSON.parse(options.body || '{}');
     providerRequests.push(payload);
-    return new Response(JSON.stringify({ model: payload.model || 'openai/gpt-4.1-nano', choices: [{ message: { role: 'assistant', content: '✦ 海岸 API 模型伙伴 已经在同一窗口回应。' }, finish_reason: 'stop' }], usage: { prompt_tokens: 48, completion_tokens: 16, total_tokens: 64 } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ model: payload.model || 'openai/gpt-4.1-nano', choices: [{ message: { role: 'assistant', content: '✦ API 模型伙伴已经在同一窗口回应。' }, finish_reason: 'stop' }], usage: { prompt_tokens: 48, completion_tokens: 16, total_tokens: 64 } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   }
   return originalFetch(input, options);
 };
@@ -141,7 +141,7 @@ assert.equal(radio.result.isError, undefined);
 const radioResult = radio.result.structuredContent;
 assert.equal(radioResult.conversation.room_type, 'radio');
 assert.equal(radioResult.source, 'official_mcp');
-assert.match(radioResult.assistant.content, /海岸 API 模型伙伴/);
+assert.match(radioResult.assistant.content, /API 模型伙伴/);
 assert.equal(providerRequests.length, 1);
 const radioState = await readConversationState(db, radioResult.conversation.id);
 assert.equal(radioState.turns.length, 1);
@@ -155,7 +155,7 @@ assert.equal(lighthouse.result.isError, undefined);
 const lighthouseResult = lighthouse.result.structuredContent;
 assert.equal(lighthouseResult.conversation.room_type, 'lighthouse');
 assert.equal(lighthouseResult.source, 'official_mcp');
-assert.match(lighthouseResult.assistant.content, /海岸 API 模型伙伴/);
+assert.match(lighthouseResult.assistant.content, /API 模型伙伴/);
 assert.equal(providerRequests.length, 2, 'lighthouse should trigger one API reply');
 const lighthouseState = await readConversationState(db, lighthouseResult.conversation.id);
 assert.equal(lighthouseState.turns.length, 1);
