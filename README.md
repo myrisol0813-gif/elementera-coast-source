@@ -54,7 +54,7 @@ The Android preview APK is available from the GitHub Release:
 - build type: `debug`
 - official_production_apk: `false`
 - preview password: `123456`
-- SHA-256: `9f8f8bc3337c2c083db9b205cc6cab10ad61c2596178852c1cad4d59544135c0`
+- SHA-256: `989a8f7f159f251d2f2b0bcc57e915da3724268fa901c2ae182d30c524859beb`
 
 See `docs/SANITIZATION_REPORT.md` and `docs/KNOWN_LIMITATIONS.md` for details.
 
