@@ -623,12 +623,12 @@ class CoastShellViewModel(
 
     private fun applyProfile(profile: RemoteProfile?, daily: DailyProfile) {
         val current = profile?.currentChatModel.orEmpty()
-        val myri = profile?.assistantAvatarDataUrl.orEmpty().ifBlank { daily.myriAvatarDataUrl }
+        val model_partner = profile?.assistantAvatarDataUrl.orEmpty().ifBlank { daily.modelPartnerAvatarDataUrl }
         _state.update {
             it.copy(
                 currentModel = current.ifBlank { it.currentModel },
-                myriAvatarDataUrl = myri,
-                xiaohanAvatarDataUrl = daily.xiaohanAvatarDataUrl,
+                modelPartnerAvatarDataUrl = model_partner,
+                ownerAvatarDataUrl = daily.ownerAvatarDataUrl,
                 coverDataUrl = daily.momentCoverDataUrl
             )
         }

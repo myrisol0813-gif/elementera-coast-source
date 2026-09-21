@@ -58,7 +58,7 @@ data class MailboxMessageEnvelope(
 data class MailboxStatus(
     val ok: Boolean = true,
     val pending_count: Int = 0,
-    val last_myri_reply_at: String? = null,
+    val last_model_partner_reply_at: String? = null,
     val last_visitor_message_at: String? = null,
     val queue_status: String = "idle"
 )

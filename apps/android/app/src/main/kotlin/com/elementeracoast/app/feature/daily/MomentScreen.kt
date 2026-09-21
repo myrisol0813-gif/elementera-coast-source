@@ -50,7 +50,7 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun MomentScreen(
     repository: DailyRepository,
-    myriAvatarDataUrl: String,
+    modelPartnerAvatarDataUrl: String,
     onUpdateModelPartnerAvatar: (String) -> Unit,
     onActionLogged: (String, String, String) -> Unit,
     onSnackbar: (String) -> Unit,
@@ -63,7 +63,7 @@ internal fun MomentScreen(
     var editing by remember { mutableStateOf<DailyMoment?>(null) }
     var deleting by remember { mutableStateOf<DailyMoment?>(null) }
     var editingModelPartnerName by remember { mutableStateOf(false) }
-    var myriBusyId by remember { mutableStateOf<String?>(null) }
+    var modelPartnerBusyId by remember { mutableStateOf<String?>(null) }
 
     fun reportFailure(label: String, error: Throwable) {
         val detail = if (error is CoastApiException) error.message else error.message ?: "未知错误"
@@ -86,7 +86,7 @@ internal fun MomentScreen(
     val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uploadDailyImage(uri, DailyProfileImageField.HumanOwnerAvatar, "屋主头像")
     }
-    val myriPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    val modelPartnerPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             scope.launch {
                 try {
@@ -112,11 +112,11 @@ internal fun MomentScreen(
         }
         item {
             DailyIdentityBar(
-                profileUri = snapshot.profile.xiaohanAvatarDataUrl,
-                myriUri = myriAvatarDataUrl,
-                myriLabel = snapshot.profile.myriDisplayName,
+                profileUri = snapshot.profile.ownerAvatarDataUrl,
+                modelPartnerUri = modelPartnerAvatarDataUrl,
+                modelPartnerLabel = snapshot.profile.modelPartnerDisplayName,
                 onProfileClick = { avatarPicker.launch(arrayOf("image/*")) },
-                onModelPartnerAvatarClick = { myriPicker.launch(arrayOf("image/*")) },
+                onModelPartnerAvatarClick = { modelPartnerPicker.launch(arrayOf("image/*")) },
                 onModelPartnerNameClick = { editingModelPartnerName = true }
             )
         }
@@ -132,16 +132,16 @@ internal fun MomentScreen(
             }
         } else {
             items(snapshot.moments, key = { it.id }) { moment ->
-                val xiaohan = moment.isHumanOwner
-                val editableModelPartnerAuthor = moment.author == "api" || moment.author == "myri"
+                val owner = moment.isHumanOwner
+                val editableModelPartnerAuthor = moment.author == "api" || moment.author == "model_partner"
                 MomentCard(
                     moment = moment,
-                    avatarUri = if (xiaohan) snapshot.profile.xiaohanAvatarDataUrl else myriAvatarDataUrl,
-                    avatarFallback = if (xiaohan) "H" else "M",
-                    authorLabel = momentAuthorLabel(moment, snapshot.profile.myriDisplayName),
-                    myriDisplayName = snapshot.profile.myriDisplayName,
+                    avatarUri = if (owner) snapshot.profile.ownerAvatarDataUrl else modelPartnerAvatarDataUrl,
+                    avatarFallback = if (owner) "H" else "M",
+                    authorLabel = momentAuthorLabel(moment, snapshot.profile.modelPartnerDisplayName),
+                    modelPartnerDisplayName = snapshot.profile.modelPartnerDisplayName,
                     authorEditable = editableModelPartnerAuthor,
-                    myriCommentBusy = myriBusyId == moment.id,
+                    modelPartnerCommentBusy = modelPartnerBusyId == moment.id,
                     onEditModelPartnerName = { editingModelPartnerName = true },
                     onLike = {
                         scope.launch {
@@ -151,17 +151,17 @@ internal fun MomentScreen(
                     },
                     onComment = { commenting = moment },
                     onModelPartnerComment = {
-                        if (myriBusyId == null) {
-                            myriBusyId = moment.id
+                        if (modelPartnerBusyId == null) {
+                            modelPartnerBusyId = moment.id
                             scope.launch {
                                 try {
                                     repository.requestModelPartnerComment(moment.id)
-                                    onActionLogged("daily.moment.myri-comment", "另一位屋主留言", "前端已生成并保存 1 条真实留言")
+                                    onActionLogged("daily.moment.model-partner-comment", "另一位屋主留言", "前端已生成并保存 1 条真实留言")
                                     onSnackbar("另一位屋主已在前端留下回复")
                                 } catch (error: Throwable) {
                                     reportFailure("另一位屋主留言失败", error)
                                 } finally {
-                                    myriBusyId = null
+                                    modelPartnerBusyId = null
                                 }
                             }
                         }
@@ -176,7 +176,7 @@ internal fun MomentScreen(
 
     if (editingModelPartnerName) {
         ModelPartnerNameDialog(
-            initial = snapshot.profile.myriDisplayName,
+            initial = snapshot.profile.modelPartnerDisplayName,
             onDismiss = { editingModelPartnerName = false },
             onSave = { raw ->
                 scope.launch {
@@ -264,7 +264,7 @@ internal fun MomentComposeScreen(
                                 onActionLogged("daily.moment.write", "写了一条碳硅圈", "前端新增 1 条屋主动态")
                                 try {
                                     repository.requestModelPartnerComment(created.id)
-                                    onActionLogged("daily.moment.myri-comment", "另一位屋主即时留言", "前端已生成并保存 1 条真实留言")
+                                    onActionLogged("daily.moment.model-partner-comment", "另一位屋主即时留言", "前端已生成并保存 1 条真实留言")
                                     onSnackbar("动态已发布，另一位屋主也在前端留下了回复")
                                 } catch (commentError: Throwable) {
                                     val detail = if (commentError is CoastApiException) commentError.message else commentError.message ?: "未知错误"
@@ -289,9 +289,9 @@ private fun MomentCard(
     avatarUri: String,
     avatarFallback: String,
     authorLabel: String,
-    myriDisplayName: String,
+    modelPartnerDisplayName: String,
     authorEditable: Boolean,
-    myriCommentBusy: Boolean,
+    modelPartnerCommentBusy: Boolean,
     onEditModelPartnerName: () -> Unit,
     onLike: () -> Unit,
     onComment: () -> Unit,
@@ -320,14 +320,14 @@ private fun MomentCard(
                     Spacer(Modifier.height(9.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         moment.comments.takeLast(5).forEach { comment ->
-                            val commentAuthor = if (comment.author == "xiaohan") "屋主" else myriDisplayName.ifBlank { "另一位屋主" }
+                            val commentAuthor = if (comment.author == "owner") "屋主" else modelPartnerDisplayName.ifBlank { "另一位屋主" }
                             Text(
                                 text = buildAnnotatedString {
                                     withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(commentAuthor) }
                                     append("：")
                                     append(comment.text)
                                 },
-                                modifier = if (comment.author != "xiaohan") Modifier.clickable(onClick = onEditModelPartnerName) else Modifier,
+                                modifier = if (comment.author != "owner") Modifier.clickable(onClick = onEditModelPartnerName) else Modifier,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.Normal)
                             )
@@ -339,7 +339,7 @@ private fun MomentCard(
                 MomentActionRows(
                     moment = moment,
                     footer = momentFooter(moment),
-                    myriCommentBusy = myriCommentBusy,
+                    modelPartnerCommentBusy = modelPartnerCommentBusy,
                     onLike = onLike,
                     onComment = onComment,
                     onModelPartnerComment = onModelPartnerComment,
@@ -361,15 +361,15 @@ private fun MomentCard(
     }
 }
 
-private fun momentAuthorLabel(moment: DailyMoment, myriDisplayName: String): String = when {
+private fun momentAuthorLabel(moment: DailyMoment, modelPartnerDisplayName: String): String = when {
     moment.isHumanOwner -> moment.displayAuthor.ifBlank { "屋主" }
-    moment.author == "api" || moment.author == "myri" -> myriDisplayName.ifBlank { "另一位屋主" }
+    moment.author == "api" || moment.author == "model_partner" -> modelPartnerDisplayName.ifBlank { "另一位屋主" }
     else -> moment.displayAuthor.ifBlank { moment.author }
 }
 
 private fun momentModelUsage(moment: DailyMoment): String {
     val latestModelPartner = moment.comments.asReversed().firstOrNull {
-        it.author != "xiaohan" && !it.modelId.isNullOrBlank()
+        it.author != "owner" && !it.modelId.isNullOrBlank()
     }
     val model = latestModelPartner?.modelId?.takeIf(String::isNotBlank) ?: moment.modelLabel?.takeIf(String::isNotBlank) ?: return ""
     val usage = latestModelPartner?.usage

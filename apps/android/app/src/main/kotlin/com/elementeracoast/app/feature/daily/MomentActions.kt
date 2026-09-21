@@ -29,7 +29,7 @@ internal const val ModelPartnerCommentActionLabel = "另一位屋主留言"
 internal fun MomentActionRows(
     moment: DailyMoment,
     footer: String,
-    myriCommentBusy: Boolean,
+    modelPartnerCommentBusy: Boolean,
     onLike: () -> Unit,
     onComment: () -> Unit,
     onModelPartnerComment: () -> Unit,
@@ -54,7 +54,7 @@ internal fun MomentActionRows(
         IconButton(onClick = onComment, modifier = Modifier.size(34.dp)) {
             Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = "评论", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
         }
-        MomentActionChip(if (myriCommentBusy) "留言中…" else ModelPartnerCommentActionLabel, enabled = !myriCommentBusy, onClick = onModelPartnerComment)
+        MomentActionChip(if (modelPartnerCommentBusy) "留言中…" else ModelPartnerCommentActionLabel, enabled = !modelPartnerCommentBusy, onClick = onModelPartnerComment)
     }
 
     Spacer(Modifier.size(3.dp))

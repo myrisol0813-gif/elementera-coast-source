@@ -41,7 +41,7 @@ internal fun FeatureLandingScreen(
         when (feature) {
             FeatureDestination.Daily -> DailyLanding(
                 repository = daily,
-                myriAvatarDataUrl = shellState.myriAvatarDataUrl,
+                modelPartnerAvatarDataUrl = shellState.modelPartnerAvatarDataUrl,
                 onUpdateModelPartnerAvatar = onUpdateModelPartnerAvatar,
                 onRefreshCoast = onRefresh,
                 onBackToChat = onBackToChat,

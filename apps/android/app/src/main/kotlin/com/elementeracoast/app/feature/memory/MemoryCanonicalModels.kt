@@ -48,7 +48,7 @@ data class CustomInstructions(
     val content: String = "",
     val status: String = "active",
     val updatedAt: String? = null,
-    val updatedBy: String = "xiaohan",
+    val updatedBy: String = "owner",
     val source: String = "屋主手动编辑"
 )
 

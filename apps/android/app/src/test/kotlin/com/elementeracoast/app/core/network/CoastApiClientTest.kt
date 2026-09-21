@@ -93,13 +93,13 @@ class CoastApiClientTest {
 
     @Test
     fun dailyCrudUsesCanonicalEndpointsAndPreservesTagsAndProfilePatch() = runBlocking {
-        server.enqueue(jsonResponse("""{"ok":true,"moment":{"id":"m1","date":"2026-09-02","author":"xiaohan","text":"回海","liked":false,"comments":[]}}"""))
-        server.enqueue(jsonResponse("""{"ok":true,"diary":{"id":"d1","date":"2026-09-02","author":"xiaohan","weather":"有风","mood":"开心","tags":["回海","金色"],"text":"今天。"}}"""))
-        server.enqueue(jsonResponse("""{"ok":true,"profile":{"xiaohan_avatar_dataurl":"","myri_avatar_dataurl":"data:image/webp;base64,TVlSSQ==","moment_cover_dataurl":""}}"""))
+        server.enqueue(jsonResponse("""{"ok":true,"moment":{"id":"m1","date":"2026-09-02","author":"owner","text":"回海","liked":false,"comments":[]}}"""))
+        server.enqueue(jsonResponse("""{"ok":true,"diary":{"id":"d1","date":"2026-09-02","author":"owner","weather":"有风","mood":"开心","tags":["回海","金色"],"text":"今天。"}}"""))
+        server.enqueue(jsonResponse("""{"ok":true,"profile":{"owner_avatar_dataurl":"","model_partner_avatar_dataurl":"data:image/webp;base64,TVlSSQ==","moment_cover_dataurl":""}}"""))
 
         api.createDailyMoment(RemoteDailyMomentCreateRequest("2026-09-02", "回海"))
         api.createDailyDiary(RemoteDailyDiaryCreateRequest("2026-09-02", "有风", "开心", listOf("回海", "金色"), "今天。"))
-        api.putDailyProfile(RemoteDailyProfilePatch(myriAvatarDataUrl = "data:image/webp;base64,TVlSSQ=="))
+        api.putDailyProfile(RemoteDailyProfilePatch(modelPartnerAvatarDataUrl = "data:image/webp;base64,TVlSSQ=="))
 
         val momentRequest = server.takeRequest()
         assertEquals("/api/daily/moments", momentRequest.path)
@@ -117,8 +117,8 @@ class CoastApiClientTest {
         assertEquals("PUT", profileRequest.method)
         assertEquals("/api/daily/profile", profileRequest.path)
         val profileBody = profileRequest.body.readUtf8()
-        assertTrue(profileBody.contains("\"myri_avatar_dataurl\":\"data:image/webp;base64,TVlSSQ==\""))
-        assertTrue(!profileBody.contains("xiaohan_avatar_dataurl"))
+        assertTrue(profileBody.contains("\"model_partner_avatar_dataurl\":\"data:image/webp;base64,TVlSSQ==\""))
+        assertTrue(!profileBody.contains("owner_avatar_dataurl"))
     }
 
     @Test
@@ -126,14 +126,14 @@ class CoastApiClientTest {
         server.enqueue(
             MockResponse().setResponseCode(200).setHeader("Content-Type", "text/event-stream").setBody(
                 "event: ready\ndata: {\"build\":\"daily-comment-33\"}\n\n" +
-                    "event: result\ndata: {\"ok\":true,\"model\":\"openai/gpt-5.6\",\"moment\":{\"id\":\"m1\",\"date\":\"2026-09-02\",\"author\":\"xiaohan\",\"text\":\"回海\",\"comments\":[{\"id\":\"c1\",\"author\":\"api\",\"text\":\"我看见了。\"}]}}\n\n"
+                    "event: result\ndata: {\"ok\":true,\"model\":\"openai/gpt-5.6\",\"moment\":{\"id\":\"m1\",\"date\":\"2026-09-02\",\"author\":\"owner\",\"text\":\"回海\",\"comments\":[{\"id\":\"c1\",\"author\":\"api\",\"text\":\"我看见了。\"}]}}\n\n"
             )
         )
         val result = api.requestDailyModelPartnerComment("m1")
         assertEquals("openai/gpt-5.6", result.model)
         assertEquals("我看见了。", result.moment.comments.single().text)
         val recorded = server.takeRequest()
-        assertEquals("/api/daily/moments/m1/myri-comment", recorded.path)
+        assertEquals("/api/daily/moments/m1/model-partner-comment", recorded.path)
         assertEquals("text/event-stream", recorded.getHeader("Accept"))
         assertTrue(recorded.body.readUtf8().contains("\"mode\":\"instant\""))
     }
