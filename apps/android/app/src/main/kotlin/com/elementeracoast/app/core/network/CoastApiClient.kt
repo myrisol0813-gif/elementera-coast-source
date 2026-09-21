@@ -171,7 +171,7 @@ class CoastApiClient(
     suspend fun requestDailyModelPartnerComment(id: String): RemoteDailyModelPartnerCommentResult {
         val payload = json.encodeToString(RemoteDailyModelPartnerCommentRequest.serializer(), RemoteDailyModelPartnerCommentRequest())
         val request = Request.Builder()
-            .url(config.url("/api/daily/moments/${encodePath(id)}/myri-comment"))
+            .url(config.url("/api/daily/moments/${encodePath(id)}/model-partner-comment"))
             .post(jsonBody(payload))
             .header("Accept", "text/event-stream")
             .build()

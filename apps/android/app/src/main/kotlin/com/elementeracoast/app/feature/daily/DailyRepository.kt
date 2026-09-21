@@ -131,15 +131,15 @@ class DefaultDailyRepository(
 
     override suspend fun updateProfile(field: DailyProfileImageField, dataUrl: String): DailyProfile {
         val patch = when (field) {
-            DailyProfileImageField.HumanOwnerAvatar -> RemoteDailyProfilePatch(xiaohanAvatarDataUrl = dataUrl)
-            DailyProfileImageField.ModelPartnerAvatar -> RemoteDailyProfilePatch(myriAvatarDataUrl = dataUrl)
+            DailyProfileImageField.HumanOwnerAvatar -> RemoteDailyProfilePatch(ownerAvatarDataUrl = dataUrl)
+            DailyProfileImageField.ModelPartnerAvatar -> RemoteDailyProfilePatch(modelPartnerAvatarDataUrl = dataUrl)
             DailyProfileImageField.MomentCover -> RemoteDailyProfilePatch(momentCoverDataUrl = dataUrl)
         }
         return persistProfilePatch(patch)
     }
 
     override suspend fun updateModelPartnerDisplayName(value: String): DailyProfile =
-        persistProfilePatch(RemoteDailyProfilePatch(myriDisplayName = value.trim().ifBlank { "另一位屋主" }.take(80)))
+        persistProfilePatch(RemoteDailyProfilePatch(modelPartnerDisplayName = value.trim().ifBlank { "另一位屋主" }.take(80)))
 
     private suspend fun persistProfilePatch(patch: RemoteDailyProfilePatch): DailyProfile {
         val profile = api.putDailyProfile(patch)
@@ -203,7 +203,7 @@ internal object DailyMapper {
         author = value.author,
         source = value.source,
         text = value.text,
-        displayAuthor = value.displayAuthor.ifBlank { if (value.author == "xiaohan") "屋主" else "另一位屋主" },
+        displayAuthor = value.displayAuthor.ifBlank { if (value.author == "owner") "屋主" else "另一位屋主" },
         modelLabel = value.modelLabel,
         symbol = value.symbol,
         createdAt = value.createdAt,
@@ -222,7 +222,7 @@ internal object DailyMapper {
         mood = value.mood,
         tags = value.tags,
         text = value.text,
-        displayAuthor = value.displayAuthor.ifBlank { if (value.author == "xiaohan") "屋主" else "另一位屋主" },
+        displayAuthor = value.displayAuthor.ifBlank { if (value.author == "owner") "屋主" else "另一位屋主" },
         modelLabel = value.modelLabel,
         symbol = value.symbol,
         createdAt = value.createdAt,
@@ -230,10 +230,10 @@ internal object DailyMapper {
     )
 
     fun profile(value: RemoteDailyProfile) = DailyProfile(
-        xiaohanAvatarDataUrl = value.xiaohanAvatarDataUrl,
-        myriAvatarDataUrl = value.myriAvatarDataUrl,
+        ownerAvatarDataUrl = value.ownerAvatarDataUrl,
+        modelPartnerAvatarDataUrl = value.modelPartnerAvatarDataUrl,
         momentCoverDataUrl = value.momentCoverDataUrl,
-        myriDisplayName = value.myriDisplayName.trim().ifBlank { "另一位屋主" },
+        modelPartnerDisplayName = value.modelPartnerDisplayName.trim().ifBlank { "另一位屋主" },
         updatedAt = value.updatedAt
     )
 }

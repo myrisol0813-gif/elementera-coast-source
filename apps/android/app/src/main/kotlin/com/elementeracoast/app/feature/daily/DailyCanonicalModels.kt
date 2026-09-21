@@ -32,7 +32,7 @@ data class DailyMoment(
     val likeCount: Int = 0,
     val comments: List<DailyComment> = emptyList()
 ) {
-    val isHumanOwner: Boolean get() = author == "xiaohan"
+    val isHumanOwner: Boolean get() = author == "owner"
 }
 
 data class DailyDiary(
@@ -52,10 +52,10 @@ data class DailyDiary(
 )
 
 data class DailyProfile(
-    val xiaohanAvatarDataUrl: String = "",
-    val myriAvatarDataUrl: String = "",
+    val ownerAvatarDataUrl: String = "",
+    val modelPartnerAvatarDataUrl: String = "",
     val momentCoverDataUrl: String = "",
-    val myriDisplayName: String = "另一位屋主",
+    val modelPartnerDisplayName: String = "另一位屋主",
     val updatedAt: String? = null
 )
 

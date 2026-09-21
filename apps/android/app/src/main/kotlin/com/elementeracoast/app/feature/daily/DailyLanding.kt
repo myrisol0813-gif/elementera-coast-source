@@ -46,7 +46,7 @@ internal enum class DailyPage { Home, Moments, MomentCompose, Diary, DiaryCompos
 @Composable
 fun DailyLanding(
     repository: DailyRepository,
-    myriAvatarDataUrl: String,
+    modelPartnerAvatarDataUrl: String,
     onUpdateModelPartnerAvatar: (String) -> Unit,
     onRefreshCoast: () -> Unit,
     onBackToChat: () -> Unit,
@@ -136,7 +136,7 @@ fun DailyLanding(
                 })
                 DailyPage.Moments -> MomentScreen(
                     repository = repository,
-                    myriAvatarDataUrl = myriAvatarDataUrl,
+                    modelPartnerAvatarDataUrl = modelPartnerAvatarDataUrl,
                     onUpdateModelPartnerAvatar = onUpdateModelPartnerAvatar,
                     onActionLogged = onActionLogged,
                     onSnackbar = onSnackbar,
