@@ -102,7 +102,7 @@ function webSearchDeskDetails(section = {}) {
   return [
     paragraph('本轮触发语句：', section.requested_query),
     section.provider_query_returned === false
-      ? '<p class="desk-slip-note">OpenRouter server tool 未向海岸回传模型内部生成的原始搜索 query；这里如实显示当前用户请求，不伪造 query。</p>'
+      ? '<p class="desk-slip-note">OpenRouter server tool 未向前端回传模型内部生成的原始搜索 query；这里如实显示当前用户请求，不伪造 query。</p>'
       : '',
     paragraph('搜索次数：', Math.max(0, Number(section.requests) || 0)),
     paragraph('来源结果：', Math.max(0, Number(section.results_count) || 0)),
@@ -231,7 +231,7 @@ export function createDesk({ router, toast }) {
           paragraph('裁剪：', contextBudget.trimmed ? `是 · ${Number(contextBudget.trimmed_count || 0)} 处` : '否'),
           paragraph('保留来源：', Array.isArray(contextBudget.sources_preserved) ? contextBudget.sources_preserved.join('、') : ''),
           paragraph('全局摘录注入：', contextBudget.global_excerpt || globalExcerpt.injection || 'empty'),
-          contextBudget.exceeds_comfort_ceiling ? '<p class="desk-slip-note">当前组包超过 comfort ceiling；海岸没有静默截断全局摘录。</p>' : '',
+          contextBudget.exceeds_comfort_ceiling ? '<p class="desk-slip-note">当前组包超过 comfort ceiling；前端没有静默截断全局摘录。</p>' : '',
         ].join(''))}
         ${deskRow(custom.label || '核心自定义', customStatus, [sourceNote(custom.description), custom.content ? deskText(custom.content) : emptyNote()].join(''))}
         ${deskRow(globalExcerpt.label || '全局摘录', excerptStatus, [sourceNote(globalExcerpt.description), globalExcerpt.content ? deskText(globalExcerpt.content) : emptyNote()].join(''))}
@@ -260,11 +260,11 @@ export function createDesk({ router, toast }) {
     await loadWorldbook();
     const entries = state.worldbook.length
       ? state.worldbook.map((entry) => `<article class="worldbook-entry ${entry.enabled ? '' : 'is-disabled'}"><button type="button" data-action="desk:edit-worldbook" data-id="${escapeAttribute(entry.id)}"><span><strong>${escapeHtml(entry.title)}</strong><small>${escapeHtml(entry.keywords.join(' · ') || '常驻词条')}</small></span><i>${escapeHtml(scopeLabel(entry.scope))}</i></button><p>${escapeHtml(entry.content)}</p></article>`).join('')
-      : '<div class="feature-card"><p class="feature-empty">这里还没有词条。以后聊到某个海岸名词时，再整理进来。</p></div>';
+      : '<div class="feature-card"><p class="feature-empty">这里还没有词条。以后聊到某个专有名词时，再整理进来。</p></div>';
     return {
       title: '词典', subtitle: '专有名词按关键词出现，不和记忆库混放', className: 'worldbook-panel',
       headerAction: '<button class="feature-head-action" type="button" data-action="desk:new-worldbook">＋ 词条</button>',
-      body: `<section class="worldbook-test"><label>试一句<input id="worldbookTestInput" placeholder="聊到哪个海岸名词，就试哪个"></label><button type="button" data-action="desk:test-worldbook">测试命中</button><div id="worldbookTestResult"></div></section><div class="worldbook-list">${entries}</div>`,
+      body: `<section class="worldbook-test"><label>试一句<input id="worldbookTestInput" placeholder="聊到哪个专有名词，就试哪个"></label><button type="button" data-action="desk:test-worldbook">测试命中</button><div id="worldbookTestResult"></div></section><div class="worldbook-list">${entries}</div>`,
     };
   }
   function worldbookEditor({ id } = {}) {
