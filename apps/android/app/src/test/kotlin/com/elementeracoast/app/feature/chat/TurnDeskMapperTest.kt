@@ -72,7 +72,7 @@ class TurnDeskMapperTest {
         )
 
         assertEquals(
-            listOf("当前消息", "最近上下文", "核心自定义", "全局摘录", "整理当前对话的纸条", "相关记忆", "世界书", "人类思考链", "跨窗口取信", "工作台 / 工具回执", "上下文预算", "外部入口消息"),
+            listOf("当前消息", "最近上下文", "核心自定义", "全局摘录", "整理当前对话的纸条", "相关记忆", "世界书", "人类思考链", "跨窗口读取", "工作台 / 工具回执", "上下文预算", "外部入口消息"),
             receipt.sections.map { it.title }
         )
         assertEquals("已递给 · 1 轮", receipt.sections[1].status)
@@ -87,7 +87,7 @@ class TurnDeskMapperTest {
         assertTrue(receipt.sections.last().details.any { it.text == "本轮没有递入外部材料。" })
         val sourceSections = setOf(
             "当前消息", "最近上下文", "核心自定义", "全局摘录", "整理当前对话的纸条",
-            "相关记忆", "世界书", "人类思考链", "跨窗口取信", "工作台 / 工具回执", "外部入口消息"
+            "相关记忆", "世界书", "人类思考链", "跨窗口读取", "工作台 / 工具回执", "外部入口消息"
         )
         assertTrue(
             receipt.sections
