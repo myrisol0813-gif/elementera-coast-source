@@ -26,7 +26,7 @@ function sessionSecret(env) {
 }
 
 function previewPasswordHint(env) {
-  const configuredHint = String(previewPasswordHint(env)).trim();
+  const configuredHint = String(env.COAST_PREVIEW_PASSWORD_HINT || '').trim();
   return configuredHint || (sourcePreviewDefaultsEnabled(env) ? SOURCE_PREVIEW_PASSWORD : '');
 }
 
