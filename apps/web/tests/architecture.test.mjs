@@ -99,7 +99,7 @@ assert.doesNotMatch(mcp, /calendar\.|executeCalendarMcpTool|CALENDAR_MCP_DEFINIT
 for (const source of [dailyStore, dailySchema, dailyModelTools, dailyFrontend, dailyClient, mcp]) assert.equal(source.includes('image_refs'), false, 'image_refs must not remain in current Daily runtime');
 for (const source of [dailyStore, dailySchema, dailyFrontend, dailyClient]) assert.equal(source.includes('image_refs_json'), false, 'image_refs_json must not remain in current Daily runtime/schema');
 for (const deadUi of ['momentImageRef', 'diaryImageRef', 'stableImageRef', '图片引用']) assert.equal(dailyFrontend.includes(deadUi), false);
-for (const profileField of ['xiaohan_avatar_dataurl', 'myri_avatar_dataurl', 'moment_cover_dataurl']) assert.ok([dailySchema, dailyFrontend].join('\n').includes(profileField));
+for (const profileField of ['owner_avatar_dataurl', 'model_partner_avatar_dataurl', 'moment_cover_dataurl']) assert.ok([dailySchema, dailyFrontend].join('\n').includes(profileField));
 
 for (const forbiddenPattern of [/globalThis\.__[A-Za-z_$]/, /window\.__[A-Za-z_$]/, /setInterval\([^)]*querySelector/s, /document\.write\s*\(/]) assert.equal(forbiddenPattern.test(runtime), false, `forbidden ownership pattern: ${forbiddenPattern}`);
 
@@ -128,7 +128,7 @@ assert.ok(coreUrls.includes('/public/features/desk.js'));
 assert.ok(coreUrls.includes('/public/features/daily.js'));
 assert.ok(coreUrls.includes('/public/content/island-letter.js'));
 assert.equal(coreUrls.includes('/public/content/letters.js'), false);
-assert.ok(coreUrls.includes('/public/media/myri-default-avatar.jpg'));
+assert.ok(coreUrls.includes('/public/media/model-partner-default-avatar.jpg'));
 assert.equal(coreUrls.includes('/public/features/construction.js'), false);
 
 const moduleFiles = [

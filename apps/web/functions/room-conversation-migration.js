@@ -35,7 +35,7 @@ function userVariant(row, content) {
     id: id('legacy_user'),
     content,
     created_at: iso(row.created_at),
-    message_source: official ? 'official_mcp' : 'xiaohan_web',
+    message_source: official ? 'official_mcp' : 'owner_web',
     ...(row.display_author ? { display_author: row.display_author } : {}),
     ...(row.model_label ? { model_label: row.model_label } : {}),
   };
@@ -89,7 +89,7 @@ async function migrateRadio(db, normalizeState) {
   const turns = [];
   for (const row of rows) {
     const isAssistant = row.surface === 'coast_api'
-      || (row.surface !== 'official_mcp' && ['myri', 'api'].includes(String(row.actor || '')));
+      || (row.surface !== 'official_mcp' && ['model_partner', 'api'].includes(String(row.actor || '')));
     if (isAssistant) {
       let turn = turns.at(-1);
       const assistants = turn?.assistant?.variantsByUserVariant?.['0'];

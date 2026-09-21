@@ -13,5 +13,5 @@ export function requireOwnerSession(session) {
   if (!session || typeof session !== 'object') {
     throw new OwnerAccessError();
   }
-  return Object.freeze({ actor: 'xiaohan', owner: true });
+  return Object.freeze({ actor: 'owner', owner: true });
 }

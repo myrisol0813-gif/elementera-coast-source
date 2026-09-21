@@ -103,7 +103,7 @@ export async function startToolRun(db, definition, input, context = {}) {
   ) VALUES (?, ?, ?, ?, ?, 'running', ?, NULL, NULL, ?, NULL)`, [
     id,
     definition.tool_key,
-    clip(context.actor || 'api_myri', 80),
+    clip(context.actor || 'api_model_partner', 80),
     clip(context.room_scope || context.surface || 'main_chat', 80),
     clip(context.conversation_id, 200) || null,
     summarizeToolValue(definition.tool_key, input),

@@ -3,9 +3,9 @@ const schemaPromises = new WeakMap();
 
 const RETIRED_SYSTEM_ENTRY_IDS = Object.freeze([
   'elementera-coast',
-  'myrisol-myri',
-  'official-myri',
-  'api-myri',
+  'elementera_model-model_partner',
+  'official-model_partner',
+  'api-model_partner',
   'coast-mailbox',
   'radio-room',
   'lighthouse-letters',
