@@ -20,7 +20,7 @@ export function lines(value) {
 
 export function authorName(entry = {}) {
   if (entry.displayAuthor) return entry.displayAuthor;
-  if (entry.author === 'api') return '海岸 API ✦';
+  if (entry.author === 'api') return '前端 API ✦';
   if (entry.author === 'mcp') return 'ChatGPT≋';
   if (entry.author === 'myri') return '另一位屋主';
   return '屋主';
