@@ -1,8 +1,8 @@
 import { getConversation, sanitizeId } from './chat-store.js';
 import { ensureMemorySchema } from './memory-store.js';
 
-const TYPE = 'xiaohan_mystic_dogtalk';
-const OWNER = 'xiaohan';
+const TYPE = 'owner_mystic_dogtalk';
+const OWNER = 'owner';
 const DEFAULT_TEXT = '屋主这轮很放松，因此偷懒中。';
 const LEGACY_DEFAULT_MISUNDERSTANDING = '不要误会成长期偏好、边界取消、行为命令，或比当前正文更重要。';
 const ROOM_SCOPES = new Set(['conversation', 'radio', 'lighthouse']);
@@ -62,14 +62,14 @@ function rowToDogtalk(row) {
     weather: row.weather || '',
     read_mode: READ_MODES.has(row.read_mode) ? row.read_mode : 'keep_private',
     status: row.status === 'archived' ? 'archived' : 'saved',
-    readable_by_myri: true,
+    readable_by_model_partner: true,
     auto_recall: false,
     memory_weight: 'low',
     not_instruction: true,
     not_preference: true,
     not_memory_seed: true,
     not_pocket: true,
-    visibility: 'private_to_xiaohan_and_myri',
+    visibility: 'private_to_owner_and_model_partner',
     default_text: DEFAULT_TEXT,
     created_at: iso(row.created_at),
     updated_at: iso(row.updated_at),
@@ -94,14 +94,14 @@ function rowToSnapshot(row) {
     true_core: row.true_core || '',
     weather: row.weather || '',
     read_mode: READ_MODES.has(row.read_mode) ? row.read_mode : 'keep_private',
-    readable_by_myri: true,
+    readable_by_model_partner: true,
     auto_recall: false,
     memory_weight: 'low',
     not_instruction: true,
     not_preference: true,
     not_memory_seed: true,
     not_pocket: true,
-    visibility: 'private_to_xiaohan_and_myri',
+    visibility: 'private_to_owner_and_model_partner',
     created_at: iso(row.created_at),
   };
 }
@@ -119,14 +119,14 @@ function defaultDogtalk(scope) {
     weather: '放松',
     read_mode: 'keep_private',
     status: 'saved',
-    readable_by_myri: true,
+    readable_by_model_partner: true,
     auto_recall: false,
     memory_weight: 'low',
     not_instruction: true,
     not_preference: true,
     not_memory_seed: true,
     not_pocket: true,
-    visibility: 'private_to_xiaohan_and_myri',
+    visibility: 'private_to_owner_and_model_partner',
     default_text: DEFAULT_TEXT,
     created_at: null,
     updated_at: null,
@@ -192,12 +192,12 @@ async function migrateLegacyOwnerNotes(db) {
     const timestamp = Number(legacy.updated_at || legacy.created_at || Date.now());
     await run(db, `INSERT INTO coast_mystic_dogtalk (
       id, type, owner, room_scope, scope_key, conversation_id, body,
-      true_core, self_note, myri_hint, not_to_misunderstand, weather,
-      read_mode, status, readable_by_myri, auto_recall, memory_weight,
+      true_core, self_note, model_partner_hint, not_to_misunderstand, weather,
+      read_mode, status, readable_by_model_partner, auto_recall, memory_weight,
       not_instruction, not_preference, not_memory_seed, not_pocket,
       visibility, source, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, NULL, ?, '', '', '', ?, '', 'when_confused',
-      'saved', 1, 0, 'low', 1, 1, 1, 1, 'private_to_xiaohan_and_myri',
+      'saved', 1, 0, 'low', 1, 1, 1, 1, 'private_to_owner_and_model_partner',
       'legacy_owner_room_note_migration', ?, ?)`, [
       `dogtalk-${crypto.randomUUID()}`,
       TYPE,
@@ -228,19 +228,19 @@ async function initialize(db) {
     body TEXT NOT NULL DEFAULT '',
     true_core TEXT NOT NULL DEFAULT '',
     self_note TEXT NOT NULL DEFAULT '',
-    myri_hint TEXT NOT NULL DEFAULT '',
+    model_partner_hint TEXT NOT NULL DEFAULT '',
     not_to_misunderstand TEXT NOT NULL DEFAULT '',
     weather TEXT NOT NULL DEFAULT '',
     read_mode TEXT NOT NULL DEFAULT 'keep_private',
     status TEXT NOT NULL DEFAULT 'draft',
-    readable_by_myri INTEGER NOT NULL DEFAULT 1,
+    readable_by_model_partner INTEGER NOT NULL DEFAULT 1,
     auto_recall INTEGER NOT NULL DEFAULT 0,
     memory_weight TEXT NOT NULL DEFAULT 'low',
     not_instruction INTEGER NOT NULL DEFAULT 1,
     not_preference INTEGER NOT NULL DEFAULT 1,
     not_memory_seed INTEGER NOT NULL DEFAULT 1,
     not_pocket INTEGER NOT NULL DEFAULT 1,
-    visibility TEXT NOT NULL DEFAULT 'private_to_xiaohan_and_myri',
+    visibility TEXT NOT NULL DEFAULT 'private_to_owner_and_model_partner',
     source TEXT NOT NULL DEFAULT 'owner_web',
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
@@ -262,18 +262,18 @@ async function initialize(db) {
     body TEXT NOT NULL,
     true_core TEXT NOT NULL DEFAULT '',
     self_note TEXT NOT NULL DEFAULT '',
-    myri_hint TEXT NOT NULL DEFAULT '',
+    model_partner_hint TEXT NOT NULL DEFAULT '',
     not_to_misunderstand TEXT NOT NULL DEFAULT '',
     weather TEXT NOT NULL DEFAULT '',
     read_mode TEXT NOT NULL DEFAULT 'keep_private',
-    readable_by_myri INTEGER NOT NULL DEFAULT 1,
+    readable_by_model_partner INTEGER NOT NULL DEFAULT 1,
     auto_recall INTEGER NOT NULL DEFAULT 0,
     memory_weight TEXT NOT NULL DEFAULT 'low',
     not_instruction INTEGER NOT NULL DEFAULT 1,
     not_preference INTEGER NOT NULL DEFAULT 1,
     not_memory_seed INTEGER NOT NULL DEFAULT 1,
     not_pocket INTEGER NOT NULL DEFAULT 1,
-    visibility TEXT NOT NULL DEFAULT 'private_to_xiaohan_and_myri',
+    visibility TEXT NOT NULL DEFAULT 'private_to_owner_and_model_partner',
     created_at INTEGER NOT NULL,
     UNIQUE (source_type, source_id),
     FOREIGN KEY (dogtalk_id) REFERENCES coast_mystic_dogtalk(id),
@@ -345,12 +345,12 @@ export async function saveMysticDogtalk(db, value = {}) {
   const id = `dogtalk-${crypto.randomUUID()}`;
   await run(db, `INSERT INTO coast_mystic_dogtalk (
     id, type, owner, room_scope, scope_key, conversation_id, body,
-    true_core, self_note, myri_hint, not_to_misunderstand, weather,
-    read_mode, status, readable_by_myri, auto_recall, memory_weight,
+    true_core, self_note, model_partner_hint, not_to_misunderstand, weather,
+    read_mode, status, readable_by_model_partner, auto_recall, memory_weight,
     not_instruction, not_preference, not_memory_seed, not_pocket,
     visibility, source, created_at, updated_at
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', '', ?, ?, ?, 'saved', 1, 0, 'low',
-    1, 1, 1, 1, 'private_to_xiaohan_and_myri', 'owner_web', ?, ?)`, [
+    1, 1, 1, 1, 'private_to_owner_and_model_partner', 'owner_web', ?, ?)`, [
     id,
     TYPE,
     OWNER,
@@ -411,12 +411,12 @@ async function persistMysticDogtalkSnapshot(db, dogtalk, source, snapshotId = ''
   const timestamp = Date.now();
   await run(db, `INSERT INTO coast_mystic_dogtalk_snapshots (
     id, dogtalk_id, owner, room_scope, scope_key, conversation_id,
-    source_type, source_id, body, true_core, self_note, myri_hint,
-    not_to_misunderstand, weather, read_mode, readable_by_myri,
+    source_type, source_id, body, true_core, self_note, model_partner_hint,
+    not_to_misunderstand, weather, read_mode, readable_by_model_partner,
     auto_recall, memory_weight, not_instruction, not_preference,
     not_memory_seed, not_pocket, visibility, created_at
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '', ?, ?, ?, 1, 0, 'low',
-    1, 1, 1, 1, 'private_to_xiaohan_and_myri', ?)`, [
+    1, 1, 1, 1, 'private_to_owner_and_model_partner', ?)`, [
     id,
     dogtalk.id,
     OWNER,

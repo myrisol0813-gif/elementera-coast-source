@@ -35,7 +35,7 @@ export async function executeDogtalkModelTool(db, toolCall, context = {}) {
   const dogtalk = selected.dogtalk;
   return {
     ok: true,
-    kind: 'xiaohan_mystic_dogtalk',
+    kind: 'owner_mystic_dogtalk',
     available: selected.selected,
     room_scope: ['radio', 'lighthouse'].includes(context.surface) ? context.surface : 'conversation',
     memory_weight: 'low',

@@ -84,16 +84,16 @@ async function initialize(db) {
   )`);
   await run(db, `CREATE TABLE IF NOT EXISTS daily_profile (
     id TEXT PRIMARY KEY,
-    xiaohan_avatar_dataurl TEXT NOT NULL DEFAULT '',
-    myri_avatar_dataurl TEXT NOT NULL DEFAULT '',
+    owner_avatar_dataurl TEXT NOT NULL DEFAULT '',
+    model_partner_avatar_dataurl TEXT NOT NULL DEFAULT '',
     moment_cover_dataurl TEXT NOT NULL DEFAULT '',
-    myri_display_name TEXT NOT NULL DEFAULT '另一位屋主',
+    model_partner_display_name TEXT NOT NULL DEFAULT '另一位屋主',
     updated_at INTEGER NOT NULL
   )`);
 
   await ensureColumn(db, 'daily_moment_comments', 'model_id', 'TEXT DEFAULT NULL');
   await ensureColumn(db, 'daily_moment_comments', 'usage_json', 'TEXT DEFAULT NULL');
-  await ensureColumn(db, 'daily_profile', 'myri_display_name', "TEXT NOT NULL DEFAULT '另一位屋主'");
+  await ensureColumn(db, 'daily_profile', 'model_partner_display_name', "TEXT NOT NULL DEFAULT '另一位屋主'");
   for (const table of ['daily_moments', 'daily_diaries']) {
     await ensureColumn(db, table, 'actor', 'TEXT DEFAULT NULL');
     await ensureColumn(db, table, 'surface', 'TEXT DEFAULT NULL');

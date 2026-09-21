@@ -1,7 +1,7 @@
 import { ensureDailySchema } from './daily-schema.js';
 import { validateCoastIdentity } from './coast-identity.js';
 
-const AUTHORS = new Set(['xiaohan', 'myri', 'api', 'mcp']);
+const AUTHORS = new Set(['owner', 'model_partner', 'api', 'mcp']);
 const SOURCES = new Set(['manual', 'chat_tool']);
 const MOMENT_STATUSES = new Set(['published']);
 const MAX_TEXT = 24000;
@@ -58,10 +58,10 @@ function normalizedIdentity(defaults = {}) {
   try { return validateCoastIdentity(defaults.identity); } catch { throw new DailyStoreError('invalid_daily_identity', '日报来源身份无效。', 400); }
 }
 function provenanceFromRow(row) {
-  const inferredSurface = row.author === 'mcp' ? 'official_mcp' : ['api', 'myri'].includes(row.author) ? 'coast_api' : 'web_manual';
+  const inferredSurface = row.author === 'mcp' ? 'official_mcp' : ['api', 'model_partner'].includes(row.author) ? 'coast_api' : 'web_manual';
   const surface = row.surface || inferredSurface;
   return {
-    actor: row.actor || (surface === 'web_manual' ? 'xiaohan' : 'myri'), surface,
+    actor: row.actor || (surface === 'web_manual' ? 'owner' : 'model_partner'), surface,
     model_label: row.model_label || null, model_nickname: row.model_nickname || null,
     symbol: row.symbol ?? (surface === 'official_mcp' ? '≋' : surface === 'coast_api' ? '✦' : ''),
     display_author: row.display_author || (surface === 'official_mcp' ? 'ChatGPT≋' : surface === 'coast_api' ? '前端 API ✦' : '屋主'),
@@ -86,7 +86,7 @@ function momentFromRow(row, comments = [], like = {}) {
     like_count: Number(like.like_count || 0), liked: Number(like.liked || 0) === 1, comments,
   };
 }
-async function hydrateMoments(db, rows, actor = 'xiaohan') {
+async function hydrateMoments(db, rows, actor = 'owner') {
   if (!rows.length) return [];
   const ids = rows.map((row) => row.id);
   const placeholders = ids.map(() => '?').join(',');
@@ -106,14 +106,14 @@ export async function listMoments(db, filters = {}) {
   if (filters.date) { clauses.push('date = ?'); params.push(dateKey(filters.date)); }
   const limit = Math.min(300, Math.max(1, Number(filters.limit || 200)));
   const rows = await all(db, `SELECT * FROM daily_moments ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''} ORDER BY COALESCE(published_at, created_at) DESC, created_at DESC LIMIT ?`, [...params, limit]);
-  return hydrateMoments(db, rows, filters.actor || 'xiaohan');
+  return hydrateMoments(db, rows, filters.actor || 'owner');
 }
-export async function getMoment(db, id, actor = 'xiaohan') { await ensureDailySchema(db); return (await hydrateMoments(db, [await requireMomentRow(db, id)], actor))[0]; }
+export async function getMoment(db, id, actor = 'owner') { await ensureDailySchema(db); return (await hydrateMoments(db, [await requireMomentRow(db, id)], actor))[0]; }
 function normalizeMoment(value = {}, defaults = {}) {
   const now = Date.now(); const text = clip(value.text, 12000);
   if (!text) throw new DailyStoreError('empty_moment', '碳硅圈动态需要正文。', 400);
   return {
-    id: cleanId(value.id, 'moment'), date: dateKey(value.date, new Date(now)), author: enumValue(trustedOrValue(defaults, 'author', value.author), AUTHORS, 'xiaohan', '动态作者'),
+    id: cleanId(value.id, 'moment'), date: dateKey(value.date, new Date(now)), author: enumValue(trustedOrValue(defaults, 'author', value.author), AUTHORS, 'owner', '动态作者'),
     source: enumValue(trustedOrValue(defaults, 'source', value.source), SOURCES, 'manual', '动态来源'), status: 'published', text,
     conversation_id: optionalId(trustedOrValue(defaults, 'conversation_id', value.conversation_id)), source_turn_id: optionalId(trustedOrValue(defaults, 'source_turn_id', value.source_turn_id)),
     tool_call_id: optionalId(trustedOrValue(defaults, 'tool_call_id', value.tool_call_id)), ...normalizedIdentity(defaults), reason: clip(value.reason, 1000),
@@ -146,21 +146,21 @@ export async function addMomentComment(db, id, value = {}) {
   await run(db, `INSERT OR IGNORE INTO daily_moment_comments (id, moment_id, author, text, model_id, usage_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
     commentId,
     momentId,
-    enumValue(value.author, AUTHORS, 'xiaohan', '评论作者'),
+    enumValue(value.author, AUTHORS, 'owner', '评论作者'),
     text,
     clip(value.model_id, 180) || null,
     usage ? JSON.stringify(usage) : null,
     Date.now(),
   ]);
-  await run(db, 'UPDATE daily_moments SET updated_at = ? WHERE id = ?', [Date.now(), momentId]); return getMoment(db, momentId, value.author || 'xiaohan');
+  await run(db, 'UPDATE daily_moments SET updated_at = ? WHERE id = ?', [Date.now(), momentId]); return getMoment(db, momentId, value.author || 'owner');
 }
 export async function deleteMomentComment(db, id, commentId) {
   await ensureDailySchema(db); const momentId = (await requireMomentRow(db, id)).id; const cleanCommentId = cleanId(commentId, 'moment_comment');
   const row = await first(db, 'SELECT id FROM daily_moment_comments WHERE id = ? AND moment_id = ?', [cleanCommentId, momentId]); if (!row) throw new DailyStoreError('moment_comment_not_found', '这条评论不存在。', 404);
   await run(db, 'DELETE FROM daily_moment_comments WHERE id = ? AND moment_id = ?', [cleanCommentId, momentId]); await run(db, 'UPDATE daily_moments SET updated_at = ? WHERE id = ?', [Date.now(), momentId]); return getMoment(db, momentId);
 }
-export async function setMomentLike(db, id, liked, actorValue = 'xiaohan') {
-  await ensureDailySchema(db); const momentId = (await requireMomentRow(db, id)).id; const actor = enumValue(actorValue, AUTHORS, 'xiaohan', '点赞者');
+export async function setMomentLike(db, id, liked, actorValue = 'owner') {
+  await ensureDailySchema(db); const momentId = (await requireMomentRow(db, id)).id; const actor = enumValue(actorValue, AUTHORS, 'owner', '点赞者');
   if (liked) await run(db, `INSERT OR IGNORE INTO daily_moment_likes (moment_id, actor, created_at) VALUES (?, ?, ?)`, [momentId, actor, Date.now()]);
   else await run(db, 'DELETE FROM daily_moment_likes WHERE moment_id = ? AND actor = ?', [momentId, actor]);
   await run(db, 'UPDATE daily_moments SET updated_at = ? WHERE id = ?', [Date.now(), momentId]); return getMoment(db, momentId, actor);
@@ -177,7 +177,7 @@ export async function listDiaries(db, filters = {}) {
 }
 function normalizeDiary(value = {}, defaults = {}) {
   const now = Date.now(); const text = clip(value.text); if (!text) throw new DailyStoreError('empty_diary', '日记需要正文。', 400);
-  return { id: cleanId(value.id, 'diary'), date: dateKey(value.date, new Date(now)), author: enumValue(trustedOrValue(defaults, 'author', value.author), AUTHORS, 'xiaohan', '日记作者'), source: enumValue(trustedOrValue(defaults, 'source', value.source), SOURCES, 'manual', '日记来源'), weather: clip(value.weather || '未标注', 80), mood: clip(value.mood || '未标注', 120), tags: tags(value.tags), text, conversation_id: optionalId(trustedOrValue(defaults, 'conversation_id', value.conversation_id)), source_turn_id: optionalId(trustedOrValue(defaults, 'source_turn_id', value.source_turn_id)), tool_call_id: optionalId(trustedOrValue(defaults, 'tool_call_id', value.tool_call_id)), ...normalizedIdentity(defaults), created_at: now, updated_at: now };
+  return { id: cleanId(value.id, 'diary'), date: dateKey(value.date, new Date(now)), author: enumValue(trustedOrValue(defaults, 'author', value.author), AUTHORS, 'owner', '日记作者'), source: enumValue(trustedOrValue(defaults, 'source', value.source), SOURCES, 'manual', '日记来源'), weather: clip(value.weather || '未标注', 80), mood: clip(value.mood || '未标注', 120), tags: tags(value.tags), text, conversation_id: optionalId(trustedOrValue(defaults, 'conversation_id', value.conversation_id)), source_turn_id: optionalId(trustedOrValue(defaults, 'source_turn_id', value.source_turn_id)), tool_call_id: optionalId(trustedOrValue(defaults, 'tool_call_id', value.tool_call_id)), ...normalizedIdentity(defaults), created_at: now, updated_at: now };
 }
 async function matchingDiaries(db, date, author) { return all(db, 'SELECT * FROM daily_diaries WHERE date = ? AND author = ? ORDER BY created_at DESC', [date, author]); }
 export async function createDiary(db, value = {}, defaults = {}) {

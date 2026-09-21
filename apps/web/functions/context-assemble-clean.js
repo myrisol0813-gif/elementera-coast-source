@@ -225,7 +225,7 @@ export async function assembleCleanContext(env, {
     const name = String(toolCall?.function?.name || '').trim();
     try {
       const result = await executeModelTool(env.COAST_CHAT_DB, toolCall, {
-        env, permission, surface, visitorId, room_scope: roomId || surface, authScope, actor: surface === 'official_mcp' ? 'official_mcp' : 'api_myri',
+        env, permission, surface, visitorId, room_scope: roomId || surface, authScope, actor: surface === 'official_mcp' ? 'official_mcp' : 'api_model_partner',
         conversation_id: conversationId, source_turn_id: sourceTurnId, local_date: localDate, model_label: model, user_query: query,
         cross_window_mode: crossWindowRequest.mode,
         global_excerpt_write_enabled: globalExcerpt?.write_enabled === true,
