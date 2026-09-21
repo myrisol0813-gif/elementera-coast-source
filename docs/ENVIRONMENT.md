@@ -4,7 +4,12 @@
 
 The copied PWA expects Cloudflare Pages/Workers-style bindings.
 
-Required configuration:
+Source preview:
+
+- With no auth configuration and no `COAST_CHAT_DB` binding, the source PWA exposes only its empty shell behind the public preview password `123456`.
+- The login page labels this password as preview-only. Before connecting real data or deploying a real service, configure your own password hash and session secret.
+
+Required for a real/self-hosted deployment:
 
 - `COAST_PASSWORD_HASH` — SHA-256 hex digest of the owner access password.
 - `COAST_SESSION_SECRET` — local/self-hosted session signing secret.
@@ -28,4 +33,6 @@ The checked-in default API base is the non-routable placeholder:
 
 `https://elementera-coast-source.invalid`
 
-Self-hosters should set their own source-build backend endpoint at build time. Production signing material and production updater/release configuration are intentionally absent.
+With the checked-in non-routable placeholder backend, the source debug APK accepts `123456` locally and opens the empty application shell for inspection. The gate labels it as a public preview password. Once a real backend is configured, authentication returns to that backend.
+
+Self-hosters should set their own source-build backend endpoint at build time and change the password before connecting real data. Production signing material and production updater/release configuration are intentionally absent.
