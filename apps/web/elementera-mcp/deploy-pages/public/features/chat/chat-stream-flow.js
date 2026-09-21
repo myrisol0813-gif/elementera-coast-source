@@ -51,7 +51,7 @@ function annotateCrossWindowError(error, slip, runtime) {
     ...(error.details && typeof error.details === 'object' ? error.details : {}),
     cross_window: section,
   };
-  error.message = `这轮跨窗口取信递送失败。海岸没有偷偷裁剪，也没有自动缩短后重试。requested=${section.requested_turns}轮，loaded=${section.loaded_turns}轮，attempted=${section.attempted_delivered_turns}轮，attempted_chars=${section.attempted_chars}；${section.provider_error_type || error.type}：${section.provider_error_message || error.message}`;
+  error.message = `这轮跨窗口读取递送失败。前端没有偷偷裁剪，也没有自动缩短后重试。requested=${section.requested_turns}轮，loaded=${section.loaded_turns}轮，attempted=${section.attempted_delivered_turns}轮，attempted_chars=${section.attempted_chars}；${section.provider_error_type || error.type}：${section.provider_error_message || error.message}`;
   return error;
 }
 
