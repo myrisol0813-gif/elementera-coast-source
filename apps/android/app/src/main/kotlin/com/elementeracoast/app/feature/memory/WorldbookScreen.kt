@@ -58,7 +58,7 @@ internal fun WorldbookScreen(
     ) {
         item {
             DailySurfaceCard {
-                DailyField("试一句", testText, { testText = it }, "聊到哪个海岸名词，就试哪个")
+                DailyField("试一句", testText, { testText = it }, "聊到哪个专有名词，就试哪个")
                 Spacer(Modifier.height(14.dp))
                 DailyPrimaryButton("测试命中") {
                     scope.launch {
@@ -82,7 +82,7 @@ internal fun WorldbookScreen(
         if (state.worldbook.isEmpty()) {
             item {
                 DailySurfaceCard {
-                    Text("海岸世界书目前还是空的。以后聊到某个专有名词时，再整理进来。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("世界书目前还是空的。以后聊到某个专有名词时，再整理进来。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         } else {
@@ -113,7 +113,7 @@ internal fun WorldbookScreen(
     if (creating) WorldbookEditor(null, { creating = false }) { draft ->
         scope.launch {
             runCatching { repository.saveWorldbook(draft) }
-                .onSuccess { creating = false; onSnackbar("世界书词条已写入海岸") }
+                .onSuccess { creating = false; onSnackbar("世界书词条已写入") }
                 .onFailure { onSnackbar(it.message ?: "保存世界书失败") }
         }
     }
