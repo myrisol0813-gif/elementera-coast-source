@@ -49,7 +49,8 @@ import kotlinx.coroutines.withContext
 class CoastShellViewModel(
     private val persistence: LocalPersistence,
     private val backend: CoastBackendGraph,
-    private val workDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate
+    private val workDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
+    private val sourcePreviewMode: Boolean = false
 ) : ViewModel() {
     private val _state = MutableStateFlow(CoastShellState())
     val state: StateFlow<CoastShellState> = _state.asStateFlow()
@@ -135,9 +136,7 @@ class CoastShellViewModel(
         }
     }
 
-    private fun sourcePreviewShellEnabled(): Boolean =
-        BuildConfig.COAST_API_BASE_URL == "https://elementera-coast-source.invalid" &&
-            BuildConfig.SOURCE_PREVIEW_PASSWORD_HINT.isNotBlank()
+    private fun sourcePreviewShellEnabled(): Boolean = sourcePreviewMode
 
     private fun loadSourcePreviewDemo(snackbar: String? = null) {
         _state.update { state ->
@@ -1216,7 +1215,14 @@ class CoastShellViewModel(
                 val appContext = context.applicationContext
                 val persistence = SharedPreferencesLocalPersistence(appContext)
                 val backend = CoastBackendGraph.production(appContext, persistence)
-                return CoastShellViewModel(persistence, backend) as T
+                val sourcePreviewMode =
+                    BuildConfig.COAST_API_BASE_URL == "https://elementera-coast-source.invalid" &&
+                        BuildConfig.SOURCE_PREVIEW_PASSWORD_HINT.isNotBlank()
+                return CoastShellViewModel(
+                    persistence = persistence,
+                    backend = backend,
+                    sourcePreviewMode = sourcePreviewMode
+                ) as T
             }
         }
     }
