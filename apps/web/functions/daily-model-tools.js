@@ -27,7 +27,7 @@ const CREATE_DIARY = {
   type: 'function',
   function: {
     name: 'create_diary',
-    description: '直接写入一篇正式海岸日记，不经过草稿发布流程。用户明确说“写进日记 / 记到日记 / 帮我存成日记”时应调用本工具。写入后可在「小组件 > 日记」找到。',
+    description: '直接写入一篇正式日记，不经过草稿发布流程。用户明确说“写进日记 / 记到日记 / 帮我存成日记”时应调用本工具。写入后可在「小组件 > 日记」找到。',
     parameters: {
       type: 'object', additionalProperties: false,
       properties: {

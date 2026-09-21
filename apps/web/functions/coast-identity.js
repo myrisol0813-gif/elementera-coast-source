@@ -44,7 +44,7 @@ export function apiModelPartnerIdentity(value = {}) {
     model_label: modelLabel,
     model_nickname: clip(value.model_nickname ?? value.modelNickname, 60) || null,
     symbol: SURFACE_SYMBOLS.coast_api,
-    display_author: '海岸 API ✦',
+    display_author: '前端 API ✦',
   });
 }
 

@@ -265,7 +265,7 @@ async function executeToolCalls(calls, executeTool) {
 function completedReply(message, model, finishReason, completedToolCalls = 0) {
   const content = typeof message?.content === 'string' ? message.content : '';
   if (!content.trim()) {
-    throw new ModelRequestError('empty_model_reply', '模型结束了工具调用，但没有返回可展示正文。海岸没有把空白回复当作成功。', 502, {
+    throw new ModelRequestError('empty_model_reply', '模型结束了工具调用，但没有返回可展示正文。前端没有把空白回复当作成功。', 502, {
       model,
       finish_reason: finishReason || null,
       completed_tool_calls: completedToolCalls,
@@ -498,7 +498,7 @@ export async function* performFormalChatStream(env, input = {}, {
       }
 
       if (!roundContent.trim()) {
-        throw new ModelRequestError('empty_model_reply', '模型结束了工具调用，但没有返回可展示正文。海岸没有把空白回复当作成功。', 502, {
+        throw new ModelRequestError('empty_model_reply', '模型结束了工具调用，但没有返回可展示正文。前端没有把空白回复当作成功。', 502, {
           model: actualModel,
           finish_reason: finishReason,
           completed_tool_calls: completedToolCalls,

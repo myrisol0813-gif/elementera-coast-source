@@ -168,7 +168,7 @@ function bearerToken(request, diagnostic) {
   if (authorization == null) {
     throw authFailure(
       'missing_authorization_header',
-      '需要连接屋主的海岸账号。',
+      '需要连接屋主账号。',
       401,
       diagnostic,
     );
@@ -178,7 +178,7 @@ function bearerToken(request, diagnostic) {
   if (!match) {
     throw authFailure(
       'malformed_bearer_token',
-      '海岸连接的 Authorization 格式无效。',
+      '连接的 Authorization 格式无效。',
       401,
       diagnostic,
     );
@@ -187,7 +187,7 @@ function bearerToken(request, diagnostic) {
   if (!token || token.length > MAX_TOKEN_LENGTH) {
     throw authFailure(
       'malformed_bearer_token',
-      '海岸连接的 Bearer token 格式无效。',
+      '连接的 Bearer token 格式无效。',
       401,
       diagnostic,
     );
@@ -206,7 +206,7 @@ function decodeBase64Url(value) {
   try {
     binary = atob(padded);
   } catch {
-    throw new McpAuthError('invalid_access_token', '海岸连接令牌无效或已经过期。', 401);
+    throw new McpAuthError('invalid_access_token', '连接令牌无效或已经过期。', 401);
   }
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
@@ -218,7 +218,7 @@ function decodeJsonSegment(value) {
     return parsed;
   } catch (error) {
     if (error instanceof McpAuthError) throw error;
-    throw new McpAuthError('invalid_access_token', '海岸连接令牌无效或已经过期。', 401);
+    throw new McpAuthError('invalid_access_token', '连接令牌无效或已经过期。', 401);
   }
 }
 
@@ -249,22 +249,22 @@ function populateVerifiedClaimDiagnostic(payload, config, diagnostic) {
 function validateRegisteredClaims(payload, config, diagnostic) {
   const now = Date.now() / 1000;
   if (!diagnostic.claim_checks.iss_matches) {
-    throw authFailure('issuer_mismatch', '海岸连接令牌的 issuer 不匹配。', 401, diagnostic);
+    throw authFailure('issuer_mismatch', '连接令牌的 issuer 不匹配。', 401, diagnostic);
   }
   if (!diagnostic.claim_checks.aud_matches) {
-    throw authFailure('audience_mismatch', '海岸连接令牌的 audience 不匹配。', 401, diagnostic);
+    throw authFailure('audience_mismatch', '连接令牌的 audience 不匹配。', 401, diagnostic);
   }
   if (!Number.isFinite(payload.exp)) {
-    throw jwtFailure('invalid_exp', '海岸连接令牌缺少有效过期时间。', diagnostic);
+    throw jwtFailure('invalid_exp', '连接令牌缺少有效过期时间。', diagnostic);
   }
   if (diagnostic.claim_checks.token_expired) {
-    throw authFailure('expired_token', '海岸连接令牌已经过期。', 401, diagnostic);
+    throw authFailure('expired_token', '连接令牌已经过期。', 401, diagnostic);
   }
   if (payload.nbf != null && (!Number.isFinite(payload.nbf) || payload.nbf > now + 5)) {
-    throw jwtFailure('token_not_yet_valid', '海岸连接令牌尚未生效。', diagnostic);
+    throw jwtFailure('token_not_yet_valid', '连接令牌尚未生效。', diagnostic);
   }
   if (payload.iat != null && (!Number.isFinite(payload.iat) || payload.iat > now + 60)) {
-    throw jwtFailure('invalid_iat', '海岸连接令牌签发时间无效。', diagnostic);
+    throw jwtFailure('invalid_iat', '连接令牌签发时间无效。', diagnostic);
   }
 }
 
@@ -416,10 +416,10 @@ async function verifyMcpToken(token, config, diagnostic) {
       : diagnostic.token_dot_count === 4
         ? 'token_is_jwe_or_opaque'
         : 'token_segment_count';
-    throw jwtFailure(reason, '海岸连接令牌不是可验证的三段 JWT。', diagnostic);
+    throw jwtFailure(reason, '连接令牌不是可验证的三段 JWT。', diagnostic);
   }
   if (segments.some((segment) => !segment)) {
-    throw jwtFailure('token_not_jwt', '海岸连接令牌不是完整的三段 JWT。', diagnostic);
+    throw jwtFailure('token_not_jwt', '连接令牌不是完整的三段 JWT。', diagnostic);
   }
   const [encodedHeader, encodedPayload, encodedSignature] = segments;
   let header;
@@ -428,7 +428,7 @@ async function verifyMcpToken(token, config, diagnostic) {
   } catch (error) {
     throw jwtFailure(
       'jwt_header_decode_failed',
-      '海岸连接令牌的 JWT header 无法解析。',
+      '连接令牌的 JWT header 无法解析。',
       diagnostic,
       { exception: error },
     );
@@ -441,17 +441,17 @@ async function verifyMcpToken(token, config, diagnostic) {
   } catch (error) {
     throw jwtFailure(
       'jwt_payload_decode_failed',
-      '海岸连接令牌的 JWT payload 无法解析。',
+      '连接令牌的 JWT payload 无法解析。',
       diagnostic,
       { exception: error },
     );
   }
   populateUnverifiedJwtDiagnostic(payload, config, diagnostic);
   if (header.alg !== 'RS256') {
-    throw jwtFailure('unsupported_alg', '海岸连接令牌不是受支持的 RS256 JWT。', diagnostic);
+    throw jwtFailure('unsupported_alg', '连接令牌不是受支持的 RS256 JWT。', diagnostic);
   }
   if (!diagnostic.jwt_header_kid_present) {
-    throw jwtFailure('missing_kid', '海岸连接令牌缺少签名密钥标识。', diagnostic);
+    throw jwtFailure('missing_kid', '连接令牌缺少签名密钥标识。', diagnostic);
   }
   let jwks = await remoteJwks(config.issuer, diagnostic);
   let jwk = jwks.keys.find((candidate) => candidate.kid === header.kid);
@@ -488,7 +488,7 @@ async function verifyMcpToken(token, config, diagnostic) {
   } catch (error) {
     throw jwtFailure(
       'signature_decode_failed',
-      '海岸连接令牌签名格式无效。',
+      '连接令牌签名格式无效。',
       diagnostic,
       { exception: error },
     );
@@ -504,7 +504,7 @@ async function verifyMcpToken(token, config, diagnostic) {
   } catch (error) {
     throw jwtFailure(
       'verify_exception',
-      '海岸连接令牌验签过程异常。',
+      '连接令牌验签过程异常。',
       diagnostic,
       { exception: error },
     );
@@ -512,7 +512,7 @@ async function verifyMcpToken(token, config, diagnostic) {
   if (!verified) {
     throw jwtFailure(
       'signature_invalid',
-      '海岸连接令牌签名验证失败。',
+      '连接令牌签名验证失败。',
       diagnostic,
     );
   }
@@ -533,7 +533,7 @@ export async function requireMcpAuth(request, env, requiredScopes = []) {
     if (error instanceof McpAuthError && error.failureCode) throw error;
     throw jwtFailure(
       diagnostic.jwt_verify_reason || 'verify_exception',
-      error?.status === 503 ? 'MCP OAuth 验证暂时不可用。' : '海岸连接令牌验证失败。',
+      error?.status === 503 ? 'MCP OAuth 验证暂时不可用。' : '连接令牌验证失败。',
       diagnostic,
       {
         status: error?.status === 503 ? 503 : 401,

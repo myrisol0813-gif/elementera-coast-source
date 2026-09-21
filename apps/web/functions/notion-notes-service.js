@@ -109,13 +109,13 @@ export async function assertNotionPageInRoot(env, pageId, { allowRoot = true } =
     const page = await getPage(env, current);
     const parent = page?.parent || {};
     if (parent.type !== 'page_id' || !parent.page_id) {
-      throw new DevHandsError('notion_outside_root', '目标页面不在 Elementera Coast 工作日志根页面下。', 403);
+      throw new DevHandsError('notion_outside_root', '目标页面不在 项目工作日志根页面下。', 403);
     }
     const parentId = cleanId(parent.page_id);
     if (parentId === root) return { root, page_id: cleanId(pageId), depth };
     current = parentId;
   }
-  throw new DevHandsError('notion_parent_depth_exceeded', 'Notion 页面层级超过海岸安全检查范围。', 400);
+  throw new DevHandsError('notion_parent_depth_exceeded', 'Notion 页面层级超过项目安全检查范围。', 400);
 }
 
 export async function notionSelfCheck(env, { readEnabled = true } = {}) {
