@@ -42,8 +42,12 @@ The demo is enabled only while the Android build still points at:
 
 As soon as `COAST_API_BASE_URL` is set to a real backend, the local demo path is bypassed and authentication/data loading use that backend instead. No demo file needs to be deleted.
 
-For maintainers who want to remove the fixture entirely, the Android sample data is isolated in:
+For maintainers who want to remove the preview fixture entirely rather than simply disable it, remove these preview-only pieces together:
 
-`apps/android/app/src/main/kotlin/com/elementeracoast/app/feature/shell/SourcePreviewDemo.kt`
+- `apps/android/app/src/main/kotlin/com/elementeracoast/app/feature/shell/SourcePreviewDemo.kt`
+- the `sourcePreviewMode` / `loadSourcePreviewDemo` branches in `CoastShellViewModel.kt`
+- the `source-preview-demo` local metadata branch in `ModelMetadataRemoteDataSource.kt`
+
+This cleanup is optional; setting a real backend already bypasses them.
 
 Self-hosters should set their own source-build backend endpoint at build time and change the password before connecting real data. Production signing material and production updater/release configuration are intentionally absent.
