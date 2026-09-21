@@ -292,7 +292,7 @@ internal fun DiagnosticsScreen(shell: CoastShellState, wolf: WolfState) {
         "当前消息数" to shell.messages.size.toString(),
         "INTERNET permission" to "是",
         "后端接线状态" to if (shell.backendOffline) "缓存可读 · 后端暂不可达" else "聊天主链已接线",
-        "聊天 source of truth" to "Coast D1 / shared history v4"
+        "聊天 source of truth" to "Source D1 / shared history v4"
     )
     LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item { Text("关于与诊断", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) }
