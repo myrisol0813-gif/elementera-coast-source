@@ -153,7 +153,7 @@ export function createDaily({ storage, router, toast, chat }) {
   function dailyHomeView() {
     ensureLoad();
     const entries = [
-      ['moments', '碳硅圈', '海岸内部朋友圈', 'heart'],
+      ['moments', '碳硅圈', '前端内部朋友圈', 'heart'],
       ['diary', '日记', '留下今天的纸页', 'edit'],
       ['pets', '宠物系统', '还在准备休憩箱', 'heart'],
       ['widgets', '未来小组件', '以后再慢慢长出来', 'plus'],
