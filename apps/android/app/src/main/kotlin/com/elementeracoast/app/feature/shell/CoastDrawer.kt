@@ -169,7 +169,7 @@ internal fun CoastDrawer(
                 item {
                     DrawerEntry(
                         Icons.Default.Pets,
-                        "轨迹 / 记忆",
+                        "记忆",
                         state.activeFeature == FeatureDestination.Memory
                     ) { onOpenFeature(FeatureDestination.Memory) }
                 }
