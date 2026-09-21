@@ -317,6 +317,6 @@ assert.match(danger, /removeEventListener\?\.\('popstate', onPopState\)/);
 
 assert.equal(mailbox.includes('document.addEventListener'), false, 'mailbox delegation must stay local');
 assert.match(mailbox, /q\('#mailboxApp'\)\?\.addEventListener\('click'/);
-assert.match(serviceWorker, /const CACHE_NAME = 'elementera-coast-app-[0-9]+';/);
+assert.match(serviceWorker, /const CACHE_NAME = 'elementera-coast-source-app-[0-9]+';/);
 
 console.log('controller-lifecycle: ok');
