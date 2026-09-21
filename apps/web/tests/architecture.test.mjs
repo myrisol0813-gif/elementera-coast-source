@@ -109,7 +109,7 @@ assert.match(redirects, /^\/gptlike \/index\.html 200$/m);
 assert.match(redirects, /^\/app\.html \/index\.html 200$/m);
 const manifest = JSON.parse(await read(resolve(pages, 'manifest.json')));
 assert.deepEqual({ id: manifest.id, name: manifest.name, short_name: manifest.short_name, start_url: manifest.start_url, scope: manifest.scope, display: manifest.display, orientation: manifest.orientation }, {
-  id: '/', name: 'Elementera Coast', short_name: '海岸', start_url: '/?source=pwa', scope: '/', display: 'standalone', orientation: 'portrait',
+  id: '/', name: 'Elementera Coast', short_name: '前端', start_url: '/?source=pwa', scope: '/', display: 'standalone', orientation: 'portrait',
 });
 assert.match(headers, /^\/manifest\.json\n[\s\S]*?^  Content-Type: application\/manifest\+json; charset=utf-8$/m);
 for (const id of ['coastStatus', 'mainRooms', 'chatConversationSection', 'chatConversationList', 'modelQuickPicker', 'chatWindow', 'mainDogtalkComposer', 'deskStatus']) assert.equal((index.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, `${id} must have one owner`);
