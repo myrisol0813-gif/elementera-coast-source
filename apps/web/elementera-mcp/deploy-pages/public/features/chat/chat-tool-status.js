@@ -16,7 +16,7 @@ function node() {
 
 function toolLabel(value) {
   const key = String(value || '').trim();
-  if (!key) return '海岸工具';
+  if (!key) return '前端工具';
   return TOOL_LABELS[key] || key.replace(/[._-]+/g, ' ');
 }
 
