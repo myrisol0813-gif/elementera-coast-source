@@ -81,16 +81,16 @@ class CoastApiClient(
     suspend fun login(password: String): AuthSession {
         val request = Request.Builder().url(config.url("/login")).post(FormBody.Builder().add("password", password).build()).build()
         val cookie = execute(request) { response ->
-            if (response.code == 401) throw CoastApiException(CoastApiErrorKind.Unauthorized, "invalid_password", "海岸密码不正确。", 401)
+            if (response.code == 401) throw CoastApiException(CoastApiErrorKind.Unauthorized, "invalid_password", "访问密码不正确。", 401)
             if (response.code !in 300..399) throw responseError(response)
             val raw = response.headers.values("Set-Cookie").firstOrNull { it.startsWith("${AndroidKeystoreAuthStore.COOKIE_NAME}=") }
-                ?: throw CoastApiException(CoastApiErrorKind.Decode, "missing_session_cookie", "海岸没有返回登录凭据。")
+                ?: throw CoastApiException(CoastApiErrorKind.Decode, "missing_session_cookie", "后端没有返回登录凭据。")
             raw.substringBefore(';').trim()
         }
         val provisional = AuthSession(cookie, 0L)
         val verified = getSession(provisional)
         if (!verified.authenticated || (!verified.persistsUntilLogout && verified.expiresAt <= 0L)) {
-            throw CoastApiException(CoastApiErrorKind.Unauthorized, "invalid_session", "海岸登录凭据未通过验证。", 401)
+            throw CoastApiException(CoastApiErrorKind.Unauthorized, "invalid_session", "登录凭据未通过验证。", 401)
         }
         return AuthSession(cookie, if (verified.persistsUntilLogout) 0L else verified.expiresAt)
     }
