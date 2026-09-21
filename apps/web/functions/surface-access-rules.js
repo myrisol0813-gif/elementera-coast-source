@@ -95,9 +95,9 @@ export class RoomAccessError extends Error {
 export function roomAccess(surface, { permission = 'owner', visitorId = '' } = {}) {
   const key = String(surface || '').trim();
   const access = SURFACE_ACCESS_RULES[key];
-  if (!access) throw new RoomAccessError('surface_required', '请求必须明确指定一个海岸房间。');
+  if (!access) throw new RoomAccessError('surface_required', '请求必须明确指定一个房间。');
   if (access.ownerOnly && permission !== 'owner') {
-    throw new RoomAccessError('surface_forbidden', '当前访客无权读取这个海岸房间。', 403);
+    throw new RoomAccessError('surface_forbidden', '当前访客无权读取这个房间。', 403);
   }
   if (access.visitorBound && !String(visitorId || '').trim()) {
     throw new RoomAccessError('visitor_id_required', '访客房间必须绑定当前 visitor_id。');

@@ -53,7 +53,7 @@ function successLabel(toolKey, displayName) {
     'memory.write_candidate': '放入待确认区',
     'memory.global_excerpt_propose': '全局摘录：新增 1 条待确认修改',
   };
-  return labels[toolKey] || clean(displayName || toolKey, 120) || '动用了一件海岸家具';
+  return labels[toolKey] || clean(displayName || toolKey, 120) || '使用了一件工具';
 }
 
 export function buildFurnitureSummary({ id, toolKey, displayName, status = 'success', output = null, error = null } = {}) {

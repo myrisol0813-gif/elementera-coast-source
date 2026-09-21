@@ -431,7 +431,7 @@ export async function routeSnapshotApi(request, env) {
   } catch (error) {
     return apiError(
       'snapshot_export_failed',
-      pathname === FULL_ARCHIVE_PATH ? '完整海岸包生成失败。' : 'V1 防丢快照生成失败。',
+      pathname === FULL_ARCHIVE_PATH ? '完整导出包生成失败。' : 'V1 防丢快照生成失败。',
       500,
       { reason: String(error?.type || error?.message || 'snapshot_export_failed').slice(0, 160) },
     );

@@ -30,7 +30,7 @@ function validateTextContent(content, maxContent) {
     const tooLong = typeof content === 'string' && content.length > maxContent;
     throw new ModelRequestError(
       tooLong ? 'request_body_too_large' : 'invalid_messages',
-      tooLong ? `单条模型消息超过海岸技术保护上限 ${maxContent} 字符，海岸没有静默裁剪。` : '消息内容无效。',
+      tooLong ? `单条模型消息超过前端技术保护上限 ${maxContent} 字符，前端没有静默裁剪。` : '消息内容无效。',
       tooLong ? 413 : 400,
       tooLong ? { technical_max_message_chars: maxContent, attempted_chars: content.length } : {},
     );
@@ -50,7 +50,7 @@ function validateUserMultimodalContent(content, maxContent) {
       if (textChars > maxContent) {
         throw new ModelRequestError(
           'request_body_too_large',
-          `单条模型消息超过海岸技术保护上限 ${maxContent} 字符，海岸没有静默裁剪。`,
+          `单条模型消息超过前端技术保护上限 ${maxContent} 字符，前端没有静默裁剪。`,
           413,
           { technical_max_message_chars: maxContent, attempted_chars: textChars },
         );
@@ -198,9 +198,9 @@ export function normalizedProviderError(status, model, preview = '') {
     if (credit) return ['insufficient_credits', `OpenRouter 额度预检未通过：本次最大输出设为 ${credit.requested} tokens，当前余额最多负担 ${credit.affordable}，还差 ${credit.missing} tokens。请在 API 小屋把“最大输出 token”调到 ${credit.affordable} 或更低。`];
     return ['insufficient_credits', 'OpenRouter 余额或 credits 不足。可以在 API 小屋调低“最大输出 token”。'];
   }
-  if (status === 413) return ['request_body_too_large', 'provider 拒绝了过大的请求体；海岸没有偷偷缩短跨窗口内容。'];
+  if (status === 413) return ['request_body_too_large', 'provider 拒绝了过大的请求体；前端没有偷偷缩短跨窗口内容。'];
   if (contextLimitPreview(lower)) return ['context_length_exceeded', 'provider / 模型拒绝了这次完整上下文；海岸没有偷偷裁剪跨窗口内容。'];
-  if (status === 408 || lower.includes('timed out') || lower.includes('timeout')) return ['provider_timeout', 'provider 在等待完整请求时超时；海岸没有自动缩短后重试。'];
+  if (status === 408 || lower.includes('timed out') || lower.includes('timeout')) return ['provider_timeout', 'provider 在等待完整请求时超时；前端没有自动缩短后重试。'];
   if (status === 403 && lower.includes('not available in your region')) return ['region_unavailable', '该模型在当前网络地区不可用。可以切换网络出口，或换用其他模型。'];
   if (status === 403) return ['forbidden', '当前 key 或账户没有权限使用该模型。'];
   if (status === 404) return ['model_not_found', '模型不存在或已下架。'];

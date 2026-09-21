@@ -58,7 +58,7 @@ export function requireAllowedRepo(env, value) {
   const repo = cleanRepo(value);
   const allowed = allowedRepos(env);
   if (!allowed.includes(repo)) {
-    throw new DevHandsError('repo_not_allowed', '这个仓库不在海岸开发手 allowlist 中。', 403, { repo, allowed_repos: allowed });
+    throw new DevHandsError('repo_not_allowed', '这个仓库不在开发手 allowlist 中。', 403, { repo, allowed_repos: allowed });
   }
   return repo;
 }
