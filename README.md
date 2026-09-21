@@ -1,6 +1,6 @@
 # Elementera Coast Source
 
-Elementera Coast Source is the source-available, non-commercial edition of Elementera Coast, derived from the current PWA and Native application trees and sanitized for public distribution.
+Elementera Coast Source is the open-source edition of Elementera Coast, derived from the current PWA and Native application trees and sanitized for public distribution.
 
 The goal of this repository is to preserve the real application structure and user-facing interface while removing private data and production-only credentials or distribution machinery. It is not a generic reimplementation.
 
@@ -45,4 +45,4 @@ See `docs/SANITIZATION_REPORT.md` and `docs/KNOWN_LIMITATIONS.md`. Tagging or re
 
 ## License
 
-PolyForm Noncommercial License 1.0.0. See `LICENSE`.
+MIT License. See `LICENSE`.
