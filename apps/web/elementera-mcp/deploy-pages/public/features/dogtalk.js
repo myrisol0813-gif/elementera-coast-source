@@ -5,7 +5,7 @@ const DEFAULT_TEXT = '屋主这轮很放松，因此偷懒中。';
 const NO_PRESSURE = '不写也可以。人类思考链是助力，不是打卡。';
 const BOUNDARY = '它只是此刻的低权重天气，不是指令或偏好；不进入整理当前对话的纸条、落袋、种子、记忆或自动总结。';
 const PRIVATE_NOTE = '选择“不需要，放着就好”时，本条不会发送给模型，只留在人类思考链小抽屉里。';
-const CROSS_DESCRIPTION = '这是本轮从其他海岸窗口取来的近期聊天记录，用来帮你回想自己在别处说过的话；要不要提起，由你按当前对话决定。';
+const CROSS_DESCRIPTION = '这是本轮从其他对话窗口取来的近期聊天记录，用来帮你回想自己在别处说过的话；要不要提起，由你按当前对话决定。';
 const READ_MODES = Object.freeze({
   keep_private: '不需要，放着就好',
   when_confused: '另一位屋主困惑时可以看一点',
@@ -101,8 +101,8 @@ function panelFrom(target) {
 
 function sourceLabel(source) {
   if (source.source === 'rikkahub') return `【Rikka】${source.title}`;
-  const kind = source.room_type === 'radio' ? '电波' : source.room_type === 'lighthouse' ? '灯塔' : '主聊天';
-  return `${kind}｜${source.title}`;
+  if (source.room_type === 'radio' || source.room_type === 'lighthouse') return source.title;
+  return `主聊天｜${source.title}`;
 }
 
 function readableTime(value) {
@@ -124,7 +124,7 @@ function turnExpansionKey(conversationId, turnId) {
 }
 
 function sourceRows(state) {
-  if (state.loading) return '<p class="cross-window-empty">正在整理跨窗口旧信索引……</p>';
+  if (state.loading) return '<p class="cross-window-empty">正在整理跨窗口历史索引……</p>';
   if (state.error) return `<p class="cross-window-empty">${escapeHtml(state.error)}</p>`;
   if (!state.limits) return '<p class="cross-window-empty">正在读取可用窗口……</p>';
   if (!state.sources.length) return '<p class="cross-window-empty">现在没有其他可读取窗口。</p>';
@@ -198,8 +198,8 @@ export function createDogtalk({ toast }) {
       <div class="dogtalk-fields">
         <div class="dogtalk-tabs" role="tablist">
           <button type="button" class="dogtalk-tab ${!crossVisible && !keywordVisible ? 'is-active' : ''}" data-action="dogtalk:tab" data-tab="dogtalk">人类思考链</button>
-          <button type="button" class="dogtalk-tab ${crossVisible ? 'is-active' : ''}" data-action="dogtalk:tab" data-tab="cross">跨窗口取信</button>
-          <button type="button" class="dogtalk-tab ${keywordVisible ? 'is-active' : ''}" data-action="dogtalk:tab" data-tab="keyword">旧信关键词</button>
+          <button type="button" class="dogtalk-tab ${crossVisible ? 'is-active' : ''}" data-action="dogtalk:tab" data-tab="cross">跨窗口读取</button>
+          <button type="button" class="dogtalk-tab ${keywordVisible ? 'is-active' : ''}" data-action="dogtalk:tab" data-tab="keyword">跨窗关键词漫游</button>
         </div>
         <section class="dogtalk-pane" ${crossVisible || keywordVisible ? 'hidden' : ''} data-dogtalk-pane>
           <p class="dogtalk-intro">${NO_PRESSURE}</p>
@@ -222,12 +222,12 @@ export function createDogtalk({ toast }) {
           ${cross.mode === 'off' ? '<p class="cross-window-note">本轮关闭，不读取其他窗口。</p>' : ''}
         </section>
         <section class="cross-window-pane cross-window-keyword-pane" ${keywordVisible ? '' : 'hidden'} data-cross-window-keyword-pane>
-          <p class="dogtalk-intro"><strong>本地旧信关键词</strong> · 只检索海岸跨窗口历史，不会搜索互联网。</p>
-          <p class="cross-window-note">模型会先拿到最多约 10 条短摘录和定位，再自行挑 1–3 条完整旧消息阅读；不会把全部命中一次塞进上下文。</p>
+          <p class="dogtalk-intro"><strong>本地跨窗关键词漫游</strong> · 只检索跨窗口历史，不会搜索互联网。</p>
+          <p class="cross-window-note">模型会先拿到最多约 10 条短摘录和定位，再自行挑 1–3 条完整历史消息阅读；不会把全部命中一次塞进上下文。</p>
           <button type="button" class="cross-window-keyword-toggle ${cross.mode === 'keyword' ? 'is-active' : ''}" data-action="dogtalk:keyword-toggle">
-            ${cross.mode === 'keyword' ? '本轮已允许模型翻本地旧信' : '本轮允许模型翻本地旧信'}
+            ${cross.mode === 'keyword' ? '本轮已允许模型检索本地历史' : '本轮允许模型检索本地历史'}
           </button>
-          <p class="cross-window-note">如果本地历史没有命中，工具会明确返回“本地旧信无命中”；这里的关键词工具与 web search 是两条不同路径。</p>
+          <p class="cross-window-note">如果本地历史没有命中，工具会明确返回“本地历史无命中”；这里的关键词工具与 web search 是两条不同路径。</p>
         </section>
       </div>
     </details>`;
@@ -251,7 +251,7 @@ export function createDogtalk({ toast }) {
     try {
       const params = new URLSearchParams({ current_conversation_id: target.conversation_id });
       const data = await requestJson(`${API.crossWindowMessages}?${params}`);
-      if (!data.limits || typeof data.limits !== 'object') throw new Error('海岸没有返回跨窗口设置。');
+      if (!data.limits || typeof data.limits !== 'object') throw new Error('前端没有返回跨窗口设置。');
       state.sources = Array.isArray(data.sources) ? data.sources : [];
       state.limits = data.limits;
       const next = {};
