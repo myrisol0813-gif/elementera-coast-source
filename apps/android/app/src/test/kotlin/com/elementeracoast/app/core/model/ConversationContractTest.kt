@@ -16,8 +16,8 @@ class ConversationContractTest {
     fun filteringSupportsConcreteHistoryAcrossAllRoomTypes() {
         val conversations = listOf(
             ConversationSummary("main-test", "主聊天测试", RoomType.Main),
-            ConversationSummary("radio-test", "【电波】夜航测试", RoomType.Radio),
-            ConversationSummary("lighthouse-test", "【灯塔】来信测试", RoomType.Lighthouse)
+            ConversationSummary("radio-test", "【共通聊天室】夜航测试", RoomType.Radio),
+            ConversationSummary("lighthouse-test", "【MCP 对话区】来信测试", RoomType.Lighthouse)
         )
 
         assertEquals(conversations, filterConversations(conversations, ""))
@@ -28,9 +28,9 @@ class ConversationContractTest {
 
     @Test
     fun roomTitlesKeepExactlyOneRequiredPrefix() {
-        assertEquals("【电波】新的窗口", roomConversationTitle(RoomType.Radio, "新的窗口"))
-        assertEquals("【电波】新的窗口", roomConversationTitle(RoomType.Radio, "【电波】新的窗口"))
-        assertEquals("【灯塔】新的窗口", roomConversationTitle(RoomType.Lighthouse, "【电波】新的窗口"))
-        assertEquals("新的窗口", roomConversationTitle(RoomType.Main, "【灯塔】新的窗口"))
+        assertEquals("【共通聊天室】新的窗口", roomConversationTitle(RoomType.Radio, "新的窗口"))
+        assertEquals("【共通聊天室】新的窗口", roomConversationTitle(RoomType.Radio, "【共通聊天室】新的窗口"))
+        assertEquals("【MCP 对话区】新的窗口", roomConversationTitle(RoomType.Lighthouse, "【共通聊天室】新的窗口"))
+        assertEquals("新的窗口", roomConversationTitle(RoomType.Main, "【MCP 对话区】新的窗口"))
     }
 }
