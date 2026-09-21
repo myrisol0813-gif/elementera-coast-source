@@ -103,8 +103,8 @@ internal fun DiaryScreen(
             if (draft.text.isBlank()) onSnackbar("正文还是空的") else scope.launch {
                 try {
                     repository.patchDiary(entry.id, draft.date, draft.weather, draft.mood, draft.tags, draft.text)
-                    onActionLogged("daily.diary.edit", "编辑了一篇日记", "海岸更新 1 篇日记")
-                    onSnackbar("日记已写回海岸")
+                    onActionLogged("daily.diary.edit", "编辑了一篇日记", "前端更新 1 篇日记")
+                    onSnackbar("日记已写回前端")
                     editing = null
                 } catch (error: Throwable) { reportFailure("日记更新失败", error) }
             }
@@ -113,14 +113,14 @@ internal fun DiaryScreen(
     deleting?.let { entry ->
         DailyDeleteConfirmDialog(
             title = "删除这篇日记？",
-            body = "这是海岸里的正式纸页；删除后 PWA 与 Native 都不会再看到它。",
+            body = "这是前端里的正式纸页；删除后 PWA 与 Native 都不会再看到它。",
             onDismiss = { deleting = null },
             onConfirm = {
                 scope.launch {
                     try {
                         repository.deleteDiary(entry.id)
-                        onActionLogged("daily.diary.delete", "删除了一篇日记", "海岸删除 1 篇日记")
-                        onSnackbar("日记已从海岸删除")
+                        onActionLogged("daily.diary.delete", "删除了一篇日记", "前端删除 1 篇日记")
+                        onSnackbar("日记已从前端删除")
                         deleting = null
                     } catch (error: Throwable) { reportFailure("日记删除失败", error) }
                 }
@@ -157,7 +157,7 @@ internal fun DiaryComposeScreen(
                 Spacer(Modifier.height(18.dp))
                 DailyField("标签（逗号或换行分隔）", tags, { tags = it }, minLines = 3, maxLines = 6)
                 Spacer(Modifier.height(18.dp))
-                DailyPrimaryButton(if (saving) "正在写回海岸…" else "写入日记") {
+                DailyPrimaryButton(if (saving) "正在写回前端…" else "写入日记") {
                     if (body.isBlank()) {
                         onSnackbar("正文还是空的")
                     } else if (!saving) {
@@ -165,8 +165,8 @@ internal fun DiaryComposeScreen(
                         scope.launch {
                             try {
                                 repository.createDiary(date, weather, mood, splitTags(tags), body)
-                                onActionLogged("daily.diary.write", "写了一篇日记", "海岸新增 1 篇屋主日记")
-                                onSnackbar("日记已留在海岸")
+                                onActionLogged("daily.diary.write", "写了一篇日记", "前端新增 1 篇屋主日记")
+                                onSnackbar("日记已留在前端")
                                 onDone()
                             } catch (error: Throwable) {
                                 val detail = if (error is CoastApiException) error.message else error.message ?: "未知错误"
