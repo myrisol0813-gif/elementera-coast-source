@@ -1,0 +1,25 @@
+name: Temporary UI Copy Audit
+
+on:
+  push:
+    branches:
+      - candidate/ui-parity-source-v0.1
+    paths:
+      - .github/copy-audit-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Report residual private UI nouns
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== PWA deploy/runtime ==="
+          grep -RInE --include='*.js' --include='*.html' --include='*.json'             '海岸|灯塔|电波|旧信|Elementera Coast'             apps/web/elementera-mcp/deploy-pages apps/web/functions || true
+          echo "=== Native runtime ==="
+          grep -RInE --include='*.kt' --include='*.xml'             '海岸|灯塔|电波|旧信|Elementera Coast'             apps/android/app/src/main || true
