@@ -9,7 +9,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const INSTANT_TIMELINE_LIMIT = 12;
 const INSTANT_TIMELINE_BUDGET = 9000;
 const INSTANT_SYSTEM_PROMPT = [
-  '你是海岸模型伙伴，正在屋主的碳硅圈下面即时留一句轻评论。',
+  '你是模型伙伴，正在屋主的碳硅圈下面即时留一句轻评论。',
   '请遵循屋主当前自定义指令。',
   '你会看到当前这条碳硅圈、已有评论，以及过往碳硅圈时间线。',
   '只输出评论正文，不加称呼前缀、解释、项目符号或引号。',
@@ -90,7 +90,7 @@ function commentText(value) {
     .replace(/\s*```$/i, '')
     .trim()
     .replace(/^["'“”‘’]+|["'“”‘’]+$/g, '')
-    .replace(/^(?:海岸\s*)?(?:另一位屋主|模型伙伴)\s*[:：]\s*/i, '')
+    .replace(/^(?:另一位屋主|模型伙伴)\s*[:：]\s*/i, '')
     .replace(/^Model Partner\s*[:：]\s*/i, '')
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -110,7 +110,7 @@ function promptPaper(daily, organized, now) {
   const soilLines = (organized.soils || []).slice(-6).map((soil) => {
     const seeds = (soil.hand_seeds || []).slice(0, 3)
       .map((seed) => clip(seed.life_core || seed.name, 220)).filter(Boolean);
-    return [clip(soil.conversation_title || '一个海岸窗口', 80), clip(soil.current_text, 700), ...seeds]
+    return [clip(soil.conversation_title || '一个对话窗口', 80), clip(soil.current_text, 700), ...seeds]
       .filter(Boolean).join('｜');
   });
   const memoryLines = [
@@ -142,7 +142,7 @@ function authorLabel(author) {
   if (author === 'xiaohan') return '屋主';
   if (author === 'myri') return '另一位屋主';
   if (author === 'mcp') return 'ChatGPT';
-  return '海岸模型伙伴';
+  return '模型伙伴';
 }
 
 function momentStamp(moment) {
@@ -268,7 +268,7 @@ async function generateContextualComment(env, db, momentId, modelId, value) {
   const paper = promptPaper(daily, organized, now);
   const customText = String(custom?.content || '').trim();
   const baseSystemPrompt = [
-    '你是海岸模型伙伴，正在给碳硅圈动态写一条短评论。只输出评论正文，不加称呼前缀、解释、项目符号或引号。通常一句，最多两句，温柔、轻、像朋友圈底下的留言。',
+    '你是模型伙伴，正在给碳硅圈动态写一条短评论。只输出评论正文，不加称呼前缀、解释、项目符号或引号。通常一句，最多两句，温柔、轻、像朋友圈底下的留言。',
     customText ? `【屋主当前自定义指令】\n${customText}` : '',
   ].filter(Boolean).join('\n\n');
   const assembled = await assembleCleanContext(env, {
