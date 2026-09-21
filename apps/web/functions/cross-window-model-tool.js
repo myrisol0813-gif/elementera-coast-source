@@ -14,7 +14,7 @@ function tool(name, description, properties, required = []) {
 export const CROSS_WINDOW_MODEL_TOOLS = Object.freeze({
   search: tool(
     'cross_window_search',
-    '仅当本轮屋主已开启“让模型决定”时，查看可读取的其他海岸窗口标题与来源；不会读取正文。',
+    '仅当本轮屋主已开启“让模型决定”时，查看可读取的其他对话窗口标题与来源；不会读取正文。',
     {
       query: { type: 'string', maxLength: 120, description: '可选标题关键词。' },
       limit: { type: 'integer', minimum: 1, maximum: 20 },
@@ -22,7 +22,7 @@ export const CROSS_WINDOW_MODEL_TOOLS = Object.freeze({
   ),
   keyword_search: tool(
     'cross_window_keyword_search',
-    '只检索海岸本地跨窗口旧信，不搜索互联网。先返回最多 10 条短摘录与定位，再决定是否读取 1–3 条具体消息；不会把全部命中正文一次性塞入上下文。',
+    '只检索本地跨窗口历史，不搜索互联网。先返回最多 10 条短摘录与定位，再决定是否读取 1–3 条具体消息；不会把全部命中正文一次性塞入上下文。',
     {
       query: { type: 'string', minLength: 1, maxLength: 160 },
       limit: { type: 'integer', minimum: 1, maximum: 10 },
@@ -45,7 +45,7 @@ export const CROSS_WINDOW_MODEL_TOOLS = Object.freeze({
   ),
   read_recent: tool(
     'cross_window_read_recent',
-    '仅当本轮屋主已开启“让模型决定”时，从一个其他海岸窗口读取近期聊天；只读，不改变原窗口。',
+    '仅当本轮屋主已开启“让模型决定”时，从一个其他对话窗口读取近期聊天；只读，不改变原窗口。',
     {
       conversation_id: { type: 'string', minLength: 1, maxLength: 200 },
       turns: { type: 'integer', minimum: 1, maximum: CROSS_WINDOW_LIMITS.technical_max_turns_per_source },
@@ -62,7 +62,7 @@ export async function executeCrossWindowModelTool(db, kind, input = {}, context 
     || (kind === 'read_messages' && ['model_decides', 'keyword'].includes(mode))
   );
   if (!allowed) {
-    const error = new Error(mode === 'keyword' ? '本轮只开放本地旧信关键词检索与少量精读。' : '本轮没有开放对应的跨窗口取信工具。');
+    const error = new Error(mode === 'keyword' ? '本轮只开放本地跨窗关键词漫游检索与少量精读。' : '本轮没有开放对应的跨窗口读取工具。');
     error.type = 'cross_window_tool_forbidden';
     error.status = 403;
     throw error;
@@ -74,8 +74,8 @@ export async function executeCrossWindowModelTool(db, kind, input = {}, context 
       currentConversationId: context.conversation_id || '',
     });
     return result.hits.length
-      ? { ...result, status: 'matched', message: `本地旧信命中 ${result.hits.length} 条短摘录。` }
-      : { ...result, status: 'no_match', message: '本地旧信无命中。' };
+      ? { ...result, status: 'matched', message: `本地历史命中 ${result.hits.length} 条短摘录。` }
+      : { ...result, status: 'no_match', message: '本地历史无命中。' };
   }
 
   if (kind === 'read_messages') {
