@@ -60,7 +60,7 @@ const activeBranchTurn = {
 const conversations = [
   { id: 'current-main', title: '当前窗口', room_type: 'main', source: 'coast', source_window_id: null, created_at: now - 9000, updated_at: now, deleted_at: null, archived_at: null, conversation_kind: 'chat', user_id: 'owner' },
   { id: 'work-main', title: '找工作这窗', room_type: 'main', source: 'coast', source_window_id: null, created_at: now - 8000, updated_at: now - 1000, deleted_at: null, archived_at: null, conversation_kind: 'chat', user_id: 'owner' },
-  { id: 'radio-1', title: '晚间电波', room_type: 'radio', source: 'coast', source_window_id: null, created_at: now - 7000, updated_at: now - 2000, deleted_at: null, archived_at: null, conversation_kind: 'chat', user_id: 'owner' },
+  { id: 'radio-1', title: '晚间聊天室', room_type: 'radio', source: 'coast', source_window_id: null, created_at: now - 7000, updated_at: now - 2000, deleted_at: null, archived_at: null, conversation_kind: 'chat', user_id: 'owner' },
   { id: 'rikka-1', title: '旧窗口', room_type: 'main', source: 'rikkahub', source_window_id: 'rikka-origin-77', created_at: now - 5000, updated_at: now - 4000, deleted_at: null, archived_at: null, conversation_kind: 'chat', user_id: 'owner' },
   { id: 'archived-1', title: '已隐藏窗口', room_type: 'main', source: 'coast', source_window_id: null, created_at: now - 2500, updated_at: now - 6500, deleted_at: null, archived_at: now - 2, conversation_kind: 'chat', user_id: 'owner' },
   { id: 'deleted-1', title: '已删除', room_type: 'main', source: 'coast', source_window_id: null, created_at: now - 2000, updated_at: now - 7000, deleted_at: now - 1, archived_at: null, conversation_kind: 'chat', user_id: 'owner' },
