@@ -1,6 +1,7 @@
 package com.elementeracoast.app.feature.shell
 
 import android.content.Context
+import com.elementeracoast.app.BuildConfig
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -77,6 +78,33 @@ class CoastShellViewModel(
     fun enterCoast() {
         val password = _state.value.password
         if (password.isBlank() || _state.value.authBusy) return
+
+        if (sourcePreviewShellEnabled()) {
+            if (password != BuildConfig.SOURCE_PREVIEW_PASSWORD_HINT) {
+                _state.update {
+                    it.copy(
+                        authenticated = false,
+                        authBusy = false,
+                        authMessage = "访问密码不正确。",
+                        backendOffline = true
+                    )
+                }
+                return
+            }
+            _state.update {
+                it.copy(
+                    authenticated = true,
+                    authBusy = false,
+                    authMessage = null,
+                    backendOffline = true,
+                    password = "",
+                    snackbarMessage = "source preview：当前仅用于查看空壳，未连接后端。"
+                )
+            }
+            applyCachedBootstrap()
+            return
+        }
+
         viewModelScope.launch(workDispatcher) {
             _state.update { it.copy(authBusy = true, authMessage = null) }
             try {
@@ -105,6 +133,10 @@ class CoastShellViewModel(
             }
         }
     }
+
+    private fun sourcePreviewShellEnabled(): Boolean =
+        BuildConfig.COAST_API_BASE_URL == "https://elementera-coast-source.invalid" &&
+            BuildConfig.SOURCE_PREVIEW_PASSWORD_HINT.isNotBlank()
 
     fun logout() {
         stopGeneration()
