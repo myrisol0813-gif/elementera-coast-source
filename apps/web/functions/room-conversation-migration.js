@@ -52,7 +52,7 @@ function userTurn(row, content) {
 function assistantVariant(row) {
   return {
     id: id('legacy_assistant'),
-    content: row.withdrawn_at ? '这条电波已撤回' : String(row.text || ''),
+    content: row.withdrawn_at ? '这条消息已撤回' : String(row.text || ''),
     created_at: iso(row.created_at),
     ...(row.model_label ? { model_id: row.model_label } : {}),
     generation_source: 'radio',
@@ -94,14 +94,14 @@ async function migrateRadio(db, normalizeState) {
       let turn = turns.at(-1);
       const assistants = turn?.assistant?.variantsByUserVariant?.['0'];
       if (!turn || !Array.isArray(assistants) || assistants.length) {
-        turn = userTurn({ ...row, surface: 'web_manual' }, '（迁移前的电波上下文）');
+        turn = userTurn({ ...row, surface: 'web_manual' }, '（迁移前的对话上下文）');
         turn.user.variants[0].hidden = true;
         turns.push(turn);
       }
       turn.assistant.variantsByUserVariant['0'].push(assistantVariant(row));
       continue;
     }
-    const text = row.withdrawn_at ? '这条电波已撤回' : String(row.text || '');
+    const text = row.withdrawn_at ? '这条消息已撤回' : String(row.text || '');
     if (text.trim()) turns.push(userTurn(row, text));
   }
   return insertConversation(
