@@ -33,10 +33,10 @@ export function createDaily({ storage, router, toast, chat }) {
     expandedMoments: new Set(),
     savingMoment: false,
     profile: {
-      xiaohanAvatarDataurl: preferences.xiaohanAvatar || '',
-      myriAvatarDataurl: chat?.getProfile?.()?.assistant_avatar_dataurl || preferences.myriAvatar || '',
+      ownerAvatarDataurl: preferences.ownerAvatar || '',
+      modelPartnerAvatarDataurl: chat?.getProfile?.()?.assistant_avatar_dataurl || preferences.modelPartnerAvatar || '',
       momentCoverDataurl: saved.momentCover || '',
-      myriDisplayName: '另一位屋主',
+      modelPartnerDisplayName: '另一位屋主',
       updatedAt: null,
     },
     loaded: false,
@@ -63,7 +63,7 @@ export function createDaily({ storage, router, toast, chat }) {
           syncedAt: state.sync === 'server' ? Date.now() : Number(local.daily.cache?.syncedAt || 0),
         };
         local.daily.momentCover = state.profile.momentCoverDataurl;
-        local.preferences.xiaohanAvatar = state.profile.xiaohanAvatarDataurl;
+        local.preferences.ownerAvatar = state.profile.ownerAvatarDataurl;
       });
     } catch (error) {
       console.warn('[daily-cache]', error);
@@ -81,21 +81,21 @@ export function createDaily({ storage, router, toast, chat }) {
         state.moments = data.moments;
         state.diaries = data.diaries;
         const serverProfile = data.profile || {};
-        const priorModelPartnerAvatar = serverProfile.myriAvatarDataurl || '';
+        const priorModelPartnerAvatar = serverProfile.modelPartnerAvatarDataurl || '';
         let canonicalModelPartnerAvatar = chat?.getProfile?.()?.assistant_avatar_dataurl || '';
         if (!canonicalModelPartnerAvatar && priorModelPartnerAvatar && chat?.updateProfile) {
           try {
             const promoted = await chat.updateProfile({ assistant_avatar_dataurl: priorModelPartnerAvatar });
             canonicalModelPartnerAvatar = promoted.assistant_avatar_dataurl || priorModelPartnerAvatar;
           } catch (error) {
-            console.warn('[daily-myri-avatar-migration]', error);
+            console.warn('[daily-model-partner-avatar-migration]', error);
           }
         }
         state.profile = {
-          xiaohanAvatarDataurl: serverProfile.xiaohanAvatarDataurl || state.profile.xiaohanAvatarDataurl || '',
-          myriAvatarDataurl: canonicalModelPartnerAvatar || priorModelPartnerAvatar || state.profile.myriAvatarDataurl || '',
+          ownerAvatarDataurl: serverProfile.ownerAvatarDataurl || state.profile.ownerAvatarDataurl || '',
+          modelPartnerAvatarDataurl: canonicalModelPartnerAvatar || priorModelPartnerAvatar || state.profile.modelPartnerAvatarDataurl || '',
           momentCoverDataurl: serverProfile.momentCoverDataurl || state.profile.momentCoverDataurl || '',
-          myriDisplayName: serverProfile.myriDisplayName || state.profile.myriDisplayName || '另一位屋主',
+          modelPartnerDisplayName: serverProfile.modelPartnerDisplayName || state.profile.modelPartnerDisplayName || '另一位屋主',
           updatedAt: serverProfile.updatedAt || state.profile.updatedAt || null,
         };
         state.loaded = true;

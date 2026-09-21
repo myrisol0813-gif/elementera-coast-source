@@ -37,7 +37,7 @@ function moment(value = {}) {
     likeCount: Number(value.like_count || 0),
     comments: (Array.isArray(value.comments) ? value.comments : []).map((commentValue) => ({
       id: commentValue.id,
-      who: commentValue.author === 'xiaohan' ? '屋主' : '另一位屋主',
+      who: commentValue.author === 'owner' ? '屋主' : '另一位屋主',
       author: commentValue.author,
       text: commentValue.text || '',
       modelId: commentValue.model_id || null,
@@ -70,12 +70,12 @@ function diary(value = {}) {
 }
 
 function profile(value = {}) {
-  const name = String(value.myri_display_name || '另一位屋主').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80) || '另一位屋主';
+  const name = String(value.model_partner_display_name || '另一位屋主').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80) || '另一位屋主';
   return {
-    xiaohanAvatarDataurl: typeof value.xiaohan_avatar_dataurl === 'string' ? value.xiaohan_avatar_dataurl : '',
-    myriAvatarDataurl: typeof value.myri_avatar_dataurl === 'string' ? value.myri_avatar_dataurl : '',
+    ownerAvatarDataurl: typeof value.owner_avatar_dataurl === 'string' ? value.owner_avatar_dataurl : '',
+    modelPartnerAvatarDataurl: typeof value.model_partner_avatar_dataurl === 'string' ? value.model_partner_avatar_dataurl : '',
     momentCoverDataurl: typeof value.moment_cover_dataurl === 'string' ? value.moment_cover_dataurl : '',
-    myriDisplayName: name,
+    modelPartnerDisplayName: name,
     updatedAt: value.updated_at || null,
   };
 }
@@ -190,8 +190,8 @@ export function createDailyClient() {
     const data = await requestJson(`${API.dailyMoments}/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE' });
     return moment(data.moment);
   }
-  async function myriCommentMoment(id, value = {}) {
-    const data = await requestModelPartnerComment(`${API.dailyMoments}/${encodeURIComponent(id)}/myri-comment`, value);
+  async function modelPartnerCommentMoment(id, value = {}) {
+    const data = await requestModelPartnerComment(`${API.dailyMoments}/${encodeURIComponent(id)}/model-partner-comment`, value);
     return { moment: moment(data.moment), comment: data.comment || null, model: data.model || value.model || '', diagnostic: data.diagnostic || null };
   }
   async function setMomentLike(id, liked) {
@@ -211,5 +211,5 @@ export function createDailyClient() {
     return Boolean(data.deleted);
   }
 
-  return Object.freeze({ load, saveProfile, createMoment, patchMoment, deleteMoment, commentMoment, deleteMomentComment, myriCommentMoment, setMomentLike, createDiary, patchDiary, deleteDiary });
+  return Object.freeze({ load, saveProfile, createMoment, patchMoment, deleteMoment, commentMoment, deleteMomentComment, modelPartnerCommentMoment, setMomentLike, createDiary, patchDiary, deleteDiary });
 }

@@ -81,8 +81,8 @@ class CoastShellViewModelTest {
         assertEquals("openai/gpt-5.6", state.currentModel)
         assertEquals(listOf("PWA 留下的问题", "PWA 已有回复"), state.messages.map { it.text })
         assertTrue(state.models.contains("openai/gpt-5.6"))
-        assertEquals("chat://myri", state.myriAvatarDataUrl)
-        assertEquals("daily://xiaohan", state.xiaohanAvatarDataUrl)
+        assertEquals("chat://model_partner", state.modelPartnerAvatarDataUrl)
+        assertEquals("daily://owner", state.ownerAvatarDataUrl)
         assertEquals("daily://cover", state.coverDataUrl)
     }
 
@@ -95,8 +95,8 @@ class CoastShellViewModelTest {
         vm.updateModelPartnerAvatar("data:image/webp;base64,MODEL_PARTNER")
 
         assertEquals("data:image/webp;base64,MODEL_PARTNER", fixture.profile.current.assistantAvatarDataUrl)
-        assertEquals("data:image/webp;base64,MODEL_PARTNER", vm.state.value.myriAvatarDataUrl)
-        assertEquals("daily://myri", fixture.daily.cachedProfile().myriAvatarDataUrl)
+        assertEquals("data:image/webp;base64,MODEL_PARTNER", vm.state.value.modelPartnerAvatarDataUrl)
+        assertEquals("daily://model_partner", fixture.daily.cachedProfile().modelPartnerAvatarDataUrl)
     }
 
     @Test
@@ -352,7 +352,7 @@ class CoastShellViewModelTest {
 
     private class FakeProfileRepository : ProfileRepository {
         var current = RemoteProfile(
-            assistantAvatarDataUrl = "chat://myri",
+            assistantAvatarDataUrl = "chat://model_partner",
             currentChatModel = "openai/gpt-5.6",
             modelBox = com.elementeracoast.app.core.remote.RemoteModelBox(chat = listOf("openai/gpt-5.6"))
         )
@@ -381,8 +381,8 @@ class CoastShellViewModelTest {
         private val state = MutableStateFlow(
             DailySnapshot(
                 profile = DailyProfile(
-                    xiaohanAvatarDataUrl = "daily://xiaohan",
-                    myriAvatarDataUrl = "daily://myri",
+                    ownerAvatarDataUrl = "daily://owner",
+                    modelPartnerAvatarDataUrl = "daily://model_partner",
                     momentCoverDataUrl = "daily://cover"
                 )
             )

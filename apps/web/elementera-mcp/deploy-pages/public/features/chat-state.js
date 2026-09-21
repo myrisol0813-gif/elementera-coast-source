@@ -5,7 +5,7 @@ const MAX_TURNS = 400;
 const MAX_VARIANTS = 20;
 const MAX_DESK_SLIP_JSON = 256000;
 const GENERATION_SOURCES = new Set(['chat', 'landing', 'relay', 'radio', 'lighthouse', 'other']);
-const MESSAGE_SOURCES = new Set(['xiaohan_web', 'official_mcp', 'rikkahub']);
+const MESSAGE_SOURCES = new Set(['owner_web', 'official_mcp', 'rikkahub']);
 
 const now = () => new Date().toISOString();
 

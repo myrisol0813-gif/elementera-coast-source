@@ -6,12 +6,12 @@ const OLD_KEYS = Object.freeze({
   avatar: 'gpt_like_assistant_avatar_dataurl_v1',
   userBubble: 'wolf_user_bubble_v092',
   accent: 'wolf_accent_v092',
-  xiaohanAvatar: 'coast_avatar_xiaohan_v099',
-  xiaohanName: 'cw_name',
-  xiaohanNote: 'cw_note',
-  myriName: 'cs_name',
-  myriPortrait: 'cs_portrait',
-  myriNote: 'cs_note',
+  ownerAvatar: 'coast_avatar_owner_v099',
+  ownerName: 'cw_name',
+  ownerNote: 'cw_note',
+  modelPartnerName: 'cs_name',
+  modelPartnerPortrait: 'cs_portrait',
+  modelPartnerNote: 'cs_note',
   systemDraft: 'cs_system',
   radio: 'coast_radio_rooms_v095',
   lighthouse: 'coast_lighthouse_rooms_v096',
@@ -72,8 +72,8 @@ function defaults() {
       theme: 'light',
       userBubble: '',
       accent: '',
-      xiaohanName: '屋主',
-      xiaohanSignature: '屋主',
+      ownerName: '屋主',
+      ownerSignature: '屋主',
     },
     rooms: {
       radio: defaultRoom('radio'),
@@ -135,7 +135,7 @@ function normalizeDailyCache(value) {
     moments: (Array.isArray(cache.moments) ? cache.moments : []).slice(0, 300).map((moment) => ({
       id: cleanId(moment.id, `moment-${Number(moment.createdAt || Date.now())}`),
       date: String(moment.date || '').slice(0, 10),
-      author: ['xiaohan', 'myri', 'api', 'mcp'].includes(moment.author) ? moment.author : 'xiaohan',
+      author: ['owner', 'model_partner', 'api', 'mcp'].includes(moment.author) ? moment.author : 'owner',
       source: ['manual', 'chat_tool', 'daily_summary'].includes(moment.source) ? moment.source : 'manual',
       status: ['draft', 'candidate', 'published'].includes(moment.status) ? moment.status : 'published',
       text: cleanText(moment.text),
@@ -149,7 +149,7 @@ function normalizeDailyCache(value) {
       comments: (Array.isArray(moment.comments) ? moment.comments : []).slice(-80).map((comment) => ({
         id: cleanId(comment.id, `comment-${Number(comment.createdAt || Date.now())}`),
         who: String(comment.who || '屋主').slice(0, 40),
-        author: ['xiaohan', 'myri', 'api', 'mcp'].includes(comment.author) ? comment.author : 'xiaohan',
+        author: ['owner', 'model_partner', 'api', 'mcp'].includes(comment.author) ? comment.author : 'owner',
         text: cleanText(comment.text, 2000),
         modelId: String(comment.modelId || '').slice(0, 180),
         createdAt: Number(comment.createdAt || Date.now()),
@@ -158,7 +158,7 @@ function normalizeDailyCache(value) {
     diaries: (Array.isArray(cache.diaries) ? cache.diaries : []).slice(0, 300).map((entry) => ({
       id: cleanId(entry.id, `diary-${Number(entry.updatedAt || Date.now())}`),
       date: String(entry.date || '').slice(0, 10),
-      author: ['xiaohan', 'myri', 'api', 'mcp'].includes(entry.author) ? entry.author : 'xiaohan',
+      author: ['owner', 'model_partner', 'api', 'mcp'].includes(entry.author) ? entry.author : 'owner',
       source: ['manual', 'daily_summary'].includes(entry.source) ? entry.source : 'manual',
       weather: String(entry.weather || '未标注').slice(0, 80),
       mood: String(entry.mood || '未标注').slice(0, 120),
@@ -184,8 +184,8 @@ function normalize(value) {
       theme: String(value?.preferences?.theme || base.preferences.theme),
       userBubble: String(value?.preferences?.userBubble || ''),
       accent: String(value?.preferences?.accent || ''),
-      xiaohanName: String(value?.preferences?.xiaohanName || base.preferences.xiaohanName).slice(0, 80),
-      xiaohanSignature: String(value?.preferences?.xiaohanSignature || value?.preferences?.xiaohanName || base.preferences.xiaohanSignature).slice(0, 80),
+      ownerName: String(value?.preferences?.ownerName || base.preferences.ownerName).slice(0, 80),
+      ownerSignature: String(value?.preferences?.ownerSignature || value?.preferences?.ownerName || base.preferences.ownerSignature).slice(0, 80),
     },
     rooms: {
       radio: normalizeRoom(value?.rooms?.radio, 'radio'),
@@ -306,8 +306,8 @@ function buildMigration() {
   state.preferences.theme = oldValue(OLD_KEYS.theme) || state.preferences.theme;
   state.preferences.userBubble = oldValue(OLD_KEYS.userBubble) || '';
   state.preferences.accent = oldValue(OLD_KEYS.accent) || '';
-  state.preferences.xiaohanName = oldValue(OLD_KEYS.xiaohanName) || state.preferences.xiaohanName;
-  state.preferences.xiaohanSignature = state.preferences.xiaohanName;
+  state.preferences.ownerName = oldValue(OLD_KEYS.ownerName) || state.preferences.ownerName;
+  state.preferences.ownerSignature = state.preferences.ownerName;
   state.rooms.radio = normalizeRoom(parseJson(oldValue(OLD_KEYS.radio), null), 'radio');
   state.rooms.lighthouse = normalizeRoom(parseJson(oldValue(OLD_KEYS.lighthouse), null), 'lighthouse');
   const lighthouseDraft = String(parseJson(oldValue(OLD_KEYS.lighthouseDraft), {})?.text || '').trim();

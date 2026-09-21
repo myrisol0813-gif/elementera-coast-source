@@ -17,7 +17,7 @@ function edgeDiagnostic(error) {
   const build = String(details.backend_build || '').trim();
   const ray = String(details.cf_ray || '').trim();
   const contentType = String(details.content_type || '').split(';')[0].trim();
-  console.warn('[daily-myri-comment-edge]', {
+  console.warn('[daily-model-partner-comment-edge]', {
     status: error?.status || 0,
     backend_build: build || 'missing',
     cf_ray: ray || 'missing',
@@ -29,7 +29,7 @@ function edgeDiagnostic(error) {
   return `未收到 Daily 后端版本标记${ray ? ` · Ray ${ray}` : ''}`;
 }
 
-function myriCommentError(error) {
+function modelPartnerCommentError(error) {
   if (error?.type === 'missing_comment_model') return '先去主页选择一个聊天模型。';
   if (error?.type === 'empty_model_comment') return '另一位屋主这次没有生成可写入的评论。';
   if (error?.status === 502 && error?.type === 'request_failed') {
@@ -81,12 +81,12 @@ export function createDailyActions({
         state.moments = [savedMoment, ...state.moments];
         persistCache();
         try {
-          const generated = await client.myriCommentMoment(savedMoment.id, { mode: 'instant' });
+          const generated = await client.modelPartnerCommentMoment(savedMoment.id, { mode: 'instant' });
           replaceMoment(generated.moment);
           toast('碳硅圈已经写下，另一位屋主也留了一句。');
         } catch (error) {
           console.warn('[daily-instant-comment]', error);
-          const message = myriCommentError(error);
+          const message = modelPartnerCommentError(error);
           toast(message.startsWith('另一位屋主留言失败') ? `碳硅圈已经写下，但 ${message}` : message, 4200);
         }
       }
@@ -102,12 +102,12 @@ export function createDailyActions({
     state.commentingMomentIds.add(id);
     await router.refresh({ preserveScroll: true });
     try {
-      const generated = await client.myriCommentMoment(id, { mode: 'instant' });
+      const generated = await client.modelPartnerCommentMoment(id, { mode: 'instant' });
       replaceMoment(generated.moment);
       toast('另一位屋主已经在下面留了一句。');
     } catch (error) {
-      console.warn('[daily-myri-comment]', error);
-      toast(myriCommentError(error), 4200);
+      console.warn('[daily-model-partner-comment]', error);
+      toast(modelPartnerCommentError(error), 4200);
     } finally {
       state.commentingMomentIds.delete(id);
       await router.refresh({ preserveScroll: true });
@@ -115,7 +115,7 @@ export function createDailyActions({
   }
 
   async function editModelPartnerDisplayName() {
-    const current = profile.myriDisplayName();
+    const current = profile.modelPartnerDisplayName();
     const next = globalThis.prompt?.('另一位屋主在碳硅圈里的显示名称', current);
     if (next == null) return;
     try {
@@ -178,8 +178,8 @@ export function createDailyActions({
       state.commentTarget = state.commentTarget === target.dataset.id ? '' : target.dataset.id;
       return router.refresh({ preserveScroll: true });
     }
-    if (name === 'myri-comment') return commentAsModelPartner(target.dataset.id || '');
-    if (name === 'edit-myri-name') return editModelPartnerDisplayName();
+    if (name === 'model-partner-comment') return commentAsModelPartner(target.dataset.id || '');
+    if (name === 'edit-model-partner-name') return editModelPartnerDisplayName();
     if (name === 'send-comment') {
       const text = q('#momentCommentInput')?.value.trim() || '';
       if (!text) return toast('先写一句评论。');
@@ -194,8 +194,8 @@ export function createDailyActions({
       replaceMoment(await client.deleteMomentComment(id, commentId));
       return router.refresh({ preserveScroll: true });
     }
-    if (name === 'avatar') return profile.chooseProfileImage('xiaohan_avatar_dataurl');
-    if (name === 'myri-avatar') return profile.chooseProfileImage('myri_avatar_dataurl');
+    if (name === 'avatar') return profile.chooseProfileImage('owner_avatar_dataurl');
+    if (name === 'model-partner-avatar') return profile.chooseProfileImage('model_partner_avatar_dataurl');
     if (name === 'cover') return profile.chooseProfileImage('moment_cover_dataurl');
     if (name === 'diary') { void startLoad(true); return router.open('diary'); }
     if (name === 'diary-compose') return router.open('diary-compose');
