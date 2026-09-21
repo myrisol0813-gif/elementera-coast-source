@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#16204A">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="海岸">
+  <meta name="apple-mobile-web-app-title" content="前端">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Elementera Coast</title>
   <link rel="manifest" href="/manifest.json" crossorigin="use-credentials">
@@ -32,8 +32,8 @@
         <label class="sidebar-search"><span data-icon="search"></span><input id="sidebarSearch" type="search" data-input="shell:filter-sidebar" placeholder="搜索聊天" autocomplete="off"></label>
       </div>
 
-      <nav class="sidebar-content" aria-label="海岸入口">
-        <section id="coastStatus" class="coast-status" aria-label="海岸日期">
+      <nav class="sidebar-content" aria-label="前端入口">
+        <section id="coastStatus" class="coast-status" aria-label="日期">
           <div class="coast-status-grid">
             <span>同轨第 <b id="orbitDays">—</b> 日</span>
             <span>距 8.12 <b id="august12Days">—</b> 天</span>
@@ -76,7 +76,7 @@
           <span class="model-title">ChatGPT</span><span id="modelName" class="model-name">载入中 ›</span>
         </button>
         <div id="chatTopbarActions" class="topbar-actions">
-          <button id="refreshCoastButton" class="icon-button" type="button" data-action="chat:refresh" data-icon="refresh" aria-label="刷新海岸状态"></button>
+          <button id="refreshCoastButton" class="icon-button" type="button" data-action="chat:refresh" data-icon="refresh" aria-label="刷新前端状态"></button>
           <button id="newChatButton" class="icon-button" type="button" data-action="chat:new" data-icon="new-chat" aria-label="新建当前类型聊天"></button>
           <button id="moreButton" class="icon-button" type="button" data-action="letters:open" data-icon="more" aria-label="登岛信"></button>
         </div>
@@ -85,7 +85,7 @@
 
       <section id="chatWindow" class="window-surface" data-window-scope="conversation">
         <section id="messageScroller" class="message-scroller" aria-label="聊天消息">
-          <div id="messages" class="messages"><div class="empty-state">正在载入海岸…</div></div>
+          <div id="messages" class="messages"><div class="empty-state">正在载入…</div></div>
         </section>
 
         <div id="chatStatus" class="chat-status" role="status" aria-live="polite" hidden></div>

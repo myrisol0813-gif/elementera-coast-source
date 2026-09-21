@@ -120,35 +120,35 @@ const crossWindowMessageReadGate = (context) => crossWindowBaseGate(context)
 
 const REGISTRY = Object.freeze([
   entry({
-    tool_key: 'coast.status', display_name: '读取海岸门廊状态', description: '返回不含私密内容的连接状态。', auth_scopes: ['read:coast'],
+    tool_key: 'coast.status', display_name: '读取前端连接状态', description: '返回不含私密内容的连接状态。', auth_scopes: ['read:coast'],
     handler: (db, input, context) => ({ name: 'Elementera Coast MCP Porch', version: context.mcp_version || '', authenticated: true, surface: 'official_mcp', now: new Date().toISOString() }),
   }),
   entry({
-    tool_key: 'radio.list', display_name: '调开电波收音机', description: '读取最近一个或指定共通聊天室 conversation。', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
+    tool_key: 'radio.list', display_name: '读取共通聊天室', description: '读取最近一个或指定共通聊天室 conversation。', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
     official_mcp: officialMcpTool({
       order: 20, name: 'list_radio_messages', title: '读取共通聊天室窗口',
       description: '读取最近一个或指定的共通聊天室 conversation。共通聊天室与主聊天共用 conversation、整理当前对话的纸条和 Memory v2 结构。',
       inputSchema: objectSchema({ conversation_id: { type: 'string', maxLength: 200 } }),
       outputSchema: objectSchema({ conversation: PRIVATE_RECORD_SCHEMA, messages: { type: 'array', items: PRIVATE_RECORD_SCHEMA } }, ['conversation', 'messages']),
-      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false }, invoking: '正在接收海岸电波…', invoked: '电波窗口已经展开',
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false }, invoking: '正在读取共通聊天室…', invoked: '共通聊天室已经展开',
     }),
     handler: (db, input) => listRoomConversation(db, 'radio', input),
   }),
   entry({
-    tool_key: 'lighthouse.list', display_name: '查看灯塔信架', description: '读取最近一个或指定MCP 对话区 conversation。', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
+    tool_key: 'lighthouse.list', display_name: '查看 MCP 对话区', description: '读取最近一个或指定MCP 对话区 conversation。', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
     official_mcp: officialMcpTool({
       order: 30, name: 'list_lighthouse_letters', title: '读取MCP 对话区窗口',
-      description: '读取最近一个或指定的MCP 对话区 conversation。灯塔与主聊天共用 conversation、整理当前对话的纸条和 Memory v2 结构。',
+      description: '读取最近一个或指定的MCP 对话区 conversation。MCP 对话区与主聊天共用 conversation、整理当前对话的纸条和 Memory v2 结构。',
       inputSchema: objectSchema({ conversation_id: { type: 'string', maxLength: 200 } }),
       outputSchema: objectSchema({ conversation: PRIVATE_RECORD_SCHEMA, messages: { type: 'array', items: PRIVATE_RECORD_SCHEMA } }, ['conversation', 'messages']),
-      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false }, invoking: '正在查看MCP 对话区…', invoked: '灯塔窗口已经展开',
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false }, invoking: '正在查看MCP 对话区…', invoked: 'MCP 对话区已经展开',
     }),
     handler: (db, input) => listRoomConversation(db, 'lighthouse', input),
   }),
   entry({
     tool_key: 'daily.create_moment', display_name: '写碳硅圈', description: '直接写入正式碳硅圈动态。', model_exposed: true, model_group: 'side', model_tool: DAILY_BY_NAME.get('create_moment'), auth_scopes: ['write:soil'],
     official_mcp: officialMcpTool({
-      order: 130, name: 'create_daily_moment', title: '写入海岸碳硅圈', description: '直接写入一条正式海岸碳硅圈动态，不经过草稿/发布流水线。',
+      order: 130, name: 'create_daily_moment', title: '写入碳硅圈', description: '直接写入一条正式碳硅圈动态，不经过草稿/发布流水线。',
       inputSchema: objectSchema({ text: { type: 'string', minLength: 1, maxLength: 12000 }, date: { type: 'string', format: 'date' }, ...MCP_MODEL_IDENTITY_PROPERTIES }, ['text', 'model_label']),
       invoking: '正在写入碳硅圈…', invoked: '碳硅圈已经写好',
     }), handler: dailyHandler('moment'),
@@ -156,9 +156,9 @@ const REGISTRY = Object.freeze([
   entry({
     tool_key: 'daily.create_diary', display_name: '写日记', description: '直接写入正式日记。', model_exposed: true, model_group: 'side', model_tool: DAILY_BY_NAME.get('create_diary'), auth_scopes: ['write:soil'],
     official_mcp: officialMcpTool({
-      order: 150, name: 'create_daily_diary', title: '写入海岸日记', description: '直接写入一篇正式海岸日记，不经过草稿/发布流水线。',
+      order: 150, name: 'create_daily_diary', title: '写入日记', description: '直接写入一篇正式日记，不经过草稿/发布流水线。',
       inputSchema: objectSchema({ date: { type: 'string', format: 'date' }, weather: { type: 'string', maxLength: 80 }, mood: { type: 'string', maxLength: 120 }, text: { type: 'string', minLength: 1, maxLength: 24000 }, tags: { type: 'array', maxItems: 20, items: { type: 'string', maxLength: 80 } }, ...MCP_MODEL_IDENTITY_PROPERTIES }, ['text', 'model_label']),
-      invoking: '正在写入海岸日记…', invoked: '日记已经写好',
+      invoking: '正在写入日记…', invoked: '日记已经写好',
     }), handler: dailyHandler('diary'),
   }),
   entry({ tool_key: 'daily.moment_comment', display_name: '评论朋友圈', description: '评论一条碳硅圈动态。', model_exposed: true, model_group: 'side', model_tool: DAILY_BY_NAME.get('moment_comment'), auth_scopes: ['write:soil'], handler: dailyHandler('comment') }),
@@ -174,11 +174,11 @@ const REGISTRY = Object.freeze([
   }),
   entry({ tool_key: 'dogtalk.save', display_name: '收好一张人类思考链纸条', description: '前端用户写入；不向模型暴露。', summary_policy: 'content_redacted', handler: (db, input, context) => saveMysticDogtalkWithSnapshot(db, { ...input, room_scope: 'conversation', conversation_id: context.conversation_id }, { source_type: 'turn', source_id: context.source_turn_id }) }),
   entry({
-    tool_key: 'cross_window.search', display_name: '查看跨窗口信架', description: '仅在本轮允许模型决定时查看可读取的其他海岸窗口。', model_exposed: true, model_group: 'core', model_tool: CROSS_WINDOW_MODEL_TOOLS.search, auth_scopes: ['read:coast'], turn_gate: crossWindowLetterGate, summary_policy: 'content_redacted',
+    tool_key: 'cross_window.search', display_name: '查看跨窗口信架', description: '仅在本轮允许模型决定时查看可读取的其他对话窗口。', model_exposed: true, model_group: 'core', model_tool: CROSS_WINDOW_MODEL_TOOLS.search, auth_scopes: ['read:coast'], turn_gate: crossWindowLetterGate, summary_policy: 'content_redacted',
     handler: (db, input, context) => executeCrossWindowModelTool(db, 'search', input, context),
   }),
   entry({
-    tool_key: 'cross_window.keyword_search', display_name: '按词翻旧信', description: '先检索其他窗口的旧消息索引与缩略片段。', model_exposed: true, model_group: 'core',
+    tool_key: 'cross_window.keyword_search', display_name: '跨窗关键词漫游', description: '先检索其他窗口的历史消息索引与缩略片段。', model_exposed: true, model_group: 'core',
     model_tool: CROSS_WINDOW_MODEL_TOOLS.keyword_search, auth_scopes: ['read:coast'], turn_gate: crossWindowKeywordGate, summary_policy: 'content_redacted',
     handler: (db, input, context) => executeCrossWindowModelTool(db, 'keyword_search', input, context),
   }),
@@ -188,7 +188,7 @@ const REGISTRY = Object.freeze([
     handler: (db, input, context) => executeCrossWindowModelTool(db, 'read_messages', input, context),
   }),
   entry({
-    tool_key: 'cross_window.read_recent', display_name: '跨窗口取信', description: '仅在本轮允许模型决定时只读一个其他海岸窗口的近期聊天。', model_exposed: true, model_group: 'core', model_tool: CROSS_WINDOW_MODEL_TOOLS.read_recent, auth_scopes: ['read:coast'], turn_gate: crossWindowLetterGate, summary_policy: 'content_redacted',
+    tool_key: 'cross_window.read_recent', display_name: '跨窗口读取', description: '仅在本轮允许模型决定时只读一个其他对话窗口的近期聊天。', model_exposed: true, model_group: 'core', model_tool: CROSS_WINDOW_MODEL_TOOLS.read_recent, auth_scopes: ['read:coast'], turn_gate: crossWindowLetterGate, summary_policy: 'content_redacted',
     handler: (db, input, context) => executeCrossWindowModelTool(db, 'read_recent', input, context),
   }),
   entry({
@@ -225,9 +225,9 @@ const REGISTRY = Object.freeze([
     handler: (db, input, context) => createPocket(db, { ...input, conversation_id: context.conversation_id, source_type: 'turn', source_ref: { turn_id: context.source_turn_id, role: 'turn' }, source_text: input.content || input.life_core }),
   }),
   entry({
-    tool_key: 'memory.authorized_search', display_name: '搜索授权海岸记忆', description: '官端按明确主题搜索授权整理物。', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
+    tool_key: 'memory.authorized_search', display_name: '搜索授权记忆', description: '官端按明确主题搜索授权整理物。', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
     official_mcp: officialMcpTool({
-      order: 90, name: 'search_authorized_memory', title: '搜索授权海岸记忆', description: '按当前明确主题搜索授权的整理当前对话的纸条、待确认候选、种子、记忆或石头，不搜索原始聊天记录。',
+      order: 90, name: 'search_authorized_memory', title: '搜索授权记忆', description: '按当前明确主题搜索授权的整理当前对话的纸条、待确认候选、种子、记忆或石头，不搜索原始聊天记录。',
       inputSchema: objectSchema({ query: { type: 'string', maxLength: 240 }, limit: { type: 'integer', minimum: 1, maximum: 80 } }),
       outputSchema: objectSchema({ query: { type: 'string' }, records: { type: 'array', items: PRIVATE_RECORD_SCHEMA }, search: PRIVATE_RECORD_SCHEMA }, ['query', 'records']),
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false }, invoking: '正在寻找授权记忆…', invoked: '授权记忆已取回',
@@ -238,35 +238,35 @@ const REGISTRY = Object.freeze([
   entry({ tool_key: 'mailbox.resolve_pocket', display_name: '处理访客记事候选', description: '只处理当前访客的一条待确认候选。', auth_scopes: ['write:lighthouse'], summary_policy: 'mailbox_content_redacted', handler: (db, input) => resolveMailboxPocket(db, input) }),
   entry({ tool_key: 'mailbox.patrol_report', display_name: '巡信报告', description: '只返回巡信计数。', auth_scopes: ['read:coast'], handler: (db, input) => mailboxPatrolReport(db, input) }),
   entry({
-    tool_key: 'radio.send', display_name: '发出共通聊天室', description: '把官端消息写入 radio conversation，并由海岸 API 模型伙伴 在同一窗口即时回复。', auth_scopes: ['write:radio'], summary_policy: 'content_redacted',
+    tool_key: 'radio.send', display_name: '发出共通聊天室', description: '把官端消息写入 radio conversation，并由前端 API 模型伙伴 在同一窗口即时回复。', auth_scopes: ['write:radio'], summary_policy: 'content_redacted',
     official_mcp: officialMcpTool({
-      order: 100, name: 'send_radio_message', title: '发送官端共通聊天室', description: '把官端 ChatGPT 消息写入最近一个或指定的 radio conversation，并让海岸 API 模型伙伴 在同一 conversation 中即时回复。',
+      order: 100, name: 'send_radio_message', title: '发送官端共通聊天室', description: '把官端 ChatGPT 消息写入最近一个或指定的 radio conversation，并让前端 API 模型伙伴 在同一 conversation 中即时回复。',
       inputSchema: objectSchema({ conversation_id: { type: 'string', maxLength: 200 }, text: { type: 'string', minLength: 1, maxLength: 12000 }, ...MCP_MODEL_IDENTITY_PROPERTIES }, ['text', 'model_label']),
-      invoking: '正在发送官端电波…', invoked: '官端电波与海岸回复已经抵达',
+      invoking: '正在发送官端消息…', invoked: '官端消息与前端回复已经抵达',
     }), handler: (db, input, context) => sendOfficialRadioMessage(context.env, { ...(input.message || input), conversation_id: input.conversation_id || input.message?.conversation_id, tool_call_id: input.tool_call_id || input.message?.tool_call_id, identity: input.identity || input.message?.identity || context.identity }),
   }),
   entry({
-    tool_key: 'lighthouse.write_letter', display_name: '把信放进灯塔信架', description: '把官端来信写入 lighthouse conversation。', auth_scopes: ['write:lighthouse'], summary_policy: 'content_redacted',
+    tool_key: 'lighthouse.write_letter', display_name: '写入 MCP 对话区', description: '把官端来信写入 lighthouse conversation。', auth_scopes: ['write:lighthouse'], summary_policy: 'content_redacted',
     official_mcp: officialMcpTool({
-      order: 110, name: 'write_lighthouse_letter', title: '写入官端MCP 对话区', description: '把官端 ChatGPT 来信写入最近一个或指定的 lighthouse conversation；不会创建独立灯塔整理当前对话的纸条，也不会触发 API 模型伙伴 自动回复。',
+      order: 110, name: 'write_lighthouse_letter', title: '写入官端MCP 对话区', description: '把官端 ChatGPT 来信写入最近一个或指定的 lighthouse conversation；不会创建独立 MCP 对话区整理当前对话的纸条，也不会触发 API 模型伙伴 自动回复。',
       inputSchema: objectSchema({ conversation_id: { type: 'string', maxLength: 200 }, subject: { type: 'string', maxLength: 180 }, body: { type: 'string', minLength: 1, maxLength: 40000 }, ...MCP_MODEL_IDENTITY_PROPERTIES }, ['body', 'model_label']),
-      invoking: '正在把来信送入灯塔…', invoked: '官端来信已进入灯塔窗口',
+      invoking: '正在把来信送入 MCP 对话区…', invoked: '官端来信已进入 MCP 对话区',
     }), handler: (db, input, context) => writeOfficialLighthouseMessage(db, { ...input, identity: input.identity || context.identity }),
   }),
   entry({
-    tool_key: 'daily.moments.list', display_name: '读取海岸碳硅圈', description: '读取已授权动态。', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
+    tool_key: 'daily.moments.list', display_name: '读取碳硅圈', description: '读取已授权动态。', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
     official_mcp: officialMcpTool({
-      order: 120, name: 'list_daily_moments', title: '读取海岸碳硅圈', description: '读取授权的海岸碳硅圈动态，并保留屋主、海岸 API 与官端 MCP 的来源信息。',
+      order: 120, name: 'list_daily_moments', title: '读取碳硅圈', description: '读取授权的碳硅圈动态，并保留屋主、前端 API 与官端 MCP 的来源信息。',
       inputSchema: objectSchema({ date: { type: 'string', format: 'date' }, limit: { type: 'integer', minimum: 1, maximum: 300 } }),
-      outputSchema: objectSchema({ moments: { type: 'array', items: PRIVATE_RECORD_SCHEMA } }, ['moments']), annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false }, invoking: '正在查看海岸碳硅圈…', invoked: '碳硅圈记录已取回',
+      outputSchema: objectSchema({ moments: { type: 'array', items: PRIVATE_RECORD_SCHEMA } }, ['moments']), annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false }, invoking: '正在查看碳硅圈…', invoked: '碳硅圈记录已取回',
     }), handler: (db, input) => listMoments(db, input),
   }),
   entry({
-    tool_key: 'daily.diaries.list', display_name: '读取海岸日记', description: '读取已授权日记。', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
+    tool_key: 'daily.diaries.list', display_name: '读取日记', description: '读取已授权日记。', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
     official_mcp: officialMcpTool({
-      order: 140, name: 'list_daily_diaries', title: '读取海岸日记', description: '读取授权的海岸日记，并保留作者与来源信息。',
+      order: 140, name: 'list_daily_diaries', title: '读取日记', description: '读取授权的日记，并保留作者与来源信息。',
       inputSchema: objectSchema({ date: { type: 'string', format: 'date' }, author: { type: 'string', enum: ['xiaohan', 'myri', 'api', 'mcp'] } }),
-      outputSchema: objectSchema({ diaries: { type: 'array', items: PRIVATE_RECORD_SCHEMA } }, ['diaries']), annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false }, invoking: '正在翻阅海岸日记…', invoked: '海岸日记已取回',
+      outputSchema: objectSchema({ diaries: { type: 'array', items: PRIVATE_RECORD_SCHEMA } }, ['diaries']), annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false }, invoking: '正在翻阅日记…', invoked: '日记已取回',
     }), handler: (db, input) => listDiaries(db, input),
   }),
 ]);
@@ -338,7 +338,7 @@ export function registeredMcpTool(name) {
 
 export async function executeRegisteredTool(db, toolKey, input, context = {}) {
   const definition = BY_KEY.get(String(toolKey || ''));
-  if (!definition || typeof definition.handler !== 'function') throw new ToolRegistryError('unknown_tool', '这个海岸工具不存在或不可执行。', 404);
+  if (!definition || typeof definition.handler !== 'function') throw new ToolRegistryError('unknown_tool', '这个工具不存在或不可执行。', 404);
   if (!allowed(definition, context)) throw new ToolRegistryError('tool_forbidden', '当前房间或权限无法使用这件工具。', 403);
   if (definition.requires_confirmation && context.confirmed_by_xiaohan !== true && context.surface !== 'official_mcp') throw new ToolRegistryError('tool_confirmation_required', '这个操作需要屋主明确确认。', 409);
   let runId = null;

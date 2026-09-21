@@ -64,7 +64,7 @@ function provenanceFromRow(row) {
     actor: row.actor || (surface === 'web_manual' ? 'xiaohan' : 'myri'), surface,
     model_label: row.model_label || null, model_nickname: row.model_nickname || null,
     symbol: row.symbol ?? (surface === 'official_mcp' ? '≋' : surface === 'coast_api' ? '✦' : ''),
-    display_author: row.display_author || (surface === 'official_mcp' ? 'ChatGPT≋' : surface === 'coast_api' ? '海岸 API ✦' : '屋主'),
+    display_author: row.display_author || (surface === 'official_mcp' ? 'ChatGPT≋' : surface === 'coast_api' ? '前端 API ✦' : '屋主'),
   };
 }
 function commentFromRow(row) {

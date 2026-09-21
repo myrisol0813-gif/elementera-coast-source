@@ -1,7 +1,7 @@
 {
   "id": "/",
   "name": "Elementera Coast",
-  "short_name": "海岸",
+  "short_name": "前端",
   "description": "Elementera Coast 主屋",
   "start_url": "/?source=pwa",
   "scope": "/",
