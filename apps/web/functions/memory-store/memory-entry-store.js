@@ -12,7 +12,7 @@ import {
   MEMORY_OWNER_ID,
   confirmedTimestamp,
   entryIndexFromRow,
-  firstKnownTag,
+  mappedLegacyTag,
   memoryTags,
   normalizeMemoryLevel,
   normalizeMemoryTag,
@@ -27,7 +27,7 @@ import { ensureMemorySchema } from './memory-schema.js';
 
 export function entryFromRow(row) {
   const reference = sourceRef(parseJson(row.source_ref_json, {}));
-  const tags = memoryTags(parseJson(row.memory_tags_json, []));
+  const legacyTags = memoryTags(parseJson(row.memory_tags_json, []));
   return {
     id: row.id,
     entry_type: row.entry_type,
@@ -51,8 +51,8 @@ export function entryFromRow(row) {
     embedding_version: row.embedding_version || null,
     embedding_status: row.embedding_status || 'pending',
     embedded_at: iso(row.embedded_at),
-    memory_tags: tags,
-    ...entryIndexFromRow(row, reference, tags),
+    memory_tags: legacyTags,
+    ...entryIndexFromRow(row, reference, legacyTags),
     last_confirmed_at: iso(row.last_confirmed_at),
     created_at: iso(row.created_at),
     updated_at: iso(row.updated_at),
@@ -79,14 +79,14 @@ export function insertEntryStatement(db, entry, timestamp) {
     usage_hint, avoid_hint, source_type, source_ref_json, promoted_from_id,
     memory_level, status, user_confirmed, recall_count, last_recalled_at,
     vector_id, embedding_model, embedding_version, embedding_status, embedded_at,
-    memory_tags_json, source_model, source_window, source_time, tag,
+    memory_tags_json, source_model, source_window, source_time, tag, migration_status,
     last_confirmed_at, created_at, updated_at, deleted_at
   ) VALUES (?, ?, ?, 'global', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, NULL, NULL, NULL, NULL, 'pending', NULL,
     ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`).bind(
     entry.id, MEMORY_OWNER_ID, entry.entry_type, entry.title, entry.life_core, entry.content,
     entry.usage_hint, entry.avoid_hint, entry.source_type, JSON.stringify(entry.source_ref),
     entry.promoted_from_id, entry.memory_level, entry.status, JSON.stringify(entry.memory_tags),
-    entry.source_model, entry.source_window, entry.source_time, entry.tag,
+    entry.source_model, entry.source_window, entry.source_time, entry.tag, entry.migration_status,
     entry.last_confirmed_at, timestamp, timestamp,
   );
 }
@@ -189,26 +189,26 @@ export async function patchEntry(db, id, value = {}) {
   if (!title || !lifeCore) throw new MemoryStoreError('entry_fields_required', '标题与生命核不能为空。');
   const status = value.status == null ? row.status : normalizeStatus(value.status);
   const memoryLevel = value.memory_level == null ? row.memory_level : normalizeMemoryLevel(value.memory_level, row.entry_type);
-  const tags = value.memory_tags == null ? parseJson(row.memory_tags_json, []) : memoryTags(value.memory_tags);
+  const legacyTags = value.memory_tags == null ? parseJson(row.memory_tags_json, []) : memoryTags(value.memory_tags);
   const tag = value.tag == null
-    ? normalizeMemoryTag(row.tag, { allowEmpty: true }) || firstKnownTag(tags)
+    ? normalizeMemoryTag(row.tag, { allowEmpty: true }) || mappedLegacyTag(legacyTags)
     : normalizeMemoryTag(value.tag, { allowEmpty: false });
   const timestamp = Date.now();
   await run(db, `UPDATE memory_entries SET
     scope = 'global', conversation_id = NULL, title = ?, life_core = ?, content = ?,
     usage_hint = ?, avoid_hint = ?, status = ?, memory_level = ?, memory_tags_json = ?,
-    source_model = ?, source_window = ?, source_time = ?, tag = ?,
+    source_model = ?, source_window = ?, source_time = ?, tag = ?, migration_status = ?,
     last_confirmed_at = ?, embedding_status = 'pending', updated_at = ?
     WHERE id = ? AND user_id = ? AND deleted_at IS NULL`, [
     title, lifeCore,
     value.content == null ? row.content : clip(value.content, MAX_ENTRY_CONTENT),
     value.usage_hint == null ? row.usage_hint : clip(value.usage_hint, MAX_HINT),
     value.avoid_hint == null ? row.avoid_hint : clip(value.avoid_hint, MAX_HINT),
-    status, memoryLevel, JSON.stringify(tag ? [tag] : tags),
+    status, memoryLevel, JSON.stringify(tag ? [tag] : legacyTags),
     value.source_model == null ? row.source_model : clip(value.source_model, MAX_SOURCE_MODEL),
     value.source_window == null ? row.source_window : clip(value.source_window, MAX_SOURCE_WINDOW),
     value.source_time == null ? (row.source_time || row.created_at) : sourceTimestamp(value.source_time),
-    tag,
+    tag, tag ? '' : (row.migration_status || '待整理'),
     value.last_confirmed_at == null ? row.last_confirmed_at : confirmedTimestamp(value.last_confirmed_at),
     timestamp, row.id, MEMORY_OWNER_ID,
   ]);

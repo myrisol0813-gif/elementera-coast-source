@@ -58,7 +58,7 @@ export function mailboxPocketCandidateStatements(db, candidateValues, value, rep
       created_at, updated_at, resolved_at
     ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, ?, ?,
         'official_mcp', ?, ?, ?, ?, ?, NULL
-      WHERE EXISTS (SELECT 1 FROM mailbox_messages WHERE id = ? AND role = 'model_partner')
+      WHERE EXISTS (SELECT 1 FROM mailbox_messages WHERE id = ? AND role = 'myri')
     ON CONFLICT(visitor_id, fingerprint) DO UPDATE SET
       source_message_id = excluded.source_message_id,
       title = excluded.title,

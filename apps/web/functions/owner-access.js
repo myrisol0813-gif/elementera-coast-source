@@ -1,5 +1,5 @@
 export class OwnerAccessError extends Error {
-  constructor(message = '请先完成屋主登录。') {
+  constructor(message = '请先从海岸网页登录。') {
     super(message);
     this.name = 'OwnerAccessError';
     this.type = 'owner_session_required';
@@ -8,6 +8,10 @@ export class OwnerAccessError extends Error {
 }
 
 export function requireOwnerSession(session) {
-  if (!session || typeof session !== 'object') throw new OwnerAccessError();
-  return Object.freeze({ actor: 'owner', owner: true });
+  // The signed cookie, version and expiry are already verified by auth.verifySession
+  // before any /api route is entered. Route owners only accept that verified object.
+  if (!session || typeof session !== 'object') {
+    throw new OwnerAccessError();
+  }
+  return Object.freeze({ actor: 'xiaohan', owner: true });
 }

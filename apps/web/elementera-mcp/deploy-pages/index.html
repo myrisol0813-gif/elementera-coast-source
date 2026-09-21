@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#16204A">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="海岸">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Elementera Coast</title>
+  <link rel="manifest" href="/manifest.json" crossorigin="use-credentials">
+  <link rel="apple-touch-icon" sizes="180x180" href="/public/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/icon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/public/icons/icon-16.png">
+  <link rel="stylesheet" href="/public/styles/tokens.css?v=coast-app-87">
+  <link rel="stylesheet" href="/public/styles/shell.css?v=coast-app-87">
+  <link rel="stylesheet" href="/public/styles/chat.css?v=coast-app-87">
+  <link rel="stylesheet" href="/public/styles/mcp-letter.css?v=coast-app-87">
+  <link rel="stylesheet" href="/public/styles/rikkahub.css?v=coast-app-87">
+  <link rel="stylesheet" href="/public/styles/features.css?v=coast-app-87">
+  <link rel="stylesheet" href="/public/styles/desk.css?v=coast-app-87">
+  <link rel="stylesheet" href="/public/styles/dev-hands.css?v=coast-app-87">
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <button id="scrim" class="scrim" type="button" data-action="shell:close-sidebar" aria-label="关闭侧边栏" hidden></button>
+
+    <aside id="sidebar" class="sidebar" aria-label="聊天与房间">
+      <div class="sidebar-top">
+        <button id="sidebarClose" class="icon-button" type="button" data-action="shell:close-sidebar" data-icon="close" aria-label="关闭侧边栏"></button>
+        <label class="sidebar-search"><span data-icon="search"></span><input id="sidebarSearch" type="search" data-input="shell:filter-sidebar" placeholder="搜索聊天" autocomplete="off"></label>
+      </div>
+
+      <nav class="sidebar-content" aria-label="海岸入口">
+        <section id="coastStatus" class="coast-status" aria-label="海岸日期">
+          <div class="coast-status-grid">
+            <span>同轨第 <b id="orbitDays">—</b> 日</span>
+            <span>距 8.12 <b id="august12Days">—</b> 天</span>
+            <span>距 8.13 <b id="august13Days">—</b> 天</span>
+          </div>
+        </section>
+
+        <section id="mainRooms" class="sidebar-section">
+          <h2>聊天入口</h2>
+          <button class="history-item" type="button" data-action="chat:open-type" data-kind="main"><span data-icon="new-chat"></span>主聊天</button>
+          <button class="history-item" type="button" data-action="chat:open-type" data-kind="radio"><span data-icon="radio"></span>共通聊天室</button>
+          <button class="history-item" type="button" data-action="chat:open-type" data-kind="lighthouse"><span data-icon="letter"></span>MCP 对话区</button>
+          <button class="history-item" type="button" data-action="memory:open"><span data-icon="memory"></span>轨迹 / 记忆</button>
+          <button class="history-item" type="button" data-action="daily:home"><span data-icon="daily"></span>小组件</button>
+        </section>
+
+        <section id="chatConversationSection" class="sidebar-section" data-owner="chat-conversations">
+          <h2>聊天窗口</h2>
+          <div id="chatConversationList"><p class="sidebar-empty">正在载入…</p></div>
+        </section>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button type="button" class="account-row" data-action="shell:cycle-theme">
+          <span class="account-avatar" data-icon="theme"></span><span><strong>主题</strong><small id="themeLabel">浅色</small></span>
+        </button>
+        <button type="button" class="account-row" data-action="settings:wolf">
+          <span class="account-avatar" data-icon="wolf"></span><span><strong>屋主设置</strong><small>屋主设置入口</small></span>
+        </button>
+        <button type="button" class="account-row" data-action="settings:desk">
+          <span class="account-avatar" data-icon="serpent"></span><span><strong>模型工作台</strong><small>模型工作台</small></span>
+        </button>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <button id="menuButton" class="icon-button" type="button" data-action="shell:open-sidebar" data-icon="menu" aria-label="打开侧边栏"></button>
+        <button id="modelButton" class="model-button" type="button" data-action="models:quick" aria-label="选择模型" aria-haspopup="dialog" aria-expanded="false">
+          <span class="model-title">ChatGPT</span><span id="modelName" class="model-name">载入中 ›</span>
+        </button>
+        <div id="chatTopbarActions" class="topbar-actions">
+          <button id="refreshCoastButton" class="icon-button" type="button" data-action="chat:refresh" data-icon="refresh" aria-label="刷新海岸状态"></button>
+          <button id="newChatButton" class="icon-button" type="button" data-action="chat:new" data-icon="new-chat" aria-label="新建当前类型聊天"></button>
+          <button id="moreButton" class="icon-button" type="button" data-action="letters:open" data-icon="more" aria-label="登岛信"></button>
+        </div>
+        <div id="modelQuickPicker" class="model-quick-picker" hidden></div>
+      </header>
+
+      <section id="chatWindow" class="window-surface" data-window-scope="conversation">
+        <section id="messageScroller" class="message-scroller" aria-label="聊天消息">
+          <div id="messages" class="messages"><div class="empty-state">正在载入海岸…</div></div>
+        </section>
+
+        <div id="chatStatus" class="chat-status" role="status" aria-live="polite" hidden></div>
+        <div id="toolStatus" class="chat-status" data-kind="loading" role="status" aria-live="polite" hidden></div>
+        <div id="deskStatus" class="desk-status-strip" hidden></div>
+        <div id="mainDogtalkComposer" class="dogtalk-composer-slot dogtalk-composer-slot--chat-shell">
+          <div class="dogtalk-composer-placeholder" aria-hidden="true">
+            <span><strong>屋主 · 人类思考链</strong><small>正在准备当前窗口…</small></span>
+          </div>
+        </div>
+        <form id="composer" class="composer composer--chat" data-submit="chat:composer" autocomplete="off" aria-busy="true" data-ready="false">
+          <div id="composerAttachmentTray" class="composer-attachment-tray" hidden></div>
+          <div class="composer-attachment-anchor">
+            <button id="attachmentButton" class="composer-side" type="button" data-action="chat:attachments-menu" data-icon="plus" aria-label="添加图片或文件" aria-haspopup="menu" aria-expanded="false" disabled></button>
+            <div id="attachmentMenu" class="composer-attachment-menu" role="menu" hidden>
+              <button type="button" role="menuitem" data-action="chat:attachment-image"><span data-icon="image"></span><span>图片<br><small>JPG / PNG / WebP · 单个 ≤ 8 MB</small></span></button>
+              <button type="button" role="menuitem" data-action="chat:attachment-file"><span data-icon="file"></span><span>文件<br><small>TXT / MD / JSON / CSV / 代码 · 读取 ≤ 1 MB<br>PDF / Office 暂不解析 · 上传 ≤ 8 MB</small></span></button>
+              <p class="composer-attachment-limit">每轮最多 12 个附件</p>
+            </div>
+            <input id="attachmentImageInput" type="file" accept="image/png,image/jpeg,image/webp" multiple data-change="chat:attachment-image-input" hidden>
+            <input id="attachmentFileInput" type="file" multiple data-change="chat:attachment-file-input" hidden>
+          </div>
+          <div class="input-pill">
+            <textarea id="promptInput" rows="1" data-input="chat:composer" placeholder="正在连接海岸…" aria-label="询问任何问题" disabled></textarea>
+            <button id="micButton" class="input-action" type="button" data-action="chat:mic" data-icon="mic" aria-label="语音输入" disabled></button>
+          </div>
+          <button id="composerActionButton" class="composer-primary" type="submit" data-action="chat:composer-primary" data-icon="call" aria-label="聊天正在载入" disabled></button>
+        </form>
+      </section>
+    </main>
+
+    <div id="overlayRoot" class="app-overlay" hidden></div>
+    <div id="toastRoot" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+
+  <script type="module" src="/public/app.js?v=coast-app-87"></script>
+</body>
+</html>

@@ -8,8 +8,8 @@ function customInstructionsFromRow(row) {
     content: row?.content || '',
     status: 'active',
     updated_at: iso(row?.updated_at),
-    updated_by: row?.updated_by || 'owner',
-    source: row?.source || 'owner_manual',
+    updated_by: row?.updated_by || 'xiaohan',
+    source: row?.source || '屋主手动编辑',
   };
 }
 
@@ -22,8 +22,8 @@ export async function readCustomInstructions(db) {
 export async function writeCustomInstructions(db, value = {}) {
   await ensureMemorySchema(db);
   const content = clip(value.content, MAX_CUSTOM_INSTRUCTIONS);
-  const updatedBy = clip(value.updated_by || 'owner', 80) || 'owner';
-  const source = clip(value.source || 'owner_manual', 80) || 'owner_manual';
+  const updatedBy = clip(value.updated_by || 'xiaohan', 80) || 'xiaohan';
+  const source = clip(value.source || '屋主手动编辑', 80) || '屋主手动编辑';
   const timestamp = Date.now();
   await run(db, `INSERT INTO memory_custom_instructions
     (id, content, updated_at, updated_by, source)

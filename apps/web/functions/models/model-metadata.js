@@ -1,6 +1,6 @@
 const SENSITIVE_KEY = /^(authorization|proxy-authorization|api[-_]?key|x-api-key|access[-_]?token|refresh[-_]?token|token|cookie|set-cookie|provider[-_]?secret|client[-_]?secret|session[-_]?secret|jwt|secret|password)$/i;
 const ENCRYPTED_KEY = /^(encrypted_content|encrypted_reasoning|reasoning_encrypted_content)$/i;
-const MODEL_PARTNER_CONTENT_PATH = /choices\.\d+\.(message|delta)\.content$/;
+const ASSISTANT_CONTENT_PATH = /choices\.\d+\.(message|delta)\.content$/;
 const MAX_RAW_FRAMES = 160;
 const MAX_STRING = 16000;
 
@@ -33,8 +33,8 @@ export function sanitizeProviderMetadata(value, path = '') {
       output[key] = '[REDACTED_ENCRYPTED]';
       continue;
     }
-    if (MODEL_PARTNER_CONTENT_PATH.test(nextPath)) {
-      output[key] = '[OMITTED_MODEL_PARTNER_CONTENT]';
+    if (ASSISTANT_CONTENT_PATH.test(nextPath)) {
+      output[key] = '[OMITTED_ASSISTANT_CONTENT]';
       continue;
     }
     output[key] = sanitizeProviderMetadata(rawValue, nextPath);

@@ -66,7 +66,7 @@ export function normalizeCandidateSourceRef(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const turnId = clip(value.turn_id ?? value.turnId, 160);
   const role = String(value.role || '').trim();
-  if (!turnId || !['owner', 'model_partner', 'turn'].includes(role)) return null;
+  if (!turnId || !['user', 'assistant', 'turn'].includes(role)) return null;
   return { turn_id: turnId, role };
 }
 
@@ -144,8 +144,23 @@ export function normalizeMemoryTag(value, { allowEmpty = true } = {}) {
   return tag;
 }
 
-export function firstKnownTag(value) {
-  return memoryTags(value).find((tag) => MEMORY_TAG_SET.has(tag)) || '';
+export function mappedLegacyTag(value) {
+  const tags = memoryTags(value);
+  for (const tag of tags) {
+    if (MEMORY_TAG_SET.has(tag)) return tag;
+    const normalized = tag.toLocaleLowerCase('zh-CN');
+    const aliases = [
+      ['关系', ['relationship', '关系', '相爱', '恋爱']],
+      ['历史锚点', ['history', '历史', '锚点', '纪念']],
+      ['偏好', ['preference', '偏好', '喜欢', '不喜欢']],
+      ['人物档案', ['profile', '人物', '档案', '形象', '身份']],
+      ['海岸世界观', ['worldbook', 'coast', '世界观', '海岸', '设定']],
+      ['工程技术', ['engineering', 'technical', '工程', '技术', '代码', '部署', 'mcp']],
+    ];
+    const matched = aliases.find(([, words]) => words.some((word) => normalized.includes(word)));
+    if (matched) return matched[0];
+  }
+  return '';
 }
 
 export function sourceTimestamp(value, fallback = Date.now()) {
@@ -164,8 +179,8 @@ export function sourceDate(value) {
     : '';
 }
 
-export function entryIndexFromRow(row, reference, tags) {
-  const tag = normalizeMemoryTag(row.tag, { allowEmpty: true }) || firstKnownTag(tags);
+export function entryIndexFromRow(row, reference, legacyTags) {
+  const tag = normalizeMemoryTag(row.tag, { allowEmpty: true }) || mappedLegacyTag(legacyTags);
   const sourceModel = clip(
     row.source_model
       || reference.source_model
@@ -189,6 +204,7 @@ export function entryIndexFromRow(row, reference, tags) {
     source_time: iso(timestamp),
     source_date: sourceDate(timestamp),
     tag,
+    migration_status: row.migration_status || (tag ? '' : '待整理'),
   };
 }
 
@@ -231,8 +247,8 @@ export async function normalizedEntry(value = {}, defaults = {}) {
   const lifeCore = clip(value.life_core ?? defaults.life_core, MAX_LIFE_CORE);
   if (!title || !lifeCore) throw new MemoryStoreError('entry_fields_required', '标题与生命核不能为空。');
   const reference = sourceRef(value.source_ref ?? defaults.source_ref);
-  const tags = memoryTags(value.memory_tags ?? defaults.memory_tags);
-  const tag = normalizeMemoryTag(value.tag ?? defaults.tag, { allowEmpty: true }) || firstKnownTag(tags);
+  const legacyTags = memoryTags(value.memory_tags ?? defaults.memory_tags);
+  const tag = normalizeMemoryTag(value.tag ?? defaults.tag, { allowEmpty: true }) || mappedLegacyTag(legacyTags);
   return {
     id: value.id ?? defaults.id ?? crypto.randomUUID(),
     entry_type: entryType,
@@ -248,11 +264,12 @@ export async function normalizedEntry(value = {}, defaults = {}) {
     promoted_from_id: value.promoted_from_id ?? defaults.promoted_from_id ?? null,
     memory_level: normalizeMemoryLevel(value.memory_level ?? defaults.memory_level, entryType),
     status: normalizeStatus(value.status ?? defaults.status, entryType === 'seed' ? 'dormant' : 'active'),
-    memory_tags: tag ? [tag] : tags,
+    memory_tags: tag ? [tag] : legacyTags,
     source_model: clip(value.source_model ?? defaults.source_model ?? reference.source_model ?? reference.model_label ?? reference.generated_by_model ?? reference.model, MAX_SOURCE_MODEL),
     source_window: clip(value.source_window ?? defaults.source_window ?? reference.source_window ?? reference.source_conversation_id, MAX_SOURCE_WINDOW),
     source_time: sourceTimestamp(value.source_time ?? defaults.source_time, Date.now()),
     tag,
+    migration_status: tag ? '' : clip(value.migration_status ?? defaults.migration_status ?? '待整理', 40),
     last_confirmed_at: confirmedTimestamp(value.last_confirmed_at ?? defaults.last_confirmed_at, Date.now()),
   };
 }

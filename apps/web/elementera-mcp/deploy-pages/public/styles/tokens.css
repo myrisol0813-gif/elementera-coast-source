@@ -1,0 +1,114 @@
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-soft: #f7f7f8;
+  --surface-raised: #ffffff;
+  --text: #202123;
+  --text-soft: #5f6368;
+  --muted: #8e8e93;
+  --line: #e5e5e7;
+  --user: #f1f1f1;
+  --accent: #ff6a21;
+  --accent-contrast: #ffffff;
+  --danger: #d04444;
+  --success: #2f855a;
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.14);
+  --sidebar-width: min(86vw, 320px);
+  --topbar-height: 52px;
+  --composer-height: 62px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #171717;
+  --surface: #202123;
+  --surface-soft: #2a2b2e;
+  --surface-raised: #252628;
+  --text: #f2f2f2;
+  --text-soft: #c4c5c7;
+  --muted: #92959a;
+  --line: #3a3b3f;
+  --user: #2d2f33;
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+}
+
+:root[data-theme="gold"] {
+  color-scheme: dark;
+  --bg: #0b0b0c;
+  --surface: #111114;
+  --surface-soft: #1b1915;
+  --surface-raised: #171512;
+  --text: #f5ecd8;
+  --text-soft: #d2c5ab;
+  --muted: #9b8f78;
+  --line: #393126;
+  --user: #29231a;
+  --accent: #d9a441;
+  --accent-contrast: #17120a;
+  --danger: #e27b6f;
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.54);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  touch-action: pan-y;
+}
+
+button,
+input,
+textarea,
+select {
+  color: inherit;
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 72%, white);
+  outline-offset: 2px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.empty-state {
+  padding: 36px 18px;
+  color: var(--muted);
+  text-align: center;
+}

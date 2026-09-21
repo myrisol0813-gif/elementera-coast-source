@@ -1,4 +1,4 @@
-export const OPENROUTER_REFERER = globalThis.process?.env?.OPENROUTER_REFERER || '';
+export const OPENROUTER_REFERER = 'https://elementera-coast-source.invalid';
 export const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models?output_modalities=text,image';
 export const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
 export const DEFAULT_MODEL = 'openai/gpt-4.1-nano';

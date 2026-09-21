@@ -1,25 +1,30 @@
-# Secrets and local configuration
+# Local configuration / secrets
 .env
 .env.*
 !.env.example
 .dev.vars
-*.jks
-*.keystore
-*.p12
-*.pfx
 *.pem
 *.key
-*.der
+*.p12
+*.pfx
+*.jks
+*.keystore
 local.properties
 
-# JavaScript / web
-node_modules/
-dist/
-coverage/
-.wrangler/
+# Local databases / logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
 
-# Android / Gradle
-.gradle/
+# Web / Cloudflare output
+**/node_modules/
+**/dist/
+**/coverage/
+**/.wrangler/
+
+# Android output
+**/.gradle/
 **/build/
 *.apk
 *.aab
@@ -28,8 +33,5 @@ coverage/
 .idea/
 .vscode/
 .DS_Store
-
-# Logs and temporary files
-*.log
-*.tmp
 *.swp
+*.tmp

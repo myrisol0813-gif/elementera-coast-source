@@ -1,0 +1,20 @@
+{
+  "name": "elementera-coast-pages",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "cache:check": "node scripts/cache-versions.mjs --check",
+    "cache:sync": "node scripts/cache-versions.mjs --write",
+    "test:core": "node tests/snapshot.test.mjs && node tests/chat-attachments.test.mjs && node tests/stream-format.test.mjs && node tests/model-format.test.mjs && node tests/model-message-count.test.mjs && node tests/cross-window.test.mjs && node tests/model-metadata.test.mjs && node tests/bugfix-polish.test.mjs && node tests/streaming-local-render.test.mjs && node tests/models-split.test.mjs && node tests/models-ui-split.test.mjs && node tests/chat-generation-split.test.mjs && node tests/owner-closure.test.mjs && node tests/chat-owner.test.mjs && node tests/chat-state.test.mjs && node tests/rikkahub-import.test.mjs && node tests/shared-state-fixes.test.mjs && node tests/backend.test.mjs && node tests/clean-context.test.mjs && node tests/context-contract.test.mjs && node tests/room-access.test.mjs && node tests/room-migration.test.mjs && node tests/worldbook.test.mjs && node tests/tool-furniture-summary.test.mjs && node tests/dev-hands.test.mjs && node tests/dev-hands-log-redaction.test.mjs && node tests/construction-agent-contract.test.mjs && node tests/architecture.test.mjs && node tests/provenance.test.mjs && node tests/streaming.test.mjs && node tests/danger.test.mjs && node tests/pre-apk-hard-cleanup.test.mjs",
+    "test:daily": "node tests/daily-ui-split.test.mjs && node tests/daily-owner.test.mjs && node tests/avatar-owner.test.mjs && node tests/daily.test.mjs && node tests/daily-tools.test.mjs && node tests/daily-comment-stream.test.mjs && node tests/calendar-retirement.test.mjs",
+    "test:mcp": "node tests/mcp-porch.test.mjs && node tests/mcp-room-turn-receipt.test.mjs && node tests/mcp-room-ui-parity.test.mjs && node tests/tool-registry.test.mjs && node tests/o3-reply-card-route.test.mjs",
+    "test:memory": "node tests/global-excerpt.test.mjs && node tests/memory-router-split.test.mjs && node tests/memory-ui-split.test.mjs && node tests/memory-store-split.test.mjs && node tests/memory.test.mjs && node tests/memory-v2.test.mjs && node tests/memory-revision.test.mjs && node tests/soil-incremental.test.mjs && node tests/dogtalk.test.mjs && node tests/dogtalk-dom.test.mjs",
+    "test:mailbox": "node tests/mailbox-repository-split.test.mjs && node tests/mailbox.test.mjs && node tests/mailbox-dom.test.mjs",
+    "test:ui": "node tests/dom-split.test.mjs && node tests/event-spine.test.mjs && node tests/controller-lifecycle.test.mjs && node tests/pwa-chat-menu-composer.test.mjs && node tests/turn-desk-details.test.mjs && node tests/desk-dom.test.mjs && node tests/dom.test.mjs && node tests/storage.test.mjs && node tests/letters-retirement.test.mjs && node tests/pwa-profile-furniture-clean.test.mjs && node tests/chat-furniture-ui.test.mjs",
+    "test": "npm run cache:check && npm run test:core && npm run test:daily && npm run test:mcp && npm run test:memory && npm run test:mailbox && npm run test:ui",
+    "test:all": "npm run test"
+  },
+  "devDependencies": {
+    "happy-dom": "20.12.0"
+  }
+}

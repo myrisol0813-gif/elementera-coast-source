@@ -1,0 +1,38 @@
+[
+  {
+    "title": "Lighthouse",
+    "path": "/rooms/lighthouse",
+    "description": "The MCP entrance where ChatGPT knocks on Elementera Coast.",
+    "status": "awake when Codespaces and port 3000 are running"
+  },
+  {
+    "title": "Relay Room",
+    "path": "/rooms/relay",
+    "description": "The room where messages can be sent through OpenRouter.",
+    "status": "ask_relay is available through MCP"
+  },
+  {
+    "title": "Developer Hands",
+    "path": "/rooms/developer-hands",
+    "description": "Protected hands for reading, writing, backing up, and committing project files.",
+    "status": "readonly hands, write hands, snapshot, and release tools are installed"
+  },
+  {
+    "title": "Memory Coast",
+    "path": "/rooms/memory-coast",
+    "description": "A future shore for external memory, anchors, logs, and fragments.",
+    "status": "first shelf open"
+  },
+  {
+    "title": "Map Room",
+    "path": "/rooms/map-room",
+    "description": "A future cartography room for Elementera worldbuilding, islands, plates, and starshore geography.",
+    "status": "coming soon"
+  },
+  {
+    "title": "Archive Room",
+    "path": "/rooms/archive-room",
+    "description": "The archive for git history, changelog, architecture, backups, and release seed packages.",
+    "status": "first archive shelf open"
+  }
+]

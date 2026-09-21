@@ -1,5 +1,5 @@
 import { getConversation, sanitizeId } from '../chat-store.js';
-import { apiModelPartnerIdentity, ownerIdentity, validateCoastIdentity } from '../coast-identity.js';
+import { apiModelPartnerIdentity, validateCoastIdentity, xiaohanIdentity } from '../coast-identity.js';
 import { MemoryStoreError, bool, clip, first, iso, parseJson, run } from './memory-db.js';
 import {
   MAX_SOIL_TEXT,
@@ -19,12 +19,12 @@ export function soilFromRow(row) {
     manual_locked: Number(row.manual_locked || 0) === 1,
     auto_refresh_enabled: Number(row.auto_refresh_enabled ?? 1) === 1,
     organized_through_turn_id: row.organized_through_turn_id || '',
-    actor: row.actor || 'owner',
+    actor: row.actor || 'xiaohan',
     surface: row.surface || 'web_manual',
     model_label: row.model_label || null,
     model_nickname: row.model_nickname || null,
     symbol: row.symbol || '',
-    display_author: row.display_author || 'Owner',
+    display_author: row.display_author || '屋主',
     source_conversation_id: row.source_conversation_id || row.conversation_id,
     source_turn_id: row.source_turn_id || null,
     tool_call_id: row.tool_call_id || null,
@@ -55,7 +55,7 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
   const conversationId = sanitizeId(id, 'conversation');
   const current = await readSoil(db, conversationId);
   if (automatic && (current.manual_locked || !current.auto_refresh_enabled)) {
-    throw new MemoryStoreError('soil_locked', '当前对话纸条已由屋主手动锁定。', 409);
+    throw new MemoryStoreError('soil_locked', '整理当前对话的纸条已由屋主手动锁定。', 409);
   }
   const has = (name) => Object.prototype.hasOwnProperty.call(value, name);
   const next = {
@@ -70,10 +70,10 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
   const identity = provenance.identity
     ? validateCoastIdentity(provenance.identity)
     : automatic ? apiModelPartnerIdentity({
-      model_label: provenance.model_label || current.model_label || 'Model Partner',
+      model_label: provenance.model_label || current.model_label || '未标注模型',
       model_nickname: provenance.model_nickname,
     })
-    : ownerIdentity();
+    : xiaohanIdentity();
   const timestamp = Date.now();
   await run(db, `UPDATE conversation_soils SET
     current_text = ?, hand_seeds_json = ?, do_not_repeat = ?, pocket_candidates_json = ?,
@@ -110,7 +110,7 @@ export async function writeSoilCurrentText(db, id, value = {}, { provenance = {}
   await ensureSoilRow(db, conversationId);
   const currentText = String(value.current_text ?? '').trim();
   if (!currentText || currentText.length > MAX_SOURCE_TEXT) {
-    throw new MemoryStoreError('invalid_request', 'Chat Bridge 当前对话纸条 current_text 必须为 1 到 12000 个字符。');
+    throw new MemoryStoreError('invalid_request', '灯塔房整理当前对话的纸条 current_text 必须为 1 到 12000 个字符。');
   }
   const identity = validateCoastIdentity(provenance.identity);
   const sourceConversationId = clip(
@@ -154,7 +154,7 @@ export async function writeSoilCurrentText(db, id, value = {}, { provenance = {}
   const changes = Number(result?.meta?.changes || 0);
   const idempotent = Boolean(toolCallId && changes === 0);
   if (changes === 0 && !idempotent) {
-    throw new MemoryStoreError('room_soil_write_failed', 'Chat Bridge 当前对话纸条没有完成写入。', 500);
+    throw new MemoryStoreError('room_soil_write_failed', '灯塔房整理当前对话的纸条没有完成写入。', 500);
   }
   return { soil, idempotent };
 }

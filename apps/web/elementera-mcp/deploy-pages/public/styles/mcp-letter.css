@@ -1,0 +1,177 @@
+.message.user.official-mcp-message {
+  display: block;
+  justify-content: initial;
+  margin: 8px 0 30px;
+}
+
+.mcp-letter-wrap {
+  position: relative;
+  width: min(88%, 620px);
+  margin: 0 auto;
+  padding-bottom: 5px;
+}
+
+.mcp-letter-wrap::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  left: 7%;
+  right: 7%;
+  bottom: 2px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(79, 61, 39, .09);
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.mcp-letter-paper {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  padding: 23px 24px 24px;
+  border: 1px solid rgba(142, 111, 68, .24);
+  border-radius: 4px 11px 5px 9px;
+  background:
+    linear-gradient(rgba(112, 82, 48, .045) 1px, transparent 1px) 0 38px / 100% 30px,
+    radial-gradient(circle at 18% 13%, rgba(171, 132, 76, .07), transparent 31%),
+    radial-gradient(circle at 83% 82%, rgba(126, 92, 53, .055), transparent 35%),
+    #fbf2d8;
+  color: #453726;
+  box-shadow:
+    0 3px 8px rgba(79, 61, 39, .055),
+    0 12px 24px -18px rgba(79, 61, 39, .22),
+    0 1px 0 rgba(255,255,255,.72) inset;
+  transform: rotate(-.18deg);
+  overflow: clip;
+}
+
+.mcp-letter-paper::before,
+.mcp-letter-paper::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+
+.mcp-letter-paper::before {
+  inset: 0;
+  border: 1px solid rgba(255,255,255,.38);
+  clip-path: polygon(0 1%, 9% 0, 17% 1.1%, 28% .1%, 41% .8%, 53% 0, 67% .9%, 81% .2%, 100% 1.1%, 99.2% 18%, 100% 38%, 99.4% 61%, 100% 82%, 99% 100%, 79% 99.2%, 63% 100%, 42% 99.1%, 21% 100%, 0 99%, .7% 79%, 0 56%, .7% 35%);
+}
+
+.mcp-letter-paper::after {
+  width: 46px;
+  height: 14px;
+  right: 19px;
+  top: 10px;
+  border-radius: 3px;
+  background: rgba(217, 194, 154, .27);
+  transform: rotate(7deg);
+}
+
+.mcp-letter-heading {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 15px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(111, 82, 45, .16);
+  color: rgba(79, 59, 34, .68);
+  font-family: ui-serif, 'Noto Serif CJK SC', 'Songti SC', serif;
+  font-size: 11px;
+  letter-spacing: .12em;
+}
+
+.mcp-letter-heading span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: .03em;
+}
+
+.mcp-letter-heading .message-dogtalk-mark {
+  margin-left: 0;
+  color: inherit;
+}
+
+.mcp-letter-body {
+  position: relative;
+  z-index: 1;
+  font-family: 'Kaiti SC', 'STKaiti', 'KaiTi', 'Noto Serif CJK SC', ui-serif, serif;
+  font-size: 17px;
+  line-height: 1.9;
+  letter-spacing: .025em;
+  overflow-wrap: anywhere;
+}
+
+.mcp-letter-body p {
+  margin: 0 0 11px;
+}
+
+.mcp-letter-body p:last-child {
+  margin-bottom: 0;
+}
+
+.mcp-letter-signature {
+  position: relative;
+  z-index: 2;
+  margin-top: 20px;
+  padding-top: 6px;
+  color: rgba(75, 54, 30, .7);
+  font-family: 'Kaiti SC', 'STKaiti', 'KaiTi', ui-serif, serif;
+  font-size: 13px;
+  text-align: right;
+}
+
+.official-mcp-message .chat-attachments {
+  margin: 8px 0 0 auto;
+}
+
+[data-theme="dark"] .mcp-letter-paper,
+[data-theme="gold"] .mcp-letter-paper {
+  border-color: rgba(218, 184, 125, .22);
+  background:
+    linear-gradient(rgba(255, 226, 174, .035) 1px, transparent 1px) 0 38px / 100% 30px,
+    radial-gradient(circle at 18% 13%, rgba(195, 154, 91, .10), transparent 31%),
+    #3d3225;
+  color: #eadfc9;
+  box-shadow:
+    0 3px 8px rgba(0,0,0,.10),
+    0 12px 24px -18px rgba(0,0,0,.34);
+}
+
+[data-theme="dark"] .mcp-letter-heading,
+[data-theme="gold"] .mcp-letter-heading,
+[data-theme="dark"] .mcp-letter-signature,
+[data-theme="gold"] .mcp-letter-signature {
+  color: rgba(234, 215, 178, .7);
+}
+
+@media (max-width: 620px) {
+  .mcp-letter-wrap { width: min(94%, 620px); }
+  .mcp-letter-paper { padding: 20px 18px 18px; }
+  .mcp-letter-body { font-size: 16px; }
+}
+
+
+/* Long letters keep a soft paper edge instead of ending on a hard grey shelf. */
+.mcp-letter-body {
+  min-width: 0;
+}
+
+.mcp-letter-body > :last-child {
+  margin-bottom: 0;
+}
+
+.official-mcp-message .message-actions,
+.official-mcp-message .chat-attachments {
+  position: relative;
+  z-index: 2;
+}
+
+[data-theme="dark"] .mcp-letter-wrap::after,
+[data-theme="gold"] .mcp-letter-wrap::after {
+  background: rgba(0, 0, 0, .18);
+}

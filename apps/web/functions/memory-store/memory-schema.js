@@ -1,6 +1,7 @@
 import { ensureChatSchema } from '../chat-store.js';
-import { run } from './memory-db.js';
+import { ensureColumn, run } from './memory-db.js';
 
+const MEMORY_LIBRARY_V2_MIGRATION_ID = 'coast-memory-library-v2';
 const schemaPromises = new WeakMap();
 
 async function initializeMemorySchema(db) {
@@ -14,21 +15,28 @@ async function initializeMemorySchema(db) {
     manual_locked INTEGER NOT NULL DEFAULT 0,
     auto_refresh_enabled INTEGER NOT NULL DEFAULT 1,
     organized_through_turn_id TEXT NOT NULL DEFAULT '',
-    actor TEXT NOT NULL DEFAULT 'owner',
-    surface TEXT NOT NULL DEFAULT 'web_manual',
-    model_label TEXT DEFAULT NULL,
-    model_nickname TEXT DEFAULT NULL,
-    symbol TEXT NOT NULL DEFAULT '',
-    display_author TEXT NOT NULL DEFAULT 'Owner',
-    source_conversation_id TEXT DEFAULT NULL,
-    source_turn_id TEXT DEFAULT NULL,
-    tool_call_id TEXT DEFAULT NULL,
     tool_call_ids_json TEXT NOT NULL DEFAULT '[]',
     revision INTEGER NOT NULL DEFAULT 1,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
-    FOREIGN KEY (conversation_id) REFERENCES source_conversations(id)
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id)
   )`);
+  await ensureColumn(db, 'conversation_soils', 'organized_through_turn_id', "TEXT NOT NULL DEFAULT ''");
+  for (const [column, declaration] of [
+    ['actor', "TEXT NOT NULL DEFAULT 'xiaohan'"],
+    ['surface', "TEXT NOT NULL DEFAULT 'web_manual'"],
+    ['model_label', 'TEXT DEFAULT NULL'],
+    ['model_nickname', 'TEXT DEFAULT NULL'],
+    ['symbol', "TEXT NOT NULL DEFAULT ''"],
+    ['display_author', "TEXT NOT NULL DEFAULT '屋主'"],
+    ['source_conversation_id', 'TEXT DEFAULT NULL'],
+    ['source_turn_id', 'TEXT DEFAULT NULL'],
+    ['tool_call_id', 'TEXT DEFAULT NULL'],
+    ['tool_call_ids_json', "TEXT NOT NULL DEFAULT '[]'"],
+  ]) await ensureColumn(db, 'conversation_soils', column, declaration);
+  await run(db, `UPDATE conversation_soils
+    SET tool_call_ids_json = json_array(tool_call_id)
+    WHERE tool_call_id IS NOT NULL AND json_array_length(tool_call_ids_json) = 0`);
   await run(db, `CREATE TABLE IF NOT EXISTS memory_pockets (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL DEFAULT 'owner',
@@ -63,14 +71,38 @@ async function initializeMemorySchema(db) {
     source_window TEXT NOT NULL DEFAULT '',
     source_time INTEGER,
     tag TEXT NOT NULL DEFAULT '',
+    migration_status TEXT NOT NULL DEFAULT '',
     supersedes_entry_id TEXT,
     last_confirmed_at INTEGER,
     revision_action TEXT NOT NULL DEFAULT '',
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER DEFAULT NULL,
-    FOREIGN KEY (conversation_id) REFERENCES source_conversations(id)
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id)
   )`);
+  for (const [column, declaration] of [
+    ['suggested_avoid_hint', "TEXT NOT NULL DEFAULT ''"],
+    ['candidate_id', 'TEXT DEFAULT NULL'],
+    ['title', "TEXT NOT NULL DEFAULT ''"],
+    ['life_core', "TEXT NOT NULL DEFAULT ''"],
+    ['content', "TEXT NOT NULL DEFAULT ''"],
+    ['usage_hint', "TEXT NOT NULL DEFAULT ''"],
+    ['avoid_hint', "TEXT NOT NULL DEFAULT ''"],
+    ['source_refs_json', "TEXT NOT NULL DEFAULT '[]'"],
+    ['source_excerpt', "TEXT NOT NULL DEFAULT ''"],
+    ['fingerprint', 'TEXT DEFAULT NULL'],
+    ['recall_count', 'INTEGER NOT NULL DEFAULT 0'],
+    ['last_recalled_at', 'INTEGER DEFAULT NULL'],
+    ['vector_ids_json', "TEXT NOT NULL DEFAULT '[]'"],
+    ['embedding_model', 'TEXT DEFAULT NULL'],
+    ['embedding_version', 'TEXT DEFAULT NULL'],
+    ['embedding_status', "TEXT NOT NULL DEFAULT 'pending'"],
+    ['embedded_at', 'INTEGER DEFAULT NULL'],
+    ['memory_tags_json', "TEXT NOT NULL DEFAULT '[]'"],
+    ['supersedes_entry_id', 'TEXT DEFAULT NULL'],
+    ['last_confirmed_at', 'INTEGER DEFAULT NULL'],
+    ['revision_action', "TEXT NOT NULL DEFAULT ''"],
+  ]) await ensureColumn(db, 'memory_pockets', column, declaration);
   await run(db, `CREATE TABLE IF NOT EXISTS memory_entries (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL DEFAULT 'owner',
@@ -96,24 +128,31 @@ async function initializeMemorySchema(db) {
     embedding_status TEXT NOT NULL DEFAULT 'pending',
     embedded_at INTEGER DEFAULT NULL,
     memory_tags_json TEXT NOT NULL DEFAULT '[]',
-    source_model TEXT NOT NULL DEFAULT '',
-    source_window TEXT NOT NULL DEFAULT '',
-    source_time INTEGER,
-    tag TEXT NOT NULL DEFAULT '',
     supersedes_entry_id TEXT,
     last_confirmed_at INTEGER,
     revision_action TEXT NOT NULL DEFAULT '',
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER DEFAULT NULL,
-    FOREIGN KEY (conversation_id) REFERENCES source_conversations(id)
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id)
   )`);
+  for (const [column, declaration] of [
+    ['memory_tags_json', "TEXT NOT NULL DEFAULT '[]'"],
+    ['source_model', "TEXT NOT NULL DEFAULT ''"],
+    ['source_window', "TEXT NOT NULL DEFAULT ''"],
+    ['source_time', 'INTEGER DEFAULT NULL'],
+    ['tag', "TEXT NOT NULL DEFAULT ''"],
+    ['migration_status', "TEXT NOT NULL DEFAULT ''"],
+    ['supersedes_entry_id', 'TEXT DEFAULT NULL'],
+    ['last_confirmed_at', 'INTEGER DEFAULT NULL'],
+    ['revision_action', "TEXT NOT NULL DEFAULT ''"],
+  ]) await ensureColumn(db, 'memory_entries', column, declaration);
   await run(db, `CREATE TABLE IF NOT EXISTS memory_custom_instructions (
     id TEXT PRIMARY KEY,
     content TEXT NOT NULL DEFAULT '',
     updated_at INTEGER NOT NULL,
-    updated_by TEXT NOT NULL DEFAULT 'owner',
-    source TEXT NOT NULL DEFAULT 'owner_manual'
+    updated_by TEXT NOT NULL DEFAULT 'xiaohan',
+    source TEXT NOT NULL DEFAULT '屋主手动编辑'
   )`);
   await run(db, 'CREATE INDEX IF NOT EXISTS idx_soils_updated ON conversation_soils(updated_at)');
   await run(db, `CREATE INDEX IF NOT EXISTS idx_pockets_conversation_status
@@ -127,8 +166,12 @@ async function initializeMemorySchema(db) {
     ON memory_entries(conversation_id, entry_type, status, updated_at)`);
   await run(db, `CREATE INDEX IF NOT EXISTS idx_entries_recall
     ON memory_entries(last_recalled_at, recall_count)`);
-  await run(db, `CREATE INDEX IF NOT EXISTS idx_entries_facets
+  await run(db, `CREATE INDEX IF NOT EXISTS idx_entries_v2_facets
     ON memory_entries(user_id, entry_type, tag, source_time)`);
+  await run(db, 'INSERT OR IGNORE INTO schema_migrations (id, applied_at) VALUES (?, ?)', [
+    MEMORY_LIBRARY_V2_MIGRATION_ID,
+    Date.now(),
+  ]);
 }
 
 export async function ensureMemorySchema(db) {

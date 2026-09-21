@@ -1,9 +1,0 @@
-{
-  "name": "Elementera Coast Source",
-  "short_name": "Coast Source",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#16204A",
-  "description": "Source-available long-term conversation workspace."
-}

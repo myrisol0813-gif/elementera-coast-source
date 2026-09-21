@@ -1,65 +1,31 @@
-# Environment and bindings
+# Environment
 
-## Required
+## PWA
 
-### `SOURCE_ACCESS_PASSWORD`
+The copied PWA expects Cloudflare Pages/Workers-style bindings.
 
-Owner password for the source deployment.
+Required configuration:
 
-- type: secret/string
-- minimum accepted length: 8 characters
-- never commit a real value
+- `COAST_PASSWORD_HASH` — SHA-256 hex digest of the owner access password.
+- `COAST_SESSION_SECRET` — local/self-hosted session signing secret.
+- `COAST_CHAT_DB` — D1-compatible database binding named exactly `COAST_CHAT_DB` (a platform binding, not a checked-in string value).
 
-### `COAST_SESSION_SECRET`
+Optional configuration:
 
-HMAC secret used to sign owner sessions.
+- `OPENROUTER_API_KEY`
+- `COAST_GITHUB_ALLOWED_REPOS`
+- `COAST_GITHUB_TOKEN`
+- `COAST_NOTION_ROOT_PAGE_ID`
+- `COAST_NOTION_TOKEN`
+- MCP/OIDC variables documented by the code in `apps/web/functions/mcp-auth.js`
+- optional vector/AI platform bindings when those features are used.
 
-- type: secret/string
-- minimum accepted length: 32 characters
-- never commit a real value
+`apps/web/.env.example` contains empty values only. Local secret files and platform state must remain untracked.
 
-### `COAST_CHAT_DB`
+## Android
 
-Cloudflare D1 binding used by source-backed stores.
+The checked-in default API base is the non-routable placeholder:
 
-- type: D1 binding
-- expected binding name: `COAST_CHAT_DB`
-- it is **not** a normal string environment variable
+`https://elementera-coast-source.invalid`
 
-For local preview, `apps/web/wrangler.jsonc` binds this name to a local-only D1 simulation.
-
-For a real self-hosted deployment, create a D1 database owned by that deployment and bind it as `COAST_CHAT_DB` through Cloudflare Pages configuration. Do not reuse a private/production database.
-
-## Optional
-
-### `OPENROUTER_API_KEY`
-
-OpenRouter provider key.
-
-If absent, provider-backed model generation fails explicitly with `OpenRouter key 未配置。`. Source-backed UI/storage surfaces can still be inspected.
-
-### `OPENROUTER_MODEL`
-
-Optional default model id. It is used when a chat request does not explicitly choose a model. The id still has to be accepted by the source model catalog.
-
-## Local file
-
-Copy the root template:
-
-```bash
-cp .env.example apps/web/.dev.vars
-```
-
-Do not commit `.dev.vars`, `.env`, keys, database identifiers or other deployment credentials.
-
-Start the local Pages runtime with the tracked local-only Wrangler configuration:
-
-```bash
-npx wrangler pages dev apps/web \
-  --config apps/web/wrangler.jsonc \
-  --env-file .dev.vars
-```
-
-## Not provided by this repository
-
-The public source does not provide private deployment domains, private database ids, provider credentials, OAuth credentials, release signing material or updater configuration.
+Self-hosters should set their own source-build backend endpoint at build time. Production signing material and production updater/release configuration are intentionally absent.

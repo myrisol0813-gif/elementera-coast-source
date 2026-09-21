@@ -322,7 +322,7 @@ export async function resolveMailboxPocket(db, input = {}) {
     invalid('confidence 超出范围。');
   }
   const visibility = input.visibility == null ? 'visitor_visible' : String(input.visibility);
-  if (!['model_partner_only', 'visitor_visible'].includes(visibility)) {
+  if (!['myri_only', 'visitor_visible'].includes(visibility)) {
     invalid('visibility 不是允许的选项。');
   }
   try {
@@ -357,7 +357,7 @@ export async function mailboxPatrolReport(db, input = {}) {
     );
     return {
       ...report,
-      summary: `本次巡灯处理 ${report.visitor_count} 位访客，回信 ${report.reply_count} 封。${report.failure_count} 封未完成，${report.needs_owner_attention_count} 封需要前端屋主处理。`,
+      summary: `本次巡灯处理 ${report.visitor_count} 位访客，回信 ${report.reply_count} 封。${report.failure_count} 封未完成，${report.needs_owner_attention_count} 封需要屋主处理。`,
     };
   } catch (error) {
     if (error instanceof MailboxRepositoryError) {

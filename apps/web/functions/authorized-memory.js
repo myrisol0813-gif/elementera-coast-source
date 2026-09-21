@@ -15,7 +15,7 @@ function currentSoilRecord(soil) {
   return {
     id: `conversation-soil:${soil.conversation_id}`,
     type: 'soil',
-    title: soil.conversation_title || '当前对话纸条',
+    title: soil.conversation_title || '窗口整理当前对话的纸条',
     content: clip(soil.current_text, 4000),
     hand_seeds: (soil.hand_seeds || []).slice(0, 7),
     do_not_repeat: clip(soil.do_not_repeat, 1200),

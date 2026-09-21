@@ -1,0 +1,127 @@
+.rikkahub-conversation-section {
+  display: grid;
+  gap: 3px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.rikkahub-section-toggle,
+.rikkahub-import-button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+}
+
+.rikkahub-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 38px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  font-weight: 650;
+  text-align: left;
+}
+
+.rikkahub-section-toggle:hover,
+.rikkahub-import-button:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+.rikkahub-conversation-body {
+  display: grid;
+  gap: 2px;
+}
+
+.rikkahub-conversation-body .conversation-row {
+  padding-left: 7px;
+}
+
+.rikkahub-import-button {
+  min-height: 34px;
+  margin-top: 4px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: left;
+}
+
+.rikka-archive-note,
+.rikka-coast-divider {
+  width: min(620px, calc(100% - 24px));
+  margin: 0 auto 24px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.rikka-coast-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.rikka-coast-divider::before,
+.rikka-coast-divider::after {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+  content: '';
+}
+
+.imported-message {
+  opacity: .94;
+}
+
+.rikka-attachments {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 520px);
+  margin-top: 8px;
+}
+
+.message.user .rikka-attachments {
+  justify-items: end;
+}
+
+.rikka-attachment {
+  max-width: 100%;
+  margin: 0;
+}
+
+.rikka-attachment img {
+  display: block;
+  max-width: min(100%, 520px);
+  max-height: 520px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  object-fit: contain;
+}
+
+.rikka-attachment figcaption,
+.rikka-attachment-link {
+  display: inline-block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.rikka-attachment-link {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-soft);
+  color: var(--text-soft);
+  text-decoration: none;
+}
+
+.rikka-attachment-link.is-missing {
+  opacity: .65;
+}

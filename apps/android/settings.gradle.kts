@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ElementeraCoastSource"
+rootProject.name = "CoastGPT"
 include(":app")

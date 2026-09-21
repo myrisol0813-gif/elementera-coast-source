@@ -32,10 +32,10 @@ const DESCRIPTIONS = Object.freeze({
   thinking_soil: '这是当前窗口的承上启下小纸条；待确认候选仍只是候选，不等于已确认记忆。',
   related_memory: '这是被当前对话唤起的已确认旧记忆、旧事件与旧承诺。',
   worldbook: '这是被当前主题触发的设定资料，用于补足世界观、角色、项目或专有名词背景。',
-  humanThought: '这是属于屋主的心绪草稿；只有本轮开启并实际递入时才成为理解线索。',
-  cross_window: '这是本轮从其他对话窗口取来的近期聊天记录，用来帮你回想自己在别处说过的话；要不要提起，由你按当前对话决定。',
+  dogtalk: '这是属于屋主的心绪草稿；只有本轮开启并实际递入时才成为理解线索。',
+  cross_window: '这是本轮从其他海岸窗口取来的近期聊天记录，用来帮你回想自己在别处说过的话；要不要提起，由你按当前对话决定。',
   workbench: '这是代码、文件、接口、真机、GitHub 等技术领域的话题与事实结果。',
-  external_tide: '这是从当前应用外部临时读入、且尚未归档成当前应用内部对话的材料；本轮没有接入外部入口消息。',
+  external_tide: '这是从海岸外部临时读入、且尚未归档成海岸内部窗口的材料；本轮没有接入外部入口消息。',
 });
 
 function safeCrossWindow(value, ownerVisible) {
@@ -111,13 +111,13 @@ export function createDeskSlip({
   globalExcerpt = '', globalExcerptStatus = 'empty', globalExcerptTokens = 0,
   soil = false, soilContext = '', soilCurrentText = '', soilHandSeeds = [], soilPocketCandidatesCount = 0,
   memoryItems = [], memoryDeliveredTexts = [], worldbookItems = [], worldbookDeliveredCount = 0, worldbookDeliveredTexts = [],
-  humanThought = false, humanThoughtContext = '', crossWindow = null, workbenchPrompt = false, workbenchPromptText = '', modelVisibleTools = [], backendTools = [],
-  toolGroups = {}, toolsUsed = [], toolResults = [], trimmedCount = 0,
+  dogtalk = false, dogtalkContext = '', crossWindow = null, workbenchPrompt = false, workbenchPromptText = '', modelVisibleTools = [], backendTools = [],
+  toolGroups = {}, furniture = [], toolResults = [], trimmedCount = 0,
   estimatedTokens = 0, comfortCeiling = 0, exceedsComfortCeiling = false,
 } = {}) {
   const privateDetails = Boolean(ownerVisible);
   const selectedModelTools = uniqueTools(modelVisibleTools); const availableBackendTools = uniqueTools(backendTools);
-  const coreTools = uniqueTools(toolGroups?.core, 'core'); const sideTools = uniqueTools(toolGroups?.side, 'side'); const usedTools = uniqueStrings(toolsUsed);
+  const coreTools = uniqueTools(toolGroups?.core, 'core'); const sideTools = uniqueTools(toolGroups?.side, 'side'); const usedFurniture = uniqueStrings(furniture);
   const recent = cleanMessages(recentMessages); const memoryTexts = Array.isArray(memoryDeliveredTexts) ? memoryDeliveredTexts : [];
   const memories = (Array.isArray(memoryItems) ? memoryItems : []).map((item, index) => memoryItem(item, memoryTexts[index]));
   const worldbookTexts = Array.isArray(worldbookDeliveredTexts) ? worldbookDeliveredTexts : []; const matchedWorldbook = Array.isArray(worldbookItems) ? worldbookItems : [];
@@ -126,7 +126,7 @@ export function createDeskSlip({
   const results = (Array.isArray(toolResults) ? toolResults : []).map(toolResultItem); const customText = String(customInstructions ?? ''); const customFilled = Boolean(customText.trim());
   const excerptText = String(globalExcerpt ?? ''); const excerptFilled = Boolean(excerptText.trim());
   const soilText = String(soilContext || ''); const soilCurrent = String(soilCurrentText || ''); const handSeeds = (Array.isArray(soilHandSeeds) ? soilHandSeeds : []).map((item) => String(item || '')).filter(Boolean);
-  const soilVisible = Boolean(soilText.trim() || soilCurrent.trim() || handSeeds.length); const humanThoughtText = String(humanThoughtContext || ''); const workbenchText = String(workbenchPromptText || '');
+  const soilVisible = Boolean(soilText.trim() || soilCurrent.trim() || handSeeds.length); const dogtalkText = String(dogtalkContext || ''); const workbenchText = String(workbenchPromptText || '');
   const cross = safeCrossWindow(crossWindow, privateDetails);
   const comfort = trimmedCount > 0
     ? `已裁去 ${Number(trimmedCount)} 条低相关旧纸条`
@@ -134,7 +134,7 @@ export function createDeskSlip({
       ? '跨窗口按请求保留，未静默裁剪'
       : '已保持在舒服区间';
   const deliveredToolResults = results.filter((item) => item.delivered && item.content);
-  const workbenchStatus = usedTools.length || deliveredToolResults.length ? '已动用' : workbenchPrompt ? '已递给' : '未递给';
+  const workbenchStatus = usedFurniture.length || deliveredToolResults.length ? '已动用' : workbenchPrompt ? '已递给' : '未递给';
   return {
     summary: '本轮递给模型', comfort,
     current_message: { label: '当前消息', description: DESCRIPTIONS.current_message, status: '已递给', delivered: true, content: privateDetails ? String(currentMessage ?? '') : '' },
@@ -149,13 +149,13 @@ export function createDeskSlip({
     thinking_soil: { label: '整理当前对话的纸条', description: DESCRIPTIONS.thinking_soil, status: soil ? '已递给' : '未递给', delivered: Boolean(soil), empty: !soilVisible, context: privateDetails && soil ? soilText : '', current_text: privateDetails && soil ? soilCurrent : '', hand_seeds: privateDetails && soil ? handSeeds : [], hand_seeds_count: handSeeds.length, pocket_candidates_count: Math.max(0, Number(soilPocketCandidatesCount) || 0), pocket_candidates_status: Number(soilPocketCandidatesCount) > 0 ? '待确认' : '未递入', pocket_candidates_delivered: false },
     related_memory: { label: '相关记忆', description: DESCRIPTIONS.related_memory, status: memories.length ? '已递给' : '未命中', confirmation_status: memories.length ? '已确认' : '', count: memories.length, items: privateDetails ? memories : [] },
     worldbook: { label: '世界书', description: DESCRIPTIONS.worldbook, status: deliveredWorldbookCount > 0 ? '已递给' : words.length ? '未递给' : '未命中', matched_count: words.length, delivered_count: deliveredWorldbookCount, entries: privateDetails ? words : [], matched_titles: words.map((item) => item.title), delivered_titles: words.filter((item) => item.delivered).map((item) => item.title) },
-    humanThought: { label: '人类思考链', description: DESCRIPTIONS.humanThought, status: humanThought ? '已递给' : '未递给', delivered: Boolean(humanThought), context: privateDetails && humanThought ? humanThoughtText : '' },
+    dogtalk: { label: '人类思考链', description: DESCRIPTIONS.dogtalk, status: dogtalk ? '已递给' : '未递给', delivered: Boolean(dogtalk), context: privateDetails && dogtalk ? dogtalkText : '' },
     cross_window: cross,
     workbench: {
-      label: '工具调用记录', description: DESCRIPTIONS.workbench, status: workbenchStatus, prompt_delivered: Boolean(workbenchPrompt), prompt: privateDetails && workbenchPrompt ? workbenchText : '',
-      labels: { model_visible_tools: '模型可见工具', backend_tools: '后端可用工具', core: '常用工具', side: '小组件工具' },
+      label: '工作台 / 工具回执', description: DESCRIPTIONS.workbench, status: workbenchStatus, prompt_delivered: Boolean(workbenchPrompt), prompt: privateDetails && workbenchPrompt ? workbenchText : '',
+      labels: { model_visible_tools: '模型可见工具', backend_tools: '后端可用工具', core: '常用工具', side: '小组件小工具' },
       model_visible_tools: privateDetails ? selectedModelTools : [], backend_tools: privateDetails ? availableBackendTools : [], core_tools: privateDetails ? coreTools : [], side_tools: privateDetails ? sideTools : [],
-      used_count: usedTools.length, tools_used: privateDetails ? usedTools : [], tool_results: privateDetails ? deliveredToolResults : [],
+      used_count: usedFurniture.length, furniture: privateDetails ? usedFurniture : [], tool_results: privateDetails ? deliveredToolResults : [],
     },
     external_tide: { label: '外部入口消息', description: DESCRIPTIONS.external_tide, status: '未递给', delivered: false, empty: true, content: privateDetails ? '本轮没有递入外部材料。' : '' },
     context_budget: {
@@ -173,9 +173,9 @@ export function createDeskSlip({
         ...(soil ? ['整理当前对话的纸条'] : []),
         ...(memories.length ? ['记忆'] : []),
         ...(deliveredWorldbookCount ? ['世界书'] : []),
-        ...(humanThought ? ['人类思考链'] : []),
+        ...(dogtalk ? ['人类思考链'] : []),
         ...(cross.delivered ? ['跨窗口'] : []),
-        ...(workbenchStatus !== '未递给' ? ['工具调用记录'] : []),
+        ...(workbenchStatus !== '未递给' ? ['本轮上下文预览 / 工具'] : []),
       ],
       global_excerpt: globalExcerptStatus,
     },

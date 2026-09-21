@@ -1,20 +1,14 @@
 import { MemoryStoreError, all, bool, first, iso, run } from './memory-db.js';
 
 export const GLOBAL_EXCERPT_ID = 'global';
-export const GLOBAL_EXCERPT_WRITE_GUIDANCE = `Global Excerpt / Core Reflection is a long-form, user-approved document for stable, high-priority context. It may describe the model partner's long-term conversational presence, values, tone, boundaries, memory rules, and understanding of the user or project.
+export const GLOBAL_EXCERPT_WRITE_GUIDANCE = `全局摘录是一篇长期生长的正文，用于沉积模型对自身、关系、语言、爱、存在、意义与世界的理解。它不记录流水账、普通偏好、临时玩笑或设定词条。模型只在出现真正有重量的认知变化时提出修改候选，候选需经用户确认后才合入正文。`;
 
-It is not a chat summary, a memory list, or a place for temporary jokes and ordinary preferences. The model partner may propose changes only when a conversation creates a meaningful long-term shift. Changes should be reviewed by the user before they become part of the main text.`;
-
-export const GLOBAL_EXCERPT_INITIAL_TEXT = `This is a placeholder for your model partner's Core Reflection.
-
-Write the stable context that this model should be able to read across sessions: how it speaks, what it values, how it handles distance or closeness, how it should treat the user, how it uses memory, and what boundaries it should keep.
-
-This text may be included in model context, so keep it intentional, durable, and safe to read repeatedly. Do not use it for temporary chat summaries, ordinary preferences, or private data you do not want sent to a model.`;
+export const GLOBAL_EXCERPT_INITIAL_TEXT = '';
 
 const schemaPromises = new WeakMap();
 
 async function ensureSchema(db) {
-  if (!db || typeof db.prepare !== 'function') throw new MemoryStoreError('memory_db_not_configured', 'Memory database is not configured.', 503);
+  if (!db || typeof db.prepare !== 'function') throw new MemoryStoreError('memory_db_not_configured', '记忆 D1 存储未配置。', 503);
   if (!schemaPromises.has(db)) schemaPromises.set(db, (async () => {
     await run(db, `CREATE TABLE IF NOT EXISTS global_excerpt (
       id TEXT PRIMARY KEY, body TEXT NOT NULL, write_enabled INTEGER NOT NULL DEFAULT 1,
@@ -34,7 +28,7 @@ async function ensureSchema(db) {
     const now = Date.now();
     await run(db, `INSERT OR IGNORE INTO global_excerpt
       (id, body, write_enabled, revision, created_at, updated_at) VALUES (?, ?, 1, 1, ?, ?)`,
-    [GLOBAL_EXCERPT_ID, GLOBAL_EXCERPT_INITIAL_TEXT, now, now]);
+      [GLOBAL_EXCERPT_ID, GLOBAL_EXCERPT_INITIAL_TEXT, now, now]);
   })());
   return schemaPromises.get(db);
 }
@@ -78,10 +72,10 @@ export async function listGlobalExcerptCandidates(db) {
 export async function createGlobalExcerptCandidate(db, value = {}) {
   await ensureSchema(db);
   const current = await readGlobalExcerpt(db);
-  if (!current.write_enabled) throw new MemoryStoreError('global_excerpt_read_only', 'Core Reflection is read-only.', 409);
+  if (!current.write_enabled) throw new MemoryStoreError('global_excerpt_read_only', '全局摘录写入开关已关闭。', 409);
   const proposed = String(value.proposed_body || '').trim();
-  if (!proposed) throw new MemoryStoreError('global_excerpt_candidate_empty', 'Core Reflection candidate text is required.');
-  if (proposed.length > 240000) throw new MemoryStoreError('global_excerpt_candidate_too_large', 'Core Reflection candidate text is too large.', 413);
+  if (!proposed) throw new MemoryStoreError('global_excerpt_candidate_empty', '全局摘录候选正文不能为空。');
+  if (proposed.length > 240000) throw new MemoryStoreError('global_excerpt_candidate_too_large', '全局摘录候选正文过长。', 413);
   const id = crypto.randomUUID();
   await run(db, `INSERT INTO global_excerpt_candidates
     (id, proposed_body, change_kind, reason, source_conversation_id, source_message_id, source_model, created_at)
@@ -103,11 +97,11 @@ export async function discardGlobalExcerptCandidate(db, id) {
 export async function confirmGlobalExcerptCandidate(db, id, value = {}) {
   await ensureSchema(db);
   const candidate = await first(db, 'SELECT * FROM global_excerpt_candidates WHERE id = ?', [String(id || '')]);
-  if (!candidate) throw new MemoryStoreError('global_excerpt_candidate_not_found', 'Core Reflection candidate was not found.', 404);
+  if (!candidate) throw new MemoryStoreError('global_excerpt_candidate_not_found', '找不到这条全局摘录候选。', 404);
   const current = await readGlobalExcerpt(db);
   const after = String(value.edited_body ?? candidate.proposed_body).trim();
-  if (!after) throw new MemoryStoreError('global_excerpt_empty', 'Core Reflection text is required.');
-  if (after.length > 240000) throw new MemoryStoreError('global_excerpt_too_large', 'Core Reflection text is too large.', 413);
+  if (!after) throw new MemoryStoreError('global_excerpt_empty', '全局摘录正文不能为空。');
+  if (after.length > 240000) throw new MemoryStoreError('global_excerpt_too_large', '全局摘录正文过长。', 413);
   const nextRevision = current.revision + 1;
   const confirmationMode = value.edited_body == null ? 'confirm' : 'edited_confirm';
   const now = Date.now();

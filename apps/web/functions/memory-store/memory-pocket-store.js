@@ -28,8 +28,8 @@ export function pocketFromRow(row) {
     .filter(Boolean)
     .slice(0, 8);
   if (!sourceRefs.length) {
-    const fallbackReference = normalizeCandidateSourceRef(reference);
-    if (fallbackReference) sourceRefs = [fallbackReference];
+    const legacyReference = normalizeCandidateSourceRef(reference);
+    if (legacyReference) sourceRefs = [legacyReference];
   }
   const title = row.title || row.suggested_title || clip(row.source_text, MAX_TITLE);
   const lifeCore = row.life_core || row.suggested_life_core || row.source_text || title;

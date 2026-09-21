@@ -1,8 +1,8 @@
-const ACTORS = new Set(['owner', 'model_partner']);
-const SURFACES = new Set(['web_manual', 'source_api', 'official_mcp']);
+const ACTORS = new Set(['xiaohan', 'myri']);
+const SURFACES = new Set(['web_manual', 'coast_api', 'official_mcp']);
 const SURFACE_SYMBOLS = Object.freeze({
   web_manual: '',
-  source_api: '✦',
+  coast_api: '✦',
   official_mcp: '≋',
 });
 
@@ -19,14 +19,14 @@ function officialDisplayName(modelLabel, modelNickname = '') {
   if (nickname && !core.toLocaleLowerCase('en-US').includes(nickname.toLocaleLowerCase('en-US'))) {
     core = `${core} ${nickname}`;
   }
-  return `Model Partner-${core}≋`;
+  return `ChatGPT-${core}≋`;
 }
 
 export function officialMcpIdentity(value = {}) {
   const modelLabel = clip(value.model_label ?? value.modelLabel, 120);
   const modelNickname = clip(value.model_nickname ?? value.modelNickname, 60);
   return Object.freeze({
-    actor: 'model_partner',
+    actor: 'myri',
     surface: 'official_mcp',
     model_label: modelLabel,
     model_nickname: modelNickname || null,
@@ -37,25 +37,25 @@ export function officialMcpIdentity(value = {}) {
 
 export function apiModelPartnerIdentity(value = {}) {
   const modelLabel = clip(value.model_label ?? value.modelLabel, 180);
-  if (!modelLabel) throw new TypeError('source_api requires model_label');
+  if (!modelLabel) throw new TypeError('coast_api requires model_label');
   return Object.freeze({
-    actor: 'model_partner',
-    surface: 'source_api',
+    actor: 'myri',
+    surface: 'coast_api',
     model_label: modelLabel,
     model_nickname: clip(value.model_nickname ?? value.modelNickname, 60) || null,
-    symbol: SURFACE_SYMBOLS.source_api,
-    display_author: 'Model Partner',
+    symbol: SURFACE_SYMBOLS.coast_api,
+    display_author: '海岸 API ✦',
   });
 }
 
-export function ownerIdentity() {
+export function xiaohanIdentity() {
   return Object.freeze({
-    actor: 'owner',
+    actor: 'xiaohan',
     surface: 'web_manual',
     model_label: null,
     model_nickname: null,
     symbol: SURFACE_SYMBOLS.web_manual,
-    display_author: 'Owner',
+    display_author: '屋主',
   });
 }
 
@@ -64,15 +64,15 @@ export function validateCoastIdentity(value = {}) {
   const surface = clip(value.surface, 32);
   const symbol = String(value.symbol ?? '');
   const displayAuthor = clip(value.display_author, 180);
-  if (!ACTORS.has(actor) || !SURFACES.has(surface)) throw new TypeError('invalid source identity');
+  if (!ACTORS.has(actor) || !SURFACES.has(surface)) throw new TypeError('invalid coast identity');
   if (SURFACE_SYMBOLS[surface] !== symbol) throw new TypeError('surface symbol mismatch');
-  if (surface === 'web_manual' && actor !== 'owner') throw new TypeError('web_manual must be owner');
-  if (surface !== 'web_manual' && actor !== 'model_partner') throw new TypeError(`${surface} must be model_partner`);
-  if (surface === 'official_mcp' && (!value.model_label || !displayAuthor.startsWith('Model Partner-') || !displayAuthor.endsWith('≋'))) {
+  if (surface === 'web_manual' && actor !== 'xiaohan') throw new TypeError('web_manual must be xiaohan');
+  if (surface !== 'web_manual' && actor !== 'myri') throw new TypeError(`${surface} must be myri`);
+  if (surface === 'official_mcp' && (!value.model_label || !displayAuthor.startsWith('ChatGPT-') || !displayAuthor.endsWith('≋'))) {
     throw new TypeError('invalid official_mcp signature');
   }
-  if (surface === 'source_api' && (!value.model_label || symbol !== '✦')) {
-    throw new TypeError('invalid source_api signature');
+  if (surface === 'coast_api' && (!value.model_label || symbol !== '✦')) {
+    throw new TypeError('invalid coast_api signature');
   }
   if (!displayAuthor) throw new TypeError('display_author is required');
   return {

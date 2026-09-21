@@ -1,4 +1,4 @@
-import { readConversationState, readOwnerProfile } from '../chat-store.js';
+import { readConversationState, readProfile } from '../chat-store.js';
 import { safeLogError } from '../http.js';
 import { soilSettings } from '../memory-config.js';
 import {
@@ -70,7 +70,7 @@ export const SOIL_RESPONSE_FORMAT = Object.freeze({
                   additionalProperties: false,
                   properties: Object.freeze({
                     turn_id: Object.freeze({ type: 'string' }),
-                    role: Object.freeze({ type: 'string', enum: ['owner', 'model_partner', 'turn'] }),
+                    role: Object.freeze({ type: 'string', enum: ['user', 'assistant', 'turn'] }),
                   }),
                   required: ['turn_id', 'role'],
                 }),
@@ -95,30 +95,30 @@ export const SOIL_RESPONSE_FORMAT = Object.freeze({
 });
 
 export function activeBranch(turn = {}) {
-  const ownerVariants = Array.isArray(turn?.owner?.variants) ? turn.owner.variants : [];
-  const ownerIndex = Math.min(Math.max(0, Number(turn?.owner?.active || 0)), Math.max(0, ownerVariants.length - 1));
-  const modelPartnerVariants = turn?.model_partner?.variantsByOwnerVariant?.[String(ownerIndex)] || [];
-  const modelPartnerIndex = Math.min(
-    Math.max(0, Number(turn?.model_partner?.activeByOwnerVariant?.[String(ownerIndex)] || 0)),
-    Math.max(0, modelPartnerVariants.length - 1),
+  const userVariants = Array.isArray(turn?.user?.variants) ? turn.user.variants : [];
+  const userIndex = Math.min(Math.max(0, Number(turn?.user?.active || 0)), Math.max(0, userVariants.length - 1));
+  const assistants = turn?.assistant?.variantsByUserVariant?.[String(userIndex)] || [];
+  const assistantIndex = Math.min(
+    Math.max(0, Number(turn?.assistant?.activeByUserVariant?.[String(userIndex)] || 0)),
+    Math.max(0, assistants.length - 1),
   );
   return {
     turn_id: String(turn.id || ''),
-    owner: ownerVariants[ownerIndex] || null,
-    model_partner: modelPartnerVariants[modelPartnerIndex] || null,
+    user: userVariants[userIndex] || null,
+    assistant: assistants[assistantIndex] || null,
   };
 }
 
 export function completedTurns(state) {
   return (Array.isArray(state?.turns) ? state.turns : [])
     .map(activeBranch)
-    .filter((branch) => branch.owner?.content
-      && branch.model_partner?.content
-      && branch.model_partner.content !== '正在连接当前模型……');
+    .filter((branch) => branch.user?.content
+      && branch.assistant?.content
+      && branch.assistant.content !== '正在连接当前模型……');
 }
 
 export function isLandingBranch(branch = {}) {
-  return branch.owner?.hidden === true || branch.owner?.input_type === 'landing_letter';
+  return branch.user?.hidden === true || branch.user?.input_type === 'landing_letter';
 }
 
 export function visibleCompletedTurns(state) {
@@ -167,7 +167,7 @@ export function parseStrictJson(value) {
       }
     }
   }
-  throw new MemoryStoreError('soil_organize_invalid', '当前对话纸条整理结果格式无效。', 502);
+  throw new MemoryStoreError('soil_organize_invalid', '整理当前对话的纸条整理结果格式无效。', 502);
 }
 
 export function normalizeSoilMode(value) {
@@ -177,10 +177,10 @@ export function normalizeSoilMode(value) {
 
 export function fallbackCurrentText(turns, landing) {
   const latest = turns.at(-1);
-  if (landing || latest?.owner?.hidden || latest?.owner?.input_type === 'landing_letter') {
-    return '启动说明已经读取，正在承接当前对话。';
+  if (landing || latest?.user?.hidden || latest?.user?.input_type === 'landing_letter') {
+    return '登岛信开场已经完成，正在承接这封信与刚刚的读信回复。';
   }
-  const source = String(latest?.owner?.content || '').replace(/\s+/g, ' ').trim();
+  const source = String(latest?.user?.content || '').replace(/\s+/g, ' ').trim();
   const preview = Array.from(source).slice(0, 72).join('');
   return preview
     ? `刚刚完成了一轮对话，当前正在承接：${preview}${Array.from(source).length > 72 ? '…' : ''}`
@@ -195,13 +195,13 @@ export function soilTurnDigest(branch, maxChars) {
   if (!branch) return null;
   return {
     turn_id: branch.turn_id,
-    owner: {
-      message_id: String(branch.owner?.id || ''),
-      content: clipSoilContent(branch.owner?.content, maxChars),
+    user: {
+      message_id: String(branch.user?.id || ''),
+      content: clipSoilContent(branch.user?.content, maxChars),
     },
-    model_partner: {
-      message_id: String(branch.model_partner?.id || ''),
-      content: clipSoilContent(branch.model_partner?.content, maxChars),
+    assistant: {
+      message_id: String(branch.assistant?.id || ''),
+      content: clipSoilContent(branch.assistant?.content, maxChars),
     },
   };
 }
@@ -253,8 +253,8 @@ export function boundedSoilContext(context) {
     ...context,
     previous_turn_excerpt: context.previous_turn_excerpt ? soilTurnDigest({
       turn_id: context.previous_turn_excerpt.turn_id,
-      owner: context.previous_turn_excerpt.owner,
-      model_partner: context.previous_turn_excerpt.model_partner,
+      user: context.previous_turn_excerpt.user,
+      assistant: context.previous_turn_excerpt.assistant,
     }, 400) : null,
     missed_since_success: (context.missed_since_success || []).slice(-1),
   };
@@ -287,24 +287,24 @@ export function soilPrompt(turns, oldSoil, maxHandSeeds, options = {}) {
     "content": "保留足够上下文后的压缩内容",
     "usage_hint": "什么情况下值得重新碰到",
     "avoid_hint": "如何避免机械复读或误用",
-    "source_refs": [{"turn_id":"从本轮上下文中原样选择","role":"owner|model_partner|turn"}],
+    "source_refs": [{"turn_id":"从本轮上下文中原样选择","role":"user|assistant|turn"}],
     "source_excerpt": "帮助辨认来源的短摘录"
   }]
 }
 
 mode 含义：
 - replace：使用你本轮返回的新纸条。旧纸条可以退出、被改写、合并或替换；新内容比旧内容少也没关系。
-- keep：这一栏原样保留旧纸条。
+- keep：这一栏原样保留旧整理当前对话的纸条。
 - clear：你明确判断这一栏已经过时、重复、已经落袋或不再适合当前窗口，因此清空这一栏。
 不要把空数组或空字符串当作失败占位。如果你确实要清空，请使用 clear mode；如果你没有要改这一栏，请使用 keep mode。
 
 current_text 是“滚动承接便签”，不是最近十二轮聊天摘要。普通回复整理时，约 60–70% 注意力放在 latest_turn，约 20–30% 保留 old_current_text 中仍直接连接当前话题的未完成线索，极少量使用 previous_turn_excerpt 与 missed_since_success 防止断层。允许改写、压缩、删除已经结束的话题，用最新一轮重新解释上一段。不要累加“先聊 A、再聊 B、然后 C”的流水账；不要每轮继续背着登岛信；不要把远古精华长期塞在 current_text。
 
-hand_seeds 不是永久收藏夹，而是“此刻最值得手持”的最多 ${maxHandSeeds} 粒。每轮都可以保留仍有用的旧线索、删除过时旧线索、替换旧线索、合并重复旧线索、改写旧线索或加入新线索。满 ${maxHandSeeds} 粒时主动做取舍。不要因为旧纸条里已经有旧线索就机械保留，也不要害怕让旧纸条退出手持。
+hand_seeds 不是永久收藏夹，而是“此刻最值得手持”的最多 ${maxHandSeeds} 粒。每轮都可以保留仍有用的旧种、删除过时旧种、替换旧种、合并重复旧种、改写旧种或加入新种。满 ${maxHandSeeds} 粒时主动做取舍。不要因为旧整理当前对话的纸条里已经有旧种就机械保留，也不要害怕让旧纸条退出手持。
 do_not_repeat 也只是当前窗口的工作提醒。已经不再需要防复读的提醒可以改写、合并或 clear。
 pocket_candidates 只放“现在不用、但仍有再生力”的内容，并使用上方真实 turn_id。旧候选会由系统先 upsert 到 pending；已经进入 pending、已经落袋或已经不适合当前窗口的候选可以从整理当前对话的纸条展示层退出，不要为了保留展示而反复挂在手上。当前确实没有候选时使用 pocket_candidates_mode=clear。
 
-你只能整理 current_text、hand_seeds、do_not_repeat、pocket_candidates 这四块临时工作台内容。不要创建或删除长期记忆，不要删除聊天记录、pending pocket、confirmed pocket、clue、memory 或向量索引中的已确认内容；不要判断 core，不要把候选升级为 clue 或 memory，不要替用户做决定，不要复述整段聊天。
+你只能整理 current_text、hand_seeds、do_not_repeat、pocket_candidates 这四块临时工作台内容。不要创建或删除长期记忆，不要删除聊天记录、pending pocket、confirmed pocket、seed、memory 或向量索引中的已确认内容；不要判断 core，不要把候选升级为 seed 或 memory，不要替用户做决定，不要复述整段聊天。
 
 整理输入结构：
 ${JSON.stringify(context)}`;
@@ -337,9 +337,9 @@ export async function organizeConversationSoil(env, conversationId, value) {
     || reply
     || turns.length === 1
     || (turns.length - 1) % settings.autoRefreshEveryTurns === 0;
-  const latestModelPartnerAt = Date.parse(turns.at(-1)?.model_partner?.created_at || '');
+  const latestAssistantAt = Date.parse(turns.at(-1)?.assistant?.created_at || '');
   const soilUpdatedAt = Date.parse(oldSoil.updated_at || '');
-  if (!force && (!scheduledTurn || (oldSoil.revision > 1 && Number.isFinite(latestModelPartnerAt) && soilUpdatedAt >= latestModelPartnerAt))) {
+  if (!force && (!scheduledTurn || (oldSoil.revision > 1 && Number.isFinite(latestAssistantAt) && soilUpdatedAt >= latestAssistantAt))) {
     return { ok: true, skipped: true, reason: 'not_due', soil: oldSoil };
   }
 
@@ -348,7 +348,7 @@ export async function organizeConversationSoil(env, conversationId, value) {
   let organizedBy = null;
   let degradedReason = '';
   try {
-    const profile = await readOwnerProfile(env.COAST_CHAT_DB);
+    const profile = await readProfile(env.COAST_CHAT_DB);
     const modelId = requestedModel || profile.current_chat_model || 'openai/gpt-4.1-nano';
     const basePrompt = soilPrompt(turns, oldSoil, settings.maxHandSeeds, { landing });
     let lastJsonError = null;
@@ -410,7 +410,7 @@ export async function organizeConversationSoil(env, conversationId, value) {
 
   const latestTurn = turns.at(-1);
   const allowedTurnIds = new Set(turns.map((turn) => turn.turn_id).filter(Boolean));
-  const fallbackExcerpt = [latestTurn?.owner?.content, latestTurn?.model_partner?.content]
+  const fallbackExcerpt = [latestTurn?.user?.content, latestTurn?.assistant?.content]
     .map((part) => String(part || '').replace(/\s+/g, ' ').trim())
     .filter(Boolean).join(' / ').slice(0, 360);
   const handSeedsMode = normalizeSoilMode(organized.hand_seeds_mode);

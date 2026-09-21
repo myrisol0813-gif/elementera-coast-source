@@ -26,7 +26,7 @@ export async function writeVisitorMailboxMessage(db, visitorId, content) {
     db.prepare(`INSERT INTO mailbox_messages (
       id, visitor_id, role, content, created_at, updated_at, status,
       reply_batch_id, is_visible_to_owner, safety_flag
-    ) VALUES (?, ?, 'visitor', ?, ?, ?, 'waiting_for_model_partner', NULL, 0, NULL)`).bind(
+    ) VALUES (?, ?, 'visitor', ?, ?, ?, 'waiting_for_myri', NULL, 0, NULL)`).bind(
       messageId,
       visitorId,
       content,
@@ -75,7 +75,7 @@ async function soleReplyForVisitorMessage(db, message) {
   ]);
   if (sibling) return null;
   return first(db, `SELECT * FROM mailbox_messages
-    WHERE visitor_id = ? AND role = 'model_partner' AND reply_batch_id = ?
+    WHERE visitor_id = ? AND role = 'myri' AND reply_batch_id = ?
       AND status != 'hidden' LIMIT 1`, [message.visitor_id, message.reply_batch_id]);
 }
 
@@ -90,6 +90,8 @@ function detachMessageStatements(db, visitorId, messageId) {
       WHERE visitor_id = ? AND source_message_id = ?`).bind(visitorId, messageId),
     db.prepare(`UPDATE visitor_notebook_entries SET source_message_id = NULL
       WHERE visitor_id = ? AND source_message_id = ?`).bind(visitorId, messageId),
+    db.prepare(`UPDATE mailbox_thinking_notes SET source_message_id = NULL
+      WHERE visitor_id = ? AND source_message_id = ?`).bind(visitorId, messageId),
   ];
 }
 
@@ -102,7 +104,7 @@ function upsertPendingQueueStatement(db, visitorId, timestamp, excludeMessageId 
     ) SELECT ?, ?, m.id, 'pending', ?, ?, NULL, NULL, NULL, 0, NULL, NULL
       FROM mailbox_messages m
       WHERE m.visitor_id = ? AND m.role = 'visitor'
-        AND m.status = 'waiting_for_model_partner' AND m.id != ?
+        AND m.status = 'waiting_for_myri' AND m.id != ?
       ORDER BY m.created_at DESC, m.id DESC LIMIT 1
     ON CONFLICT(visitor_id) DO UPDATE SET
       latest_message_id = excluded.latest_message_id,
@@ -136,12 +138,12 @@ export async function editVisitorMailboxMessage(db, visitorId, messageId, conten
     statements.push(
       ...detachMessageStatements(db, visitorId, relatedReply.id),
       db.prepare(`DELETE FROM mailbox_messages
-        WHERE id = ? AND visitor_id = ? AND role = 'model_partner'`).bind(relatedReply.id, visitorId),
+        WHERE id = ? AND visitor_id = ? AND role = 'myri'`).bind(relatedReply.id, visitorId),
     );
   }
   statements.push(
     db.prepare(`UPDATE mailbox_messages SET
-      content = ?, updated_at = ?, status = 'waiting_for_model_partner', reply_batch_id = NULL
+      content = ?, updated_at = ?, status = 'waiting_for_myri', reply_batch_id = NULL
       WHERE id = ? AND visitor_id = ? AND role = 'visitor'`).bind(
       content,
       timestamp,
@@ -159,7 +161,7 @@ export async function editVisitorMailboxMessage(db, visitorId, messageId, conten
 export async function deleteMailboxMessage(db, visitorId, messageId) {
   await ensureMailboxSchema(db);
   const message = await mailboxMessageForVisitor(db, visitorId, messageId);
-  if (!message || !['visitor', 'model_partner'].includes(message.role)) {
+  if (!message || !['visitor', 'myri'].includes(message.role)) {
     throw new MailboxRepositoryError('mailbox_message_not_found', '这条信箱消息不存在。', 404);
   }
   const relatedReply = await soleReplyForVisitorMessage(db, message);
@@ -172,7 +174,7 @@ export async function deleteMailboxMessage(db, visitorId, messageId) {
         WHERE visitor_id = ?
           AND NOT EXISTS (SELECT 1 FROM mailbox_messages m
             WHERE m.visitor_id = ? AND m.role = 'visitor'
-              AND m.status = 'waiting_for_model_partner' AND m.id != ?)`).bind(
+              AND m.status = 'waiting_for_myri' AND m.id != ?)`).bind(
         visitorId,
         visitorId,
         message.id,
@@ -184,12 +186,12 @@ export async function deleteMailboxMessage(db, visitorId, messageId) {
     statements.push(
       ...detachMessageStatements(db, visitorId, relatedReply.id),
       db.prepare(`DELETE FROM mailbox_messages
-        WHERE id = ? AND visitor_id = ? AND role = 'model_partner'`).bind(relatedReply.id, visitorId),
+        WHERE id = ? AND visitor_id = ? AND role = 'myri'`).bind(relatedReply.id, visitorId),
     );
   }
   statements.push(
     db.prepare(`DELETE FROM mailbox_messages
-      WHERE id = ? AND visitor_id = ? AND role IN ('visitor', 'model_partner')`).bind(message.id, visitorId),
+      WHERE id = ? AND visitor_id = ? AND role IN ('visitor', 'myri')`).bind(message.id, visitorId),
     db.prepare(`UPDATE mailbox_visitors SET updated_at = ?, last_seen_at = ?
       WHERE id = ? AND is_active = 1`).bind(timestamp, timestamp, visitorId),
   );
@@ -205,9 +207,9 @@ export async function mailboxStatusForVisitor(db, visitorId) {
   await ensureMailboxSchema(db);
   const row = await first(db, `SELECT
       (SELECT COUNT(*) FROM mailbox_messages
-        WHERE visitor_id = ? AND role = 'visitor' AND status = 'waiting_for_model_partner') AS pending_count,
+        WHERE visitor_id = ? AND role = 'visitor' AND status = 'waiting_for_myri') AS pending_count,
       (SELECT MAX(created_at) FROM mailbox_messages
-        WHERE visitor_id = ? AND role = 'model_partner' AND status != 'hidden') AS last_model_partner_reply_at,
+        WHERE visitor_id = ? AND role = 'myri' AND status != 'hidden') AS last_myri_reply_at,
       (SELECT MAX(created_at) FROM mailbox_messages
         WHERE visitor_id = ? AND role = 'visitor' AND status != 'hidden') AS last_visitor_message_at,
       (SELECT status FROM mailbox_reply_queue WHERE visitor_id = ?) AS queue_status`, [
@@ -218,7 +220,7 @@ export async function mailboxStatusForVisitor(db, visitorId) {
   ]);
   return {
     pending_count: Number(row?.pending_count || 0),
-    last_model_partner_reply_at: row?.last_model_partner_reply_at || null,
+    last_myri_reply_at: row?.last_myri_reply_at || null,
     last_visitor_message_at: row?.last_visitor_message_at || null,
     queue_status: row?.queue_status || 'idle',
   };
