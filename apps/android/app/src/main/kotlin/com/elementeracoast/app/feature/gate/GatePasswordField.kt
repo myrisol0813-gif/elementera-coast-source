@@ -122,7 +122,7 @@ fun GatePasswordField(
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = "进入海岸",
+                contentDescription = "进入",
                 tint = if (password.isNotBlank() && enabled) MaterialTheme.colorScheme.onSurface
                 else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .36f),
                 modifier = Modifier.size(19.dp)
