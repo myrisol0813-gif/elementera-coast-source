@@ -42,4 +42,4 @@ Do not commit provider/API/session secrets, local databases, build outputs, APK/
 
 ## License
 
-Elementera Coast Source is distributed under the PolyForm Noncommercial License 1.0.0. See `LICENSE`. Third-party components retain their upstream licenses as documented in `THIRD_PARTY_NOTICES.md` and `third_party/`.
+Elementera Coast Source is distributed under the MIT License. See `LICENSE`. Third-party components retain their upstream licenses as documented in `THIRD_PARTY_NOTICES.md` and `third_party/`.
