@@ -56,7 +56,7 @@ assert.match(futureVision, /附件 \/ 文件对象/);
 assert.match(futureVision, /vision\/image input/);
 assert.match(futureVision, /不实现新的识图系统/);
 
-for (const ownerLabel of ['核心', '使用时机', '勿误用', '当前整理', '当前活跃线索', '待确认候选', '屋主', '访客', '双方', '信箱', '灯塔', '共通聊天室', '官端 MCP', '小组件', '用户消息', '另一位屋主回复', '工具结果 JSON']) {
+for (const ownerLabel of ['核心', '使用时机', '勿误用', '当前整理', '当前活跃线索', '待确认候选', '屋主', '访客', '双方', '信箱', 'MCP 对话区', '共通聊天室', '官端 MCP', '小组件', '用户消息', '另一位屋主回复', '工具结果 JSON']) {
   assert.ok(desk.includes(ownerLabel), `desk misses owner-visible Chinese label: ${ownerLabel}`);
 }
 for (const rawLabel of ["deskText(item.life_core, 'life_core')", "deskText(item.usage_hint, 'usage_hint')", "deskText(item.avoid_hint, 'avoid_hint')", "'tool result JSON'", "'current_text'", "<b>hand_seeds</b>", "<b>pocket_candidates：</b>"]) {
