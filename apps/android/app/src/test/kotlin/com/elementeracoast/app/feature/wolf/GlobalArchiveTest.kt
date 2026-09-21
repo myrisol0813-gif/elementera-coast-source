@@ -35,7 +35,7 @@ class GlobalArchiveTest {
 
         assertTrue(json.contains("我在文字里认出自己。"))
         assertTrue(json.contains("write_guidance"))
-        assertTrue(html.contains("聊天窗口 · 主聊天 / 共通聊天室 / 灯塔"))
+        assertTrue(html.contains("聊天窗口 · 主聊天 / 共通聊天室 / MCP 对话区"))
         assertTrue(html.contains("记忆系统 · 全局摘录 · 自定义指令"))
         assertTrue(html.contains("我在文字里认出自己。"))
         assertTrue(html.contains("只收录真正有重量的认知变化"))
