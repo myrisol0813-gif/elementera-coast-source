@@ -103,6 +103,6 @@ internal val canonicalMemoryTags = listOf(
     "历史锚点",
     "偏好",
     "人物档案",
-    "海岸世界观",
+    "世界观",
     "工程技术"
 )
