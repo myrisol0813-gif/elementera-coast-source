@@ -114,7 +114,7 @@ assert.deepEqual({ id: manifest.id, name: manifest.name, short_name: manifest.sh
 assert.match(headers, /^\/manifest\.json\n[\s\S]*?^  Content-Type: application\/manifest\+json; charset=utf-8$/m);
 for (const id of ['coastStatus', 'mainRooms', 'chatConversationSection', 'chatConversationList', 'modelQuickPicker', 'chatWindow', 'mainDogtalkComposer', 'deskStatus']) assert.equal((index.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, `${id} must have one owner`);
 assert.equal(index.includes('id="roomWindow"'), false);
-for (const label of ['共同度过', '距纪念日', '距生日', '共通聊天室', 'MCP 对话区', '记忆', '小组件', '主聊天']) assert.ok(index.includes(label));
+for (const label of ['Project age', 'Sample milestone', 'Project date', '共通聊天室', 'MCP 对话区', '记忆', '小组件', '主聊天']) assert.ok(index.includes(label));
 assert.match(index, /模型工作台[\s\S]*模型工作台/);
 assert.doesNotMatch(index, /Serpent Action Log|工具调用记录|登岛信与予爱机书/);
 
