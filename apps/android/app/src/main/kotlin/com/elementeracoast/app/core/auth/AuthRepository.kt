@@ -32,7 +32,7 @@ class DefaultAuthRepository(
             val response = api.getSession(session)
             if (!response.authenticated) {
                 store.clear()
-                SessionRestoreResult.Invalid("登录状态已失效，请重新进入海岸。")
+                SessionRestoreResult.Invalid("登录状态已失效，请重新输入访问密码。")
             } else {
                 val refreshed = session.copy(
                     expiresAtEpochSeconds = if (response.persistsUntilLogout) 0L else response.expiresAt
@@ -43,7 +43,7 @@ class DefaultAuthRepository(
         } catch (error: CoastApiException) {
             if (error.kind == CoastApiErrorKind.Unauthorized) {
                 store.clear()
-                SessionRestoreResult.Invalid("登录状态已失效，请重新进入海岸。")
+                SessionRestoreResult.Invalid("登录状态已失效，请重新输入访问密码。")
             } else {
                 SessionRestoreResult.Offline(session, error.message)
             }
