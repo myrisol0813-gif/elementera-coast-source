@@ -33,7 +33,7 @@ const DESCRIPTIONS = Object.freeze({
   related_memory: '这是被当前对话唤起的已确认旧记忆、旧事件与旧承诺。',
   worldbook: '这是被当前主题触发的设定资料，用于补足世界观、角色、项目或专有名词背景。',
   dogtalk: '这是属于屋主的心绪草稿；只有本轮开启并实际递入时才成为理解线索。',
-  cross_window: '这是本轮从其他海岸窗口取来的近期聊天记录，用来帮你回想自己在别处说过的话；要不要提起，由你按当前对话决定。',
+  cross_window: '这是本轮从其他对话窗口取来的近期聊天记录，用来帮你回想自己在别处说过的话；要不要提起，由你按当前对话决定。',
   workbench: '这是代码、文件、接口、真机、GitHub 等技术领域的话题与事实结果。',
   external_tide: '这是从海岸外部临时读入、且尚未归档成海岸内部窗口的材料；本轮没有接入外部入口消息。',
 });
@@ -46,7 +46,7 @@ function safeCrossWindow(value, ownerVisible) {
   const loadedChars = Math.max(0, Number(section.loaded_chars ?? section.total_loaded_chars) || 0);
   const deliveredChars = Math.max(0, Number(section.delivered_to_model_chars ?? section.total_delivered_chars) || 0);
   return {
-    label: '跨窗口取信',
+    label: '跨窗口读取',
     description: DESCRIPTIONS.cross_window,
     status: String(section.status || '未递给'),
     mode: String(section.mode || 'off'),
