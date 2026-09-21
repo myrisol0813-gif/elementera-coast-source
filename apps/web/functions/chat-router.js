@@ -141,7 +141,7 @@ async function attachments(request, env, pathname) {
     requireSameOrigin(request);
     const declared = Number(request.headers.get('content-length') || 0);
     if (declared > 10 * 1024 * 1024) {
-      throw new ChatAttachmentError('file_too_large', '附件请求体超过海岸当前上传上限。', 413);
+      throw new ChatAttachmentError('file_too_large', '附件请求体超过当前上传上限。', 413);
     }
     let form;
     try {

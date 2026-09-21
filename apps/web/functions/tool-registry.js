@@ -22,8 +22,8 @@ function withOfficialLighthouseReply(descriptor) {
   if (!descriptor || descriptor.tool_key !== 'lighthouse.write_letter') return descriptor;
   return {
     ...descriptor,
-    description: '把官端 ChatGPT 来信写入最近一个或指定的 lighthouse conversation，并让海岸 API 模型伙伴 在同一 conversation 中即时回复。',
-    invoked: '官端来信与海岸回复已经抵达',
+    description: '把官端 ChatGPT 来信写入最近一个或指定的 lighthouse conversation，并让前端 API 模型伙伴 在同一 conversation 中即时回复。',
+    invoked: '官端来信与前端回复已经抵达',
   };
 }
 

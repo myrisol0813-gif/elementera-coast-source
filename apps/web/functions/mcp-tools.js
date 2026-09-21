@@ -58,7 +58,7 @@ function tool(value, scopes, order = 0) {
 const SPECIAL_TOOLS = Object.freeze([
   tool({
     name: 'get_coast_status',
-    title: '读取海岸门廊状态',
+    title: '读取前端连接状态',
     description: '确认私有 Elementera Coast MCP 门廊已经连接，不读取私密内容。',
     inputSchema: objectSchema(),
     outputSchema: objectSchema({
@@ -71,7 +71,7 @@ const SPECIAL_TOOLS = Object.freeze([
       }, ['name', 'version', 'authenticated', 'surface', 'now']),
     }, ['status']),
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
-    invoking: '正在确认海岸门廊…', invoked: '海岸门廊已回应',
+    invoking: '正在确认前端连接…', invoked: '前端连接已回应',
   }, ['read:coast'], 10),
   tool({
     name: 'mcp_mailbox_fetch_unreplied',
@@ -173,7 +173,7 @@ function errorResult(error) {
   const errorType = error?.type || 'mcp_tool_failed';
   return {
     isError: true,
-    content: [{ type: 'text', text: error?.message || '海岸工具暂时没有完成请求。' }],
+    content: [{ type: 'text', text: error?.message || '工具暂时没有完成请求。' }],
     _meta: {
       error_type: errorType,
       failure_code: error?.failureCode || (errorType === 'invalid_tool_input' ? 'invalid_request' : errorType),
@@ -410,14 +410,14 @@ async function executeTool(name, rawArgs, request, env, requestMeta, auth) {
       date: textInput(args.date, 'date', 10),
       limit: integerInput(args.limit, 'limit', 200, 300),
     }, registryContext(auth, 'daily'));
-    return resultContent({ moments }, `读取了 ${moments.length} 条海岸碳硅圈记录。`);
+    return resultContent({ moments }, `读取了 ${moments.length} 条碳硅圈记录。`);
   }
   if (name === 'list_daily_diaries') {
     const diaries = await executeRegisteredTool(env.COAST_CHAT_DB, 'daily.diaries.list', {
       date: textInput(args.date, 'date', 10),
       author: enumInput(args.author, 'author', ['xiaohan', 'myri', 'api', 'mcp'], ''),
     }, registryContext(auth, 'daily'));
-    return resultContent({ diaries }, `读取了 ${diaries.length} 张海岸日记。`);
+    return resultContent({ diaries }, `读取了 ${diaries.length} 张日记。`);
   }
 
   const identityArgs = modelIdentityInput(args);
@@ -442,7 +442,7 @@ async function executeTool(name, rawArgs, request, env, requestMeta, auth) {
       identity: provenance.identity,
     }, writeContext);
     return resultContent(written,
-      '官端电波已经写入统一 radio conversation，海岸 API 模型伙伴 也已在同一窗口回复。');
+      '官端消息已经写入统一 radio conversation，前端 API 模型伙伴 也已在同一窗口回复。');
   }
   if (name === 'write_lighthouse_letter') {
     const written = await executeRegisteredTool(env.COAST_CHAT_DB, 'lighthouse.write_letter', {
@@ -471,7 +471,7 @@ async function executeTool(name, rawArgs, request, env, requestMeta, auth) {
     }, writeContext);
     return resultContent(result, '日记已经直接写入正式条目。');
   }
-  return errorResult({ type: 'unknown_tool', message: '这个海岸工具不存在或已不再开放。' });
+  return errorResult({ type: 'unknown_tool', message: '这个工具不存在或已不再开放。' });
 }
 
 export function listCoastMcpTools() {
@@ -481,7 +481,7 @@ export function listCoastMcpTools() {
 export async function callCoastMcpTool(name, args, request, env, requestMeta = {}) {
   const definition = TOOLS_BY_NAME.get(String(name || ''));
   if (!definition) {
-    return errorResult({ type: 'unknown_tool', message: '这个海岸工具不存在或已不再开放。' });
+    return errorResult({ type: 'unknown_tool', message: '这个工具不存在或已不再开放。' });
   }
   const scopes = definition.securitySchemes[0].scopes;
   try {
