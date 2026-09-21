@@ -11,10 +11,10 @@ class CoastThemePresetTest {
         assertEquals(CoastThemePreset.CoastDefault, CoastThemePreset.entries.first())
         assertEquals(
             listOf(
-                "默认海岸",
+                "默认主题",
                 "深蓝旧金",
                 "柔粉主题",
-                "白狼雪野",
+                "雪野冷光",
                 "雪地来信",
                 "火烧云",
                 "极光夜航",
