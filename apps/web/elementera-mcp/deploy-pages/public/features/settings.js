@@ -71,9 +71,9 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     title: '模型工作台',
     subtitle: '另一位屋主的工作台',
     className: 'settings-panel',
-    body: group('海岸施工台',
+    body: group('前端施工台',
       row('开发手 / 施工台', 'GitHub · CI / APK · Notion · 屋主设置更新', 'devhands:open')
-      + row('工具调用记录', '普通海岸工具调用 · 房间 · 脱敏摘要', 'toolroom:open')),
+      + row('工具调用记录', '普通前端工具调用 · 房间 · 脱敏摘要', 'toolroom:open')),
   }));
 
   router.register('settings-profile', () => ({
