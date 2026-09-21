@@ -100,5 +100,5 @@ assert.equal(/async function start\s*\(/.test(mailbox), false);
 assert.match(dogtalk, /async function mountComposer\s*\(/);
 assert.equal(/async function mount\(container, targetValue\)/.test(dogtalk), false, 'Dogtalk domain mount cannot collide with owner lifecycle mount');
 
-assert.match(serviceWorker, /const CACHE_NAME = 'elementera-coast-app-[0-9]+';/);
+assert.match(serviceWorker, /const CACHE_NAME = 'elementera-coast-source-app-[0-9]+';/);
 console.log('owner-closure: ok');
