@@ -546,9 +546,9 @@ assert.deepEqual(mailboxTools.mcp_mailbox_patrol_report.securitySchemes[0].scope
 assert.ok(mailboxTools.mcp_mailbox_reply.inputSchema.required.includes('thought_soil'));
 assert.equal('optional_thinking_notes' in mailboxTools.mcp_mailbox_reply.inputSchema.properties, false);
 assert.equal('optional_notebook_entries' in mailboxTools.mcp_mailbox_reply.inputSchema.properties, false);
-assert.match(VISITOR_MODEL_PARTNER_PROMPT_V1, /访客信箱里给一位朋友回信/);
-assert.match(VISITOR_MODEL_PARTNER_PROMPT_V1, /先放入待确认区/);
-assert.match(VISITOR_MODEL_PARTNER_PROMPT_V1, /确认后再收进记事本/);
+assert.match(VISITOR_MODEL_PARTNER_PROMPT_V1, /public Elementera Coast visitor mailbox demo/);
+assert.match(VISITOR_MODEL_PARTNER_PROMPT_V1, /neutral pending note for later review/);
+assert.match(VISITOR_MODEL_PARTNER_PROMPT_V1, /Do not expose private owner data/);
 assert.equal(VISITOR_MODEL_PARTNER_PROMPT_V1.includes('主聊天、独立房间、共通聊天室'), false, '后端门锁不重复成为模型说明书');
 
 const deleteBobResponse = await routeMailboxApi(requestWithToken(
