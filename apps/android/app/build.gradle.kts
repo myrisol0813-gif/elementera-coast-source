@@ -5,6 +5,9 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+val sourceApiBaseUrl = providers.gradleProperty("COAST_API_BASE_URL")
+    .orElse("https://elementera-coast-source.invalid")
+
 android {
     namespace = "com.elementeracoast.app"
     compileSdk = 34
@@ -15,7 +18,7 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0-source"
-        buildConfigField("String", "COAST_API_BASE_URL", "\"https://elementera-coast-source.invalid\"")
+        buildConfigField("String", "COAST_API_BASE_URL", "\"${sourceApiBaseUrl.get()}\"")
     }
 
     buildTypes {
