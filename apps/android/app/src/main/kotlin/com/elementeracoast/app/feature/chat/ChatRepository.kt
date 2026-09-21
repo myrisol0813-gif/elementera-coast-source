@@ -179,7 +179,7 @@ class DefaultChatRepository(
         if (!done) throw CoastApiException(
             CoastApiErrorKind.Stream,
             "stream_incomplete",
-            "海岸回复流提前中断。"
+            "回复流提前中断。"
         )
         val completed = ChatSyncMapper.appendAssistant(
             history = ChatSyncMapper.clearUserFailure(historyWithUser, turnId),

@@ -54,7 +54,7 @@ class IslandLetterRemoteDataSource(
         if (cleanConversation.isBlank()) throw CoastApiException(
             CoastApiErrorKind.Request,
             "missing_conversation",
-            "当前窗口还没有海岸 conversation id。"
+            "当前窗口还没有后端 conversation id。"
         )
         if (cleanModel.isBlank()) throw CoastApiException(
             CoastApiErrorKind.Request,
@@ -97,7 +97,7 @@ class IslandLetterRemoteDataSource(
                 if (!decoded.ok || reply.isBlank()) throw CoastApiException(
                     CoastApiErrorKind.Server,
                     "empty_landing_reply",
-                    "海岸收到了信，但没有返回可显示的回复。",
+                    "后端收到了信，但没有返回可显示的回复。",
                     response.code
                 )
                 IslandLetterReceipt(
@@ -111,13 +111,13 @@ class IslandLetterRemoteDataSource(
         } catch (error: CoastApiException) {
             throw error
         } catch (error: IOException) {
-            throw CoastApiException(CoastApiErrorKind.Network, "network_unreachable", "无法连接海岸后端。", cause = error)
+            throw CoastApiException(CoastApiErrorKind.Network, "network_unreachable", "无法连接后端。", cause = error)
         }
     }
 
     private fun responseError(status: Int, text: String): CoastApiException {
         var type = if (status == 401) "unauthorized" else "request_failed"
-        var message = if (status == 401) "需要先登录海岸。" else "递信失败，请稍后再试。"
+        var message = if (status == 401) "需要先登录。" else "递信失败，请稍后再试。"
         runCatching {
             val error = json.parseToJsonElement(text).jsonObject["error"]
             if (error is JsonObject) {

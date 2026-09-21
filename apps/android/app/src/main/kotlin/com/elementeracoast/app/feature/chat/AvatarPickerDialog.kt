@@ -14,7 +14,7 @@ internal fun AvatarPickerDialog(
         onDismissRequest = onDismiss,
         title = { Text("另一位屋主头像") },
         text = {
-            Text("当前头像从海岸后端 profile 读取。上传写回不在本轮范围内，因此这里不会只改本机、也不会伪装成已同步。")
+            Text("当前头像从后端 profile 读取。上传写回不在本轮范围内，因此这里不会只改本机、也不会伪装成已同步。")
         },
         confirmButton = {
             TextButton(onClick = onUploadLater) { Text("上传接线后启用") }

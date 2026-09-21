@@ -70,9 +70,9 @@ fun IslandLetterScreen(
                 val receipt = remote.send(conversationId, modelName, text, recentTurns, contextBudget)
                 reply = receipt.reply
                 replyModel = receipt.model
-                status = "已送到海岸"
+                status = "已送达"
                 onRefreshCoast()
-                onSnackbar("登岛信已送到海岸")
+                onSnackbar("登岛信已送达")
             } catch (error: Throwable) {
                 val message = when (error) {
                     is CoastApiException -> error.message
@@ -105,7 +105,7 @@ fun IslandLetterScreen(
                 ) {
                     Text("一封给当前模型的入住信", fontWeight = FontWeight.Bold)
                     Text(
-                        "草稿按当前窗口与模型保存在本机；递出时会交给海岸后端，并把真实回复写回当前聊天窗口。",
+                        "草稿按当前窗口与模型保存在本机；递出时会交给后端，并把真实回复写回当前聊天窗口。",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )

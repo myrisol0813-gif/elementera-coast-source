@@ -196,7 +196,7 @@ fun ChatWindow(
             onDismiss = { avatarDialogOpen = false },
             onUploadLater = {
                 avatarDialogOpen = false
-                onPlaceholder("请从小组件的头像入口更新；同一张海岸头像会回到聊天窗口。")
+                onPlaceholder("请从小组件的头像入口更新；同一张头像会回到聊天窗口。")
             }
         )
     }
@@ -237,13 +237,13 @@ private suspend fun readPickedAttachment(
             }
         }
         if (declaredSize > 8L * 1024L * 1024L) {
-            return@withContext PickedAttachmentResult.Failed("${name} 超过海岸当前 8 MB 上传上限。")
+            return@withContext PickedAttachmentResult.Failed("${name} 超过当前 8 MB 上传上限。")
         }
         val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
             ?: return@withContext PickedAttachmentResult.Failed("${name} 无法读取。")
         if (bytes.isEmpty()) return@withContext PickedAttachmentResult.Failed("${name} 是空文件。")
         if (bytes.size > 8 * 1024 * 1024) {
-            return@withContext PickedAttachmentResult.Failed("${name} 超过海岸当前 8 MB 上传上限。")
+            return@withContext PickedAttachmentResult.Failed("${name} 超过当前 8 MB 上传上限。")
         }
         PickedAttachmentResult.Ready(
             name = name.take(180),
