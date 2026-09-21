@@ -60,7 +60,7 @@ fun DailyLanding(
         try {
             repository.refresh()
             onRefreshCoast()
-            onSnackbar("海岸状态已刷新")
+            onSnackbar("前端状态已刷新")
         } catch (error: CoastApiException) {
             onSnackbar("小组件刷新失败：${error.message}")
         }
@@ -101,13 +101,13 @@ fun DailyLanding(
             )
             DailyPage.MomentCompose -> FeaturePageTopBar(
                 "写碳硅圈",
-                "直接写入海岸正式条目",
+                "直接写入前端正式条目",
                 { page = DailyPage.Moments },
                 compact = true
             )
             DailyPage.Diary -> FeaturePageTopBar(
                 title = "日记",
-                subtitle = "海岸里的正式纸页",
+                subtitle = "前端里的正式纸页",
                 onBack = { page = DailyPage.Home },
                 actionLabel = "+ 日记",
                 onAction = { page = DailyPage.DiaryCompose },
@@ -117,7 +117,7 @@ fun DailyLanding(
             )
             DailyPage.DiaryCompose -> FeaturePageTopBar(
                 "写日记",
-                "直接写入海岸正式日记",
+                "直接写入前端正式日记",
                 { page = DailyPage.Diary },
                 compact = true
             )
