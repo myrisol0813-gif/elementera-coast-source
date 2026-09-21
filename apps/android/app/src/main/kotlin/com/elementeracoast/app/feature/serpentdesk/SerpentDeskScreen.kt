@@ -41,13 +41,13 @@ internal data class SerpentDeskItem(
 internal fun serpentDeskItems(): List<SerpentDeskItem> = listOf(
     SerpentDeskItem(
         tool = SerpentDeskTool.DevHands,
-        title = "海岸开发手",
+        title = "前端开发手",
         subtitle = "模型随身工具 · 自检 · 脚印 · 版本 / APK"
     ),
     SerpentDeskItem(
         tool = SerpentDeskTool.ActionLog,
         title = "工具调用记录",
-        subtitle = "普通海岸工具调用 · 房间 · 脱敏摘要"
+        subtitle = "普通前端工具调用 · 房间 · 脱敏摘要"
     )
 )
 
@@ -156,7 +156,7 @@ private fun ActionLogToolPage(
             Column {
                 Text("工具调用记录", fontWeight = FontWeight.Bold)
                 Text(
-                    "普通海岸工具调用 · 房间 · 脱敏摘要",
+                    "普通前端工具调用 · 房间 · 脱敏摘要",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall
                 )
