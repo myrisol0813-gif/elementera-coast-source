@@ -827,9 +827,9 @@ private fun MailboxStatusCard(status: MailboxStatus) {
             title = "已送达，等待另一位屋主查看。"
             detail = "${status.pending_count} 封来信正在等待 · 这里是慢速回信模式。"
         }
-        status.last_myri_reply_at != null -> {
+        status.last_model_partner_reply_at != null -> {
             title = "回信已经抵达。"
-            detail = "最近回信：${mailboxTime(status.last_myri_reply_at)} · 你可以继续写下一封。"
+            detail = "最近回信：${mailboxTime(status.last_model_partner_reply_at)} · 你可以继续写下一封。"
         }
         else -> {
             title = "现在是慢速回信模式，不是实时聊天。"
@@ -1085,7 +1085,7 @@ private fun MailboxMemoryBlock(title: String, text: String) {
 }
 
 private fun visitorStatusLabel(status: String): String = when (status) {
-    "waiting_for_myri" -> "已送达 · 等待巡灯"
+    "waiting_for_model_partner" -> "已送达 · 等待巡灯"
     "replied" -> "已回信"
     else -> "已送达"
 }

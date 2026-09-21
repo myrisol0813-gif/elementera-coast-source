@@ -47,7 +47,7 @@ let customInstructions = {
   content: '先看一眼当前的屋主。',
   status: 'active',
   updated_at: null,
-  updated_by: 'xiaohan',
+  updated_by: 'owner',
   source: '屋主手动编辑',
 };
 const landingStatuses = new Map();
@@ -63,8 +63,8 @@ const dailyModelPartnerCommentBodies = [];
 const dailyMoments = [];
 const dailyDiaries = [];
 let dailyProfile = {
-  xiaohan_avatar_dataurl: '',
-  myri_avatar_dataurl: '',
+  owner_avatar_dataurl: '',
+  model_partner_avatar_dataurl: '',
   moment_cover_dataurl: '',
   updated_at: null,
 };
@@ -81,34 +81,34 @@ function dogtalkKey(roomScope, conversationId = '') {
 function emptyDogtalk(roomScope, conversationId = '') {
   return {
     id: null,
-    type: 'xiaohan_mystic_dogtalk',
-    owner: 'xiaohan',
+    type: 'owner_mystic_dogtalk',
+    owner: 'owner',
     room_scope: roomScope,
     scope_key: dogtalkKey(roomScope, conversationId),
     conversation_id: conversationId || null,
     body: '',
     true_core: '',
     self_note: '',
-    myri_hint: '',
+    model_partner_hint: '',
     not_to_misunderstand: '不要误会成长期偏好、边界取消、行为命令，或比当前正文更重要。',
     weather: '放松',
     read_mode: 'keep_private',
     status: 'empty',
-    readable_by_myri: true,
+    readable_by_model_partner: true,
     auto_recall: false,
     memory_weight: 'low',
     not_instruction: true,
     not_preference: true,
     not_memory_seed: true,
     not_pocket: true,
-    visibility: 'private_to_xiaohan_and_myri',
+    visibility: 'private_to_owner_and_model_partner',
     default_text: '屋主这轮很放松，因此偷懒中。',
     created_at: null,
     updated_at: null,
   };
 }
 
-function mockMoment(value = {}, author = 'xiaohan', source = 'manual') {
+function mockMoment(value = {}, author = 'owner', source = 'manual') {
   const createdAt = now();
   const status = value.status || value.visible_status || 'published';
   return {
@@ -130,7 +130,7 @@ function mockMoment(value = {}, author = 'xiaohan', source = 'manual') {
   };
 }
 
-function mockDiary(value = {}, author = 'xiaohan', source = 'manual') {
+function mockDiary(value = {}, author = 'owner', source = 'manual') {
   const createdAt = now();
   return {
     id: value.id || `daily-diary-${++dailySequence}`,
@@ -310,7 +310,7 @@ globalThis.fetch = async (input, options = {}) => {
     moment.updated_at = now();
     return response({ ok: true, moment, deleted: true });
   }
-  const dailyMomentMatch = url.pathname.match(/^\/api\/daily\/moments\/([^/]+)(?:\/(comments|like|myri-comment))?$/);
+  const dailyMomentMatch = url.pathname.match(/^\/api\/daily\/moments\/([^/]+)(?:\/(comments|like|model-partner-comment))?$/);
   if (dailyMomentMatch) {
     const momentId = decodeURIComponent(dailyMomentMatch[1]);
     const moment = dailyMoments.find((item) => item.id === momentId);
@@ -323,17 +323,17 @@ globalThis.fetch = async (input, options = {}) => {
       moment.comments.push({
         id: body.id || `daily-comment-${++dailySequence}`,
         moment_id: moment.id,
-        author: 'xiaohan',
+        author: 'owner',
         text: body.text,
         model_id: null,
         created_at: now(),
       });
-    } else if (dailyMomentMatch[2] === 'myri-comment') {
+    } else if (dailyMomentMatch[2] === 'model-partner-comment') {
       dailyModelPartnerCommentBodies.push(body);
       const comment = {
-        id: `daily-myri-comment-${++dailySequence}`,
+        id: `daily-model-partner-comment-${++dailySequence}`,
         moment_id: moment.id,
-        author: 'myri',
+        author: 'model_partner',
         text: '我看见这条小小的亮光了。',
         model_id: body.model,
         created_at: now(),
@@ -346,17 +346,17 @@ globalThis.fetch = async (input, options = {}) => {
     } else {
       Object.assign(moment, body, { updated_at: now() });
     }
-    return response({ ok: true, moment }, ['comments', 'myri-comment'].includes(dailyMomentMatch[2]) ? 201 : 200);
+    return response({ ok: true, moment }, ['comments', 'model-partner-comment'].includes(dailyMomentMatch[2]) ? 201 : 200);
   }
   if (url.pathname === '/api/daily/diaries') {
     if (method === 'GET') return response({ ok: true, diaries: dailyDiaries });
     let diary;
-    const existing = dailyDiaries.find((item) => item.date === body.date && item.author === (body.author || 'xiaohan'));
+    const existing = dailyDiaries.find((item) => item.date === body.date && item.author === (body.author || 'owner'));
     if (existing && body.conflict_mode === 'replace') {
       Object.assign(existing, body, { source: 'manual', updated_at: now() });
       diary = existing;
     } else {
-      diary = mockDiary(body, body.author || 'xiaohan');
+      diary = mockDiary(body, body.author || 'owner');
       dailyDiaries.unshift(diary);
     }
     return response({ ok: true, diary }, 201);

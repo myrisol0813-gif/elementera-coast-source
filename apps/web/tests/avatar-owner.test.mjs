@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createDaily } from '../elementera-mcp/deploy-pages/public/features/daily.js';
 
-function makeStorage(myriAvatar = '') {
+function makeStorage(modelPartnerAvatar = '') {
   const local = {
-    preferences: { xiaohanAvatar: '', myriAvatar },
+    preferences: { ownerAvatar: '', modelPartnerAvatar },
     daily: { cache: { moments: [], diaries: [], syncedAt: 0 }, momentCover: '' },
   };
   return {
@@ -43,8 +43,8 @@ function makeChat(initialAvatar = '') {
 const legacyAvatar = 'data:image/webp;base64,TEVHQUNZ';
 const canonicalAvatar = 'data:image/webp;base64,Q0FOT05JQ0FM';
 const profileResponse = {
-  xiaohan_avatar_dataurl: '',
-  myri_avatar_dataurl: legacyAvatar,
+  owner_avatar_dataurl: '',
+  model_partner_avatar_dataurl: legacyAvatar,
   moment_cover_dataurl: '',
   updated_at: '2026-09-03T00:00:00.000Z',
 };
@@ -63,7 +63,7 @@ const migratingRouter = makeRouter();
 const migratingDaily = createDaily({ storage: migratingStorage, router: migratingRouter, toast() {}, chat: migratingChat });
 await migratingDaily.startLoad();
 assert.deepEqual(migratingChat.updates, [{ assistant_avatar_dataurl: legacyAvatar }], 'legacy Daily Model Partner avatar should be promoted once to chat profile');
-assert.equal(migratingStorage.local.preferences.myriAvatar, 'stale-local-avatar', 'Daily must not keep writing a second local Model Partner avatar owner');
+assert.equal(migratingStorage.local.preferences.modelPartnerAvatar, 'stale-local-avatar', 'Daily must not keep writing a second local Model Partner avatar owner');
 assert.match(migratingRouter.renderers.get('moments')().body, /TEVHQUNZ/, 'migrated canonical avatar should render in Daily');
 
 const canonicalStorage = makeStorage('stale-local-avatar');
@@ -77,6 +77,6 @@ assert.doesNotMatch(canonicalRouter.renderers.get('moments')().body, /TEVHQUNZ/,
 
 const profileSource = await readFile(new URL('../elementera-mcp/deploy-pages/public/features/daily/daily-profile.js', import.meta.url), 'utf8');
 assert.match(profileSource, /chat\.updateProfile\(\{ assistant_avatar_dataurl: image \}\)/, 'Model Partner avatar writes must go through chat profile');
-assert.doesNotMatch(profileSource, /client\.saveProfile\(\{ \[field\]: image \}\)[\s\S]*field === 'myri_avatar_dataurl'/, 'Model Partner avatar must not be written back to Daily profile');
+assert.doesNotMatch(profileSource, /client\.saveProfile\(\{ \[field\]: image \}\)[\s\S]*field === 'model_partner_avatar_dataurl'/, 'Model Partner avatar must not be written back to Daily profile');
 
 console.log('avatar-owner: ok');

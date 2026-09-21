@@ -49,7 +49,7 @@ for (const source of [daily, client, store, schema, modelTools, mcp]) {
 }
 for (const source of [daily, client, store, schema]) assert.equal(source.includes('image_refs_json'), false);
 for (const retiredUi of ['momentImageRef', 'diaryImageRef', 'stableImageRef', '图片引用']) assert.equal(daily.includes(retiredUi), false);
-for (const decorative of ['xiaohan_avatar_dataurl', 'myri_avatar_dataurl', 'moment_cover_dataurl']) {
+for (const decorative of ['owner_avatar_dataurl', 'model_partner_avatar_dataurl', 'moment_cover_dataurl']) {
   assert.ok([daily, schema].join('\n').includes(decorative), `${decorative} profile persistence must remain`);
 }
 assert.match(futureVision, /附件 \/ 文件对象/);

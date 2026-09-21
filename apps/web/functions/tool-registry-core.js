@@ -265,7 +265,7 @@ const REGISTRY = Object.freeze([
     tool_key: 'daily.diaries.list', display_name: '读取日记', description: '读取已授权日记。', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
     official_mcp: officialMcpTool({
       order: 140, name: 'list_daily_diaries', title: '读取日记', description: '读取授权的日记，并保留作者与来源信息。',
-      inputSchema: objectSchema({ date: { type: 'string', format: 'date' }, author: { type: 'string', enum: ['xiaohan', 'myri', 'api', 'mcp'] } }),
+      inputSchema: objectSchema({ date: { type: 'string', format: 'date' }, author: { type: 'string', enum: ['owner', 'model_partner', 'api', 'mcp'] } }),
       outputSchema: objectSchema({ diaries: { type: 'array', items: PRIVATE_RECORD_SCHEMA } }, ['diaries']), annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false }, invoking: '正在翻阅日记…', invoked: '日记已取回',
     }), handler: (db, input) => listDiaries(db, input),
   }),
@@ -340,7 +340,7 @@ export async function executeRegisteredTool(db, toolKey, input, context = {}) {
   const definition = BY_KEY.get(String(toolKey || ''));
   if (!definition || typeof definition.handler !== 'function') throw new ToolRegistryError('unknown_tool', '这个工具不存在或不可执行。', 404);
   if (!allowed(definition, context)) throw new ToolRegistryError('tool_forbidden', '当前房间或权限无法使用这件工具。', 403);
-  if (definition.requires_confirmation && context.confirmed_by_xiaohan !== true && context.surface !== 'official_mcp') throw new ToolRegistryError('tool_confirmation_required', '这个操作需要屋主明确确认。', 409);
+  if (definition.requires_confirmation && context.confirmed_by_owner !== true && context.surface !== 'official_mcp') throw new ToolRegistryError('tool_confirmation_required', '这个操作需要屋主明确确认。', 409);
   let runId = null;
   try { runId = await startToolRun(db, definition, input, context); } catch (error) { safeLogError('tool-run-log:start', error, { operation: definition.tool_key }); }
   try {

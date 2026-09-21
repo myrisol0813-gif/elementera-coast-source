@@ -16,7 +16,7 @@ import {
 } from './daily-store.js';
 import { readDailyProfile, writeDailyProfile } from './daily-profile-store.js';
 import { createModelPartnerMomentComment } from './daily-moment-comment.js';
-import { xiaohanIdentity } from './coast-identity.js';
+import { ownerIdentity } from './coast-identity.js';
 import {
   apiError,
   json,
@@ -55,7 +55,7 @@ function suffix(pathname, base) {
 }
 
 function isModelPartnerCommentPath(pathname) {
-  return /^\/api\/daily\/moments\/[^/]+\/myri-comment$/.test(String(pathname || ''));
+  return /^\/api\/daily\/moments\/[^/]+\/model-partner-comment$/.test(String(pathname || ''));
 }
 
 function tagDailyCommentResponse(response, pathname) {
@@ -68,7 +68,7 @@ function safeRouteToken(value, max = 160) {
 }
 
 function logModelPartnerCommentRoute(id, mode, step, startedAt, extra = {}) {
-  console.info('[daily-myri-comment-route]', JSON.stringify({
+  console.info('[daily-model-partner-comment-route]', JSON.stringify({
     operation: mode === 'instant' ? 'instant' : 'contextual',
     step,
     moment_id: safeRouteToken(id),
@@ -79,7 +79,7 @@ function logModelPartnerCommentRoute(id, mode, step, startedAt, extra = {}) {
 
 function streamErrorPayload(error, id, mode) {
   if (error instanceof ModelRequestError) {
-    safeLogError('daily-myri-comment', error, {
+    safeLogError('daily-model-partner-comment', error, {
       reference: id,
       operation: mode === 'instant' ? 'instant' : 'contextual',
     });
@@ -97,7 +97,7 @@ function streamErrorPayload(error, id, mode) {
     };
   }
   const reference = crypto.randomUUID().slice(0, 8);
-  safeLogError('daily-myri-comment-stream', error, { reference });
+  safeLogError('daily-model-partner-comment-stream', error, { reference });
   return {
     type: 'daily_store_failed',
     message: `小组件操作失败（${reference}）。`,
@@ -157,12 +157,12 @@ async function moments(request, env, url, session) {
       return json({
         ok: true,
         moment: await createMoment(env.COAST_CHAT_DB, await body(request), {
-          author: 'xiaohan',
+          author: 'owner',
           source: 'manual',
           conversation_id: null,
           source_turn_id: null,
           tool_call_id: null,
-          identity: xiaohanIdentity(),
+          identity: ownerIdentity(),
         }),
       }, 201);
     }
@@ -181,10 +181,10 @@ async function moments(request, env, url, session) {
     const value = await body(request);
     return json({
       ok: true,
-      moment: await addMomentComment(env.COAST_CHAT_DB, id, { id: value.id, author: 'xiaohan', text: value.text }),
+      moment: await addMomentComment(env.COAST_CHAT_DB, id, { id: value.id, author: 'owner', text: value.text }),
     }, 201);
   }
-  if (parts.length === 2 && parts[1] === 'myri-comment') {
+  if (parts.length === 2 && parts[1] === 'model-partner-comment') {
     if (request.method !== 'POST') return methodNotAllowed('POST');
     const value = await body(request);
     logModelPartnerCommentRoute(id, value.mode, 'route_entered', Date.now());
@@ -192,7 +192,7 @@ async function moments(request, env, url, session) {
   }
   if (parts.length === 2 && parts[1] === 'like') {
     if (!['PUT', 'DELETE'].includes(request.method)) return methodNotAllowed('PUT, DELETE');
-    return json({ ok: true, moment: await setMomentLike(env.COAST_CHAT_DB, id, request.method === 'PUT', 'xiaohan') });
+    return json({ ok: true, moment: await setMomentLike(env.COAST_CHAT_DB, id, request.method === 'PUT', 'owner') });
   }
   if (parts.length !== 1) return apiError('not_found', 'Not found.', 404);
   if (request.method === 'DELETE') {
@@ -220,12 +220,12 @@ async function diaries(request, env, url, session) {
       return json({
         ok: true,
         diary: await createDiary(env.COAST_CHAT_DB, await body(request), {
-          author: 'xiaohan',
+          author: 'owner',
           source: 'manual',
           conversation_id: null,
           source_turn_id: null,
           tool_call_id: null,
-          identity: xiaohanIdentity(),
+          identity: ownerIdentity(),
         }),
       }, 201);
     }

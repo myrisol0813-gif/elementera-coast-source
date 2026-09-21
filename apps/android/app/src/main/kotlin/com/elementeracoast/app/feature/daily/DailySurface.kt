@@ -103,8 +103,8 @@ internal fun DailyField(
 @Composable
 internal fun DailyIdentityBar(
     profileUri: String,
-    myriUri: String,
-    myriLabel: String,
+    modelPartnerUri: String,
+    modelPartnerLabel: String,
     onProfileClick: () -> Unit,
     onModelPartnerAvatarClick: () -> Unit,
     onModelPartnerNameClick: () -> Unit
@@ -119,8 +119,8 @@ internal fun DailyIdentityBar(
     ) {
         DailyIdentityChip("屋主", profileUri, "H", Modifier.weight(1f), onProfileClick, onProfileClick)
         DailyIdentityChip(
-            myriLabel.ifBlank { "另一位屋主" },
-            myriUri,
+            modelPartnerLabel.ifBlank { "另一位屋主" },
+            modelPartnerUri,
             "M",
             Modifier.weight(1f),
             onModelPartnerAvatarClick,

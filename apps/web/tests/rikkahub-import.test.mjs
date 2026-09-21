@@ -33,7 +33,7 @@ assert.equal(activeBranch(state.turns[0]).user.message_source, 'rikkahub');
 assert.equal(activeBranch(state.turns[0]).assistant.message_source, 'rikkahub');
 
 const appended = appendTurn(state, '回到海岸后的新问题', {
-  message_source: 'xiaohan_web',
+  message_source: 'owner_web',
   display_author: '屋主',
 });
 state = appended.state;
@@ -80,7 +80,7 @@ const cacheVersions = fs.readFileSync(new URL('../scripts/cache-versions.mjs', i
 assert.match(schema, /source TEXT NOT NULL DEFAULT 'coast'/);
 assert.match(schema, /source_window_id TEXT/);
 assert.match(schema, /idx_conversations_source_window/);
-assert.match(store, /MESSAGE_SOURCES = new Set\(\['xiaohan_web', 'official_mcp', 'rikkahub'\]\)/);
+assert.match(store, /MESSAGE_SOURCES = new Set\(\['owner_web', 'official_mcp', 'rikkahub'\]\)/);
 assert.match(store, /c\.source != 'rikkahub'/, '跨窗口活动消息不能读取 RikkaHub 档案');
 assert.match(importer, /writeConversationState\(db, conversationId, state\)/, '导入正文必须写 canonical history');
 assert.doesNotMatch(importer, /history_json/, 'RikkaHub 不应再拥有平行 history owner');

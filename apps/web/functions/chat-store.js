@@ -8,7 +8,7 @@ const MAX_DESK_SLIP_JSON = 256000;
 const MAX_TURNS = 400;
 const DEFAULT_TITLES = new Set(['', '新聊天', '未命名对话', '主聊天']);
 const ROOM_TYPES = new Set(['main', 'radio', 'lighthouse']);
-const MESSAGE_SOURCES = new Set(['xiaohan_web', 'official_mcp', 'rikkahub']);
+const MESSAGE_SOURCES = new Set(['owner_web', 'official_mcp', 'rikkahub']);
 const GENERATION_SOURCES = new Set(['chat', 'landing', 'relay', 'radio', 'lighthouse', 'other']);
 
 export class ChatStoreError extends Error {

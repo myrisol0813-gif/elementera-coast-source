@@ -322,7 +322,7 @@ export async function resolveMailboxPocket(db, input = {}) {
     invalid('confidence 超出范围。');
   }
   const visibility = input.visibility == null ? 'visitor_visible' : String(input.visibility);
-  if (!['myri_only', 'visitor_visible'].includes(visibility)) {
+  if (!['model_partner_only', 'visitor_visible'].includes(visibility)) {
     invalid('visibility 不是允许的选项。');
   }
   try {

@@ -53,7 +53,7 @@
   border: 1px solid var(--line);
   border-radius: 50%;
   background-color: var(--surface-soft);
-  background-image: url('/public/media/myri-default-avatar.jpg');
+  background-image: url('/public/media/model-partner-default-avatar.jpg');
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;

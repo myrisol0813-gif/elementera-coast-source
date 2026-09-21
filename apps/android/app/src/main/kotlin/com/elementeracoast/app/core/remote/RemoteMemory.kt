@@ -108,7 +108,7 @@ data class RemoteCustomInstructions(
     val content: String = "",
     val status: String = "active",
     @SerialName("updated_at") val updatedAt: String? = null,
-    @SerialName("updated_by") val updatedBy: String = "xiaohan",
+    @SerialName("updated_by") val updatedBy: String = "owner",
     val source: String = "屋主手动编辑"
 )
 
@@ -122,7 +122,7 @@ data class RemoteCustomInstructionsResponse(
 data class RemoteCustomInstructionsPutRequest(
     val content: String,
     @EncodeDefault(EncodeDefault.Mode.ALWAYS)
-    @SerialName("updated_by") val updatedBy: String = "xiaohan",
+    @SerialName("updated_by") val updatedBy: String = "owner",
     @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val source: String = "Native 手动编辑"
 )

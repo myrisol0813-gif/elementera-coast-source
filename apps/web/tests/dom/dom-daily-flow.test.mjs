@@ -11,7 +11,7 @@ function installDailyCommentSseAdapter() {
   const baseFetch = globalThis.fetch;
   globalThis.fetch = async (input, options = {}) => {
     const url = new URL(String(input), 'http://coast.test');
-    if (!url.pathname.endsWith('/myri-comment')) return baseFetch(input, options);
+    if (!url.pathname.endsWith('/model-partner-comment')) return baseFetch(input, options);
     const response = await baseFetch(input, options);
     const payload = await response.json();
     const body = [
@@ -73,8 +73,8 @@ export async function runDailyFlow() {
     await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'daily-home', 'return trimmed Daily home');
     document.querySelector('[data-action="daily:moments"]').click();
     await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'moments', 'moments route');
-    assert.ok(document.querySelector('[data-action="daily:myri-avatar"]')?.textContent.includes('另一位屋主 头像'));
-    assert.ok(document.querySelector('[data-action="daily:myri-avatar"]')?.textContent.includes('点击动态里的名字可以修改显示名'));
+    assert.ok(document.querySelector('[data-action="daily:model-partner-avatar"]')?.textContent.includes('另一位屋主 头像'));
+    assert.ok(document.querySelector('[data-action="daily:model-partner-avatar"]')?.textContent.includes('点击动态里的名字可以修改显示名'));
     assert.ok(document.querySelector('[data-action="daily:cover"]')?.textContent.includes('点击设置封面'));
     assert.equal(document.querySelector('[data-draft-id]'), null, 'Daily no longer renders generated drafts');
     document.querySelector('[data-action="daily:moments-compose"]').click();
@@ -89,8 +89,8 @@ export async function runDailyFlow() {
     assert.equal(dailyMoments[0].source, 'manual');
     assert.equal(dailyModelPartnerCommentBodies.length, 1, 'new manual Moment must request the instant Model Partner comment once');
     assert.equal(dailyMoments[0].comments.length, 1);
-    assert.equal(dailyMoments[0].comments[0].author, 'myri');
-    assert.ok(document.querySelector('[data-action="daily:edit-myri-name"]'), 'Model Partner author/comment must expose the shared editable display name');
+    assert.equal(dailyMoments[0].comments[0].author, 'model_partner');
+    assert.ok(document.querySelector('[data-action="daily:edit-model-partner-name"]'), 'Model Partner author/comment must expose the shared editable display name');
     assert.ok(document.querySelector('.moment-text.is-collapsed'));
     assert.equal(document.querySelector('[data-action="daily:toggle-moment"]').textContent, '展开全文');
     document.querySelector('[data-action="daily:toggle-moment"]').click();
@@ -107,15 +107,15 @@ export async function runDailyFlow() {
     document.querySelector('[data-action="daily:send-comment"]').click();
     await waitFor(() => dailyMoments[0].comments.length === 2
       && document.querySelector('#overlayRoot').textContent.includes('今天的海风很好。'), 'manual Moment comment');
-    const xiaohanComment = dailyMoments[0].comments.find((comment) => comment.author === 'xiaohan');
-    assert.ok(xiaohanComment);
-    const commentDeleteButton = document.querySelector(`[data-action="daily:delete-comment"][data-comment-id="${xiaohanComment.id}"]`);
+    const ownerComment = dailyMoments[0].comments.find((comment) => comment.author === 'owner');
+    assert.ok(ownerComment);
+    const commentDeleteButton = document.querySelector(`[data-action="daily:delete-comment"][data-comment-id="${ownerComment.id}"]`);
     assert.ok(commentDeleteButton);
     commentDeleteButton.click();
     danger = await waitForDanger('删除这条评论吗？');
     acceptDanger(danger);
     await waitFor(() => dailyMoments[0].comments.length === 1
-      && dailyMoments[0].comments[0].author === 'myri', 'confirmed Daily comment delete');
+      && dailyMoments[0].comments[0].author === 'model_partner', 'confirmed Daily comment delete');
     const momentLoadsBeforeDelete = dailyLoadRequests;
     document.querySelector('[data-action="daily:delete-moment"]').click();
     danger = await waitForDanger('确定删除这条碳硅圈吗？');

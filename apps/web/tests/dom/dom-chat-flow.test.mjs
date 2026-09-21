@@ -10,13 +10,13 @@ import {
 export async function runChatPrelude() {
   let danger;
   assert.equal(document.documentElement.dataset.theme, 'dark');
-  assert.equal(JSON.parse(localStorage.getItem('elementera.local.v1')).preferences.xiaohanName, '迁移中的屋主');
+  assert.equal(JSON.parse(localStorage.getItem('elementera.local.v1')).preferences.ownerName, '迁移中的屋主');
   assert.equal(localStorage.getItem('gpt_like_shell_theme_clean_v1'), null);
   assert.equal(localStorage.getItem('cw_name'), null);
   assert.equal(localStorage.getItem('ec.currentConversationId'), null);
   assert.equal(document.querySelectorAll('#coastStatus').length, 1);
   assert.equal(document.querySelectorAll('#mainRooms').length, 1);
-  assert.match(document.querySelector('#coastStatus').textContent, /共同度过\s+\d+\s+天/);
+  assert.match(document.querySelector('#coastStatus').textContent, /Project age\s+\d+\s+天/);
   assert.ok(document.querySelectorAll('svg.icon').length >= 15);
   assert.equal(document.querySelector('#newChatButton svg').getAttribute('viewBox'), '0 0 32 32');
   assert.equal(document.querySelector('[data-action="settings:wolf"] svg').getAttribute('viewBox'), '0 0 24 24');

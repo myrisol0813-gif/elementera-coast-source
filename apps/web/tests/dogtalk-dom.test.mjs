@@ -83,7 +83,7 @@ for (const node of [conversation, radio, lighthouse]) {
     ['off', 'manual', 'model_decides'],
     'Cross-window controls expose the three per-turn modes',
   );
-  for (const retired of ['self_note', 'myri_hint', 'not_to_misunderstand']) {
+  for (const retired of ['self_note', 'model_partner_hint', 'not_to_misunderstand']) {
     assert.equal(node.innerHTML.includes(retired), false);
   }
   for (const retiredCopy of ['保存草稿', '把这句人类思考链轻轻展开', '让 Model Partner 读一下', '隐藏 / 归档', '清空本条草稿']) {
@@ -124,7 +124,7 @@ assert.equal(readNow.read_mode, 'read_now');
 assert.equal(readNow.room_scope, 'conversation');
 assert.equal(readNow.conversation_id, 'conversation-1');
 assert.match(readNow.snapshot_id, /^dogtalk-snapshot-/);
-for (const retired of ['self_note', 'myri_hint', 'not_to_misunderstand', 'status']) {
+for (const retired of ['self_note', 'model_partner_hint', 'not_to_misunderstand', 'status']) {
   assert.equal(retired in readNow, false);
 }
 body.value = '';

@@ -39,7 +39,7 @@ const attachmentState = appendTurn(createState(), '', {
     storage_key: 'chat-attachment:att-1',
     created_at: '2026-09-15T12:00:00.000Z',
   }],
-  message_source: 'xiaohan_web',
+  message_source: 'owner_web',
   display_author: '屋主',
 });
 assert.equal(activeBranch(attachmentState.state.turns[0]).user.content, '');

@@ -233,7 +233,7 @@ export function createChatGeneration({
     const turnPapers = { dogtalkSubmission: dogtalk?.submission(target, ui.dogtalk), crossWindowSubmission: dogtalk?.crossWindowSubmission?.(target, ui.dogtalk) };
     const appended = appendTurn(currentHistory(), content, {
       dogtalk_snapshot_id: turnPapers.dogtalkSubmission?.snapshot_id,
-      message_source: 'xiaohan_web',
+      message_source: 'owner_web',
       display_author: '屋主',
       attachments: attachmentList,
     });

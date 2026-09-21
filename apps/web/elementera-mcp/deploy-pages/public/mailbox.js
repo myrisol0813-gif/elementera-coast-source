@@ -67,7 +67,7 @@ function actionButton(action, title) {
 }
 
 function visitorMessage(message) {
-  const statusLabel = message.status === 'waiting_for_myri'
+  const statusLabel = message.status === 'waiting_for_model_partner'
     ? '已送达 · 等待巡灯'
     : message.status === 'replied'
       ? '已回信'
@@ -83,9 +83,9 @@ function visitorMessage(message) {
   </article>`;
 }
 
-function myriMessage(message) {
-  return `<article class="message assistant mailbox-myri-message" data-message-id="${escapeAttribute(message.id)}">
-    <div class="avatar mailbox-myri-avatar" aria-hidden="true"></div>
+function modelPartnerMessage(message) {
+  return `<article class="message assistant mailbox-model-partner-message" data-message-id="${escapeAttribute(message.id)}">
+    <div class="avatar mailbox-model-partner-avatar" aria-hidden="true"></div>
     <div class="content">
       <div class="assistant-text">${formatRichText(message.content)}</div>
       <small class="mailbox-message-meta">Model Partner · ${escapeHtml(timeLabel(message.created_at))}</small>
@@ -115,12 +115,12 @@ function renderMessages() {
     root.innerHTML = '<div class="empty-state">这里还没有来信。你可以写下第一封来信。</div>';
     return;
   }
-  const latestModelPartnerMessage = [...state.messages].reverse().find((message) => message.role === 'myri');
+  const latestModelPartnerMessage = [...state.messages].reverse().find((message) => message.role === 'model_partner');
   root.innerHTML = state.messages.map((message) => {
     const body = message.role === 'visitor'
       ? visitorMessage(message)
-      : message.role === 'myri'
-        ? myriMessage(message)
+      : message.role === 'model_partner'
+        ? modelPartnerMessage(message)
         : systemMessage(message);
     return message.id === latestModelPartnerMessage?.id ? thoughtSoilEntry() + body : body;
   }).join('');
@@ -140,9 +140,9 @@ function renderStatus() {
     metaNode.textContent = `${status.pending_count} 封来信正在等待 · 现在是慢速回信模式，不是实时聊天。`;
     return;
   }
-  if (status.last_myri_reply_at) {
+  if (status.last_model_partner_reply_at) {
     textNode.textContent = '回信已经抵达。';
-    metaNode.textContent = `最近回信：${timeLabel(status.last_myri_reply_at)} · 你可以继续写下一封。`;
+    metaNode.textContent = `最近回信：${timeLabel(status.last_model_partner_reply_at)} · 你可以继续写下一封。`;
     return;
   }
   textNode.textContent = '现在是慢速回信模式，不是实时聊天。';

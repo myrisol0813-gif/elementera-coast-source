@@ -23,7 +23,7 @@ async function initializeMemorySchema(db) {
   )`);
   await ensureColumn(db, 'conversation_soils', 'organized_through_turn_id', "TEXT NOT NULL DEFAULT ''");
   for (const [column, declaration] of [
-    ['actor', "TEXT NOT NULL DEFAULT 'xiaohan'"],
+    ['actor', "TEXT NOT NULL DEFAULT 'owner'"],
     ['surface', "TEXT NOT NULL DEFAULT 'web_manual'"],
     ['model_label', 'TEXT DEFAULT NULL'],
     ['model_nickname', 'TEXT DEFAULT NULL'],
@@ -151,7 +151,7 @@ async function initializeMemorySchema(db) {
     id TEXT PRIMARY KEY,
     content TEXT NOT NULL DEFAULT '',
     updated_at INTEGER NOT NULL,
-    updated_by TEXT NOT NULL DEFAULT 'xiaohan',
+    updated_by TEXT NOT NULL DEFAULT 'owner',
     source TEXT NOT NULL DEFAULT '屋主手动编辑'
   )`);
   await run(db, 'CREATE INDEX IF NOT EXISTS idx_soils_updated ON conversation_soils(updated_at)');

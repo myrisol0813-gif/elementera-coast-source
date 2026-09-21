@@ -235,7 +235,7 @@ export function createMemoryActions({
     }
     if (name === 'custom-instructions-save') {
       const data = await saveCustomInstructionsRequest({
-        content: field('content'), updated_by: 'xiaohan', source: '屋主手动编辑',
+        content: field('content'), updated_by: 'owner', source: '屋主手动编辑',
       });
       runtime.customInstructions = data.instructions;
       await router.refresh({ preserveScroll: true });

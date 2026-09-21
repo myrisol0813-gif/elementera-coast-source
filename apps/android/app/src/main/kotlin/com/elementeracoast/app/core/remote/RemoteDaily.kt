@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class RemoteDailyComment(
     val id: String,
-    val author: String = "xiaohan",
+    val author: String = "owner",
     val text: String = "",
     @SerialName("model_id") val modelId: String? = null,
     val usage: RemoteModelUsage? = null,
@@ -17,7 +17,7 @@ data class RemoteDailyComment(
 data class RemoteDailyMoment(
     val id: String,
     val date: String = "",
-    val author: String = "xiaohan",
+    val author: String = "owner",
     val source: String = "manual",
     val status: String = "published",
     val text: String = "",
@@ -71,7 +71,7 @@ data class RemoteDailyCommentRequest(
 data class RemoteDailyDiary(
     val id: String,
     val date: String = "",
-    val author: String = "xiaohan",
+    val author: String = "owner",
     val source: String = "manual",
     val weather: String = "未标注",
     val mood: String = "未标注",
@@ -124,10 +124,10 @@ data class RemoteDailyDiaryPatchRequest(
 
 @Serializable
 data class RemoteDailyProfilePatch(
-    @SerialName("xiaohan_avatar_dataurl") val xiaohanAvatarDataUrl: String? = null,
-    @SerialName("myri_avatar_dataurl") val myriAvatarDataUrl: String? = null,
+    @SerialName("owner_avatar_dataurl") val ownerAvatarDataUrl: String? = null,
+    @SerialName("model_partner_avatar_dataurl") val modelPartnerAvatarDataUrl: String? = null,
     @SerialName("moment_cover_dataurl") val momentCoverDataUrl: String? = null,
-    @SerialName("myri_display_name") val myriDisplayName: String? = null
+    @SerialName("model_partner_display_name") val modelPartnerDisplayName: String? = null
 )
 
 @Serializable

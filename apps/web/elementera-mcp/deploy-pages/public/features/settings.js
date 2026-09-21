@@ -82,8 +82,8 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     className: 'settings-form',
     body: `<p class="feature-note">这里保存屋主在前端的显示资料。这些显示资料不会自动进入另一位屋主的记忆或系统提示词。真正影响另一位屋主理解你的长期内容，请写入自定义指令或记忆库。</p>
       <div class="form-stack">
-        <label>昵称<input id="xiaohanName" value="${escapeAttribute(preferences().xiaohanName)}" maxlength="80"></label>
-        <label>聊天署名 / 导出时显示名<input id="xiaohanSignature" value="${escapeAttribute(preferences().xiaohanSignature)}" maxlength="80"></label>
+        <label>昵称<input id="ownerName" value="${escapeAttribute(preferences().ownerName)}" maxlength="80"></label>
+        <label>聊天署名 / 导出时显示名<input id="ownerSignature" value="${escapeAttribute(preferences().ownerSignature)}" maxlength="80"></label>
         <button class="feature-row" type="button" data-action="settings:bubble"><span><strong>用户气泡颜色</strong><small>复用外观里的同一项设置</small></span></button>
         <p class="feature-note">头像在碳硅圈资料中设置。本页不另建第二套头像存储。</p>
         <button class="primary-wide" type="button" data-action="settings:save-profile">保存个人资料</button>
@@ -211,8 +211,8 @@ export function createSettings({ storage, shell, chat, router, toast }) {
 
   function exportJson() {
     const display = {
-      nickname: preferences().xiaohanName || '屋主',
-      signature: preferences().xiaohanSignature || preferences().xiaohanName || '屋主',
+      nickname: preferences().ownerName || '屋主',
+      signature: preferences().ownerSignature || preferences().ownerName || '屋主',
     };
     const data = {
       format: 'elementera-chat-export',
@@ -249,7 +249,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
 
   async function exportHtml() {
     toast('正在把完整前端整理成 HTML…', 2600);
-    const signature = preferences().xiaohanSignature || preferences().xiaohanName || '屋主';
+    const signature = preferences().ownerSignature || preferences().ownerName || '屋主';
     const data = await requestJson(API.v1Snapshot);
     const snapshot = {
       ...(data.snapshot || {}),
@@ -336,8 +336,8 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     }
     if (name === 'save-profile') {
       storage.update((state) => {
-        state.preferences.xiaohanName = q('#xiaohanName')?.value || '屋主';
-        state.preferences.xiaohanSignature = q('#xiaohanSignature')?.value || state.preferences.xiaohanName || '屋主';
+        state.preferences.ownerName = q('#ownerName')?.value || '屋主';
+        state.preferences.ownerSignature = q('#ownerSignature')?.value || state.preferences.ownerName || '屋主';
       });
       toast('个人资料已保存');
       return;

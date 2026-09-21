@@ -17,7 +17,7 @@ export function mailboxThoughtSoilUpsertStatement(db, value, replyId, timestamp)
       manual_locked, auto_refresh_enabled, revision, model_label, model_nickname,
       source_conversation_id, source_turn_id, tool_call_id, created_at, updated_at
     ) SELECT ?, ?, ?, ?, ?, ?, ?, 0, 1, 1, ?, ?, ?, ?, ?, ?, ?
-      WHERE EXISTS (SELECT 1 FROM mailbox_messages WHERE id = ? AND role = 'myri')
+      WHERE EXISTS (SELECT 1 FROM mailbox_messages WHERE id = ? AND role = 'model_partner')
     ON CONFLICT(visitor_id) DO UPDATE SET
       current_text = excluded.current_text,
       hand_seeds_json = excluded.hand_seeds_json,

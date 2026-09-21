@@ -18,29 +18,29 @@ function usageLabel(value) {
 }
 
 export function createDailyMomentsView({ state, ensureLoad, syncNotice, profile }) {
-  function myriName() {
-    return profile.myriDisplayName();
+  function modelPartnerName() {
+    return profile.modelPartnerDisplayName();
   }
 
   function editableModelPartnerName(label, className = '') {
-    return `<button class="moment-author-edit${className ? ` ${className}` : ''}" type="button" data-action="daily:edit-myri-name" aria-label="编辑 另一位屋主 在碳硅圈里的显示名称">${escapeHtml(label)}</button>`;
+    return `<button class="moment-author-edit${className ? ` ${className}` : ''}" type="button" data-action="daily:edit-model-partner-name" aria-label="编辑 另一位屋主 在碳硅圈里的显示名称">${escapeHtml(label)}</button>`;
   }
 
   function postAuthor(post) {
-    if (post.author === 'api' || post.author === 'myri') {
+    if (post.author === 'api' || post.author === 'model_partner') {
       const symbol = post.symbol ? ` ${post.symbol}` : '';
-      return editableModelPartnerName(`${myriName()}${symbol}`);
+      return editableModelPartnerName(`${modelPartnerName()}${symbol}`);
     }
     return escapeHtml(authorName(post));
   }
 
   function modelUsageMeta(post) {
-    const myriComment = [...(Array.isArray(post.comments) ? post.comments : [])]
+    const modelPartnerComment = [...(Array.isArray(post.comments) ? post.comments : [])]
       .reverse()
-      .find((comment) => comment.author === 'myri' && comment.modelId);
-    const modelId = myriComment?.modelId || post.modelNickname || post.modelLabel || '';
+      .find((comment) => comment.author === 'model_partner' && comment.modelId);
+    const modelId = modelPartnerComment?.modelId || post.modelNickname || post.modelLabel || '';
     if (!modelId) return '';
-    const usage = usageLabel(myriComment?.usage);
+    const usage = usageLabel(modelPartnerComment?.usage);
     return `<div class="moment-model-usage">${escapeHtml(shortModelName(modelId))}${usage ? ` · ${escapeHtml(usage)}` : ''}</div>`;
   }
 
@@ -50,8 +50,8 @@ export function createDailyMomentsView({ state, ensureLoad, syncNotice, profile 
       ? `<div class="moment-comments">${comments.map((comment) => {
         const model = comment.modelId ? ` <small>· ${escapeHtml(shortModelName(comment.modelId))}</small>` : '';
         const remove = comment.id ? `<button class="moment-comment-delete" type="button" data-action="daily:delete-comment" data-id="${escapeAttribute(post.id)}" data-comment-id="${escapeAttribute(comment.id)}">删除</button>` : '';
-        const author = comment.author === 'myri'
-          ? editableModelPartnerName(`${myriName()}:`, 'is-comment')
+        const author = comment.author === 'model_partner'
+          ? editableModelPartnerName(`${modelPartnerName()}:`, 'is-comment')
           : `<b>${escapeHtml(comment.who || '屋主')}:</b>`;
         return `<p><span>${author} ${escapeHtml(comment.text)}${model}</span>${remove}</p>`;
       }).join('')}</div>` : '';
@@ -74,7 +74,7 @@ export function createDailyMomentsView({ state, ensureLoad, syncNotice, profile 
     const foldClass = foldable && !expanded ? ' is-collapsed' : '';
     const foldButton = foldable ? `<button class="moment-expand" type="button" data-action="daily:toggle-moment" data-id="${escapeAttribute(post.id)}">${expanded ? '收起' : '展开全文'}</button>` : '';
     return `<article class="moment-post">
-      <div>${post.author === 'xiaohan' ? profile.xiaohanAvatar() : profile.myriAvatar()}</div>
+      <div>${post.author === 'owner' ? profile.ownerAvatar() : profile.modelPartnerAvatar()}</div>
       <div class="moment-main">
         <h3>${postAuthor(post)}</h3>
         <p class="moment-text${foldClass}">${escapeHtml(post.text || '（无正文）')}</p>
@@ -83,7 +83,7 @@ export function createDailyMomentsView({ state, ensureLoad, syncNotice, profile 
           <span>${escapeHtml(stamp)}</span>
           <button class="${post.liked ? 'is-liked' : ''}" type="button" data-action="daily:like" data-id="${escapeAttribute(post.id)}">♡ ${Number(post.likeCount || 0)}</button>
           <button type="button" data-action="daily:comment" data-id="${escapeAttribute(post.id)}">评论</button>
-          <button type="button" data-action="daily:myri-comment" data-id="${escapeAttribute(post.id)}" ${commenting ? 'disabled' : ''}>${commenting ? `${escapeHtml(myriName())} 正在看…` : `${escapeHtml(myriName())} 留言`}</button>
+          <button type="button" data-action="daily:model-partner-comment" data-id="${escapeAttribute(post.id)}" ${commenting ? 'disabled' : ''}>${commenting ? `${escapeHtml(modelPartnerName())} 正在看…` : `${escapeHtml(modelPartnerName())} 留言`}</button>
           <button type="button" data-action="daily:edit-moment" data-id="${escapeAttribute(post.id)}">编辑</button>
           <button type="button" data-action="daily:delete-moment" data-id="${escapeAttribute(post.id)}">删除</button>
         </div>
@@ -105,8 +105,8 @@ export function createDailyMomentsView({ state, ensureLoad, syncNotice, profile 
       headerAction: '<button class="feature-head-action" type="button" data-action="daily:moments-compose">＋ 动态</button>',
       body: `<button class="moment-cover${coverImage ? ' has-cover' : ''}" type="button" data-action="daily:cover" aria-label="${coverImage ? '更换碳硅圈封面' : '设置碳硅圈封面'}" ${cover}>${coverImage ? '' : '<span>点击设置封面</span>'}</button>
         <section class="moment-avatar-tools" aria-label="碳硅圈头像设置">
-          <button type="button" data-action="daily:avatar">${profile.xiaohanAvatar()}<span><strong>屋主头像</strong><small>保存在前端</small></span></button>
-          <button type="button" data-action="daily:myri-avatar">${profile.myriAvatar()}<span><strong>${escapeHtml(myriName())} 头像</strong><small>点击动态里的名字可以修改显示名</small></span></button>
+          <button type="button" data-action="daily:avatar">${profile.ownerAvatar()}<span><strong>屋主头像</strong><small>保存在前端</small></span></button>
+          <button type="button" data-action="daily:model-partner-avatar">${profile.modelPartnerAvatar()}<span><strong>${escapeHtml(modelPartnerName())} 头像</strong><small>点击动态里的名字可以修改显示名</small></span></button>
         </section>
         ${syncNotice()}<section class="moment-feed">${feed}</section>`,
     };

@@ -97,7 +97,7 @@ fun ChatWindow(
     val attachmentPreviewSource = remember(context.applicationContext) {
         AttachmentPreviewRemoteDataSource.production(context.applicationContext)
     }
-    val avatarSource = state.myriAvatarDataUrl
+    val avatarSource = state.modelPartnerAvatarDataUrl
     val persistedDeskReceipt = state.messages.lastOrNull()
         ?.takeIf { it.role == MessageRole.Assistant }
         ?.deskReceipt

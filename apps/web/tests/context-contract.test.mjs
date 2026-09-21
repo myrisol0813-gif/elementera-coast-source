@@ -7,7 +7,7 @@ import { createWorldbookEntry } from '../functions/worldbook.js';
 import { D1Database } from './d1-helper.mjs';
 
 const THIN_SHELL = '遵循本轮提供的上下文与屋主保存的自定义指令回应。工具调用必须如实；没有执行成功的动作不能说成已经完成。';
-const OLD_OWNER_IDENTITY = '你是 Model Partner，在 Elementera Coast 里和屋主继续这段真实对话。';
+const OLD_OWNER_IDENTITY = 'You are the Elementera Coast demo assistant，在 Elementera Coast 里和屋主继续这段真实对话。';
 const OWNER_CUSTOM = '【屋主原文】先回应眼前这句话。\n\n不要把这份自定义指令改写成摘要。';
 const PENDING_SECRET = 'PENDING_POCKET_SECRET_713';
 const SOIL_CANDIDATE_SECRET = 'SOIL_CANDIDATE_SECRET_713';

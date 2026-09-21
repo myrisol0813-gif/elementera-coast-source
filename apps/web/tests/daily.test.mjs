@@ -43,7 +43,7 @@ assert.equal(diaryColumns.has('tags_json'), true, 'daily_diaries must persist ca
 
 const moment = await createMoment(db, { id: 'moment-core-1', date: '2026-09-01', text: '海风从窗口里吹进来。' });
 assert.equal(moment.status, 'published');
-assert.equal(moment.author, 'xiaohan');
+assert.equal(moment.author, 'owner');
 assert.equal(moment.text, '海风从窗口里吹进来。');
 assert.equal(Object.hasOwn(moment, 'image_refs'), false);
 assert.equal(Object.hasOwn(moment, 'image'), false);
@@ -54,12 +54,12 @@ assert.equal(patchedMoment.text, '海风又轻轻翻了一页。');
 await assert.rejects(() => createMoment(db, { text: '', image_refs: ['https://coast.test/old.jpg'] }), (error) => error instanceof DailyStoreError && error.type === 'empty_moment');
 await assert.rejects(() => patchMoment(db, moment.id, { image_refs: ['https://coast.test/old.jpg'] }), (error) => error instanceof DailyStoreError && error.type === 'empty_patch');
 
-const commentedMoment = await addMomentComment(db, moment.id, { id: 'comment-core-1', author: 'xiaohan', text: 'Model Partner 看见了吗？' });
+const commentedMoment = await addMomentComment(db, moment.id, { id: 'comment-core-1', author: 'owner', text: 'Model Partner 看见了吗？' });
 assert.equal(commentedMoment.comments.length, 1);
-const likedMoment = await setMomentLike(db, moment.id, true, 'xiaohan');
+const likedMoment = await setMomentLike(db, moment.id, true, 'owner');
 assert.equal(likedMoment.liked, true);
 assert.equal(likedMoment.like_count, 1);
-const unlikedMoment = await setMomentLike(db, moment.id, false, 'xiaohan');
+const unlikedMoment = await setMomentLike(db, moment.id, false, 'owner');
 assert.equal(unlikedMoment.liked, false);
 assert.equal(unlikedMoment.like_count, 0);
 const withoutComment = await deleteMomentComment(db, moment.id, 'comment-core-1');
@@ -68,7 +68,7 @@ await deleteMoment(db, moment.id);
 assert.equal((await listMoments(db)).length, 0);
 
 const diary = await createDiary(db, { id: 'diary-core-1', date: '2026-09-01', weather: '有风', mood: '安静', tags: ['海风', '  海风 ', '夜'], text: '今天把旧机器拆掉了一点。' });
-assert.equal(diary.author, 'xiaohan');
+assert.equal(diary.author, 'owner');
 assert.equal(diary.weather, '有风');
 assert.deepEqual(diary.tags, ['海风', '夜']);
 assert.equal(Object.hasOwn(diary, 'image_refs'), false);
@@ -128,15 +128,15 @@ assert.equal(isDailyApiPath('/api/daily/diaries'), true);
 assert.equal(isDailyApiPath('/api/daily/profile'), true);
 
 const initialProfile = await readDailyProfile(db);
-assert.equal(initialProfile.xiaohan_avatar_dataurl, '');
+assert.equal(initialProfile.owner_avatar_dataurl, '');
 const savedProfile = await writeDailyProfile(db, {
-  xiaohan_avatar_dataurl: 'data:image/webp;base64,SEFOR0FO',
-  myri_avatar_dataurl: 'data:image/webp;base64,TVlSSQ==',
+  owner_avatar_dataurl: 'data:image/webp;base64,SEFOR0FO',
+  model_partner_avatar_dataurl: 'data:image/webp;base64,TVlSSQ==',
   moment_cover_dataurl: 'data:image/webp;base64,Q09WRVI=',
 });
 assert.equal(savedProfile.moment_cover_dataurl, 'data:image/webp;base64,Q09WRVI=');
-assert.equal((await readDailyProfile(db)).myri_avatar_dataurl, 'data:image/webp;base64,TVlSSQ==');
-await assert.rejects(() => writeDailyProfile(db, { xiaohan_avatar_dataurl: 'data:image/webp;base64,' + 'A'.repeat(DAILY_PROFILE_LIMITS.avatarDataUrl) }), (error) => error instanceof DailyStoreError && error.type === 'daily_profile_image_too_large');
+assert.equal((await readDailyProfile(db)).model_partner_avatar_dataurl, 'data:image/webp;base64,TVlSSQ==');
+await assert.rejects(() => writeDailyProfile(db, { owner_avatar_dataurl: 'data:image/webp;base64,' + 'A'.repeat(DAILY_PROFILE_LIMITS.avatarDataUrl) }), (error) => error instanceof DailyStoreError && error.type === 'daily_profile_image_too_large');
 const unauthProfile = await routeDailyApi(new Request('https://coast.test/api/daily/profile'), env, null);
 assert.equal(unauthProfile.status, 401);
 const apiProfilePut = await routeDailyApi(new Request('https://coast.test/api/daily/profile', {

@@ -64,7 +64,7 @@ assert.equal(Object.hasOwn(slip, 'cross_window_touch'), false);
 
 const current = '这是当前用户输入，必须保留。';
 const comfort = trimContextToComfortRange({
-  basePrompt: '你是 Model Partner。', soilText: `【整理当前对话的纸条】\n${'当前的纸条。'.repeat(600)}`,
+  basePrompt: 'You are the Elementera Coast demo assistant。', soilText: `【整理当前对话的纸条】\n${'当前的纸条。'.repeat(600)}`,
   memoryItems: Array.from({ length: 14 }, (_, index) => `低相关旧记忆 ${index} ${'潮声'.repeat(80)}`),
   worldbookItems: Array.from({ length: 10 }, (_, index) => `低相关词条 ${index}：${'海风'.repeat(80)}`),
   messages: [

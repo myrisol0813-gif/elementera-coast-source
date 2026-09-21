@@ -62,7 +62,7 @@ const modelMemoryResult = await executeModelTool(db, {
   id: 'memory-call-1',
   function: { name: 'memory_search', arguments: JSON.stringify({ query: '干净工具结果', scope: 'conversation', limit: 5 }) },
 }, {
-  env: { COAST_CHAT_DB: db }, permission: 'owner', surface: 'main_chat', room_scope: 'conversation', actor: 'myri', conversation_id: conversation.id,
+  env: { COAST_CHAT_DB: db }, permission: 'owner', surface: 'main_chat', room_scope: 'conversation', actor: 'model_partner', conversation_id: conversation.id,
 });
 assert.deepEqual(Object.keys(modelMemoryResult).sort(), ['count', 'memories', 'vector_enabled']);
 assert.match(modelMemoryResult.memories[0], /干净工具结果｜模型只应看见这张简洁记忆纸条/);
@@ -78,7 +78,7 @@ assert.equal(visitorTools.some((tool) => tool.tool_key.startsWith('calendar.')),
 await executeRegisteredTool(db, 'dogtalk.save', {
   body: '这句人类思考链不能进工具日志。', true_core: '只留此刻温度。', read_mode: 'keep_private',
 }, {
-  permission: 'owner', surface: 'main_chat', room_scope: 'conversation', actor: 'xiaohan', conversation_id: conversation.id, source_turn_id: 'registry-dogtalk-turn',
+  permission: 'owner', surface: 'main_chat', room_scope: 'conversation', actor: 'owner', conversation_id: conversation.id, source_turn_id: 'registry-dogtalk-turn',
 });
 const dogtalkRun = (await listToolRuns(db)).find((run) => run.tool_key === 'dogtalk.save');
 assert.match(JSON.stringify(dogtalkRun.input_summary), /dogtalk_content_redacted/);

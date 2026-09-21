@@ -12,18 +12,18 @@ import { PWA_CACHE_VERSION, DEV_HANDS_RELEASE } from '../functions/dev-hands-ver
 import { resolveDevHandToolSelection } from '../functions/dev-hand-model-tools.js';
 
 const env = {
-  COAST_GITHUB_ALLOWED_REPOS: 'myrisol0813-gif/elementera-coast,myrisol0813-gif/coast-native-android',
+  COAST_GITHUB_ALLOWED_REPOS: 'example-owner/example-web-app,example-owner/example-android-app',
 };
 
 assert.equal(PWA_CACHE_VERSION, 'coast-app-87');
 assert.equal(DEV_HANDS_RELEASE, 'COAST-DEV-HANDS-DIRECT-03');
 assert.deepEqual(allowedRepos(env), [
-  'myrisol0813-gif/elementera-coast',
-  'myrisol0813-gif/coast-native-android',
+  'example-owner/example-web-app',
+  'example-owner/example-android-app',
 ]);
-assert.equal(requireAllowedRepo(env, 'myrisol0813-gif/elementera-coast'), 'myrisol0813-gif/elementera-coast');
+assert.equal(requireAllowedRepo(env, 'example-owner/example-web-app'), 'example-owner/example-web-app');
 assert.throws(
-  () => requireAllowedRepo(env, 'myrisol0813-gif/o3-reply-card-mcp'),
+  () => requireAllowedRepo(env, 'example-owner/example-tool-app'),
   (error) => error instanceof DevHandsError && error.type === 'repo_not_allowed' && error.status === 403,
 );
 
@@ -63,16 +63,16 @@ for (const secret of ['github_pat_11AAABBBCCC', 'SECRET_VALUE_123', 'secret-cook
   assert.equal(redacted.includes(secret), false, `redaction must remove ${secret}`);
 }
 const summary = safeDevSummary({
-  repo: 'myrisol0813-gif/elementera-coast',
+  repo: 'example-owner/example-web-app',
   token: 'do-not-log-me',
   nested: { Authorization: 'Bearer also-secret', result: 'ok' },
 });
 assert.equal(summary.includes('do-not-log-me'), false);
 assert.equal(summary.includes('also-secret'), false);
-assert.equal(summary.includes('elementera-coast'), true);
+assert.equal(summary.includes('example-web-app'), true);
 
 const shaped = devLogShape({
-  repo: 'myrisol0813-gif/elementera-coast',
+  repo: 'example-owner/example-web-app',
   path: 'functions/example.js',
   content: 'VERY_PRIVATE_CODE',
   body: 'PRIVATE_PR_BODY',
@@ -84,7 +84,7 @@ const shapedText = JSON.stringify(shaped);
 for (const hidden of ['VERY_PRIVATE_CODE', 'PRIVATE_PR_BODY', 'PRIVATE_JOB_LOGS', 'SECRET_TOKEN', 'PRIVATE_NOTION_TEXT']) {
   assert.equal(shapedText.includes(hidden), false, `dev-hand log shape must omit ${hidden}`);
 }
-assert.ok(shapedText.includes('myrisol0813-gif/elementera-coast'));
+assert.ok(shapedText.includes('example-owner/example-web-app'));
 assert.ok(shapedText.includes('functions/example.js'));
 assert.ok(shapedText.includes('[REDACTED]'));
 

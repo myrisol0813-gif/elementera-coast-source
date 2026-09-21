@@ -52,11 +52,11 @@ export function createShell({ storage }) {
 
   function updateStatus() {
     const orbit = q('#orbitDays');
-    const august12 = q('#august12Days');
-    const august13 = q('#august13Days');
-    if (orbit) orbit.textContent = String(daysSince(2025, 8, 13));
-    if (august12) august12.textContent = String(daysUntil(8, 12));
-    if (august13) august13.textContent = String(daysUntil(8, 13));
+    const sampleMilestone = q('#sampleMilestoneDays');
+    const projectDate = q('#projectDateDays');
+    if (orbit) orbit.textContent = String(daysSince(2026, 1, 1));
+    if (sampleMilestone) sampleMilestone.textContent = String(daysUntil(1, 1));
+    if (projectDate) projectDate.textContent = String(daysUntil(7, 1));
   }
 
   function syncViewportHeight() {

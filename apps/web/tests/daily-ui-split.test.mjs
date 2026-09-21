@@ -35,7 +35,7 @@ for (const retired of ['image_refs', 'momentImageRef', 'diaryImageRef', 'summary
   if (retired === 'summary') continue;
   assert.equal(cluster.includes(retired), false, `${retired} must stay retired from Daily runtime`);
 }
-for (const field of ['xiaohan_avatar_dataurl', 'myri_avatar_dataurl', 'moment_cover_dataurl']) {
+for (const field of ['owner_avatar_dataurl', 'model_partner_avatar_dataurl', 'moment_cover_dataurl']) {
   assert.ok(cluster.includes(field), `${field} persistence must remain`);
 }
 const actions = await read('elementera-mcp/deploy-pages/public/features/daily/daily-actions.js');

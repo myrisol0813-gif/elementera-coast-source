@@ -165,7 +165,7 @@ export async function appendRoomMessage(db, roomType, value = {}) {
 
   const createdAt = new Date().toISOString();
   const turnId = sanitizeId(crypto.randomUUID(), `${roomType}_turn`);
-  const source = value.message_source === 'official_mcp' ? 'official_mcp' : 'xiaohan_web';
+  const source = value.message_source === 'official_mcp' ? 'official_mcp' : 'owner_web';
   const turn = {
     id: turnId,
     user: {

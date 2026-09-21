@@ -484,7 +484,7 @@ async function formalChat(request, env) {
       throw new ChatStoreError('dogtalk_turn_required', '人类思考链需要跟随当前消息轮次。', 400);
     }
     dogtalkSubmission = await executeRegisteredTool(env.COAST_CHAT_DB, 'dogtalk.save', value.dogtalk, {
-      actor: 'xiaohan',
+      actor: 'owner',
       permission: 'owner',
       surface: conversationSurface(conversation.room_type),
       room_scope: 'conversation',

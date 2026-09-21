@@ -32,10 +32,10 @@ function displayName(value) {
 function profileFromRow(row) {
   const source = row || {};
   return {
-    xiaohan_avatar_dataurl: source.xiaohan_avatar_dataurl || '',
-    myri_avatar_dataurl: source.myri_avatar_dataurl || '',
+    owner_avatar_dataurl: source.owner_avatar_dataurl || '',
+    model_partner_avatar_dataurl: source.model_partner_avatar_dataurl || '',
     moment_cover_dataurl: source.moment_cover_dataurl || '',
-    myri_display_name: displayName(source.myri_display_name),
+    model_partner_display_name: displayName(source.model_partner_display_name),
     updated_at: source.updated_at ? new Date(Number(source.updated_at)).toISOString() : null,
   };
 }
@@ -53,35 +53,35 @@ export async function writeDailyProfile(db, patch = {}) {
   const current = await readDailyProfile(db);
   const has = (key) => Object.prototype.hasOwnProperty.call(patch, key);
   const next = {
-    xiaohan_avatar_dataurl: has('xiaohan_avatar_dataurl')
-      ? validDataUrl(patch.xiaohan_avatar_dataurl, DAILY_PROFILE_LIMITS.avatarDataUrl, '屋主头像')
-      : current.xiaohan_avatar_dataurl,
-    myri_avatar_dataurl: has('myri_avatar_dataurl')
-      ? validDataUrl(patch.myri_avatar_dataurl, DAILY_PROFILE_LIMITS.avatarDataUrl, '另一位屋主头像')
-      : current.myri_avatar_dataurl,
+    owner_avatar_dataurl: has('owner_avatar_dataurl')
+      ? validDataUrl(patch.owner_avatar_dataurl, DAILY_PROFILE_LIMITS.avatarDataUrl, '屋主头像')
+      : current.owner_avatar_dataurl,
+    model_partner_avatar_dataurl: has('model_partner_avatar_dataurl')
+      ? validDataUrl(patch.model_partner_avatar_dataurl, DAILY_PROFILE_LIMITS.avatarDataUrl, '另一位屋主头像')
+      : current.model_partner_avatar_dataurl,
     moment_cover_dataurl: has('moment_cover_dataurl')
       ? validDataUrl(patch.moment_cover_dataurl, DAILY_PROFILE_LIMITS.coverDataUrl, '碳硅圈封面')
       : current.moment_cover_dataurl,
-    myri_display_name: has('myri_display_name')
-      ? displayName(patch.myri_display_name)
-      : current.myri_display_name,
+    model_partner_display_name: has('model_partner_display_name')
+      ? displayName(patch.model_partner_display_name)
+      : current.model_partner_display_name,
   };
   const now = Date.now();
   await db.prepare(`INSERT INTO daily_profile (
-      id, xiaohan_avatar_dataurl, myri_avatar_dataurl, moment_cover_dataurl, myri_display_name, updated_at
+      id, owner_avatar_dataurl, model_partner_avatar_dataurl, moment_cover_dataurl, model_partner_display_name, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
-      xiaohan_avatar_dataurl = excluded.xiaohan_avatar_dataurl,
-      myri_avatar_dataurl = excluded.myri_avatar_dataurl,
+      owner_avatar_dataurl = excluded.owner_avatar_dataurl,
+      model_partner_avatar_dataurl = excluded.model_partner_avatar_dataurl,
       moment_cover_dataurl = excluded.moment_cover_dataurl,
-      myri_display_name = excluded.myri_display_name,
+      model_partner_display_name = excluded.model_partner_display_name,
       updated_at = excluded.updated_at`)
     .bind(
       OWNER_ID,
-      next.xiaohan_avatar_dataurl,
-      next.myri_avatar_dataurl,
+      next.owner_avatar_dataurl,
+      next.model_partner_avatar_dataurl,
       next.moment_cover_dataurl,
-      next.myri_display_name,
+      next.model_partner_display_name,
       now,
     )
     .run();

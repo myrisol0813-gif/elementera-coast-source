@@ -24,7 +24,7 @@ document.head.innerHTML = '<meta name="theme-color" content="#ffffff">';
 document.body.innerHTML = `
   <button id="scrim" hidden></button>
   <aside id="sidebar"><button id="chatRoomButton" data-action="chat:open-type" data-kind="radio">radio</button><button data-action="daily:home">daily</button><div id="chatConversationList"></div></aside>
-  <span id="themeLabel"></span><b id="orbitDays"></b><b id="august12Days"></b><b id="august13Days"></b>
+  <span id="themeLabel"></span><b id="orbitDays"></b><b id="sampleMilestoneDays"></b><b id="projectDateDays"></b>
   <button id="modelButton" data-action="models:quick" aria-expanded="false"></button><span id="modelName"></span><div id="modelQuickPicker" hidden></div>
   <section id="chatWindow"></section>
   <div id="chatTopbarActions"></div>
@@ -184,7 +184,7 @@ const ownerRouter = {
   async refresh() {},
 };
 const dailyStorageState = {
-  preferences: { xiaohanAvatar: '', myriAvatar: '' },
+  preferences: { ownerAvatar: '', modelPartnerAvatar: '' },
   daily: { cache: { moments: [], diaries: [] }, momentCover: '' },
 };
 const daily = createDaily({

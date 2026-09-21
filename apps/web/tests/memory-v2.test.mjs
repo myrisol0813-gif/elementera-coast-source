@@ -167,11 +167,11 @@ assert.deepEqual(await readCustomInstructions(db), {
   content: '',
   status: 'active',
   updated_at: null,
-  updated_by: 'xiaohan',
+  updated_by: 'owner',
   source: '屋主手动编辑',
 });
-await writeCustomInstructions(db, { content: '进入海岸时先读当前窗口。', updated_by: 'xiaohan', source: '屋主手动编辑' });
-await writeCustomInstructions(db, { content: '先回应当前的屋主。', updated_by: 'xiaohan', source: '屋主手动编辑' });
+await writeCustomInstructions(db, { content: '进入海岸时先读当前窗口。', updated_by: 'owner', source: '屋主手动编辑' });
+await writeCustomInstructions(db, { content: '先回应当前的屋主。', updated_by: 'owner', source: '屋主手动编辑' });
 assert.equal((await readCustomInstructions(db)).content, '先回应当前的屋主。');
 assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM memory_custom_instructions').get().count, 1);
 

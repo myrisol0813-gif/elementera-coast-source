@@ -59,10 +59,10 @@ data class RemoteDailyProfileResponse(
 
 @Serializable
 data class RemoteDailyProfile(
-    @SerialName("xiaohan_avatar_dataurl") val xiaohanAvatarDataUrl: String = "",
-    @SerialName("myri_avatar_dataurl") val myriAvatarDataUrl: String = "",
+    @SerialName("owner_avatar_dataurl") val ownerAvatarDataUrl: String = "",
+    @SerialName("model_partner_avatar_dataurl") val modelPartnerAvatarDataUrl: String = "",
     @SerialName("moment_cover_dataurl") val momentCoverDataUrl: String = "",
-    @SerialName("myri_display_name") val myriDisplayName: String = "另一位屋主",
+    @SerialName("model_partner_display_name") val modelPartnerDisplayName: String = "另一位屋主",
     @SerialName("updated_at") val updatedAt: String? = null
 )
 

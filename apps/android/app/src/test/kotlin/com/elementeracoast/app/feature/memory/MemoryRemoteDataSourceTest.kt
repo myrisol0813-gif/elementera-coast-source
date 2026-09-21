@@ -39,7 +39,7 @@ class MemoryRemoteDataSourceTest {
         server.enqueue(json("""{"ok":true,"entries":[{"id":"m1","entry_type":"memory","title":"灯","life_core":"归岸","tag":"关系","memory_tags":["关系"]}],"facets":{"models":[],"windows":[],"tags":["关系"],"times":[]}}"""))
         server.enqueue(json("""{"ok":true,"pockets":[{"id":"p1","conversation_id":"c1","title":"待确认","life_core":"新芽","status":"pending"}]}"""))
         server.enqueue(json("""{"ok":true,"entries":[{"id":"w1","title":"海岸","content":"家","keywords":["海岸"],"enabled":true,"scope":"owner"}]}"""))
-        server.enqueue(json("""{"ok":true,"instructions":{"title":"当前自定义指令","content":"保持清明","status":"active","updated_by":"xiaohan","source":"屋主手动编辑"}}"""))
+        server.enqueue(json("""{"ok":true,"instructions":{"title":"当前自定义指令","content":"保持清明","status":"active","updated_by":"owner","source":"屋主手动编辑"}}"""))
 
         val entries = remote.listEntries("memory")
         val pockets = remote.listPockets("c1")
@@ -71,7 +71,7 @@ class MemoryRemoteDataSourceTest {
     fun canonicalWritesCarryOriginAndResolvePocketWithoutLocalFallback() = runBlocking {
         server.enqueue(json("""{"ok":true,"entry":{"id":"m2","entry_type":"memory","title":"回海","life_core":"同一主人","status":"active","tag":"关系","memory_tags":["关系"]}}"""))
         server.enqueue(json("""{"ok":true,"pocket":{"id":"p1","conversation_id":"c1","title":"候选","life_core":"确认后归库","status":"confirmed"},"entry":{"id":"m3","entry_type":"memory","title":"候选","life_core":"确认后归库","status":"active","tag":"关系","memory_tags":["关系"]}}"""))
-        server.enqueue(json("""{"ok":true,"instructions":{"content":"同一片海","status":"active","updated_by":"xiaohan","source":"Native 手动编辑"}}"""))
+        server.enqueue(json("""{"ok":true,"instructions":{"content":"同一片海","status":"active","updated_by":"owner","source":"Native 手动编辑"}}"""))
         server.enqueue(json("""{"ok":true,"matches":[{"id":"w1","title":"海岸","content":"家","keywords":["海岸"],"enabled":true,"scope":"owner"}]}"""))
 
         remote.createEntry(

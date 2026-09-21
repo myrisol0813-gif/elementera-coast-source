@@ -30,7 +30,7 @@ function elapsed(trace) {
 }
 
 function traceInfo(trace, step, extra = {}) {
-  console.info('[daily-myri-comment-step]', JSON.stringify({
+  console.info('[daily-model-partner-comment-step]', JSON.stringify({
     operation: 'instant',
     step,
     moment_id: safeTraceToken(trace?.momentId, 160),
@@ -52,7 +52,7 @@ function attachFailureDetails(error, stage, trace) {
 
 function traceFailure(trace, stage, error) {
   const details = error?.details && typeof error.details === 'object' ? error.details : {};
-  console.error('[daily-myri-comment-failure]', JSON.stringify({
+  console.error('[daily-model-partner-comment-failure]', JSON.stringify({
     operation: 'instant',
     stage,
     moment_id: safeTraceToken(trace?.momentId, 160),
@@ -139,8 +139,8 @@ function sourceCounts(daily, organized) {
 }
 
 function authorLabel(author) {
-  if (author === 'xiaohan') return '屋主';
-  if (author === 'myri') return '另一位屋主';
+  if (author === 'owner') return '屋主';
+  if (author === 'model_partner') return '另一位屋主';
   if (author === 'mcp') return 'ChatGPT';
   return '模型伙伴';
 }
@@ -305,10 +305,10 @@ export async function createModelPartnerMomentComment(env, momentId, value = {})
     : await generateContextualComment(env, db, momentId, modelId, value);
   const text = commentText(generated.result.message?.content);
   if (!text) throw new DailyStoreError('empty_model_comment', '模型没有生成可写入的评论。', 502, value.mode === 'instant' ? { stage: 'normalize_comment', elapsed_ms: elapsed(trace) } : {});
-  const commentId = `myri-comment-${crypto.randomUUID()}`;
+  const commentId = `model-partner-comment-${crypto.randomUUID()}`;
   const moment = await addMomentComment(db, momentId, {
     id: commentId,
-    author: 'myri',
+    author: 'model_partner',
     text,
     model_id: generated.result.model || modelId,
     usage: generated.result.usage || null,

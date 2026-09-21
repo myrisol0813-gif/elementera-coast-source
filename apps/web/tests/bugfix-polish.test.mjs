@@ -20,11 +20,11 @@ assert.equal(roomAccess('landing').recentMessages, null);
 assert.equal(roomAccess('mailbox_visitor', { permission: 'visitor', visitorId: 'regression-visitor' }).recentMessages, 8);
 
 const initialDailyProfile = await readDailyProfile(db);
-assert.equal(initialDailyProfile.myri_display_name, '另一位屋主');
-const namedProfile = await writeDailyProfile(db, { myri_display_name: '  Model Partner\nModel Partner  ' });
-assert.equal(namedProfile.myri_display_name, 'Model Partner Model Partner');
-const fallbackProfile = await writeDailyProfile(db, { myri_display_name: '   ' });
-assert.equal(fallbackProfile.myri_display_name, '另一位屋主');
+assert.equal(initialDailyProfile.model_partner_display_name, '另一位屋主');
+const namedProfile = await writeDailyProfile(db, { model_partner_display_name: '  Model Partner\nModel Partner  ' });
+assert.equal(namedProfile.model_partner_display_name, 'Model Partner Model Partner');
+const fallbackProfile = await writeDailyProfile(db, { model_partner_display_name: '   ' });
+assert.equal(fallbackProfile.model_partner_display_name, '另一位屋主');
 
 const moment = await createMoment(db, {
   id: 'bugfix-polish-moment',
@@ -33,7 +33,7 @@ const moment = await createMoment(db, {
 });
 const withComment = await addMomentComment(db, moment.id, {
   id: 'bugfix-polish-comment',
-  author: 'myri',
+  author: 'model_partner',
   text: '我在这里。',
   model_id: 'openai/gpt-5.6',
   usage: {
@@ -65,6 +65,6 @@ assert.doesNotMatch(stored.usage_json, /api[_-]?key|secret|cookie|authorization|
 const dailyCommentColumns = new Set(db.database.prepare('PRAGMA table_info(daily_moment_comments)').all().map((row) => row.name));
 assert.equal(dailyCommentColumns.has('usage_json'), true);
 const dailyProfileColumns = new Set(db.database.prepare('PRAGMA table_info(daily_profile)').all().map((row) => row.name));
-assert.equal(dailyProfileColumns.has('myri_display_name'), true);
+assert.equal(dailyProfileColumns.has('model_partner_display_name'), true);
 
 console.log('bugfix-polish: ok');
