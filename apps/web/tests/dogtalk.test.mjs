@@ -69,7 +69,7 @@ assert.equal(empty.auto_recall, false);
 assert.equal(empty.not_memory_seed, true);
 assert.equal(empty.not_pocket, true);
 assert.equal('self_note' in empty, false);
-assert.equal('myri_hint' in empty, false);
+assert.equal('model_partner_hint' in empty, false);
 assert.equal('not_to_misunderstand' in empty, false);
 
 let dogtalk = await saveMysticDogtalk(db, {
@@ -78,7 +78,7 @@ let dogtalk = await saveMysticDogtalk(db, {
   body: '脑袋有一点毛线团，但想让 Model Partner 靠近。',
   true_core: '想被看见。',
   self_note: '旧客户端不应再写入这一列。',
-  myri_hint: '旧客户端不应再写入这一列。',
+  model_partner_hint: '旧客户端不应再写入这一列。',
   not_to_misunderstand: '旧客户端不应再写入这一列。',
   weather: '害羞',
   read_mode: 'keep_private',
@@ -88,14 +88,14 @@ assert.equal(dogtalk.room_scope, 'conversation');
 assert.equal(dogtalk.scope_key, `conversation:${conversation.id}`);
 assert.equal(dogtalk.status, 'saved');
 assert.equal('self_note' in dogtalk, false);
-const legacyColumnsAfterInsert = await db.prepare(`SELECT self_note, myri_hint, not_to_misunderstand
+const legacyColumnsAfterInsert = await db.prepare(`SELECT self_note, model_partner_hint, not_to_misunderstand
   FROM coast_mystic_dogtalk WHERE id = ?`).bind(dogtalk.id).first();
 assert.equal(legacyColumnsAfterInsert.self_note, '');
-assert.equal(legacyColumnsAfterInsert.myri_hint, '');
+assert.equal(legacyColumnsAfterInsert.model_partner_hint, '');
 assert.notEqual(legacyColumnsAfterInsert.not_to_misunderstand, '旧客户端不应再写入这一列。');
 
 await db.prepare(`UPDATE coast_mystic_dogtalk
-  SET self_note = 'legacy-self', myri_hint = 'legacy-hint', not_to_misunderstand = 'legacy-boundary'
+  SET self_note = 'legacy-self', model_partner_hint = 'legacy-hint', not_to_misunderstand = 'legacy-boundary'
   WHERE id = ?`).bind(dogtalk.id).run();
 dogtalk = await saveMysticDogtalk(db, {
   room_scope: 'conversation',
@@ -106,10 +106,10 @@ dogtalk = await saveMysticDogtalk(db, {
   weather: '安静',
   read_mode: 'keep_private',
 });
-const legacyColumnsAfterUpdate = await db.prepare(`SELECT self_note, myri_hint, not_to_misunderstand
+const legacyColumnsAfterUpdate = await db.prepare(`SELECT self_note, model_partner_hint, not_to_misunderstand
   FROM coast_mystic_dogtalk WHERE id = ?`).bind(dogtalk.id).first();
 assert.equal(legacyColumnsAfterUpdate.self_note, 'legacy-self');
-assert.equal(legacyColumnsAfterUpdate.myri_hint, 'legacy-hint');
+assert.equal(legacyColumnsAfterUpdate.model_partner_hint, 'legacy-hint');
 assert.equal(legacyColumnsAfterUpdate.not_to_misunderstand, 'legacy-boundary');
 
 let context = await dogtalkContext(db, {
@@ -176,7 +176,7 @@ assert.equal((await getMysticDogtalk(db, {
   conversation_id: conversation.id,
 })).read_mode, 'keep_private');
 assert.equal('self_note' in visibleSnapshot.snapshot, false);
-assert.equal('myri_hint' in visibleSnapshot.snapshot, false);
+assert.equal('model_partner_hint' in visibleSnapshot.snapshot, false);
 assert.equal('not_to_misunderstand' in visibleSnapshot.snapshot, false);
 
 dogtalk = await saveMysticDogtalk(db, {
@@ -225,7 +225,7 @@ const publicDogtalk = (await ownerRead.json()).dogtalk;
 for (const field of ['id', 'room_scope', 'conversation_id', 'body', 'true_core', 'weather', 'read_mode', 'status']) {
   assert.ok(field in publicDogtalk, `public dogtalk exposes ${field}`);
 }
-for (const legacy of ['self_note', 'myri_hint', 'not_to_misunderstand', 'scope_key', 'memory_weight']) {
+for (const legacy of ['self_note', 'model_partner_hint', 'not_to_misunderstand', 'scope_key', 'memory_weight']) {
   assert.equal(legacy in publicDogtalk, false, `public dogtalk hides ${legacy}`);
 }
 

@@ -22,14 +22,14 @@ for (const hidden of ['/opt/java', '/tmp/private-build-secret.bin', 'extremely-s
 }
 
 const shaped = JSON.stringify(devLogShape({
-  repo: 'myrisol0813-gif/elementera-coast',
+  repo: 'example-owner/example-web-app',
   path: 'functions/example.js',
   content: 'private source body',
   diff: 'private unified diff',
   bytes: new Uint8Array([1, 2, 3, 4]),
   token: 'private-token',
 }));
-assert.ok(shaped.includes('myrisol0813-gif/elementera-coast'));
+assert.ok(shaped.includes('example-owner/example-web-app'));
 assert.ok(shaped.includes('functions/example.js'));
 for (const hidden of ['private source body', 'private unified diff', 'private-token']) {
   assert.equal(shaped.includes(hidden), false, `construction log shape must remove ${hidden}`);

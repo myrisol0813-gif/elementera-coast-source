@@ -10,7 +10,7 @@ import {
 export async function runChatPrelude() {
   let danger;
   assert.equal(document.documentElement.dataset.theme, 'dark');
-  assert.equal(JSON.parse(localStorage.getItem('elementera.local.v1')).preferences.xiaohanName, '迁移中的屋主');
+  assert.equal(JSON.parse(localStorage.getItem('elementera.local.v1')).preferences.ownerName, '迁移中的屋主');
   assert.equal(localStorage.getItem('gpt_like_shell_theme_clean_v1'), null);
   assert.equal(localStorage.getItem('cw_name'), null);
   assert.equal(localStorage.getItem('ec.currentConversationId'), null);

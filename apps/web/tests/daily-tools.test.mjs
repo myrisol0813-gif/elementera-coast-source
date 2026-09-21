@@ -95,7 +95,7 @@ assert.equal(exactComment.target_moment_id, olderTarget.id);
 assert.equal(exactComment.moment.comments.at(-1).text, '具体 ID 仍然能用。');
 
 await writeProfile(db, { current_chat_model: 'openai/gpt-4.1-mini' });
-const modelErrorResponse = await routeDailyApi(new Request(`https://coast.test/api/daily/moments/${latestTarget.id}/myri-comment`, {
+const modelErrorResponse = await routeDailyApi(new Request(`https://coast.test/api/daily/moments/${latestTarget.id}/model-partner-comment`, {
   method: 'POST',
   headers: { 'content-type': 'application/json' },
   body: JSON.stringify({ mode: 'instant' }),
@@ -173,19 +173,19 @@ assert.match(instantCluster, /settings: instantCommentSettings\(\)/);
 assert.match(instantCluster, /function instantCommentSettings\(\)[\s\S]*max_tokens: 5000[\s\S]*temperature: 0\.82/);
 assert.match(instantCluster, /transport: 'stream_buffered'/);
 assert.match(instantCluster, /message_count:[\s\S]*message_chars:/);
-assert.match(commentSource, /daily-myri-comment-step/);
-assert.match(commentSource, /daily-myri-comment-failure/);
+assert.match(commentSource, /daily-model-partner-comment-step/);
+assert.match(commentSource, /daily-model-partner-comment-failure/);
 
 const actionsSource = await readFile(new URL('../elementera-mcp/deploy-pages/public/features/daily/daily-actions.js', import.meta.url), 'utf8');
 const momentsSource = await readFile(new URL('../elementera-mcp/deploy-pages/public/features/daily/daily-moments-view.js', import.meta.url), 'utf8');
-assert.match(actionsSource, /client\.createMoment\(value\)[\s\S]*await client\.myriCommentMoment\(savedMoment\.id, \{ mode: 'instant' \}\)[\s\S]*router\.open\('moments'/);
+assert.match(actionsSource, /client\.createMoment\(value\)[\s\S]*await client\.modelPartnerCommentMoment\(savedMoment\.id, \{ mode: 'instant' \}\)[\s\S]*router\.open\('moments'/);
 assert.match(actionsSource, /state\.savingMoment/);
 assert.match(actionsSource, /state\.commentingMomentIds\.has\(id\)/);
-assert.match(actionsSource, /client\.myriCommentMoment\(id, \{ mode: 'instant' \}\)/);
-assert.match(momentsSource, /data-action="daily:myri-comment"/);
-assert.match(momentsSource, /\$\{escapeHtml\(myriName\(\)\)\} 正在看…/);
-assert.match(momentsSource, /\$\{escapeHtml\(myriName\(\)\)\} 留言/);
-assert.match(clientSource, /myriCommentMoment\(id, value = \{\}\)/);
+assert.match(actionsSource, /client\.modelPartnerCommentMoment\(id, \{ mode: 'instant' \}\)/);
+assert.match(momentsSource, /data-action="daily:model-partner-comment"/);
+assert.match(momentsSource, /\$\{escapeHtml\(modelPartnerName\(\)\)\} 正在看…/);
+assert.match(momentsSource, /\$\{escapeHtml\(modelPartnerName\(\)\)\} 留言/);
+assert.match(clientSource, /modelPartnerCommentMoment\(id, value = \{\}\)/);
 
 const chatRouterSource = await readFile(new URL('../functions/chat-router.js', import.meta.url), 'utf8');
 const assemblerSource = await readFile(new URL('../functions/context-assemble-clean.js', import.meta.url), 'utf8');
@@ -209,14 +209,14 @@ assert.match(registrySource, /daily\.moment_like[\s\S]*dailyHandler\('like'\)/);
 
 const dailyApiSource = await readFile(new URL('../functions/daily-api.js', import.meta.url), 'utf8');
 assert.match(dailyApiSource, /error instanceof ModelRequestError/);
-assert.match(dailyApiSource, /daily-myri-comment-route/);
+assert.match(dailyApiSource, /daily-model-partner-comment-route/);
 assert.match(dailyApiSource, /stream_ready/);
 assert.match(dailyApiSource, /route_done/);
 assert.match(dailyApiSource, /route_failed/);
 assert.match(dailyApiSource, /DAILY_COMMENT_BUILD = 'daily-comment-33'/);
 assert.match(dailyApiSource, /X-Coast-Daily-Comment-Build/);
 assert.match(dailyApiSource, /streamModelPartnerComment/);
-assert.match(dailyApiSource, /safeLogError\('daily-myri-comment', error/);
+assert.match(dailyApiSource, /safeLogError\('daily-model-partner-comment', error/);
 
 const formalSource = await readFile(new URL('../functions/models/model-formal-chat-core.js', import.meta.url), 'utf8');
 const streamRequestCluster = formalSource.slice(formalSource.indexOf('async function requestOpenRouterStream'), formalSource.indexOf('async function* readProviderSse'));

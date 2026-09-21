@@ -184,7 +184,7 @@ const ownerRouter = {
   async refresh() {},
 };
 const dailyStorageState = {
-  preferences: { xiaohanAvatar: '', myriAvatar: '' },
+  preferences: { ownerAvatar: '', modelPartnerAvatar: '' },
   daily: { cache: { moments: [], diaries: [] }, momentCover: '' },
 };
 const daily = createDaily({

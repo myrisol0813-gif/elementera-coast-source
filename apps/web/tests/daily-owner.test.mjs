@@ -14,15 +14,15 @@ document.body.innerHTML = '<div id="overlayRoot"></div>';
 const overlayRoot = document.querySelector('#overlayRoot');
 const longMomentText = `${'长长的海岸文字。'.repeat(90)}\n尾声。`;
 const serverProfile = {
-  xiaohan_avatar_dataurl: 'data:image/webp;base64,SEFOR0FO',
-  myri_avatar_dataurl: 'data:image/webp;base64,TVlSSQ==',
+  owner_avatar_dataurl: 'data:image/webp;base64,SEFOR0FO',
+  model_partner_avatar_dataurl: 'data:image/webp;base64,TVlSSQ==',
   moment_cover_dataurl: 'data:image/webp;base64,Q09WRVI=',
   updated_at: '2026-09-01T00:00:00.000Z',
 };
 
 function makeStorage(cache = {}) {
   const local = {
-    preferences: { xiaohanAvatar: '', myriAvatar: '' },
+    preferences: { ownerAvatar: '', modelPartnerAvatar: '' },
     daily: {
       cache: {
         moments: cache.moments || [],
@@ -146,7 +146,7 @@ await daily.startLoad();
 const homeSynced = router.renderers.get('daily-home')();
 assert.equal(homeSynced.subtitle, '朋友圈与日记');
 assert.doesNotMatch(homeSynced.body, /正在同步小组件|当前显示本机缓存/);
-assert.equal(storage.local.preferences.xiaohanAvatar, serverProfile.xiaohan_avatar_dataurl, 'server avatar becomes local fast cache');
+assert.equal(storage.local.preferences.ownerAvatar, serverProfile.owner_avatar_dataurl, 'server avatar becomes local fast cache');
 assert.equal(storage.local.daily.momentCover, serverProfile.moment_cover_dataurl, 'server cover becomes local fast cache');
 
 const momentsSynced = router.renderers.get('moments')();
