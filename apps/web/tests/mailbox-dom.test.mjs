@@ -87,7 +87,7 @@ mailboxWindow.document.body.innerHTML = `
 
 let messages = [
   { id: 'v-1', visitor_id: 'visitor-a', role: 'visitor', content: '第一封信', status: 'replied', reply_batch_id: 'batch-1', created_at: '2026-08-01T10:00:00.000Z', updated_at: '2026-08-01T10:00:00.000Z' },
-  { id: 'm-1', visitor_id: 'visitor-a', role: 'myri', content: '第一封回信', status: 'sent', reply_batch_id: 'batch-1', created_at: '2026-08-01T11:00:00.000Z', updated_at: '2026-08-01T11:00:00.000Z' },
+  { id: 'm-1', visitor_id: 'visitor-a', role: 'model_partner', content: '第一封回信', status: 'sent', reply_batch_id: 'batch-1', created_at: '2026-08-01T11:00:00.000Z', updated_at: '2026-08-01T11:00:00.000Z' },
 ];
 const memory = {
   thought_soil: {
@@ -131,16 +131,16 @@ globalThis.fetch = async (input, options = {}) => {
   } else if (path === '/api/mailbox/messages' && method === 'GET') {
     value = { ok: true, messages: structuredClone(messages) };
   } else if (path === '/api/mailbox/status') {
-    value = { ok: true, pending_count: messages.filter((message) => message.status === 'waiting_for_myri').length, last_myri_reply_at: '2026-08-01T11:00:00.000Z', queue_status: 'replied' };
+    value = { ok: true, pending_count: messages.filter((message) => message.status === 'waiting_for_model_partner').length, last_model_partner_reply_at: '2026-08-01T11:00:00.000Z', queue_status: 'replied' };
   } else if (path === '/api/mailbox/memory' && method === 'GET') {
     value = { ok: true, memory: structuredClone(memory) };
   } else if (path === '/api/mailbox/send') {
     const body = JSON.parse(options.body);
-    const message = { id: 'v-2', visitor_id: 'visitor-a', role: 'visitor', content: body.content, status: 'waiting_for_myri', created_at: '2026-08-01T12:00:00.000Z', updated_at: '2026-08-01T12:00:00.000Z' };
+    const message = { id: 'v-2', visitor_id: 'visitor-a', role: 'visitor', content: body.content, status: 'waiting_for_model_partner', created_at: '2026-08-01T12:00:00.000Z', updated_at: '2026-08-01T12:00:00.000Z' };
     messages.push(message);
     value = { ok: true, message };
   } else if (path === '/api/mailbox/messages/v-1' && method === 'PATCH') {
-    messages[0] = { ...messages[0], content: JSON.parse(options.body).content, status: 'waiting_for_myri', reply_batch_id: null };
+    messages[0] = { ...messages[0], content: JSON.parse(options.body).content, status: 'waiting_for_model_partner', reply_batch_id: null };
     value = { ok: true, message: structuredClone(messages[0]) };
   } else if (path.startsWith('/api/mailbox/messages/') && method === 'DELETE') {
     const id = decodeURIComponent(path.split('/').at(-1));
@@ -188,7 +188,7 @@ assert.equal(mailboxWindow.document.querySelector('.message.user [data-mailbox-a
 assert.equal(mailboxWindow.document.querySelector('.message.user [data-mailbox-action="delete"]') != null, true);
 assert.equal(mailboxWindow.document.querySelector('.message.assistant [data-mailbox-action="copy"]') != null, true);
 assert.equal(mailboxWindow.document.querySelector('.message.assistant [data-mailbox-action="delete"]') != null, true);
-assert.equal(mailboxWindow.document.querySelector('.mailbox-myri-avatar').textContent, '');
+assert.equal(mailboxWindow.document.querySelector('.mailbox-model-partner-avatar').textContent, '');
 
 soilEntry.click();
 await waitFor(() => mailboxWindow.document.querySelector('#mailboxPanel').open, 'soil panel');

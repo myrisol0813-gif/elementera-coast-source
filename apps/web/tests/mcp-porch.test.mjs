@@ -15,8 +15,8 @@ const issuer = 'https://auth.coast-test.example/';
 const audience = 'https://coast.test/mcp';
 const emailClaim = 'https://elementeracoast.com/email';
 const emailVerifiedClaim = 'https://elementeracoast.com/email_verified';
-const subject = 'auth0|xiaohan-private';
-const email = 'xiaohan@example.test';
+const subject = 'auth0|owner-private';
+const email = 'owner@example.test';
 const env = {
   COAST_CHAT_DB: db,
   COAST_MCP_AUTH0_ISSUER: issuer,
@@ -33,7 +33,7 @@ await writeProfile(db, { current_chat_model: 'openai/gpt-4.1-nano', current_imag
 const authConfig = mcpAuthConfig(env);
 assert.equal(authConfig.issuer, issuer);
 assert.equal(validateMcpClaims({ sub: subject, [emailClaim]: email, [emailVerifiedClaim]: true, scope: 'read:coast write:soil' }, authConfig, ['read:coast']).email, email);
-assert.throws(() => validateMcpClaims({ sub: 'auth0|not-xiaohan', [emailClaim]: email, [emailVerifiedClaim]: true, scope: 'read:coast' }, authConfig, ['read:coast']), (error) => error.type === 'mcp_subject_denied');
+assert.throws(() => validateMcpClaims({ sub: 'auth0|not-owner', [emailClaim]: email, [emailVerifiedClaim]: true, scope: 'read:coast' }, authConfig, ['read:coast']), (error) => error.type === 'mcp_subject_denied');
 
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const kid = 'coast-unified-test-key';
@@ -123,7 +123,7 @@ const createDiaryTool = toolList.result.tools.find((tool) => tool.name === 'crea
 assert.equal(Object.hasOwn(createMomentTool.inputSchema.properties, 'image_refs'), false);
 assert.equal(Object.hasOwn(createDiaryTool.inputSchema.properties, 'image_refs'), false);
 assert.equal(Object.hasOwn(toolList.result.tools.find((tool) => tool.name === 'list_daily_moments').inputSchema.properties, 'status'), false);
-assert.deepEqual(toolList.result.tools.find((tool) => tool.name === 'list_daily_diaries').inputSchema.properties.author.enum, ['xiaohan', 'myri', 'api', 'mcp']);
+assert.deepEqual(toolList.result.tools.find((tool) => tool.name === 'list_daily_diaries').inputSchema.properties.author.enum, ['owner', 'model_partner', 'api', 'mcp']);
 assert.equal(Object.hasOwn(toolList.result.tools.find((tool) => tool.name === 'send_radio_message').inputSchema.properties, 'room_memory'), false);
 
 const unauthorizedStatus = await mcp({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'get_coast_status', arguments: {} } });

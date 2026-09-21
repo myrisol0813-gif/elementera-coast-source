@@ -153,7 +153,7 @@ legacyDb.database.exec(`
   CREATE TABLE visitor_notebook_entries (
     id TEXT PRIMARY KEY, visitor_id TEXT NOT NULL, content TEXT NOT NULL,
     source_message_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
-    confidence REAL NOT NULL DEFAULT 1, visibility TEXT NOT NULL DEFAULT 'myri_only',
+    confidence REAL NOT NULL DEFAULT 1, visibility TEXT NOT NULL DEFAULT 'model_partner_only',
     archived INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY(visitor_id) REFERENCES mailbox_visitors(id),
     FOREIGN KEY(source_message_id) REFERENCES mailbox_messages(id)
@@ -171,7 +171,7 @@ legacyDb.database.exec(`
     1, 1, 'sealed', NULL
   );
   INSERT INTO mailbox_messages VALUES (
-    'legacy-reply', 'legacy-visitor', 'myri', '旧回信',
+    'legacy-reply', 'legacy-visitor', 'model_partner', '旧回信',
     '2026-08-01T01:00:00.000Z', '2026-08-01T01:00:00.000Z',
     'sent', NULL, 0, NULL
   );
@@ -293,7 +293,7 @@ assert.equal(
 );
 
 const editedFirst = await editMailboxMessage(db, alice.id, aliceFirst.id, '星星编辑后的第一封密封来信。');
-assert.equal(editedFirst.status, 'waiting_for_myri');
+assert.equal(editedFirst.status, 'waiting_for_model_partner');
 assert.equal(editedFirst.content, '星星编辑后的第一封密封来信。');
 await assert.rejects(
   () => editMailboxMessage(db, bob.id, aliceFirst.id, '不应跨房编辑。'),
@@ -458,11 +458,11 @@ await deleteVisibleVisitorNotebookEntry(db, alice.id, aliceMemory.entries[0].id)
 assert.deepEqual((await visibleVisitorMemory(db, alice.id)).entries, []);
 
 const editedAfterReply = await editMailboxMessage(db, alice.id, aliceFirst.id, '第一封在回信后再次编辑。');
-assert.equal(editedAfterReply.status, 'waiting_for_myri');
-assert.equal((await mailboxMessages(db, alice.id)).some((message) => message.role === 'myri'), true, 'a shared batch reply remains while another source letter still exists');
+assert.equal(editedAfterReply.status, 'waiting_for_model_partner');
+assert.equal((await mailboxMessages(db, alice.id)).some((message) => message.role === 'model_partner'), true, 'a shared batch reply remains while another source letter still exists');
 const deletedSecond = await removeMailboxMessage(db, alice.id, aliceSecond.id);
 assert.ok(deletedSecond.related_reply_id, 'deleting the last source letter for a batch also removes that reply');
-assert.equal((await mailboxMessages(db, alice.id)).some((message) => message.role === 'myri'), false);
+assert.equal((await mailboxMessages(db, alice.id)).some((message) => message.role === 'model_partner'), false);
 assert.equal((await mailboxVisitorStatus(db, alice.id)).pending_count, 1);
 
 const stalePatrol = await fetchUnrepliedMailbox(db);

@@ -30,15 +30,15 @@ assert.equal(settings.includes("router.register('settings-system'"), false);
 assert.equal(settings.includes("router.register('settings-work'"), false);
 assert.equal(settings.includes("router.register('settings-developer-tools'"), false);
 assert.equal(settings.includes('systemDraft'), false);
-assert.equal(settings.includes('myriPortrait'), false);
-assert.equal(settings.includes('myriNote'), false);
+assert.equal(settings.includes('modelPartnerPortrait'), false);
+assert.equal(settings.includes('modelPartnerNote'), false);
 assert.equal(settings.includes('assistantBubble'), false);
 
 const profile = between(settings, "router.register('settings-profile'", "router.register('settings-appearance'");
 for (const expected of ['昵称', '聊天署名 / 导出时显示名', '用户气泡颜色', '头像在碳硅圈资料中设置', '不会自动进入另一位屋主']) assert.ok(profile.includes(expected), `profile missing: ${expected}`);
-assert.equal(profile.includes('xiaohanAvatar'), false, 'Wolf profile must not introduce a second avatar field');
+assert.equal(profile.includes('ownerAvatar'), false, 'Wolf profile must not introduce a second avatar field');
 assert.match(settings, /display_profile: display/);
-assert.match(settings, /xiaohanSignature/);
+assert.match(settings, /ownerSignature/);
 assert.match(settings, /snapshotChatHtml\(snapshot, signature\)/);
 assert.match(settings, /Elementera Coast · 全局 HTML/);
 assert.match(settings, /数据范围与 V1 JSON 快照同源/);
@@ -69,7 +69,7 @@ assert.equal(sandboxExists, false, 'retired model-sandbox.js must be deleted');
 
 const storage = await read(resolve(pages, 'public/core/storage.js'));
 const defaultsBlock = between(storage, 'function defaults()', 'function parseJson');
-for (const retired of ['systemDraft', 'assistantBubble', 'myriPortrait', 'myriNote', 'xiaohanAvatar', 'LEGACY_RUN_CONTROL_DEFAULTS', 'legacyCache', 'legacyDrafts', 'legacyStatus']) assert.equal(defaultsBlock.includes(retired), false, `active storage defaults leaked: ${retired}`);
+for (const retired of ['systemDraft', 'assistantBubble', 'modelPartnerPortrait', 'modelPartnerNote', 'ownerAvatar', 'LEGACY_RUN_CONTROL_DEFAULTS', 'legacyCache', 'legacyDrafts', 'legacyStatus']) assert.equal(defaultsBlock.includes(retired), false, `active storage defaults leaked: ${retired}`);
 const defaultDaily = between(storage, 'function defaultDaily()', 'function defaults()');
 for (const retired of ['summary', 'draft', 'album', 'legacy']) assert.equal(defaultDaily.toLowerCase().includes(retired), false, `Daily default leaked: ${retired}`);
 assert.match(storage, /Object\.keys\(base\.runControl\)/);

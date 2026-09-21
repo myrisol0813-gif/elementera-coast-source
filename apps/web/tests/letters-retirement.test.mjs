@@ -14,7 +14,7 @@ const state = {
       state: 'lovebook',
       coreText: '退休核心',
       loveText: '退休全文',
-      xiaohanPen: '退休添笔',
+      ownerPen: '退休添笔',
       modelPen: '退休模型添笔',
       promotedAt: 123,
     },
