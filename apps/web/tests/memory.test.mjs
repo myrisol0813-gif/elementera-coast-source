@@ -84,7 +84,7 @@ assert.equal(formalChatRequestSettings({ outputLength: 'auto', max_tokens: 600 }
 assert.equal(formalChatRequestSettings({ outputLength: 'long', max_tokens: 1200 }).max_tokens, null);
 assert.equal(formalChatRequestSettings({ max_tokens: 80 }).max_tokens, 80, 'low-level callers without an output preference keep their explicit budget');
 const comfortable = trimContextToComfortRange({
-  basePrompt: '你是 Model Partner。',
+  basePrompt: 'You are the Elementera Coast demo assistant。',
   soilText: `【整理当前对话的纸条】\n当前：${'潮'.repeat(1200)}`,
   memoryItems: Array.from({ length: 10 }, (_, index) => `低相关旧纸条 ${index} ${'记'.repeat(400)}`),
   worldbookItems: Array.from({ length: 6 }, (_, index) => `词典 ${index} ${'词'.repeat(300)}`),

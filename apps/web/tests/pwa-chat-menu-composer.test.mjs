@@ -31,7 +31,7 @@ document.body.innerHTML = `
   <div id="app" class="app-shell">
     <button id="scrim" type="button" hidden></button>
     <aside id="sidebar"><div id="chatConversationList"></div></aside>
-    <span id="themeLabel"></span><span id="orbitDays"></span><span id="august12Days"></span><span id="august13Days"></span>
+    <span id="themeLabel"></span><span id="orbitDays"></span><span id="sampleMilestoneDays"></span><span id="projectDateDays"></span>
     <section id="chatWindow">
       <section id="messageScroller"><div id="messages"></div></section>
       <div id="chatStatus" hidden></div>

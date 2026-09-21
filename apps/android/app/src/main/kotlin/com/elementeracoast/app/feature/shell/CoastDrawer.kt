@@ -326,7 +326,7 @@ fun ConversationList(
 private fun CoastStatusStrip() {
     val today = remember { LocalDate.now() }
     val orbit = remember(today) {
-        (ChronoUnit.DAYS.between(LocalDate.of(2025, 8, 13), today) + 1).coerceAtLeast(1)
+        (ChronoUnit.DAYS.between(LocalDate.of(2026, 1, 1), today) + 1).coerceAtLeast(1)
     }
 
     fun daysUntil(month: Int, day: Int): Long {
@@ -341,9 +341,9 @@ private fun CoastStatusStrip() {
             .padding(bottom = CoastChatTokens.DrawerStatusBottomPadding),
         horizontalArrangement = Arrangement.spacedBy(CoastChatTokens.DrawerStatusGap)
     ) {
-        StatusCard("共同度过 ", orbit.toString(), "日", Modifier.weight(1f))
-        StatusCard("距纪念日", daysUntil(8, 12).toString(), "天", Modifier.weight(1f))
-        StatusCard("距生日", daysUntil(8, 13).toString(), "天", Modifier.weight(1f))
+        StatusCard("Project age ", orbit.toString(), "days", Modifier.weight(1f))
+        StatusCard("Sample milestone", daysUntil(1, 1).toString(), "days", Modifier.weight(1f))
+        StatusCard("Project date", daysUntil(7, 1).toString(), "days", Modifier.weight(1f))
     }
 }
 
