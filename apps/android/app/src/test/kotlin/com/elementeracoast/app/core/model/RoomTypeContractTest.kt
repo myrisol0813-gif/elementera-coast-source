@@ -8,11 +8,11 @@ import org.junit.Test
 class RoomTypeContractTest {
     @Test
     fun radioAndLighthouseTitlesKeepRequiredPrefixes() {
-        assertEquals("【电波】新聊天 2", roomConversationTitle(RoomType.Radio, 2))
-        assertEquals("【灯塔】新聊天 3", roomConversationTitle(RoomType.Lighthouse, 3))
+        assertEquals("【共通聊天室】新聊天 2", roomConversationTitle(RoomType.Radio, 2))
+        assertEquals("【MCP 对话区】新聊天 3", roomConversationTitle(RoomType.Lighthouse, 3))
         assertEquals("新聊天 4", roomConversationTitle(RoomType.Main, 4))
-        assertEquals("【电波】夜航", roomConversationTitle(RoomType.Radio, "【灯塔】夜航"))
-        assertEquals("新的窗口", roomConversationTitle(RoomType.Main, "【灯塔】新的窗口"))
+        assertEquals("【共通聊天室】夜航", roomConversationTitle(RoomType.Radio, "【MCP 对话区】夜航"))
+        assertEquals("新的窗口", roomConversationTitle(RoomType.Main, "【MCP 对话区】新的窗口"))
     }
 
     @Test
@@ -30,7 +30,7 @@ class RoomTypeContractTest {
     fun nativeThemeContractKeepsDefaultAndWardrobePresets() {
         assertEquals(CoastThemePreset.CoastDefault, CoastThemePreset.entries.first())
         assertEquals(13, CoastThemePreset.entries.size)
-        assertEquals("默认海岸", CoastThemePreset.CoastDefault.label)
+        assertEquals("默认主题", CoastThemePreset.CoastDefault.label)
         assertTrue(CoastThemePreset.entries.any { it == CoastThemePreset.DeepBlueGold })
         assertTrue(CoastThemePreset.entries.any { it == CoastThemePreset.SnowLetter })
         assertTrue(CoastThemePreset.entries.any { it == CoastThemePreset.PurpleDreamTide })
