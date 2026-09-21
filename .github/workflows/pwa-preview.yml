@@ -1,0 +1,111 @@
+name: Candidate PWA Preview
+
+on:
+  push:
+    branches:
+      - candidate/ui-parity-source-v0.1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install web dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install cloudflared
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /tmp/cloudflared
+          chmod +x /tmp/cloudflared
+          /tmp/cloudflared --version
+
+      - name: Start full Pages preview
+        shell: bash
+        env:
+          COAST_PASSWORD_HASH: f4ade8894fd384793db5133d339a2647666c5f4ee27314f53e08b6b56eca1f06
+        run: |
+          set -euo pipefail
+          SESSION_SECRET="$(openssl rand -hex 32)"
+          nohup npx --yes wrangler@4 pages dev elementera-mcp/deploy-pages \
+            --ip 127.0.0.1 \
+            --port 8788 \
+            --compatibility-date 2026-09-21 \
+            --d1 COAST_CHAT_DB=00000000-0000-0000-0000-000000000001 \
+            --binding COAST_PASSWORD_HASH="$COAST_PASSWORD_HASH" \
+            --binding COAST_SESSION_SECRET="$SESSION_SECRET" \
+            > /tmp/wrangler-preview.log 2>&1 &
+          echo $! > /tmp/wrangler-preview.pid
+
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8788/login >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          cat /tmp/wrangler-preview.log
+          exit 1
+
+      - name: Open temporary public tunnel
+        shell: bash
+        run: |
+          set -euo pipefail
+          nohup /tmp/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8788 \
+            > /tmp/cloudflared-preview.log 2>&1 &
+          echo $! > /tmp/cloudflared-preview.pid
+
+          PREVIEW_URL=""
+          for attempt in $(seq 1 60); do
+            PREVIEW_URL="$(grep -Eo 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' /tmp/cloudflared-preview.log | head -n 1 || true)"
+            if [ -n "$PREVIEW_URL" ]; then
+              break
+            fi
+            sleep 2
+          done
+
+          if [ -z "$PREVIEW_URL" ]; then
+            cat /tmp/cloudflared-preview.log
+            exit 1
+          fi
+
+          echo "PREVIEW_URL=$PREVIEW_URL" >> "$GITHUB_ENV"
+          echo "::notice title=Candidate PWA Preview::$PREVIEW_URL"
+          printf '%s\n' "$PREVIEW_URL" > /tmp/PREVIEW_URL.txt
+
+      - name: Verify public preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            if curl -fsS "$PREVIEW_URL/login" >/dev/null; then
+              echo "Preview reachable: $PREVIEW_URL"
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+
+      - name: Keep preview alive for real-device acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Candidate preview: $PREVIEW_URL"
+          echo "This runner will keep the preview alive for up to 40 minutes."
+          for minute in $(seq 1 40); do
+            curl -fsS "$PREVIEW_URL/login" >/dev/null || true
+            sleep 60
+          done
