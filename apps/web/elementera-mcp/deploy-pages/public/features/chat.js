@@ -128,7 +128,7 @@ export function createChat({ storage, toast, dogtalk }) {
     }
     if (ui.input) {
       ui.input.disabled = !runtime.composerReady;
-      ui.input.placeholder = runtime.composerReady ? '询问任何问题' : (placeholder || '正在连接海岸…');
+      ui.input.placeholder = runtime.composerReady ? '询问任何问题' : (placeholder || '正在连接…');
     }
     composerState();
   }
@@ -233,7 +233,7 @@ export function createChat({ storage, toast, dogtalk }) {
     }
     const file = await pickRikkaHubPackage();
     if (!file) return;
-    setStatus('正在把 RikkaHub 旧窗口送回海岸…', 'loading');
+    setStatus('正在把 RikkaHub 旧窗口送回前端…', 'loading');
     try {
       const summary = await importRikkaHubPackage(file);
       await fetchConversations();
@@ -249,10 +249,10 @@ export function createChat({ storage, toast, dogtalk }) {
 
   async function refreshFromCoast() {
     if (runtime.generation) {
-      toast('当前回复还在生成，完成后再刷新海岸。');
+      toast('当前回复还在生成，完成后再刷新前端。');
       return false;
     }
-    setStatus('正在刷新海岸状态…', 'loading');
+    setStatus('正在刷新前端状态…', 'loading');
     try {
       const profileData = await requestJson(API.profile);
       runtime.profile = cleanProfile(profileData.profile || {});
@@ -270,11 +270,11 @@ export function createChat({ storage, toast, dogtalk }) {
         renderConversationList();
       }
       const loaded = await loadConversation(target.id);
-      if (loaded) toast('海岸状态已刷新');
+      if (loaded) toast('前端状态已刷新');
       return loaded;
     } catch (error) {
-      setStatus(`海岸刷新失败：${error.message}`, 'error');
-      toast(`海岸刷新失败：${error.message}`);
+      setStatus(`前端刷新失败：${error.message}`, 'error');
+      toast(`前端刷新失败：${error.message}`);
       return false;
     }
   }
@@ -374,7 +374,7 @@ export function createChat({ storage, toast, dogtalk }) {
 
   async function mount() {
     bindUi();
-    setComposerReady(false, '正在连接海岸…');
+    setComposerReady(false, '正在连接…');
     await bootstrap();
     chatAttachments.refresh();
     composerState();
