@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.elementeracoast.app.BuildConfig
 import com.elementeracoast.app.ui.brand.CoastBrandMarkAnimation
 import com.elementeracoast.app.ui.brand.CoastMuted
 import com.elementeracoast.app.ui.brand.rememberCoastGateMotion
@@ -110,6 +111,17 @@ fun GateScreen(
                     enabled = gateEnabled,
                     modifier = Modifier.width(GateVisualTokens.PasswordWidth)
                 )
+
+                if (BuildConfig.SOURCE_PREVIEW_PASSWORD_HINT.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "source debug 默认预览密码：${BuildConfig.SOURCE_PREVIEW_PASSWORD_HINT} · 部署时请修改",
+                        modifier = Modifier.width(GateVisualTokens.PasswordWidth),
+                        color = CoastMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center
+                    )
+                }
 
                 if (authBusy || !authMessage.isNullOrBlank()) {
                     Spacer(Modifier.height(10.dp))
