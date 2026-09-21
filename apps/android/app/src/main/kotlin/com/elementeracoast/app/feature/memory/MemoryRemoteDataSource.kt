@@ -146,13 +146,13 @@ class MemoryRemoteDataSource(
                 if (!response.isSuccessful) throw responseError(response.code, response.body?.string().orEmpty())
                 val text = response.body?.string().orEmpty()
                 runCatching { json.decodeFromString(serializer, text) }.getOrElse { cause ->
-                    throw CoastApiException(CoastApiErrorKind.Decode, "invalid_json", "海岸记忆返回的数据格式无法读取。", response.code, cause)
+                    throw CoastApiException(CoastApiErrorKind.Decode, "invalid_json", "记忆返回的数据格式无法读取。", response.code, cause)
                 }
             }
         } catch (error: CoastApiException) {
             throw error
         } catch (error: IOException) {
-            throw CoastApiException(CoastApiErrorKind.Network, "network_unreachable", "无法连接海岸后端。", cause = error)
+            throw CoastApiException(CoastApiErrorKind.Network, "network_unreachable", "无法连接后端。", cause = error)
         }
     }
 
@@ -162,19 +162,19 @@ class MemoryRemoteDataSource(
                 if (!response.isSuccessful) throw responseError(response.code, response.body?.string().orEmpty())
                 val text = response.body?.string().orEmpty()
                 if (text.isNotBlank()) runCatching { json.parseToJsonElement(text) }.getOrElse { cause ->
-                    throw CoastApiException(CoastApiErrorKind.Decode, "invalid_json", "海岸记忆返回的数据格式无法读取。", response.code, cause)
+                    throw CoastApiException(CoastApiErrorKind.Decode, "invalid_json", "记忆返回的数据格式无法读取。", response.code, cause)
                 }
             }
         } catch (error: CoastApiException) {
             throw error
         } catch (error: IOException) {
-            throw CoastApiException(CoastApiErrorKind.Network, "network_unreachable", "无法连接海岸后端。", cause = error)
+            throw CoastApiException(CoastApiErrorKind.Network, "network_unreachable", "无法连接后端。", cause = error)
         }
     }
 
     private fun responseError(status: Int, text: String): CoastApiException {
         var type = if (status == 401) "unauthorized" else "request_failed"
-        var message = if (status == 401) "登录状态已失效。" else "海岸记忆请求失败（$status）。"
+        var message = if (status == 401) "登录状态已失效。" else "记忆请求失败（$status）。"
         runCatching {
             val error = json.parseToJsonElement(text).jsonObject["error"]
             if (error is JsonObject) {

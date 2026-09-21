@@ -114,7 +114,7 @@ private fun PocketResolveDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 Text(pocket.title, fontWeight = FontWeight.SemiBold)
-                Text("选择一个海岸正式标签：", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("选择一个正式标签：", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 canonicalMemoryTags.forEach { candidate ->
                     ChoiceRow(candidate, tag == candidate) { tag = candidate }
                 }

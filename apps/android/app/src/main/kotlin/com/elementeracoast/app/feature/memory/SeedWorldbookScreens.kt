@@ -103,7 +103,7 @@ internal fun SeedLibraryScreen(
             item {
                 Column(Modifier.padding(horizontal = 28.dp)) {
                     DailySurfaceCard {
-                        Text(if (state.seeds.isEmpty()) "海岸里还没有种子。" else "没有匹配的种子。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (state.seeds.isEmpty()) "还没有种子。" else "没有匹配的种子。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -128,7 +128,7 @@ internal fun SeedLibraryScreen(
                                 Text("删除", modifier = Modifier.clickable {
                                     scope.launch {
                                         runCatching { repository.deleteEntry(seed.id) }
-                                            .onSuccess { onSnackbar("种子已从海岸删除") }
+                                            .onSuccess { onSnackbar("种子已删除") }
                                             .onFailure { onSnackbar(it.message ?: "删除种子失败") }
                                     }
                                 }, color = MaterialTheme.colorScheme.primary)
@@ -143,7 +143,7 @@ internal fun SeedLibraryScreen(
     if (creating) SeedEditor(null, { creating = false }) { draft ->
         scope.launch {
             runCatching { repository.saveEntry(draft) }
-                .onSuccess { creating = false; onSnackbar("种子已写入海岸") }
+                .onSuccess { creating = false; onSnackbar("种子已写入") }
                 .onFailure { onSnackbar(it.message ?: "保存种子失败") }
         }
     }

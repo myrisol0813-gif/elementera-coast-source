@@ -57,7 +57,7 @@ internal fun CustomInstructionsScreen(repository: MemoryRepository, onSnackbar: 
             DailyPrimaryButton("保存当前指令") {
                 scope.launch {
                     runCatching { repository.saveInstructions(draft) }
-                        .onSuccess { onSnackbar("自定义指令已写回海岸") }
+                        .onSuccess { onSnackbar("自定义指令已写回后端") }
                         .onFailure { onSnackbar(it.message ?: "保存自定义指令失败") }
                 }
             }
@@ -68,7 +68,7 @@ internal fun CustomInstructionsScreen(repository: MemoryRepository, onSnackbar: 
                         runCatching { repository.saveInstructions("") }
                             .onSuccess {
                                 draft = ""
-                                onSnackbar("海岸自定义指令已清空")
+                                onSnackbar("自定义指令已清空")
                             }
                             .onFailure { onSnackbar(it.message ?: "清空自定义指令失败") }
                     }

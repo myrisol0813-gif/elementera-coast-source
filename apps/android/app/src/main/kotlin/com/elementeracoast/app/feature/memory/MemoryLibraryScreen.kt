@@ -106,7 +106,7 @@ internal fun MemoryLibraryScreen(
                 Column(Modifier.padding(horizontal = 28.dp)) {
                     DailySurfaceCard {
                         Text(
-                            if (state.memories.isEmpty()) "海岸里还没有长期记忆。" else "没有匹配的记忆。",
+                            if (state.memories.isEmpty()) "还没有长期记忆。" else "没有匹配的记忆。",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyLarge
                         )
@@ -142,8 +142,8 @@ internal fun MemoryLibraryScreen(
                                     scope.launch {
                                         runCatching { repository.deleteEntry(entry.id) }
                                             .onSuccess {
-                                                onActionLogged("memory.delete", "删除海岸记忆", "删除 1 条 canonical 记忆")
-                                                onSnackbar("记忆已从海岸删除")
+                                                onActionLogged("memory.delete", "删除记忆", "删除 1 条 canonical 记忆")
+                                                onSnackbar("记忆已删除")
                                             }
                                             .onFailure { onSnackbar(it.message ?: "删除记忆失败") }
                                     }
@@ -161,8 +161,8 @@ internal fun MemoryLibraryScreen(
             runCatching { repository.saveEntry(draft) }
                 .onSuccess {
                     creating = false
-                    onActionLogged("memory.write", "写入海岸记忆", "新增 1 条 canonical 记忆")
-                    onSnackbar("记忆已写入海岸")
+                    onActionLogged("memory.write", "写入记忆", "新增 1 条 canonical 记忆")
+                    onSnackbar("记忆已写入")
                 }
                 .onFailure { onSnackbar(it.message ?: "保存记忆失败") }
         }
@@ -173,7 +173,7 @@ internal fun MemoryLibraryScreen(
                 runCatching { repository.saveEntry(draft.copy(id = entry.id)) }
                     .onSuccess {
                         editing = null
-                        onActionLogged("memory.edit", "编辑海岸记忆", "更新 1 条 canonical 记忆")
+                        onActionLogged("memory.edit", "编辑记忆", "更新 1 条 canonical 记忆")
                         onSnackbar("记忆已更新")
                     }
                     .onFailure { onSnackbar(it.message ?: "更新记忆失败") }
