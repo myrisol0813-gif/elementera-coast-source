@@ -285,7 +285,7 @@ export function validateMcpClaims(
   if (!diagnostic.claim_checks.sub_allowed) {
     throw authFailure(
       'subject_not_allowed',
-      '这个 Auth0 身份不在海岸邀请名单中。',
+      '这个 Auth0 身份不在访问邀请名单中。',
       403,
       diagnostic,
     );
@@ -293,7 +293,7 @@ export function validateMcpClaims(
   if (!diagnostic.claim_checks.email_allowed) {
     throw authFailure(
       'email_not_allowed',
-      '这个邮箱身份不在海岸邀请名单中。',
+      '这个邮箱身份不在访问邀请名单中。',
       403,
       diagnostic,
     );
@@ -310,7 +310,7 @@ export function validateMcpClaims(
   if (missing.length) {
     throw authFailure(
       'scope_missing',
-      '当前连接缺少所需海岸权限。',
+      '当前连接缺少所需访问权限。',
       403,
       diagnostic,
       { missing_scopes: missing },
@@ -364,7 +364,7 @@ async function remoteJwks(issuer, diagnostic, { refresh = false } = {}) {
   } catch (error) {
     throw jwksFailure(
       'jwks_fetch_exception_name',
-      '暂时无法读取海岸身份签名密钥。',
+      '暂时无法读取身份签名密钥。',
       diagnostic,
       { exception: error },
     );
@@ -384,7 +384,7 @@ async function remoteJwks(issuer, diagnostic, { refresh = false } = {}) {
   } catch (error) {
     throw jwksFailure(
       'jwks_json_parse_failed',
-      '海岸身份签名密钥响应格式无效。',
+      '身份签名密钥响应格式无效。',
       diagnostic,
       { exception: error },
     );
