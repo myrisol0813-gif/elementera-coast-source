@@ -44,7 +44,7 @@ const db = new D1Database();
 const conversationA = await createConversation(db, '主聊天');
 const conversationB = await createConversation(db, '施工窗');
 
-assert.deepEqual(MEMORY_TAGS, ['关系', '历史锚点', '偏好', '人物档案', '海岸世界观', '工程技术']);
+assert.deepEqual(MEMORY_TAGS, ['关系', '历史锚点', '偏好', '人物档案', '世界观', '工程技术']);
 assert.equal(MEMORY_TAGS.includes('待整理'), false, '待整理只能是迁移状态');
 
 const relationship = await createEntry(db, {
@@ -86,7 +86,7 @@ await createEntry(db, {
   source_model: 'o3',
   source_window: '主聊天',
   source_time: '2026-08-29',
-  tag: '海岸世界观',
+  tag: '世界观',
 });
 await createEntry(db, {
   entry_type: 'memory',
@@ -109,7 +109,7 @@ assert.ok(unified.facets.times.includes('2026-08-30'));
 const seedLibrary = await listEntries(db, { entry_type: 'seed', library_only: true, limit: 100 });
 assert.deepEqual(seedLibrary.facets.models, ['o3']);
 assert.deepEqual(seedLibrary.facets.windows, ['主聊天']);
-assert.deepEqual(seedLibrary.facets.tags, ['海岸世界观']);
+assert.deepEqual(seedLibrary.facets.tags, ['世界观']);
 assert.deepEqual(seedLibrary.facets.times, ['2026-08-29']);
 
 const filtered = await listEntries(db, {
