@@ -10,7 +10,7 @@ export function isOwnerMailboxApiPath(pathname) {
 
 export async function routeOwnerMailboxApi(request, env, session) {
   if (!env?.COAST_CHAT_DB?.prepare) {
-    return apiError('coast_db_not_configured', '海岸 D1 存储未配置。', 503);
+    return apiError('coast_db_not_configured', 'D1 存储未配置。', 503);
   }
   const url = new URL(request.url);
   try {

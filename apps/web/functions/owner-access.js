@@ -1,5 +1,5 @@
 export class OwnerAccessError extends Error {
-  constructor(message = '请先从海岸网页登录。') {
+  constructor(message = '请先从网页登录。') {
     super(message);
     this.name = 'OwnerAccessError';
     this.type = 'owner_session_required';

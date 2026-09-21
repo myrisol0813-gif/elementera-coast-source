@@ -112,7 +112,7 @@ export function isWorkbenchApiPath(pathname) {
 }
 
 export async function routeWorkbenchApi(request, env, session = null) {
-  if (!env?.COAST_CHAT_DB?.prepare) return apiError('coast_db_not_configured', '海岸 D1 存储未配置。', 503);
+  if (!env?.COAST_CHAT_DB?.prepare) return apiError('coast_db_not_configured', 'D1 存储未配置。', 503);
   const db = env.COAST_CHAT_DB;
   const url = new URL(request.url);
   try {

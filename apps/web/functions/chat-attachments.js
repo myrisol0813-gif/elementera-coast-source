@@ -146,7 +146,7 @@ export async function uploadChatAttachment(db, conversationId, file) {
   if (size > MAX_ATTACHMENT_BYTES) {
     throw new ChatAttachmentError(
       'file_too_large',
-      `附件超过海岸当前 ${Math.floor(MAX_ATTACHMENT_BYTES / 1024 / 1024)} MB 上传上限。`,
+      `附件超过当前 ${Math.floor(MAX_ATTACHMENT_BYTES / 1024 / 1024)} MB 上传上限。`,
       413,
       { max_bytes: MAX_ATTACHMENT_BYTES, attempted_bytes: size },
     );
