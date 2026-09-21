@@ -37,7 +37,7 @@ import com.elementeracoast.app.ui.theme.SnowLetterSurface
 import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
 import com.elementeracoast.app.ui.theme.coastDogtalkFieldColor
 
-private const val CrossWindowDescription = "这是本轮从其他海岸窗口取来的旧信索引；手动选择只在本轮有效。"
+private const val CrossWindowDescription = "这是本轮从其他对话窗口取来的历史索引；手动选择只在本轮有效。"
 
 @Composable
 fun CrossWindowPane(
@@ -61,15 +61,15 @@ fun CrossWindowPane(
         } catch (error: CoastApiException) {
             onChange(latestState.copy(loading = false, error = error.message))
         } catch (_: Throwable) {
-            onChange(latestState.copy(loading = false, error = "跨窗口旧信索引读取失败。"))
+            onChange(latestState.copy(loading = false, error = "跨窗口历史索引读取失败。"))
         }
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
         if (keywordOnly) {
-            Text("本地旧信关键词", fontWeight = FontWeight.SemiBold)
+            Text("本地跨窗关键词漫游", fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
-            CrossWindowNote("只检索海岸跨窗口历史，不会搜索互联网。模型先看最多约 10 条短摘录，再挑 1–3 条完整旧消息精读。")
+            CrossWindowNote("只检索跨窗口历史，不会搜索互联网。模型先看最多约 10 条短摘录，再挑 1–3 条完整历史消息精读。")
             Spacer(Modifier.height(10.dp))
             val active = state.mode == CrossWindowMode.Keyword
             Box(
@@ -79,10 +79,10 @@ fun CrossWindowPane(
                     .clickable { onChange(state.copy(mode = if (active) CrossWindowMode.Off else CrossWindowMode.Keyword)) }
                     .padding(horizontal = 13.dp, vertical = 11.dp)
             ) {
-                Text(if (active) "本轮已允许模型翻本地旧信" else "本轮允许模型翻本地旧信", fontWeight = FontWeight.SemiBold)
+                Text(if (active) "本轮已允许模型检索本地历史" else "本轮允许模型检索本地历史", fontWeight = FontWeight.SemiBold)
             }
             Spacer(Modifier.height(6.dp))
-            CrossWindowNote("无命中时会明确显示“本地旧信无命中”；本模式不会递给模型 web search 工具。")
+            CrossWindowNote("无命中时会明确显示“本地历史无命中”；本模式不会递给模型 web search 工具。")
             return@Column
         }
 
@@ -108,7 +108,7 @@ fun CrossWindowPane(
         }
         if (state.loading) {
             Spacer(Modifier.height(7.dp))
-            CrossWindowNote("正在整理跨窗口旧信索引……")
+            CrossWindowNote("正在整理跨窗口历史索引……")
         }
         state.error?.takeIf(String::isNotBlank)?.let {
             Spacer(Modifier.height(7.dp))
@@ -240,8 +240,8 @@ private fun sourceDisplayName(source: CrossWindowSource): String =
 
 private fun sourceKind(source: CrossWindowSource): String = when {
     source.source == "rikkahub" -> "RikkaHub"
-    source.roomType == "radio" -> "电波"
-    source.roomType == "lighthouse" -> "灯塔"
+    source.roomType == "radio" -> "共通聊天室"
+    source.roomType == "lighthouse" -> "MCP 对话区"
     else -> "主聊天"
 }
 
