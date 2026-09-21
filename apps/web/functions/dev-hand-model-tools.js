@@ -18,7 +18,7 @@ function modelTool(name, description, properties = {}, required = []) {
   return Object.freeze({ type: 'function', function: { name, description, parameters: objectSchema(properties, required) } });
 }
 function spec(value) { return Object.freeze(value); }
-const REPO = { repo: { type: 'string', description: '海岸 GitHub allowlist 中的 owner/repo。' } };
+const REPO = { repo: { type: 'string', description: '项目 GitHub allowlist 中的 owner/repo。' } };
 const PAGE = { page: { type: 'integer', minimum: 1, maximum: 1000 }, per_page: { type: 'integer', minimum: 1, maximum: 100 } };
 function github(name, action, risk, description, properties = {}, required = ['repo'], pack = null) {
   return spec({ name, action, risk, system: 'GitHub', pack: pack || (risk === 'read' ? DEV_HAND_PACKS.githubRead : DEV_HAND_PACKS.githubWrite), model_tool: modelTool(name, description, { ...REPO, ...properties }, required) });
@@ -33,7 +33,7 @@ const DEFINITIONS = Object.freeze([
   spec({ name: 'notion_self_check', action: 'notion_self_check', risk: 'read', system: 'Notion', pack: DEV_HAND_PACKS.status, model_tool: modelTool('notion_self_check', '检查 Notion root 是否可读；不返回 token。') }),
   spec({ name: 'model_tool_support_check', action: 'model_tool_support_check', risk: 'read', system: '模型', pack: DEV_HAND_PACKS.status, model_tool: modelTool('model_tool_support_check', '确认当前模型已经成功进入 tool-call 循环。') }),
 
-  spec({ name: 'github_list_allowed_repos', action: 'list_allowed_repos', risk: 'read', system: 'GitHub', pack: DEV_HAND_PACKS.githubRead, model_tool: modelTool('github_list_allowed_repos', '列出海岸允许访问的 GitHub 仓库。') }),
+  spec({ name: 'github_list_allowed_repos', action: 'list_allowed_repos', risk: 'read', system: 'GitHub', pack: DEV_HAND_PACKS.githubRead, model_tool: modelTool('github_list_allowed_repos', '列出项目允许访问的 GitHub 仓库。') }),
   github('github_get_repo', 'get_repo', 'read', '读取仓库 metadata。'),
   github('github_list_branches', 'list_branches', 'read', '列出仓库 branches。', PAGE),
   github('github_get_default_branch', 'get_default_branch', 'read', '读取仓库默认分支。'),
