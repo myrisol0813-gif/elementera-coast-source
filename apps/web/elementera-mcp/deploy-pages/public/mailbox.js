@@ -112,7 +112,7 @@ function renderMessages() {
   const root = q('#mailboxMessages');
   if (!root) return;
   if (!state.messages.length) {
-    root.innerHTML = '<div class="empty-state">这里还没有来信。你可以把第一封信投进海岸。</div>';
+    root.innerHTML = '<div class="empty-state">这里还没有来信。你可以写下第一封来信。</div>';
     return;
   }
   const latestModelPartnerMessage = [...state.messages].reverse().find((message) => message.role === 'myri');
@@ -136,7 +136,7 @@ function renderStatus() {
   const metaNode = q('#mailboxStatusMeta');
   if (!textNode || !metaNode) return;
   if (Number(status.pending_count || 0) > 0) {
-    textNode.textContent = '已送达灯塔，等待另一位屋主查看。';
+    textNode.textContent = '已送达，等待另一位屋主查看。';
     metaNode.textContent = `${status.pending_count} 封来信正在等待 · 现在是慢速回信模式，不是实时聊天。`;
     return;
   }
@@ -183,7 +183,7 @@ async function refreshMailbox({ announce = false } = {}) {
   state.loading = true;
   const refreshButton = q('#mailboxRefreshButton');
   if (refreshButton) refreshButton.disabled = true;
-  if (announce) showLoadingStatus('正在沿灯塔查看回信…');
+  if (announce) showLoadingStatus('正在查看回信…');
   try {
     const [messages, status, memory] = await Promise.all([
       requestJson(API.mailboxMessages),
@@ -211,7 +211,7 @@ async function sendMessage() {
   if (!content || state.loading) return;
   state.loading = true;
   if (sendButton) sendButton.disabled = true;
-  showLoadingStatus('信正在送往灯塔…');
+  showLoadingStatus('信正在送出…');
   try {
     const result = await requestJson(API.mailboxSend, {
       method: 'POST',
