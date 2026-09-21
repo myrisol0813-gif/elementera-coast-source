@@ -145,7 +145,7 @@ class CoastShellViewModelTest {
                     turnNumber = 1,
                     messages = listOf(
                         CrossWindowMessage("old-user", "user", "屋主", null, 4, "旧信问题"),
-                        CrossWindowMessage("old-assistant", "assistant", "另一位屋主", null, 4, "旧信回复")
+                        CrossWindowMessage("old-assistant", "assistant", "模型伙伴", null, 4, "旧信回复")
                     )
                 )
             )

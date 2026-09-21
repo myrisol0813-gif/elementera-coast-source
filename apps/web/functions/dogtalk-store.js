@@ -43,7 +43,7 @@ function normalizedReadMode(value) {
   const mode = String(value || 'keep_private');
   if (mode === LEGACY_CURRENT_ROOM) return 'keep_private';
   if (!READ_MODES.has(mode)) {
-    throw new DogtalkStoreError('invalid_dogtalk_read_mode', '人类思考链的可读方式无效。');
+    throw new DogtalkStoreError('invalid_dogtalk_read_mode', '私人草稿的可读方式无效。');
   }
   return mode;
 }
@@ -155,7 +155,7 @@ export function publicMysticDogtalk(value = {}) {
 export async function dogtalkScope(db, value = {}) {
   const roomScope = String(value.room_scope || '');
   if (!ROOM_SCOPES.has(roomScope)) {
-    throw new DogtalkStoreError('invalid_dogtalk_scope', '人类思考链的房间范围无效。');
+    throw new DogtalkStoreError('invalid_dogtalk_scope', '私人草稿的房间范围无效。');
   }
   if (roomScope === 'conversation') {
     const conversationId = sanitizeId(value.conversation_id || '', 'conversation');
@@ -317,14 +317,14 @@ export async function saveMysticDogtalk(db, value = {}) {
     read_mode: normalizedReadMode(value.read_mode),
   };
   if (!fields.body) {
-    throw new DogtalkStoreError('dogtalk_body_required', '写一点人类思考链再保存；不写也完全可以。');
+    throw new DogtalkStoreError('dogtalk_body_required', '写一点私人草稿再保存；不写也完全可以。');
   }
   const current = await first(db, `SELECT * FROM coast_mystic_dogtalk
     WHERE scope_key = ? AND status IN ('draft', 'saved')
     ORDER BY updated_at DESC LIMIT 1`, [scope.scope_key]);
   const requestedId = value.id ? sanitizeId(value.id, 'dogtalk') : '';
   if (requestedId && current?.id !== requestedId) {
-    throw new DogtalkStoreError('dogtalk_not_found', '这条人类思考链不在当前房间。', 404);
+    throw new DogtalkStoreError('dogtalk_not_found', '这条私人草稿不在当前房间。', 404);
   }
   const timestamp = Date.now();
   if (current) {
@@ -371,11 +371,11 @@ export async function saveMysticDogtalk(db, value = {}) {
 function snapshotSource(value = {}) {
   const sourceType = String(value.source_type || '');
   if (!SNAPSHOT_SOURCE_TYPES.has(sourceType)) {
-    throw new DogtalkStoreError('invalid_dogtalk_snapshot_source', '人类思考链的消息来源无效。');
+    throw new DogtalkStoreError('invalid_dogtalk_snapshot_source', '私人草稿的消息来源无效。');
   }
   const rawSourceId = String(value.source_id || '').trim();
   if (!rawSourceId) {
-    throw new DogtalkStoreError('dogtalk_snapshot_source_required', '人类思考链需要跟随一条实际消息。');
+    throw new DogtalkStoreError('dogtalk_snapshot_source_required', '私人草稿需要跟随一条实际消息。');
   }
   return {
     source_type: sourceType,
@@ -444,7 +444,7 @@ export async function snapshotMysticDogtalk(db, dogtalkValue = {}, sourceValue =
   await ensureDogtalkSchema(db);
   const dogtalk = rowToDogtalk(await requireActiveDogtalk(db, dogtalkValue.id));
   if (dogtalk.scope_key !== dogtalkValue.scope_key) {
-    throw new DogtalkStoreError('dogtalk_snapshot_scope_mismatch', '人类思考链与消息不属于同一个房间。', 409);
+    throw new DogtalkStoreError('dogtalk_snapshot_scope_mismatch', '私人草稿与消息不属于同一个房间。', 409);
   }
   if (!CHAT_VISIBLE_MODES.has(dogtalk.read_mode)) {
     return { dogtalk, snapshot: null, skipped: true, reason: 'read_mode_not_submitted' };
@@ -482,7 +482,7 @@ async function requireActiveDogtalk(db, idValue) {
   const id = sanitizeId(idValue || '', 'dogtalk');
   const row = await first(db, `SELECT * FROM coast_mystic_dogtalk
     WHERE id = ? AND owner = ? AND status IN ('draft', 'saved')`, [id, OWNER]);
-  if (!row) throw new DogtalkStoreError('dogtalk_not_found', '这条人类思考链已经收进抽屉。', 404);
+  if (!row) throw new DogtalkStoreError('dogtalk_not_found', '这条私人草稿已经收进抽屉。', 404);
   return row;
 }
 
@@ -511,7 +511,7 @@ export async function askModelPartnerToReadMysticDogtalk(db, idValue) {
 export function formatMysticDogtalk(dogtalk) {
   if (!dogtalk?.id || !dogtalk.body) return '';
   return [
-    '【人类思考链】',
+    '【私人草稿】',
     dogtalk.body,
     dogtalk.true_core ? `真心核：${dogtalk.true_core}` : '',
     dogtalk.weather ? `当前天气：${dogtalk.weather}` : '',

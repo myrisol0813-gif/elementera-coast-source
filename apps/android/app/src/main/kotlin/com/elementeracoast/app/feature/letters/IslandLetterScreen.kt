@@ -158,7 +158,7 @@ fun IslandLetterScreen(
                             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(20.dp))
                             .padding(16.dp)
                     ) {
-                        Text("另一位屋主的回信", fontWeight = FontWeight.Bold)
+                        Text("模型伙伴的回信", fontWeight = FontWeight.Bold)
                         if (replyModel.isNotBlank()) {
                             Text(
                                 modelDisplayName(replyModel),

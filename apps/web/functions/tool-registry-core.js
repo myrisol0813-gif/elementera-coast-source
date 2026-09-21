@@ -164,15 +164,15 @@ const REGISTRY = Object.freeze([
   entry({ tool_key: 'daily.moment_comment', display_name: '评论朋友圈', description: '评论一条碳硅圈动态。', model_exposed: true, model_group: 'side', model_tool: DAILY_BY_NAME.get('moment_comment'), auth_scopes: ['write:soil'], handler: dailyHandler('comment') }),
   entry({ tool_key: 'daily.moment_like', display_name: '点赞朋友圈', description: '点赞或取消点赞一条碳硅圈动态。', model_exposed: true, model_group: 'side', model_tool: DAILY_BY_NAME.get('moment_like'), auth_scopes: ['write:soil'], handler: dailyHandler('like') }),
   entry({
-    tool_key: 'dogtalk.read', display_name: '读取人类思考链', description: '低频读取当前聊天窗口人类思考链。', model_exposed: true, model_group: 'core', model_tool: DOGTALK_MODEL_TOOL, auth_scopes: ['read:coast'],
+    tool_key: 'dogtalk.read', display_name: '读取私人草稿', description: '低频读取当前聊天窗口私人草稿。', model_exposed: true, model_group: 'core', model_tool: DOGTALK_MODEL_TOOL, auth_scopes: ['read:coast'],
     official_mcp: officialMcpTool({
-      order: 80, name: 'read_mystic_dogtalk', title: '低频读取人类思考链', description: '只在屋主明确要求，或确实需要避免误读当前 conversation 时，低频读取人类思考链。',
+      order: 80, name: 'read_mystic_dogtalk', title: '低频读取私人草稿', description: '只在屋主明确要求，或确实需要避免误读当前 conversation 时，低频读取私人草稿。',
       inputSchema: objectSchema({ conversation_id: { type: 'string', minLength: 1, maxLength: 200 }, user_query: { type: 'string', maxLength: 240 } }, ['conversation_id']),
       outputSchema: objectSchema({ dogtalk: PRIVATE_RECORD_SCHEMA, available: { type: 'boolean' }, reason: { type: 'string' }, text: { type: 'string' } }, ['dogtalk', 'available', 'reason', 'text']),
-      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false }, invoking: '正在轻轻看一眼人类思考链…', invoked: '只读了一点当前天气',
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false }, invoking: '正在轻轻看一眼私人草稿…', invoked: '只读了一点当前天气',
     }), handler: dogtalkHandler,
   }),
-  entry({ tool_key: 'dogtalk.save', display_name: '收好一张人类思考链纸条', description: '前端用户写入；不向模型暴露。', summary_policy: 'content_redacted', handler: (db, input, context) => saveMysticDogtalkWithSnapshot(db, { ...input, room_scope: 'conversation', conversation_id: context.conversation_id }, { source_type: 'turn', source_id: context.source_turn_id }) }),
+  entry({ tool_key: 'dogtalk.save', display_name: '收好一张私人草稿纸条', description: '前端用户写入；不向模型暴露。', summary_policy: 'content_redacted', handler: (db, input, context) => saveMysticDogtalkWithSnapshot(db, { ...input, room_scope: 'conversation', conversation_id: context.conversation_id }, { source_type: 'turn', source_id: context.source_turn_id }) }),
   entry({
     tool_key: 'cross_window.search', display_name: '查看跨窗口信架', description: '仅在本轮允许模型决定时查看可读取的其他对话窗口。', model_exposed: true, model_group: 'core', model_tool: CROSS_WINDOW_MODEL_TOOLS.search, auth_scopes: ['read:coast'], turn_gate: crossWindowLetterGate, summary_policy: 'content_redacted',
     handler: (db, input, context) => executeCrossWindowModelTool(db, 'search', input, context),

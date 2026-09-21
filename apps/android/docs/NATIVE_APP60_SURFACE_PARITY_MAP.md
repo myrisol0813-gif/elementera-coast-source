@@ -3,9 +3,9 @@
 Baseline product mother: PWA app-60 (`elementera-coast@0b9ca38d50738d0c367637ccd06579a4f5feacfe`).
 
 Reviewed deltas:
-- app-62 `settings.js`: `模型工作台 / 另一位屋主的工作台` with `工具调用记录` as the current tool shelf item.
+- app-62 `settings.js`: `模型工作台 / 模型伙伴的工作台` with `工具调用记录` as the current tool shelf item.
 - Native phone review: Radio / Lighthouse room entries are transient landings; a persistent conversation is created only on first send or explicit New.
-- current PWA Daily moments surface: a model-comment action exists beside normal moment actions. Native exposes it as a separate second-row `让另一位屋主评论` chip, but keeps model comment generation explicitly unwired until backend integration.
+- current PWA Daily moments surface: a model-comment action exists beside normal moment actions. Native exposes it as a separate second-row `让模型伙伴评论` chip, but keeps model comment generation explicitly unwired until backend integration.
 
 PWA source remains read-only reference. Web/PWA code and assets are not copied into this repository.
 
@@ -30,12 +30,12 @@ PWA source remains read-only reference. Web/PWA code and assets are not copied i
 | 模型箱当前模型 | one compact solid `surfaceVariant` bubble with thin outline |
 | 模型目录 | unselected models grouped inside one catalog card by o / GPT-4 / GPT-5 / other OpenAI Chat / Free Test / image |
 | Model refresh | visible offline action; real OpenRouter retrieval still deferred |
-| 模型工作台 | visible desk home (`模型工作台 / 另一位屋主的工作台`) with an extensible tool shelf |
+| 模型工作台 | visible desk home (`模型工作台 / 模型伙伴的工作台`) with an extensible tool shelf |
 | 工具调用记录 | current only desk tool; persistent redacted local records with filters |
 | Furniture → log | opens the Action Log tool inside 模型工作台 using exact action ids |
 | Daily | 碳硅圈 / 日记 / blank Pet surface |
 | 碳硅圈 normal actions | local like / comment / delete remain on the first action row |
-| 碳硅圈 Model Partner comment | separate second-row `让另一位屋主评论` chip; records the local request and clearly reports that real model commenting waits for backend wiring; it does not manufacture a fake Model Partner comment |
+| 碳硅圈 Model Partner comment | separate second-row `让模型伙伴评论` chip; records the local request and clearly reports that real model commenting waits for backend wiring; it does not manufacture a fake Model Partner comment |
 | Memory | 记忆库 / 种子库 / 世界书 / 自定义指令 in one 2×2 surface |
 | Network | no `INTERNET` permission, no base URL, no real API/OpenRouter/SSE call |
 
@@ -52,7 +52,7 @@ PWA source remains read-only reference. Web/PWA code and assets are not copied i
 
 ## Daily Model Partner-comment rule
 
-1. Normal user actions stay on the first row; `让另一位屋主评论` is visually separated onto a small second-row chip.
+1. Normal user actions stay on the first row; `让模型伙伴评论` is visually separated onto a small second-row chip.
 2. The chip belongs to `feature/daily/MomentActions.kt`; `MomentScreen.kt` only supplies callbacks.
 3. Native does not alter the current string-only local comment schema merely to predict the PWA backend comment schema while it is still changing.
 4. Until backend wiring exists, tapping the chip records a redacted local action and shows `真实模型伙伴评论将在后端接线后启用。`.
@@ -87,7 +87,7 @@ The room landing is not a hidden conversation and has no parallel thread store. 
 ## 模型工作台 rules
 
 1. Sidebar opens `模型工作台 / 模型工作台`.
-2. Desk home shows `模型工作台` with subtitle `另一位屋主的工作台`.
+2. Desk home shows `模型工作台` with subtitle `模型伙伴的工作台`.
 3. Tool list uses `SerpentDeskItem(tool, title, subtitle)`.
 4. Current only tool: `工具调用记录` — `工具调用成功 / 失败 · 房间 · 脱敏摘要`.
 5. Furniture focus ids enter that tool directly inside the desk surface.

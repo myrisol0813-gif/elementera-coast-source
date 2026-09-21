@@ -37,7 +37,7 @@ function moment(value = {}) {
     likeCount: Number(value.like_count || 0),
     comments: (Array.isArray(value.comments) ? value.comments : []).map((commentValue) => ({
       id: commentValue.id,
-      who: commentValue.author === 'owner' ? '屋主' : '另一位屋主',
+      who: commentValue.author === 'owner' ? '屋主' : '模型伙伴',
       author: commentValue.author,
       text: commentValue.text || '',
       modelId: commentValue.model_id || null,
@@ -70,7 +70,7 @@ function diary(value = {}) {
 }
 
 function profile(value = {}) {
-  const name = String(value.model_partner_display_name || '另一位屋主').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80) || '另一位屋主';
+  const name = String(value.model_partner_display_name || '模型伙伴').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80) || '模型伙伴';
   return {
     ownerAvatarDataurl: typeof value.owner_avatar_dataurl === 'string' ? value.owner_avatar_dataurl : '',
     modelPartnerAvatarDataurl: typeof value.model_partner_avatar_dataurl === 'string' ? value.model_partner_avatar_dataurl : '',
@@ -133,7 +133,7 @@ async function requestModelPartnerComment(url, value) {
   const raw = await response.text();
   const { result, streamError } = parseCommentStream(raw);
   if (streamError) {
-    throw new ApiError(streamError.message || '另一位屋主留言生成失败。', {
+    throw new ApiError(streamError.message || '模型伙伴留言生成失败。', {
       type: streamError.type || 'request_failed',
       status: Number(streamError.status) || 500,
       details: {
@@ -143,7 +143,7 @@ async function requestModelPartnerComment(url, value) {
     });
   }
   if (!result?.ok) {
-    throw new ApiError('另一位屋主留言流提前结束。', {
+    throw new ApiError('模型伙伴留言流提前结束。', {
       type: 'stream_incomplete',
       status: 502,
       details: diagnostic,

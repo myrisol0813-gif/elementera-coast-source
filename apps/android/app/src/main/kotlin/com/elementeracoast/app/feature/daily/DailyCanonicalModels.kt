@@ -55,7 +55,7 @@ data class DailyProfile(
     val ownerAvatarDataUrl: String = "",
     val modelPartnerAvatarDataUrl: String = "",
     val momentCoverDataUrl: String = "",
-    val modelPartnerDisplayName: String = "另一位屋主",
+    val modelPartnerDisplayName: String = "模型伙伴",
     val updatedAt: String? = null
 )
 

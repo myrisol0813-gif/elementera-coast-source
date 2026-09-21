@@ -28,10 +28,10 @@ PWA baseline inspected for this pass:
 
 The native `CoastBrandMark.kt` ports the source coordinates for:
 
-- gold left/right horn paths
+- gold left/right accent paths
 - three ellipses centered at `(195, 260)`, rotations `0 / +60 / -60`
 - paper separator stroke and black visible stroke
-- cream wolf body
+- cream secondary body mark
 - gold ear, eye, nose and mouth geometry
 - source colors `#24252b`, `#f2b84b`, `#fff0d8`, `#9c8872`
 

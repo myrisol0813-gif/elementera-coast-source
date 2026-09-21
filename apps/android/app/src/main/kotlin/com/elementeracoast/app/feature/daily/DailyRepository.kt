@@ -139,7 +139,7 @@ class DefaultDailyRepository(
     }
 
     override suspend fun updateModelPartnerDisplayName(value: String): DailyProfile =
-        persistProfilePatch(RemoteDailyProfilePatch(modelPartnerDisplayName = value.trim().ifBlank { "另一位屋主" }.take(80)))
+        persistProfilePatch(RemoteDailyProfilePatch(modelPartnerDisplayName = value.trim().ifBlank { "模型伙伴" }.take(80)))
 
     private suspend fun persistProfilePatch(patch: RemoteDailyProfilePatch): DailyProfile {
         val profile = api.putDailyProfile(patch)
@@ -203,7 +203,7 @@ internal object DailyMapper {
         author = value.author,
         source = value.source,
         text = value.text,
-        displayAuthor = value.displayAuthor.ifBlank { if (value.author == "owner") "屋主" else "另一位屋主" },
+        displayAuthor = value.displayAuthor.ifBlank { if (value.author == "owner") "屋主" else "模型伙伴" },
         modelLabel = value.modelLabel,
         symbol = value.symbol,
         createdAt = value.createdAt,
@@ -222,7 +222,7 @@ internal object DailyMapper {
         mood = value.mood,
         tags = value.tags,
         text = value.text,
-        displayAuthor = value.displayAuthor.ifBlank { if (value.author == "owner") "屋主" else "另一位屋主" },
+        displayAuthor = value.displayAuthor.ifBlank { if (value.author == "owner") "屋主" else "模型伙伴" },
         modelLabel = value.modelLabel,
         symbol = value.symbol,
         createdAt = value.createdAt,
@@ -233,7 +233,7 @@ internal object DailyMapper {
         ownerAvatarDataUrl = value.ownerAvatarDataUrl,
         modelPartnerAvatarDataUrl = value.modelPartnerAvatarDataUrl,
         momentCoverDataUrl = value.momentCoverDataUrl,
-        modelPartnerDisplayName = value.modelPartnerDisplayName.trim().ifBlank { "另一位屋主" },
+        modelPartnerDisplayName = value.modelPartnerDisplayName.trim().ifBlank { "模型伙伴" },
         updatedAt = value.updatedAt
     )
 }

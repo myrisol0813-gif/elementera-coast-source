@@ -23,4 +23,4 @@ The PWA and Native developer-hands pages are observation surfaces only. They sho
 
 ## Version
 
-This architecture starts with PWA cache `coast-app-84`, backend release `COAST-DEV-HANDS-DIRECT-03`, and Native versionCode 44 / versionName `0.1.42-dev-hands-direct-03`.
+This public source snapshot uses PWA cache `coast-source-app-01` and backend release `COAST-SOURCE-DEV-HANDS-01`; the Android source identity remains versionCode 1 / versionName `0.1.0-source`.

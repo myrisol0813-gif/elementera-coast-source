@@ -69,7 +69,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
 
   router.register('desk', () => ({
     title: '模型工作台',
-    subtitle: '另一位屋主的工作台',
+    subtitle: '模型伙伴的工作台',
     className: 'settings-panel',
     body: group('前端施工台',
       row('开发手 / 施工台', 'GitHub · CI / APK · Notion · 屋主设置更新', 'devhands:open')
@@ -80,7 +80,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     title: '个人资料',
     subtitle: '屋主在前端的显示资料',
     className: 'settings-form',
-    body: `<p class="feature-note">这里保存屋主在前端的显示资料。这些显示资料不会自动进入另一位屋主的记忆或系统提示词。真正影响另一位屋主理解你的长期内容，请写入自定义指令或记忆库。</p>
+    body: `<p class="feature-note">这里保存屋主在前端的显示资料。这些显示资料不会自动进入模型伙伴的记忆或系统提示词。真正影响模型伙伴理解你的长期内容，请写入自定义指令或记忆库。</p>
       <div class="form-stack">
         <label>昵称<input id="ownerName" value="${escapeAttribute(preferences().ownerName)}" maxlength="80"></label>
         <label>聊天署名 / 导出时显示名<input id="ownerSignature" value="${escapeAttribute(preferences().ownerSignature)}" maxlength="80"></label>
@@ -238,7 +238,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
         const assistant = assistants[assistantIndex];
         if (assistant?.content) messages.push({ role: 'assistant', content: assistant.content, created_at: assistant.created_at });
       }
-      const rows = messages.map((message) => `<article class="m ${message.role}"><b>${escapeHtml(message.role === 'user' ? signature : '另一位屋主')}</b><div>${escapeHtml(message.content).replace(/\\n/g, '<br>')}</div></article>`).join('');
+      const rows = messages.map((message) => `<article class="m ${message.role}"><b>${escapeHtml(message.role === 'user' ? signature : '模型伙伴')}</b><div>${escapeHtml(message.content).replace(/\\n/g, '<br>')}</div></article>`).join('');
       return `<section class="window"><h2>${escapeHtml(conversation.room_type || 'main')}｜${escapeHtml(conversation.title || conversation.id || '未命名窗口')}</h2><small>${escapeHtml(conversation.updated_at || '')}</small>${rows || '<p class="empty">没有可读消息。</p>'}</section>`;
     }).join('');
   }

@@ -55,7 +55,7 @@ class D1Database {
 }
 
 const db = new D1Database();
-const conversation = await createConversation(db, '人类思考链测试');
+const conversation = await createConversation(db, '私人草稿测试');
 const soilBefore = await readSoil(db, conversation.id);
 
 const empty = await getMysticDogtalk(db, {
@@ -75,7 +75,7 @@ assert.equal('not_to_misunderstand' in empty, false);
 let dogtalk = await saveMysticDogtalk(db, {
   room_scope: 'conversation',
   conversation_id: conversation.id,
-  body: '脑袋有一点毛线团，但想让 Model Partner 靠近。',
+  body: '脑袋有一点未整理片段，但想让 Model Partner 靠近。',
   true_core: '想被看见。',
   self_note: '旧客户端不应再写入这一列。',
   model_partner_hint: '旧客户端不应再写入这一列。',
@@ -115,7 +115,7 @@ assert.equal(legacyColumnsAfterUpdate.not_to_misunderstand, 'legacy-boundary');
 let context = await dogtalkContext(db, {
   room_scope: 'conversation',
   conversation_id: conversation.id,
-}, 'Model Partner 看一下人类思考链');
+}, 'Model Partner 看一下私人草稿');
 assert.equal(context.selected, false, 'keep_private never enters model context, even when text asks to read dogtalk');
 assert.equal(context.context, '');
 

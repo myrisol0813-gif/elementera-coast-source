@@ -50,12 +50,12 @@ assert.equal(JSON.stringify(diary).includes('PRIVATE_DIARY_BODY'), false);
 const dogtalk = buildFurnitureSummary({
   id: 'run-dogtalk',
   toolKey: 'dogtalk.read',
-  displayName: '读取人类思考链',
+  displayName: '读取私人草稿',
   status: 'success',
-  output: { body: '完整人类思考链绝不能显示', true_core: 'PRIVATE_DOGTALK_CORE', status: 'active' },
+  output: { body: '完整私人草稿绝不能显示', true_core: 'PRIVATE_DOGTALK_CORE', status: 'active' },
 });
-assert.equal(dogtalk.label, '读取了人类思考链');
-assert.equal(JSON.stringify(dogtalk).includes('完整人类思考链'), false);
+assert.equal(dogtalk.label, '读取了私人草稿');
+assert.equal(JSON.stringify(dogtalk).includes('完整私人草稿'), false);
 assert.equal(JSON.stringify(dogtalk).includes('PRIVATE_DOGTALK_CORE'), false);
 
 const mailbox = buildFurnitureSummary({

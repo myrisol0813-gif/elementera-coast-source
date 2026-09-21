@@ -2,7 +2,7 @@ import { ensureDailySchema } from './daily-schema.js';
 import { DailyStoreError } from './daily-store.js';
 
 const OWNER_ID = 'owner';
-const DEFAULT_MODEL_PARTNER_DISPLAY_NAME = '另一位屋主';
+const DEFAULT_MODEL_PARTNER_DISPLAY_NAME = '模型伙伴';
 export const DAILY_PROFILE_LIMITS = Object.freeze({
   avatarDataUrl: 360_000,
   coverDataUrl: 1_200_000,
@@ -57,7 +57,7 @@ export async function writeDailyProfile(db, patch = {}) {
       ? validDataUrl(patch.owner_avatar_dataurl, DAILY_PROFILE_LIMITS.avatarDataUrl, '屋主头像')
       : current.owner_avatar_dataurl,
     model_partner_avatar_dataurl: has('model_partner_avatar_dataurl')
-      ? validDataUrl(patch.model_partner_avatar_dataurl, DAILY_PROFILE_LIMITS.avatarDataUrl, '另一位屋主头像')
+      ? validDataUrl(patch.model_partner_avatar_dataurl, DAILY_PROFILE_LIMITS.avatarDataUrl, '模型伙伴头像')
       : current.model_partner_avatar_dataurl,
     moment_cover_dataurl: has('moment_cover_dataurl')
       ? validDataUrl(patch.moment_cover_dataurl, DAILY_PROFILE_LIMITS.coverDataUrl, '碳硅圈封面')

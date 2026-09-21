@@ -13,7 +13,7 @@ const PAGE = `<!doctype html>
   <link rel="stylesheet" href="/public/styles/shell.css?v=coast-app-85">
   <link rel="stylesheet" href="/public/styles/chat.css?v=coast-app-85">
   <link rel="stylesheet" href="/public/styles/features.css?v=coast-app-85">
-  <link rel="stylesheet" href="/public/styles/mailbox.css?v=coast-mailbox-05">
+  <link rel="stylesheet" href="/public/styles/mailbox.css?v=coast-source-mailbox-01">
 </head>
 <body class="mailbox-body">
   <div id="mailboxApp" class="app-shell mailbox-shell">
@@ -54,7 +54,7 @@ const PAGE = `<!doctype html>
 
         <form id="mailboxComposer" class="composer composer--room mailbox-composer" autocomplete="off">
           <div class="input-pill">
-            <textarea id="mailboxPromptInput" rows="1" maxlength="40000" placeholder="写一封来信" aria-label="写给另一位屋主的来信"></textarea>
+            <textarea id="mailboxPromptInput" rows="1" maxlength="40000" placeholder="写一封来信" aria-label="写给模型伙伴的来信"></textarea>
           </div>
           <button id="mailboxSendButton" class="composer-primary" type="submit" data-icon="send" aria-label="投入信箱"></button>
         </form>
@@ -71,7 +71,7 @@ const PAGE = `<!doctype html>
 
     <div id="mailboxToast" class="toast" role="status" aria-live="polite" hidden></div>
   </div>
-  <script type="module" src="/public/mailbox.js?v=coast-mailbox-05"></script>
+  <script type="module" src="/public/mailbox.js?v=coast-source-mailbox-01"></script>
 </body>
 </html>`;
 

@@ -244,7 +244,7 @@ private fun DevHandsLogs(
     ) {
         item {
             SoftPanel {
-                Text("小蛇最近摆弄了 ${logs.size} 件工具", fontWeight = FontWeight.SemiBold)
+                Text("最近记录了 ${logs.size} 次工具调用", fontWeight = FontWeight.SemiBold)
                 Text(
                     "成功 $success · 失败 $failure",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

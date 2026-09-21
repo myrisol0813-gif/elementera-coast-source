@@ -139,7 +139,7 @@ data class RemoteDeskWorldbookItem(
 
 @Serializable
 data class RemoteDeskDogtalk(
-    val label: String = "人类思考链",
+    val label: String = "私人草稿",
     val description: String = "",
     val status: String = "未递给",
     val delivered: Boolean = false,

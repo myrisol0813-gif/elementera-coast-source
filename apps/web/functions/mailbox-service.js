@@ -74,7 +74,7 @@ function activeVisitor(visitor) {
 
 export async function registerMailboxVisitor(db, env, input = {}) {
   const displayName = text(input.display_name, '称呼', 80, { required: true });
-  const preferredName = text(input.preferred_name, '希望另一位屋主使用的称呼', 80);
+  const preferredName = text(input.preferred_name, '希望模型伙伴使用的称呼', 80);
   const passphrase = normalizePassphrase(input.passphrase);
   if (!passphrase) invalid('暗号不能为空。');
   if (passphrase.length > 160) invalid('暗号过长。');

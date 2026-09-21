@@ -233,7 +233,7 @@ mailboxWindow.prompt = () => '编辑后的第一封信';
 mailboxWindow.document.querySelector('.message.user [data-mailbox-action="edit"]').click();
 await waitFor(() => mailboxWindow.document.querySelector('.message.user')?.textContent.includes('编辑后的第一封信'), 'edited mailbox message');
 assert.ok(requestedPaths.some(([path, method]) => path === '/api/mailbox/messages/v-1' && method === 'PATCH'));
-assert.equal(mailboxWindow.document.querySelector('#mailboxStatusText').textContent, '已送达，等待另一位屋主查看。');
+assert.equal(mailboxWindow.document.querySelector('#mailboxStatusText').textContent, '已送达，等待模型伙伴查看。');
 
 mailboxWindow.document.querySelector('#mailboxConversationMenu').click();
 assert.equal(mailboxWindow.document.querySelector('#mailboxConversationBubble').hidden, false);

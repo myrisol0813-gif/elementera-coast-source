@@ -86,7 +86,7 @@ class CrossWindowRepositoryTest {
         val turn = snapshot.sources.single().turns.single()
         assertEquals("other-window:turn:1", turn.turnId)
         assertEquals("user", turn.messages[0].displayAuthor)
-        assertEquals("另一位屋主", turn.messages[1].displayAuthor)
+        assertEquals("模型伙伴", turn.messages[1].displayAuthor)
         assertTrue(server.takeRequest().path!!.startsWith("/api/chat/cross-window/messages"))
     }
 }

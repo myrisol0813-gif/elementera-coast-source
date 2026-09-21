@@ -35,7 +35,7 @@ assert.equal(settings.includes('modelPartnerNote'), false);
 assert.equal(settings.includes('assistantBubble'), false);
 
 const profile = between(settings, "router.register('settings-profile'", "router.register('settings-appearance'");
-for (const expected of ['昵称', '聊天署名 / 导出时显示名', '用户气泡颜色', '头像在碳硅圈资料中设置', '不会自动进入另一位屋主']) assert.ok(profile.includes(expected), `profile missing: ${expected}`);
+for (const expected of ['昵称', '聊天署名 / 导出时显示名', '用户气泡颜色', '头像在碳硅圈资料中设置', '不会自动进入模型伙伴']) assert.ok(profile.includes(expected), `profile missing: ${expected}`);
 assert.equal(profile.includes('ownerAvatar'), false, 'Wolf profile must not introduce a second avatar field');
 assert.match(settings, /display_profile: display/);
 assert.match(settings, /ownerSignature/);
@@ -92,7 +92,7 @@ assert.match(toolroom, /status/);
 assert.match(toolroom, /tool_key/);
 assert.match(toolroom, /runIds/);
 
-assert.equal(MAILBOX_CACHE_VERSION, 'coast-mailbox-05');
+assert.equal(MAILBOX_CACHE_VERSION, 'coast-source-mailbox-01');
 const worker = await read(resolve(pages, 'service-worker.js'));
 assert.match(worker, new RegExp(`const CACHE_NAME = '${escaped(APP_CACHE_NAME)}'`));
 assert.match(worker, new RegExp(`/public/app\\.js\\?v=${escaped(APP_CACHE_VERSION)}`));
@@ -102,7 +102,7 @@ assert.match(index, new RegExp(`/public/app\\.js\\?v=${escaped(APP_CACHE_VERSION
 assert.match(index, /模型工作台/);
 assert.match(index, /模型工作台/);
 const mailboxPage = await read(resolve(root, 'functions/mailbox-page.js'));
-assert.ok(mailboxPage.includes('coast-mailbox-05'));
+assert.ok(mailboxPage.includes('coast-source-mailbox-01'));
 assert.equal(mailboxPage.includes('coast-mailbox-04'), false);
 
 console.log('pwa-profile-furniture-clean: ok');

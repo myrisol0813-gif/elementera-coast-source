@@ -13,8 +13,8 @@ import { D1Database } from './d1-helper.mjs';
 const db = new D1Database();
 const issuer = 'https://auth.coast-test.example/';
 const audience = 'https://coast.test/mcp';
-const emailClaim = 'https://elementeracoast.com/email';
-const emailVerifiedClaim = 'https://elementeracoast.com/email_verified';
+const emailClaim = 'https://example.invalid/claims/email';
+const emailVerifiedClaim = 'https://example.invalid/claims/email_verified';
 const subject = 'auth0|owner-private';
 const email = 'owner@example.test';
 const env = {
@@ -170,7 +170,7 @@ assert.equal((await listMoments(db)).some((entry) => entry.author === 'mcp'), tr
 assert.equal((await listDiaries(db)).some((entry) => entry.author === 'mcp'), true);
 
 await saveMysticDogtalk(db, { room_scope: 'conversation', conversation_id: radioResult.conversation.id, body: '只读当前窗口的小屋主话。', true_core: '只在需要时读。', read_mode: 'read_now' });
-const dogtalk = await mcp({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'read_mystic_dogtalk', arguments: { conversation_id: radioResult.conversation.id, user_query: '请读人类思考链' } } }, fullToken);
+const dogtalk = await mcp({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'read_mystic_dogtalk', arguments: { conversation_id: radioResult.conversation.id, user_query: '请读私人草稿' } } }, fullToken);
 assert.equal(dogtalk.result.isError, undefined);
 assert.equal(dogtalk.result.structuredContent.available, true);
 

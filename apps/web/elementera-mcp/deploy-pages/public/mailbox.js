@@ -136,7 +136,7 @@ function renderStatus() {
   const metaNode = q('#mailboxStatusMeta');
   if (!textNode || !metaNode) return;
   if (Number(status.pending_count || 0) > 0) {
-    textNode.textContent = '已送达，等待另一位屋主查看。';
+    textNode.textContent = '已送达，等待模型伙伴查看。';
     metaNode.textContent = `${status.pending_count} 封来信正在等待 · 现在是慢速回信模式，不是实时聊天。`;
     return;
   }
@@ -228,7 +228,7 @@ async function sendMessage() {
     };
     renderMessages();
     renderStatus();
-    toast('信已经投入访客信箱。等待另一位屋主下一次查看。', 3000);
+    toast('信已经投入访客信箱。等待模型伙伴下一次查看。', 3000);
   } catch (error) {
     if (!handleSessionError(error)) {
       renderStatus();
@@ -309,10 +309,10 @@ function notebookBody() {
   }
   const pending = state.memory.pending_pockets || [];
   const entries = state.memory.entries || [];
-  const pendingEntry = `<section class="feature-group"><div class="feature-card"><button class="feature-row" type="button" data-panel="pockets"><span><strong>待确认区 · ${pending.length}</strong><small>只有另一位屋主明确确认后，候选才会成为轻量记忆。</small></span><span>›</span></button></div></section>`;
+  const pendingEntry = `<section class="feature-group"><div class="feature-card"><button class="feature-row" type="button" data-panel="pockets"><span><strong>待确认区 · ${pending.length}</strong><small>只有模型伙伴明确确认后，候选才会成为轻量记忆。</small></span><span>›</span></button></div></section>`;
   const memories = entries.length
     ? `<section class="feature-group"><h2>访客记事</h2><div class="memory-entry-list">${entries.map(memoryEntryCard).join('')}</div></section>`
-    : '<section class="feature-group"><h2>访客记事</h2><div class="feature-card"><p class="feature-empty">这里还没有记事。等另一位屋主更熟悉你一点，也许会在这里留下几张小纸条。</p></div></section>';
+    : '<section class="feature-group"><h2>访客记事</h2><div class="feature-card"><p class="feature-empty">这里还没有记事。等模型伙伴更熟悉你一点，也许会在这里留下几张小纸条。</p></div></section>';
   return pendingEntry + memories;
 }
 
@@ -411,8 +411,8 @@ async function deleteMessage(messageId) {
   const confirmed = await confirmDanger({
     title: visitorMessageSelected ? '删除这条用户消息？' : '删除这条助手回复？',
     message: visitorMessageSelected
-      ? '如果这是这一轮唯一的用户消息，关联的另一位屋主回信也会一起从当前访客房间移除。'
-      : '这只会删除当前选中的另一位屋主回信；其他访客房间不会受到影响。',
+      ? '如果这是这一轮唯一的用户消息，关联的模型伙伴回信也会一起从当前访客房间移除。'
+      : '这只会删除当前选中的模型伙伴回信；其他访客房间不会受到影响。',
     confirmText: '删除',
   });
   if (!confirmed) return;

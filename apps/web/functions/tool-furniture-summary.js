@@ -48,7 +48,7 @@ function successLabel(toolKey, displayName) {
     'daily.create_diary': '写了一篇日记',
     'daily.moment_comment': '评论了一条碳硅圈',
     'daily.moment_like': '调整了碳硅圈点赞',
-    'dogtalk.read': '读取了人类思考链',
+    'dogtalk.read': '读取了私人草稿',
     'memory.search': '搜索了记忆',
     'memory.write_candidate': '放入待确认区',
     'memory.global_excerpt_propose': '全局摘录：新增 1 条待确认修改',

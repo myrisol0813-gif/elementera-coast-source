@@ -190,7 +190,7 @@ class CoastApiClient(
             val final = parser.acceptLine(null)
             if (final?.event == "result") result = json.decodeFromJsonElement(RemoteDailyModelPartnerCommentResult.serializer(), final.data)
             if (final?.event == "error") throw dailyStreamError(final.data)
-            result ?: throw CoastApiException(CoastApiErrorKind.Stream, "stream_incomplete", "另一位屋主留言流提前结束。", 502)
+            result ?: throw CoastApiException(CoastApiErrorKind.Stream, "stream_incomplete", "模型伙伴留言流提前结束。", 502)
         }
     }
 
@@ -323,7 +323,7 @@ class CoastApiClient(
         val obj = data.runCatching { jsonObject }.getOrNull()
         val type = obj?.get("type")?.jsonPrimitive?.contentOrNull ?: "daily_stream_error"
         val status = obj?.get("status")?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 500
-        val message = obj?.get("message")?.jsonPrimitive?.contentOrNull ?: "另一位屋主留言生成失败。"
+        val message = obj?.get("message")?.jsonPrimitive?.contentOrNull ?: "模型伙伴留言生成失败。"
         return CoastApiException(coastErrorKind(status, type), type, message, status)
     }
 

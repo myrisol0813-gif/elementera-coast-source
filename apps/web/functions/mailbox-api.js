@@ -135,7 +135,7 @@ export async function routeMailboxApi(request, env) {
         ok: true,
         message: await sendMailboxMessage(env.COAST_CHAT_DB, visitorId, value.content),
         delivery: '信已经投入访客信箱。',
-        waiting: '等待另一位屋主下一次查看。',
+        waiting: '等待模型伙伴下一次查看。',
       }, 201);
     }
     if (url.pathname === `${ROOT}/status`) {

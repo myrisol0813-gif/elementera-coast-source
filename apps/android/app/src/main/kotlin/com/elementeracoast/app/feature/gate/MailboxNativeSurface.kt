@@ -255,7 +255,7 @@ fun MailboxNativeSurface(onClose: () -> Unit) {
                                     last_visitor_message_at = sent.created_at,
                                     queue_status = "pending"
                                 )
-                                notice = "信已经投入访客信箱。等待另一位屋主下一次查看。"
+                                notice = "信已经投入访客信箱。等待模型伙伴下一次查看。"
                             } catch (cause: Throwable) {
                                 handleFailure(cause, "这封信暂时没有送达。")
                             } finally {
@@ -438,13 +438,13 @@ fun MailboxNativeSurface(onClose: () -> Unit) {
     deleting?.let { message ->
         AlertDialog(
             onDismissRequest = { deleting = null },
-            title = { Text(if (message.role == "visitor") "删除这条来信？" else "删除这条另一位屋主回信？") },
+            title = { Text(if (message.role == "visitor") "删除这条来信？" else "删除这条模型伙伴回信？") },
             text = {
                 Text(
                     if (message.role == "visitor") {
-                        "如果这是这一轮唯一的访客消息，关联的另一位屋主回信也可能一起移除。"
+                        "如果这是这一轮唯一的访客消息，关联的模型伙伴回信也可能一起移除。"
                     } else {
-                        "只删除当前选中的另一位屋主回信；其他访客房间不会受到影响。"
+                        "只删除当前选中的模型伙伴回信；其他访客房间不会受到影响。"
                     }
                 )
             },
@@ -689,7 +689,7 @@ private fun MailboxRegister(
                 value = preferredName,
                 onValueChange = { preferredName = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("希望另一位屋主怎么称呼我（可选）") },
+                label = { Text("希望模型伙伴怎么称呼我（可选）") },
                 singleLine = true
             )
         }
@@ -697,7 +697,7 @@ private fun MailboxRegister(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = allowMemory, onCheckedChange = { allowMemory = it })
                 Text(
-                    "允许另一位屋主在这位访客自己的记事本里保存少量偏好",
+                    "允许模型伙伴在这位访客自己的记事本里保存少量偏好",
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -824,7 +824,7 @@ private fun MailboxStatusCard(status: MailboxStatus) {
     val detail: String
     when {
         status.pending_count > 0 -> {
-            title = "已送达，等待另一位屋主查看。"
+            title = "已送达，等待模型伙伴查看。"
             detail = "${status.pending_count} 封来信正在等待 · 这里是慢速回信模式。"
         }
         status.last_model_partner_reply_at != null -> {

@@ -12,11 +12,11 @@ export function createDailyProfile({ state, client, chat, persistCache, router, 
   }
 
   function modelPartnerDisplayName() {
-    return String(state.profile.modelPartnerDisplayName || '另一位屋主').trim() || '另一位屋主';
+    return String(state.profile.modelPartnerDisplayName || '模型伙伴').trim() || '模型伙伴';
   }
 
   async function saveModelPartnerDisplayName(value) {
-    const clean = String(value ?? '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80) || '另一位屋主';
+    const clean = String(value ?? '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80) || '模型伙伴';
     try {
       state.profile = await client.saveProfile({ model_partner_display_name: clean });
       persistCache();

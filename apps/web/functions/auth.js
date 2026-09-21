@@ -201,18 +201,18 @@ function loginPage(message = '', previewPasswordHint = '') {
     .loop-b { animation: draw-loop .72s cubic-bezier(.3, .75, .25, 1) .16s forwards; }
     .loop-c { animation: draw-loop .72s cubic-bezier(.3, .75, .25, 1) .27s forwards; }
 
-    .horn {
+    .primary-mark {
       opacity: 0;
       transform-box: fill-box;
       transform-origin: center bottom;
-      animation: horn-in .4s cubic-bezier(.2, .9, .3, 1.25) .62s forwards;
+      animation: primary-mark-in .4s cubic-bezier(.2, .9, .3, 1.25) .62s forwards;
     }
 
-    .wolf {
+    .secondary-mark {
       opacity: 0;
       transform-box: fill-box;
       transform-origin: center;
-      animation: wolf-in .45s cubic-bezier(.2, .85, .25, 1.15) .76s forwards;
+      animation: secondary-mark-in .45s cubic-bezier(.2, .85, .25, 1.15) .76s forwards;
     }
 
     .face-line {
@@ -515,12 +515,12 @@ function loginPage(message = '', previewPasswordHint = '') {
 
     @keyframes draw-loop { to { stroke-dashoffset: 0; } }
 
-    @keyframes horn-in {
+    @keyframes primary-mark-in {
       from { opacity: 0; transform: translateY(7px) scale(.72); }
       to { opacity: 1; transform: translateY(0) scale(1); }
     }
 
-    @keyframes wolf-in {
+    @keyframes secondary-mark-in {
       from { opacity: 0; transform: translateY(6px) scale(.9); }
       to { opacity: 1; transform: translateY(0) scale(1); }
     }
@@ -558,8 +558,8 @@ function loginPage(message = '', previewPasswordHint = '') {
     @media (prefers-reduced-motion: reduce) {
       .loop-under,
       .loop,
-      .horn,
-      .wolf,
+      .primary-mark,
+      .secondary-mark,
       .brand,
       .tagline,
       .mark,
@@ -631,7 +631,7 @@ function loginPage(message = '', previewPasswordHint = '') {
         </header>
         <div class="mailbox-entry-body">
           <section id="mailboxEntryChoices">
-            <p class="mailbox-entry-copy">这里是给受邀来客的慢速信箱。写下的信会等另一位屋主查看时收到。</p>
+            <p class="mailbox-entry-copy">这里是给受邀来客的慢速信箱。写下的信会等模型伙伴查看时收到。</p>
             <div class="mailbox-entry-choices">
               <button type="button" data-mailbox-choice="login">
                 <span class="mailbox-choice-copy"><strong>输入暗号</strong><small>之前来访的访客，可凭登记过的暗号重新进入。</small></span>
@@ -664,12 +664,12 @@ function loginPage(message = '', previewPasswordHint = '') {
             <label>暗号
               <input name="passphrase" type="password" maxlength="160" required autocomplete="new-password">
             </label>
-            <label>希望另一位屋主怎么称呼我（可选）
+            <label>希望模型伙伴怎么称呼我（可选）
               <input name="preferred_name" type="text" maxlength="80" autocomplete="off">
             </label>
             <label class="mailbox-memory-choice">
               <input name="allow_memory" type="checkbox" checked>
-              <span>允许另一位屋主在我的「访客记事本」里记住少量偏好</span>
+              <span>允许模型伙伴在我的「访客记事本」里记住少量偏好</span>
             </label>
             <p class="mailbox-entry-error" data-mailbox-error role="alert"></p>
             <div class="mailbox-form-actions">
@@ -678,12 +678,12 @@ function loginPage(message = '', previewPasswordHint = '') {
             </div>
           </form>
 
-          <p class="mailbox-privacy-copy">屋主知道谁来过，但默认不知道你具体写了什么。另一位屋主会在查看来信时读取并回复。若出现安全风险、骚扰、滥用或需要站长处理的问题，另一位屋主可能只向屋主报告“需要处理”，但不默认转述正文。</p>
+          <p class="mailbox-privacy-copy">屋主知道谁来过，但默认不知道你具体写了什么。模型伙伴会在查看来信时读取并回复。若出现安全风险、骚扰、滥用或需要站长处理的问题，模型伙伴可能只向屋主报告“需要处理”，但不默认转述正文。</p>
         </div>
       </dialog>
     </section>
   </main>
-  <script type="module" src="/public/mailbox-entry.js?v=coast-mailbox-05"></script>
+  <script type="module" src="/public/mailbox-entry.js?v=coast-source-mailbox-01"></script>
 </body>
 </html>`;
 }

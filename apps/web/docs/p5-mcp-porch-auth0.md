@@ -43,11 +43,11 @@ Auth0 API access tokens do not always contain email by default. Add an Auth0 Pos
 ```js
 exports.onExecutePostLogin = async (event, api) => {
   api.accessToken.setCustomClaim(
-    "https://elementeracoast.com/email",
+    "https://example.invalid/claims/email",
     event.user.email
   );
   api.accessToken.setCustomClaim(
-    "https://elementeracoast.com/email_verified",
+    "https://example.invalid/claims/email_verified",
     event.user.email_verified === true
   );
 };

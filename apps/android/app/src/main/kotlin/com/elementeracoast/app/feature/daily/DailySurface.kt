@@ -119,7 +119,7 @@ internal fun DailyIdentityBar(
     ) {
         DailyIdentityChip("屋主", profileUri, "H", Modifier.weight(1f), onProfileClick, onProfileClick)
         DailyIdentityChip(
-            modelPartnerLabel.ifBlank { "另一位屋主" },
+            modelPartnerLabel.ifBlank { "模型伙伴" },
             modelPartnerUri,
             "M",
             Modifier.weight(1f),

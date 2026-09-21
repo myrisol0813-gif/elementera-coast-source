@@ -338,7 +338,7 @@ const aliceReply = await replyToMailboxVisitor(db, {
   batch_id: patrol.batch_id,
   queue_id: alicePatrol.queue_id,
   visitor_id: alice.id,
-  content: '这是只写回星星房间的 另一位屋主回信。',
+  content: '这是只写回星星房间的 模型伙伴回信。',
   thought_soil: nextSoil('星星', [
     {
       title: '星星意象',
@@ -374,7 +374,7 @@ const bobReply = await replyToMailboxVisitor(db, {
   batch_id: patrol.batch_id,
   queue_id: bobPatrol.queue_id,
   visitor_id: bob.id,
-  content: '这是只写回苔藓房间的 另一位屋主回信。',
+  content: '这是只写回苔藓房间的 模型伙伴回信。',
   thought_soil: nextSoil('苔藓', [{
     title: '不应落袋',
     life_core: '访客没有允许长期记忆。',
@@ -511,7 +511,7 @@ assert.equal(ownerVisitors.length, 2);
 assert.equal(ownerSummary.visitor_count, 2);
 assert.equal(ownerSummary.pending_visitor_count, 1);
 assert.equal(JSON.stringify(ownerVisitors).includes('通过 REST 编辑'), false);
-assert.equal(JSON.stringify(ownerVisitors).includes('另一位屋主回信'), false);
+assert.equal(JSON.stringify(ownerVisitors).includes('模型伙伴回信'), false);
 assert.equal(JSON.stringify(ownerVisitors).includes('星星意象'), false);
 const ownerResponse = await routeOwnerMailboxApi(new Request(
   'https://coast.test/api/owner/mailbox/visitors',

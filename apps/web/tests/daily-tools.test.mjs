@@ -32,7 +32,7 @@ assert.deepEqual([
   mainByName.get('create_diary')?.display_name,
   mainByName.get('moment_comment')?.display_name,
   mainByName.get('moment_like')?.display_name,
-], ['读取人类思考链', '搜索已确认记忆', '放入待确认区', '写碳硅圈', '写日记', '评论朋友圈', '点赞朋友圈']);
+], ['读取私人草稿', '搜索已确认记忆', '放入待确认区', '写碳硅圈', '写日记', '评论朋友圈', '点赞朋友圈']);
 assert.match(exposedByName.get('moment_comment')?.function?.description || '', /latest[\s\S]*最新一条已发布碳硅圈/);
 assert.match(exposedByName.get('moment_like')?.function?.description || '', /latest[\s\S]*最新一条已发布碳硅圈/);
 
@@ -43,7 +43,7 @@ const core = main.modelVisibleToolRecords.filter((tool) => tool.model_group === 
 const side = main.modelVisibleToolRecords.filter((tool) => tool.model_group === 'side');
 const receipt = createDeskSlip({ modelVisibleTools: main.modelVisibleToolRecords, backendTools: main.backendTools, toolGroups: { core, side } });
 assert.deepEqual(receipt.workbench.labels, { model_visible_tools: '模型可见工具', backend_tools: '后端可用工具', core: '常用工具', side: '小组件小工具' });
-assert.deepEqual(receipt.workbench.core_tools.map((tool) => tool.display_name), ['读取人类思考链', '搜索已确认记忆', '放入待确认区']);
+assert.deepEqual(receipt.workbench.core_tools.map((tool) => tool.display_name), ['读取私人草稿', '搜索已确认记忆', '放入待确认区']);
 assert.deepEqual(receipt.workbench.side_tools.map((tool) => tool.display_name), ['写碳硅圈', '写日记', '评论朋友圈', '点赞朋友圈']);
 assert.deepEqual(receipt.workbench.side_tools.map((tool) => tool.name), ['create_moment', 'create_diary', 'moment_comment', 'moment_like']);
 assert.ok(receipt.workbench.model_visible_tools.length >= 7);

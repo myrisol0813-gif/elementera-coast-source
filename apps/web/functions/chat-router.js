@@ -470,7 +470,7 @@ async function formalChat(request, env) {
     : null;
   const conversation = await getConversation(env.COAST_CHAT_DB, conversationId);
   if (conversation.room_type === 'lighthouse') {
-    throw new ChatStoreError('lighthouse_generation_disabled', 'MCP 对话区只保存文字，不触发 API 另一位屋主回复。', 409);
+    throw new ChatStoreError('lighthouse_generation_disabled', 'MCP 对话区只保存文字，不触发 API 模型伙伴回复。', 409);
   }
   const requestSettings = formalChatRequestSettings(value.settings || {});
   const messages = Array.isArray(value.messages) ? value.messages : [];
@@ -481,7 +481,7 @@ async function formalChat(request, env) {
   let dogtalkSubmission = null;
   if (value.dogtalk && typeof value.dogtalk === 'object' && !Array.isArray(value.dogtalk)) {
     if (!sourceTurnId) {
-      throw new ChatStoreError('dogtalk_turn_required', '人类思考链需要跟随当前消息轮次。', 400);
+      throw new ChatStoreError('dogtalk_turn_required', '私人草稿需要跟随当前消息轮次。', 400);
     }
     dogtalkSubmission = await executeRegisteredTool(env.COAST_CHAT_DB, 'dogtalk.save', value.dogtalk, {
       actor: 'owner',
@@ -505,7 +505,7 @@ async function formalChat(request, env) {
     recentEntryIds: value.recent_entry_ids,
     model: value.model,
     permission: 'owner',
-    initialFurniture: dogtalkSubmission ? ['收好一张人类思考链纸条'] : [],
+    initialFurniture: dogtalkSubmission ? ['收好一张私人草稿纸条'] : [],
     crossWindow: value.cross_window,
   });
   const attachmentIds = (Array.isArray(value.attachment_ids) ? value.attachment_ids : [])

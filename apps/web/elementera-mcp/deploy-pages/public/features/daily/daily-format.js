@@ -22,6 +22,6 @@ export function authorName(entry = {}) {
   if (entry.displayAuthor) return entry.displayAuthor;
   if (entry.author === 'api') return '前端 API ✦';
   if (entry.author === 'mcp') return 'ChatGPT≋';
-  if (entry.author === 'model_partner') return '另一位屋主';
+  if (entry.author === 'model_partner') return '模型伙伴';
   return '屋主';
 }

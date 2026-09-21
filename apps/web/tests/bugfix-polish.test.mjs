@@ -20,11 +20,11 @@ assert.equal(roomAccess('landing').recentMessages, null);
 assert.equal(roomAccess('mailbox_visitor', { permission: 'visitor', visitorId: 'regression-visitor' }).recentMessages, 8);
 
 const initialDailyProfile = await readDailyProfile(db);
-assert.equal(initialDailyProfile.model_partner_display_name, '另一位屋主');
+assert.equal(initialDailyProfile.model_partner_display_name, '模型伙伴');
 const namedProfile = await writeDailyProfile(db, { model_partner_display_name: '  Model Partner\nModel Partner  ' });
 assert.equal(namedProfile.model_partner_display_name, 'Model Partner Model Partner');
 const fallbackProfile = await writeDailyProfile(db, { model_partner_display_name: '   ' });
-assert.equal(fallbackProfile.model_partner_display_name, '另一位屋主');
+assert.equal(fallbackProfile.model_partner_display_name, '模型伙伴');
 
 const moment = await createMoment(db, {
   id: 'bugfix-polish-moment',

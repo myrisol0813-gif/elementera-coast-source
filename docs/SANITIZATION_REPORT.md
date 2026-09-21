@@ -288,7 +288,7 @@ This report compares the source candidate against the two ZIP snapshots supplied
 - Ordinary icon paths in `public/core/icons.js` are unchanged; only a private attribution comment changed.
 - Native theme palette colors are unchanged; only a private preset identifier/display label was neutralized.
 - Approved visual changes are limited to the home mark, private logo/avatar family, mailbox private illustration removal, and the former wolf/serpent utility marks.
-- Public documentation has no remaining private proper-name/relationship-name matches from the agreed scan list.
+- The agreed private proper-name scan returned clean. Legacy, product, and internal identifiers may remain where they are intentional compatibility keys or pending review; current-tree text, Git history, release artifacts, and binary visual checks are tracked separately.
 - PWA JavaScript syntax check: 248 files, 0 failures.
 - PWA executable tests in the current container: 54 passed, 0 failed; 19 DOM tests are blocked because `happy-dom` cannot be installed in this network-restricted environment.
 - Native XML parse: 6 files, 0 failures.

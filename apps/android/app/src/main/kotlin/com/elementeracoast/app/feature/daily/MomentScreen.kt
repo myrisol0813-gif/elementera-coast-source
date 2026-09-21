@@ -93,7 +93,7 @@ internal fun MomentScreen(
                     val dataUrl = DailyImageCodec.encodeForProfile(context, uri, DailyProfileImageField.ModelPartnerAvatar)
                     onUpdateModelPartnerAvatar(dataUrl)
                 } catch (error: Throwable) {
-                    reportFailure("另一位屋主头像更新失败", error)
+                    reportFailure("模型伙伴头像更新失败", error)
                 }
             }
         }
@@ -156,10 +156,10 @@ internal fun MomentScreen(
                             scope.launch {
                                 try {
                                     repository.requestModelPartnerComment(moment.id)
-                                    onActionLogged("daily.moment.model-partner-comment", "另一位屋主留言", "前端已生成并保存 1 条真实留言")
-                                    onSnackbar("另一位屋主已在前端留下回复")
+                                    onActionLogged("daily.moment.model-partner-comment", "模型伙伴留言", "前端已生成并保存 1 条真实留言")
+                                    onSnackbar("模型伙伴已在前端留下回复")
                                 } catch (error: Throwable) {
-                                    reportFailure("另一位屋主留言失败", error)
+                                    reportFailure("模型伙伴留言失败", error)
                                 } finally {
                                     modelPartnerBusyId = null
                                 }
@@ -183,9 +183,9 @@ internal fun MomentScreen(
                     try {
                         repository.updateModelPartnerDisplayName(raw)
                         editingModelPartnerName = false
-                        onSnackbar("另一位屋主的碳硅圈名字已写回前端")
+                        onSnackbar("模型伙伴的碳硅圈名字已写回前端")
                     } catch (error: Throwable) {
-                        reportFailure("另一位屋主名字保存失败", error)
+                        reportFailure("模型伙伴名字保存失败", error)
                     }
                 }
             }
@@ -264,11 +264,11 @@ internal fun MomentComposeScreen(
                                 onActionLogged("daily.moment.write", "写了一条碳硅圈", "前端新增 1 条屋主动态")
                                 try {
                                     repository.requestModelPartnerComment(created.id)
-                                    onActionLogged("daily.moment.model-partner-comment", "另一位屋主即时留言", "前端已生成并保存 1 条真实留言")
-                                    onSnackbar("动态已发布，另一位屋主也在前端留下了回复")
+                                    onActionLogged("daily.moment.model-partner-comment", "模型伙伴即时留言", "前端已生成并保存 1 条真实留言")
+                                    onSnackbar("动态已发布，模型伙伴也在前端留下了回复")
                                 } catch (commentError: Throwable) {
                                     val detail = if (commentError is CoastApiException) commentError.message else commentError.message ?: "未知错误"
-                                    onSnackbar("动态已发布；另一位屋主即时留言暂未完成：$detail")
+                                    onSnackbar("动态已发布；模型伙伴即时留言暂未完成：$detail")
                                 }
                                 onDone()
                             } catch (error: Throwable) {
@@ -320,7 +320,7 @@ private fun MomentCard(
                     Spacer(Modifier.height(9.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         moment.comments.takeLast(5).forEach { comment ->
-                            val commentAuthor = if (comment.author == "owner") "屋主" else modelPartnerDisplayName.ifBlank { "另一位屋主" }
+                            val commentAuthor = if (comment.author == "owner") "屋主" else modelPartnerDisplayName.ifBlank { "模型伙伴" }
                             Text(
                                 text = buildAnnotatedString {
                                     withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(commentAuthor) }
@@ -363,7 +363,7 @@ private fun MomentCard(
 
 private fun momentAuthorLabel(moment: DailyMoment, modelPartnerDisplayName: String): String = when {
     moment.isHumanOwner -> moment.displayAuthor.ifBlank { "屋主" }
-    moment.author == "api" || moment.author == "model_partner" -> modelPartnerDisplayName.ifBlank { "另一位屋主" }
+    moment.author == "api" || moment.author == "model_partner" -> modelPartnerDisplayName.ifBlank { "模型伙伴" }
     else -> moment.displayAuthor.ifBlank { moment.author }
 }
 
@@ -414,7 +414,7 @@ private fun ModelPartnerNameDialog(initial: String, onDismiss: () -> Unit, onSav
                 singleLine = true
             )
         },
-        confirmButton = { TextButton(onClick = { onSave(value.trim().ifBlank { "另一位屋主" }) }) { Text("保存") } },
+        confirmButton = { TextButton(onClick = { onSave(value.trim().ifBlank { "模型伙伴" }) }) { Text("保存") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
     )
 }

@@ -83,7 +83,7 @@ private fun SerpentDeskHome(onOpenTool: (SerpentDeskTool) -> Unit) {
             fontWeight = FontWeight.Bold
         )
         Text(
-            "另一位屋主的工作台",
+            "模型伙伴的工作台",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall
         )
