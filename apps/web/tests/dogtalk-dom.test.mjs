@@ -76,7 +76,7 @@ for (const node of [conversation, radio, lighthouse]) {
     ['dogtalk', 'cross', 'keyword'],
     'Dogtalk card exposes dogtalk, old-letter fetch, and local keyword recall tabs',
   );
-  assert.match(node.textContent, /旧信关键词/);
+  assert.match(node.textContent, /跨窗关键词漫游/);
   assert.match(node.textContent, /不会搜索互联网/);
   assert.deepEqual(
     [...node.querySelectorAll('button[data-action="dogtalk:cross-mode"]')].map((item) => item.dataset.mode),
