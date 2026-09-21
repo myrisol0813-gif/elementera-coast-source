@@ -3,7 +3,7 @@ import { memoryDate } from './memory-format.js';
 
 export function customInstructionsBody(instructionsValue) {
   const instructions = instructionsValue || {
-    content: '', status: 'active', updated_at: null, updated_by: 'xiaohan', source: '屋主手动编辑',
+    content: '', status: 'active', updated_at: null, updated_by: 'owner', source: '屋主手动编辑',
   };
   return `<form class="form-stack memory-custom-instructions" data-submit="memory:custom-instructions-save">
     <label>当前自定义指令<textarea name="content" rows="16" maxlength="32000">${escapeHtml(instructions.content)}</textarea></label>

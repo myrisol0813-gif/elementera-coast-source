@@ -134,7 +134,7 @@
   margin-top: 5px;
 }
 
-.mailbox-myri-avatar {
+.mailbox-model-partner-avatar {
   border-color: color-mix(in srgb, #f2b84b 38%, var(--line));
   background-color: color-mix(in srgb, #fff0d8 56%, var(--surface-soft));
   color: #b57b17;

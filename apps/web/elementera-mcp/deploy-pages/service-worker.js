@@ -83,7 +83,7 @@ const CORE = Object.freeze([
   '/public/icons/icon-192.png',
   '/public/icons/icon-512.png',
   '/public/icons/icon-maskable-512.png',
-  '/public/media/myri-default-avatar.jpg',
+  '/public/media/model-partner-default-avatar.jpg',
 ]);
 
 async function putCurrentCache(request, response) {
