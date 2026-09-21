@@ -35,9 +35,9 @@ const radioInsert = db.database.prepare(`INSERT INTO coast_radio_messages
   (id, actor, surface, text, display_author, model_label, withdrawn_at, created_at)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
 radioInsert.run('legacy-radio-xiaohan', 'xiaohan', 'web_manual', '屋主在旧共通聊天室留下第一句话。', '屋主', null, null, 1000);
-radioInsert.run('legacy-radio-api-1', 'myri', 'coast_api', '旧 API 模型伙伴回了第一句。', '海岸 API ✦', 'openai/gpt-4.1-nano', null, 2000);
+radioInsert.run('legacy-radio-api-1', 'myri', 'coast_api', '旧 API 模型伙伴回了第一句。', 'API 模型伙伴 ✦', 'openai/gpt-4.1-nano', null, 2000);
 radioInsert.run('legacy-radio-official', 'myri', 'official_mcp', '官端 ChatGPT 从旧共通聊天室入口发来一句。', 'ChatGPT-5.6 Thinking 回潮≋', 'GPT-5.6 Thinking', null, 3000);
-radioInsert.run('legacy-radio-api-2', 'api', 'coast_api', '旧 API 模型伙伴也回应了官端这一句。', '海岸 API ✦', 'openai/gpt-4.1-nano', null, 4000);
+radioInsert.run('legacy-radio-api-2', 'api', 'coast_api', '旧 API 模型伙伴也回应了官端这一句。', 'API 模型伙伴 ✦', 'openai/gpt-4.1-nano', null, 4000);
 
 const lighthouseInsert = db.database.prepare(`INSERT INTO coast_lighthouse_letters
   (id, actor, surface, subject, body, display_author, model_label, created_at)
@@ -74,7 +74,7 @@ assert.equal(officialRadioAssistant.content, '旧 API 模型伙伴也回应了�
 
 const lighthouseState = await readConversationState(db, lighthouse.id);
 assert.equal(lighthouseState.turns.length, 2);
-assert.match(lighthouseState.turns[0].user.variants[0].content, /旧 MCP 对话区的屋主来信[\s\S]*这是原来的灯塔正文/);
+assert.match(lighthouseState.turns[0].user.variants[0].content, /旧 MCP 对话区的屋主来信[\s\S]*这是原来的 MCP 对话区正文/);
 assert.equal(lighthouseState.turns[0].user.variants[0].message_source, 'xiaohan_web');
 assert.match(lighthouseState.turns[1].user.variants[0].content, /旧 MCP 对话区的官端来信[\s\S]*官端这封信也必须原样搬走/);
 assert.equal(lighthouseState.turns[1].user.variants[0].message_source, 'official_mcp');
