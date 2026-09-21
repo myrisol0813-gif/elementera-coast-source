@@ -21,7 +21,7 @@ export const MEMORY_TAGS = Object.freeze([
   '历史锚点',
   '偏好',
   '人物档案',
-  '海岸世界观',
+  '世界观',
   '工程技术',
 ]);
 const MEMORY_TAG_SET = new Set(MEMORY_TAGS);
@@ -154,7 +154,7 @@ export function mappedLegacyTag(value) {
       ['历史锚点', ['history', '历史', '锚点', '纪念']],
       ['偏好', ['preference', '偏好', '喜欢', '不喜欢']],
       ['人物档案', ['profile', '人物', '档案', '形象', '身份']],
-      ['海岸世界观', ['worldbook', 'coast', '世界观', '海岸', '设定']],
+      ['世界观', ['worldbook', 'coast', '世界观', '项目世界观', '设定']],
       ['工程技术', ['engineering', 'technical', '工程', '技术', '代码', '部署', 'mcp']],
     ];
     const matched = aliases.find(([, words]) => words.some((word) => normalized.includes(word)));
