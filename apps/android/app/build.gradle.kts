@@ -7,6 +7,8 @@ plugins {
 
 val sourceApiBaseUrl = providers.gradleProperty("COAST_API_BASE_URL")
     .orElse("https://elementera-coast-source.invalid")
+val sourcePreviewPasswordHint = providers.gradleProperty("SOURCE_PREVIEW_PASSWORD_HINT")
+    .orElse("")
 
 android {
     namespace = "com.elementeracoast.app"
@@ -19,6 +21,7 @@ android {
         versionCode = 1
         versionName = "0.1.0-source"
         buildConfigField("String", "COAST_API_BASE_URL", "\"${sourceApiBaseUrl.get()}\"")
+        buildConfigField("String", "SOURCE_PREVIEW_PASSWORD_HINT", "\"${sourcePreviewPasswordHint.get()}\"")
     }
 
     buildTypes {
