@@ -48,7 +48,7 @@ for (const label of ['模型可见工具', '后端可用工具', '常用工具',
 assert.doesNotMatch(desk, /连通一千零一个触角|touch_sources/i);
 assert.match(desk, /function crossWindowDeskDetails\(/);
 assert.match(desk, /slip\.cross_window/);
-assert.match(desk, /跨窗口取信/);
+assert.match(desk, /跨窗口读取/);
 assert.doesNotMatch(desk, /今日海岸|today_coast/);
 assert.match(desk, /词典/);
 assert.equal(desk.includes('copy-debug'), false);
