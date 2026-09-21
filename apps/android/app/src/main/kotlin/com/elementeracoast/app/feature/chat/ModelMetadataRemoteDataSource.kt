@@ -7,6 +7,9 @@ import com.elementeracoast.app.core.network.CoastApiErrorKind
 import com.elementeracoast.app.core.network.CoastApiException
 import com.elementeracoast.app.core.network.CoastHttpClient
 import com.elementeracoast.app.core.remote.RemoteMessageModelMetadataResponse
+import com.elementeracoast.app.core.remote.RemoteModelMetadata
+import com.elementeracoast.app.core.remote.RemoteModelRequestMetadata
+import com.elementeracoast.app.core.remote.RemoteModelUsage
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -28,7 +31,15 @@ class ModelMetadataRemoteDataSource(
         conversationId: String,
         messageId: String,
         includeRaw: Boolean = false
-    ): RemoteMessageModelMetadataResponse = withContext(Dispatchers.IO) {
+    ): RemoteMessageModelMetadataResponse {
+        if (
+            config.normalizedBaseUrl == "https://elementera-coast-source.invalid" &&
+            conversationId == "source-preview-demo" &&
+            messageId == "source-preview-demo-assistant"
+        ) {
+            return sourcePreviewMetadata(conversationId, messageId, includeRaw)
+        }
+        return withContext(Dispatchers.IO) {
         val suffix = buildString {
             append("/api/chat/message-metadata?conversation_id=")
             append(query(conversationId))
@@ -56,6 +67,55 @@ class ModelMetadataRemoteDataSource(
         } catch (error: IOException) {
             throw CoastApiException(CoastApiErrorKind.Network, "network_unreachable", "无法连接后端。", cause = error)
         }
+        }
+    }
+
+    private fun sourcePreviewMetadata(
+        conversationId: String,
+        messageId: String,
+        includeRaw: Boolean
+    ): RemoteMessageModelMetadataResponse {
+        val toolCalls = json.parseToJsonElement(
+            """[{"name":"read_file","status":"success"},{"name":"memory_search","status":"success"}]"""
+        )
+        val toolResults = json.parseToJsonElement(
+            """[{"name":"read_file","result":"source-preview-notes.txt"},{"name":"memory_search","result":"1 demo hit"}]"""
+        )
+        val raw = if (includeRaw) {
+            json.parseToJsonElement(
+                """{"source":"local_source_preview","sanitized":true,"note":"No real provider request was made."}"""
+            )
+        } else null
+        return RemoteMessageModelMetadataResponse(
+            ok = true,
+            messageId = messageId,
+            conversationId = conversationId,
+            status = "sanitized",
+            sanitized = true,
+            metadata = RemoteModelMetadata(
+                provider = "source-preview",
+                requestedModel = "source/demo-model",
+                resolvedModel = "source/demo-model",
+                reasoningSummary = "本地样板回波：仅展示模型回波界面，没有真实推理或供应商调用。",
+                reasoningStatus = "sanitized",
+                usage = RemoteModelUsage(
+                    promptTokens = 512,
+                    completionTokens = 128,
+                    totalTokens = 640
+                ),
+                finishReason = "stop",
+                nativeFinishReason = "demo",
+                isStream = true,
+                toolCalls = toolCalls,
+                toolResults = toolResults,
+                request = RemoteModelRequestMetadata(
+                    temperature = 0.7,
+                    maxTokens = 1024,
+                    stream = true
+                )
+            ),
+            rawMetadataSanitized = raw
+        )
     }
 
     private fun responseError(status: Int, text: String): CoastApiException {

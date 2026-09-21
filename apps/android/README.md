@@ -19,6 +19,22 @@ PWA and Native share the same canonical backend contracts. The source build keep
 
 Source-local configuration uses `BuildConfig.COAST_API_BASE_URL`. The checked-in default is the non-routable placeholder `https://elementera-coast-source.invalid`; self-hosters should point their own build at their own backend.
 
+### Local source demo
+
+While the build still uses the checked-in `.invalid` backend, the public preview password `123456` opens one deterministic local sample turn. It is only a UI fixture; it does not send messages, upload attachments, call tools, invoke a model, or write remote data.
+
+Connecting a real backend is enough to disable this demo. You do not need to delete the fixture before using real data.
+
+The sample content is isolated from normal backend behavior. Connecting a real backend is the recommended way to disable it.
+
+If a fork wants to remove the preview fixture from source entirely, remove these pieces together:
+
+- `app/src/main/kotlin/com/elementeracoast/app/feature/shell/SourcePreviewDemo.kt`
+- the `sourcePreviewMode` / `loadSourcePreviewDemo` branches in `CoastShellViewModel.kt`
+- the `source-preview-demo` local metadata branch in `ModelMetadataRemoteDataSource.kt`
+
+Once `COAST_API_BASE_URL` points away from the default `.invalid` placeholder, normal backend authentication and data loading take over automatically.
+
 ## Source-build boundaries
 
 The source build does not include production credentials or distribution machinery. In particular, it ships without production signing configuration, the production APK updater, release publishing, production API origin, or private data. The existing “版本与更新” surface remains part of the copied UI, but only reports source-build metadata and does not download or install production APKs.
