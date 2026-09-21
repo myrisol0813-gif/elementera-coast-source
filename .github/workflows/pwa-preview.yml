@@ -40,7 +40,8 @@ jobs:
       - name: Start full Pages preview
         shell: bash
         env:
-          COAST_PASSWORD_HASH: f4ade8894fd384793db5133d339a2647666c5f4ee27314f53e08b6b56eca1f06
+          COAST_PASSWORD_HASH: 8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92
+          COAST_PREVIEW_PASSWORD_HINT: '123456'
         run: |
           set -euo pipefail
           SESSION_SECRET="$(openssl rand -hex 32)"
@@ -51,6 +52,7 @@ jobs:
             --d1 COAST_CHAT_DB=00000000-0000-0000-0000-000000000001 \
             --binding COAST_PASSWORD_HASH="$COAST_PASSWORD_HASH" \
             --binding COAST_SESSION_SECRET="$SESSION_SECRET" \
+            --binding COAST_PREVIEW_PASSWORD_HINT="$COAST_PREVIEW_PASSWORD_HINT" \
             > /tmp/wrangler-preview.log 2>&1 &
           echo $! > /tmp/wrangler-preview.pid
 
@@ -117,7 +119,7 @@ jobs:
         working-directory: apps/android
         run: |
           set -euo pipefail
-          gradle :app:assembleDebug --no-daemon --stacktrace -PCOAST_API_BASE_URL="$PREVIEW_URL"
+          gradle :app:assembleDebug --no-daemon --stacktrace -PCOAST_API_BASE_URL="$PREVIEW_URL" -PSOURCE_PREVIEW_PASSWORD_HINT=123456
 
       - name: Stage preview debug APK
         shell: bash
@@ -127,7 +129,7 @@ jobs:
           mkdir -p artifact
           cp app/build/outputs/apk/debug/app-debug.apk artifact/elementera-coast-source-v0.1-preview-debug.apk
           sha256sum artifact/elementera-coast-source-v0.1-preview-debug.apk > artifact/SHA256SUMS.txt
-          printf 'applicationId=com.elementeracoast.source\nversionCode=1\nversionName=0.1.0-source\nbuild_type=debug\nsource_candidate=true\nofficial_production_apk=false\npreview_base_url=%s\npreview_password=CoastPreview-2026-09-21-g4N8pQ2L\n' "$PREVIEW_URL" > artifact/BUILD_INFO.txt
+          printf 'applicationId=com.elementeracoast.source\nversionCode=1\nversionName=0.1.0-source\nbuild_type=debug\nsource_candidate=true\nofficial_production_apk=false\npreview_base_url=%s\npreview_password=123456\n' "$PREVIEW_URL" > artifact/BUILD_INFO.txt
 
       - uses: actions/upload-artifact@v4
         with:
@@ -150,7 +152,7 @@ jobs:
             echo "No open PR found for $GITHUB_REF_NAME"
             exit 1
           fi
-          gh pr comment "$PR_NUMBER" --body "Candidate PWA preview is live: $PREVIEW_URL\n\nPWA / source debug APK preview password: \`CoastPreview-2026-09-21-g4N8pQ2L\`"
+          gh pr comment "$PR_NUMBER" --body "Candidate PWA preview is live: $PREVIEW_URL\n\nPWA / source debug APK preview password: \`123456\`"
 
       - name: Keep preview alive for real-device acceptance
         shell: bash
