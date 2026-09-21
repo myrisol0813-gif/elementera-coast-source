@@ -55,7 +55,7 @@ jobs:
           mkdir -p artifact
           cp app/build/outputs/apk/debug/app-debug.apk artifact/elementera-coast-source-v0.1-debug.apk
           sha256sum artifact/elementera-coast-source-v0.1-debug.apk > artifact/SHA256SUMS.txt
-          printf 'applicationId=com.elementeracoast.source\nversionCode=1\nversionName=0.1.0-source\nofficial_production_apk=false\n' > artifact/BUILD_INFO.txt
+          printf 'applicationId=com.elementeracoast.source\nversionCode=1\nversionName=0.1.0-source\nofficial_production_apk=false\nsource_preview_shell=true\npreview_password=123456\n' > artifact/BUILD_INFO.txt
       - uses: actions/upload-artifact@v4
         with:
           name: elementera-coast-source-debug-apk
