@@ -122,8 +122,9 @@ function escapeHtml(value) {
   })[character]);
 }
 
-function loginPage(message = '') {
+function loginPage(message = '', previewPasswordHint = '') {
   const notice = message ? `<p class="gate-notice" role="alert">${escapeHtml(message)}</p>` : '';
+  const previewHint = previewPasswordHint ? `<p class="gate-notice">source debug 默认预览密码：${escapeHtml(previewPasswordHint)} · 部署时请修改</p>` : '';
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -619,6 +620,7 @@ function loginPage(message = '') {
           </button>
         </div>
         ${notice}
+        ${previewHint}
         <button id="mailboxEntryButton" class="mailbox-entry-button" type="button">访客信箱</button>
       </form>
 
@@ -704,12 +706,12 @@ export function unauthorized(request) {
 }
 
 export async function handleLogin(request, env) {
-  if (!configured(env)) return html(loginPage('Gate is not configured yet.'), 503);
+  if (!configured(env)) return html(loginPage('Gate is not configured yet.', env.COAST_PREVIEW_PASSWORD_HINT || ''), 503);
   if (request.method === 'GET') {
     const mailboxEntrance = new URL(request.url).searchParams.get('mailbox') === '1';
     return (await verifySession(request, env)) && !mailboxEntrance
       ? redirect('/')
-      : html(loginPage());
+      : html(loginPage('', env.COAST_PREVIEW_PASSWORD_HINT || ''));
   }
   if (request.method !== 'POST') return text('Method not allowed\n', 405, { Allow: 'GET, POST' });
   if (!loginRequestAllowed(request)) return text('Forbidden\n', 403);
@@ -720,7 +722,7 @@ export async function handleLogin(request, env) {
     return text('Request body too large\n', 413);
   }
   const password = new URLSearchParams(body).get('password') || '';
-  if (!(await passwordMatches(password, env))) return html(loginPage('Password is incorrect.'), 401);
+  if (!(await passwordMatches(password, env))) return html(loginPage('Password is incorrect.', env.COAST_PREVIEW_PASSWORD_HINT || ''), 401);
   return redirect('/', { 'Set-Cookie': cookie(await createSession(env)) });
 }
 
