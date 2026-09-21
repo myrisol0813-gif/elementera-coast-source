@@ -183,8 +183,8 @@ private fun AccountScreen(
     if (confirming) {
         AlertDialog(
             onDismissRequest = { confirming = false },
-            title = { Text("退出海岸账号？") },
-            text = { Text("只会清除当前登录态；聊天、记忆与海岸数据不会被删除。") },
+            title = { Text("退出当前账号？") },
+            text = { Text("只会清除当前登录态；聊天、记忆与后端数据不会被删除。") },
             confirmButton = {
                 TextButton(onClick = {
                     confirming = false

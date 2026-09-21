@@ -50,7 +50,7 @@ internal fun ModelBoxScreen(
                 Column(Modifier.weight(1f)) {
                     Text("模型箱", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
-                        "海岸后端模型目录 · 与 PWA 共用当前模型",
+                        "后端模型目录 · 与 PWA 共用当前模型",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -117,7 +117,7 @@ internal fun ModelBoxScreen(
 
         item {
             Text(
-                "刷新读取海岸 /api/models；设为当前后写回共享 profile，PWA 与 Native 会读取同一状态。",
+                "刷新读取 /api/models；设为当前后写回共享 profile，PWA 与 Native 会读取同一状态。",
                 modifier = Modifier.padding(top = 4.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall
@@ -180,7 +180,7 @@ private fun ModelCatalogBubble(
             Text(item.id, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             Text(item.series.title, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             Text(
-                "目录来源：海岸后端",
+                "目录来源：后端",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall
             )

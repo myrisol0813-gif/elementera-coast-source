@@ -84,7 +84,7 @@ internal fun AppearanceScreen(state: WolfState, store: WolfStore, onSnackbar: (S
                 }
             }
         }
-        item { Text("以上都只保存在本机，不接后端。默认海岸主题不会被覆盖。", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
+        item { Text("以上都只保存在本机，不接后端。默认主题不会被覆盖。", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
     }
 }
 

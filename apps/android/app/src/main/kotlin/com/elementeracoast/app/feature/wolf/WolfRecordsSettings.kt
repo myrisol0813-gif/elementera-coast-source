@@ -102,7 +102,7 @@ internal fun ChatRecordsScreen(
                 }
                 .onFailure {
                     busy = false
-                    onSnackbar("全局导出失败：${it.message ?: "无法读取海岸快照"}")
+                    onSnackbar("全局导出失败：${it.message ?: "无法读取后端快照"}")
                 }
         }
     }
@@ -237,7 +237,7 @@ internal fun BasicSettingsScreen(settings: BasicSettings, store: WolfStore, onSn
         }
         item {
             Text(
-                "最近聊天轮数与上下文 token budget 都保存在本机。海岸只提供推荐值，不设置人为上限；真正极限由现有历史与模型/provider 上下文窗口决定。",
+                "最近聊天轮数与上下文 token budget 都保存在本机。前端只提供推荐值，不设置人为上限；真正极限由现有历史与模型/provider 上下文窗口决定。",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall
             )
@@ -291,7 +291,7 @@ internal fun DiagnosticsScreen(shell: CoastShellState, wolf: WolfState) {
         "共享 conversation 数量" to shell.conversations.size.toString(),
         "当前消息数" to shell.messages.size.toString(),
         "INTERNET permission" to "是",
-        "后端接线状态" to if (shell.backendOffline) "缓存可读 · 后端暂不可达" else "海岸聊天主链已接线",
+        "后端接线状态" to if (shell.backendOffline) "缓存可读 · 后端暂不可达" else "聊天主链已接线",
         "聊天 source of truth" to "Coast D1 / shared history v4"
     )
     LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
