@@ -100,7 +100,7 @@ export function createDevHands({ router, toast, chat = null }) {
     const failure = logs.filter((run) => run.status === 'error').length;
     const check = state.selfCheck;
     return {
-      title: '海岸开发手',
+      title: '前端开发手',
       subtitle: '模型随身工具 · 观察窗',
       className: 'dev-hands-panel',
       headerAction: '<button class="feature-head-action" type="button" data-action="devhands:self-check">自检</button>',
