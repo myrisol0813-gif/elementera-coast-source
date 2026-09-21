@@ -97,7 +97,7 @@ fun DevHandsScreen(
     Column(Modifier.fillMaxSize()) {
         FeatureLocalBackBar(
             when (page) {
-                DevHandsPage.Home -> "海岸开发手"
+                DevHandsPage.Home -> "前端开发手"
                 DevHandsPage.Logs -> "开发手脚印"
                 DevHandsPage.Update -> "版本与更新"
             }
