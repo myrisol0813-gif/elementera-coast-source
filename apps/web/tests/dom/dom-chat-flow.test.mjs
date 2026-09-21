@@ -240,7 +240,7 @@ export async function runChatTypedRooms() {
 
   document.querySelector('#moreButton').click();
   await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'island-letter', 'letter route');
-  assert.ok(document.querySelector('#islandLetterText').value.includes('欢迎回家'));
+  assert.ok(document.querySelector('#islandLetterText').value.includes('这是 source 版本的公开占位入住信'));
   assert.equal(document.querySelector('[data-action="letters:send-island"]').textContent, '递出登岛信');
   const visibleUsersBeforeLetter = document.querySelectorAll('.message.user').length;
   const assistantsBeforeLetter = document.querySelectorAll('.message.assistant').length;
