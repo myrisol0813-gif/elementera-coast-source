@@ -199,7 +199,7 @@ export function normalizedProviderError(status, model, preview = '') {
     return ['insufficient_credits', 'OpenRouter 余额或 credits 不足。可以在 API 小屋调低“最大输出 token”。'];
   }
   if (status === 413) return ['request_body_too_large', 'provider 拒绝了过大的请求体；前端没有偷偷缩短跨窗口内容。'];
-  if (contextLimitPreview(lower)) return ['context_length_exceeded', 'provider / 模型拒绝了这次完整上下文；海岸没有偷偷裁剪跨窗口内容。'];
+  if (contextLimitPreview(lower)) return ['context_length_exceeded', 'provider / 模型拒绝了这次完整上下文；应用没有自动裁剪跨窗口内容。'];
   if (status === 408 || lower.includes('timed out') || lower.includes('timeout')) return ['provider_timeout', 'provider 在等待完整请求时超时；前端没有自动缩短后重试。'];
   if (status === 403 && lower.includes('not available in your region')) return ['region_unavailable', '该模型在当前网络地区不可用。可以切换网络出口，或换用其他模型。'];
   if (status === 403) return ['forbidden', '当前 key 或账户没有权限使用该模型。'];
