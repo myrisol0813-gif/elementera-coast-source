@@ -110,7 +110,7 @@ export async function writeSoilCurrentText(db, id, value = {}, { provenance = {}
   await ensureSoilRow(db, conversationId);
   const currentText = String(value.current_text ?? '').trim();
   if (!currentText || currentText.length > MAX_SOURCE_TEXT) {
-    throw new MemoryStoreError('invalid_request', '灯塔房整理当前对话的纸条 current_text 必须为 1 到 12000 个字符。');
+    throw new MemoryStoreError('invalid_request', '当前对话纸条整理 current_text 必须为 1 到 12000 个字符。');
   }
   const identity = validateCoastIdentity(provenance.identity);
   const sourceConversationId = clip(
@@ -154,7 +154,7 @@ export async function writeSoilCurrentText(db, id, value = {}, { provenance = {}
   const changes = Number(result?.meta?.changes || 0);
   const idempotent = Boolean(toolCallId && changes === 0);
   if (changes === 0 && !idempotent) {
-    throw new MemoryStoreError('room_soil_write_failed', '灯塔房整理当前对话的纸条没有完成写入。', 500);
+    throw new MemoryStoreError('room_soil_write_failed', '当前对话纸条整理没有完成写入。', 500);
   }
   return { soil, idempotent };
 }
