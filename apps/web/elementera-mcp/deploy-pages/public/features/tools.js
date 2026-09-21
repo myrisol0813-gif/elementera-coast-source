@@ -40,7 +40,7 @@ export function createTools({ storage, router, toast, memory }) {
       title: '基本设置',
       subtitle: '回答长度、流式输出、记忆召回与世界书',
       className: 'run-control',
-      body: `<p class="feature-note">最近聊天轮数与上下文 token budget 都保存在本机；海岸提供推荐值，但不设置人为上限。</p>
+      body: `<p class="feature-note">最近聊天轮数与上下文 token budget 都保存在本机；前端提供推荐值，但不设置人为上限。</p>
         ${group('上下文舒服区间', numberRow('recentTurns', '最近聊天轮数', 1, null, 1, '默认 8；常用可试 8 / 12 / 20。没有应用层上限，实际可递入量取决于当前窗口历史、token budget 与模型上下文窗口。', 'recent-turns') + numberRow('contextBudget', '上下文 token budget', CONTEXT_BUDGET_MIN, null, 100, '默认 6000；推荐从 6000 / 12000 / 20000 起调。没有应用层上限；最终仍受模型与 provider 的真实 context window 限制。', 'context-budget'))}
         ${group('输出偏好', choiceRow('outputLength', '回答长度', '“偏短”最多 700 tokens；“自然”和“长信”使用下方上限。') + numberRow('maxOutputTokens', '最大输出 token', 64, 65536, 64, '这是单次回复允许生成的最高值，不代表每次一定用满；自动标题固定为 40。') + choiceRow('creativity', '表达倾向'))}
         ${group('生成方式', choiceRow('streamingEnabled', '流式输出', '开启后普通聊天走真实流式输出；登岛信继续使用稳定 JSON 路径。'))}
