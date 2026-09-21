@@ -5,13 +5,29 @@ const SESSION_COOKIE_MAX_AGE_SECONDS = 10 * 365 * 24 * 60 * 60;
 const MAX_LOGIN_BODY_BYTES = 1024;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+const SOURCE_PREVIEW_PASSWORD = '123456';
+const SOURCE_PREVIEW_PASSWORD_HASH = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92';
+const SOURCE_PREVIEW_SESSION_SECRET = 'elementera-source-empty-shell-preview-session-v1';
+
+function sourcePreviewDefaultsEnabled(env) {
+  return !String(env.COAST_PASSWORD_HASH || '').trim()
+    && !String(env.COAST_SESSION_SECRET || '').trim()
+    && !env.COAST_CHAT_DB;
+}
 
 function passwordHash(env) {
-  return String(env.COAST_PASSWORD_HASH || '').trim().toLowerCase().replace(/^sha256:/, '');
+  const configuredHash = String(env.COAST_PASSWORD_HASH || '').trim().toLowerCase().replace(/^sha256:/, '');
+  return configuredHash || (sourcePreviewDefaultsEnabled(env) ? SOURCE_PREVIEW_PASSWORD_HASH : '');
 }
 
 function sessionSecret(env) {
-  return env.COAST_SESSION_SECRET;
+  const configuredSecret = String(env.COAST_SESSION_SECRET || '').trim();
+  return configuredSecret || (sourcePreviewDefaultsEnabled(env) ? SOURCE_PREVIEW_SESSION_SECRET : '');
+}
+
+function previewPasswordHint(env) {
+  const configuredHint = String(previewPasswordHint(env)).trim();
+  return configuredHint || (sourcePreviewDefaultsEnabled(env) ? SOURCE_PREVIEW_PASSWORD : '');
 }
 
 function configured(env) {
@@ -706,12 +722,12 @@ export function unauthorized(request) {
 }
 
 export async function handleLogin(request, env) {
-  if (!configured(env)) return html(loginPage('Gate is not configured yet.', env.COAST_PREVIEW_PASSWORD_HINT || ''), 503);
+  if (!configured(env)) return html(loginPage('Gate is not configured yet.', previewPasswordHint(env)), 503);
   if (request.method === 'GET') {
     const mailboxEntrance = new URL(request.url).searchParams.get('mailbox') === '1';
     return (await verifySession(request, env)) && !mailboxEntrance
       ? redirect('/')
-      : html(loginPage('', env.COAST_PREVIEW_PASSWORD_HINT || ''));
+      : html(loginPage('', previewPasswordHint(env)));
   }
   if (request.method !== 'POST') return text('Method not allowed\n', 405, { Allow: 'GET, POST' });
   if (!loginRequestAllowed(request)) return text('Forbidden\n', 403);
@@ -722,7 +738,7 @@ export async function handleLogin(request, env) {
     return text('Request body too large\n', 413);
   }
   const password = new URLSearchParams(body).get('password') || '';
-  if (!(await passwordMatches(password, env))) return html(loginPage('Password is incorrect.', env.COAST_PREVIEW_PASSWORD_HINT || ''), 401);
+  if (!(await passwordMatches(password, env))) return html(loginPage('Password is incorrect.', previewPasswordHint(env)), 401);
   return redirect('/', { 'Set-Cookie': cookie(await createSession(env)) });
 }
 
