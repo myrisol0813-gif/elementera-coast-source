@@ -17,7 +17,7 @@ assert.equal(radio.room_type, 'radio');
 assert.equal(lighthouse.room_type, 'lighthouse');
 
 await writeSoil(db, main.id, { current_text: 'OWNER_MAIN_SOIL_SECRET' });
-await writeSoil(db, radio.id, { current_text: '共通聊天室自己的讨论纸条。', hand_seeds: [{ name: '电波种', life_core: '只沿着这个 conversation 行走。' }], do_not_repeat: '', pocket_candidates: [] });
+await writeSoil(db, radio.id, { current_text: '共通聊天室自己的讨论纸条。', hand_seeds: [{ name: '聊天室种', life_core: '只沿着这个 conversation 行走。' }], do_not_repeat: '', pocket_candidates: [] });
 await writeSoil(db, lighthouse.id, { current_text: 'MCP 对话区自己的低频纸条。', hand_seeds: [], do_not_repeat: '', pocket_candidates: [] });
 
 const ownerAccess = [roomAccess('main_chat'), roomAccess('radio'), roomAccess('lighthouse')];
@@ -96,7 +96,7 @@ for (const required of [
 assert.equal(modelDecidesNames.includes('cross_window_keyword_search'), false, 'model-decides must not receive local keyword search');
 assert.ok(modelDecidesContext.tools.some((tool) => tool.type === 'openrouter:web_search'));
 
-const keywordUser = { role: 'user', content: '只翻海岸里的旧信关键词，不要搜索互联网。' };
+const keywordUser = { role: 'user', content: '只翻应用里的历史消息关键词，不要搜索互联网。' };
 const keywordContext = await assembleCleanContext(env, {
   surface: 'main_chat',
   conversationId: main.id,
