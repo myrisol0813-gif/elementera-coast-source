@@ -1,5 +1,6 @@
 package com.elementeracoast.app.feature.gate
 
+import com.elementeracoast.app.BuildConfig
 import com.elementeracoast.app.ui.brand.CoastGateMotionSpec
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -18,6 +19,12 @@ class GateContractTest {
         assertEquals(1140, CoastGateMotionSpec.TaglineStartMs)
         assertEquals(1380, CoastGateMotionSpec.GateFormStartMs)
         assertEquals(1780, CoastGateMotionSpec.TotalDurationMs)
+    }
+
+    @Test
+    fun sourceBuildPublishesPreviewPasswordHint() {
+        assertEquals("https://elementera-coast-source.invalid", BuildConfig.COAST_API_BASE_URL)
+        assertEquals("123456", BuildConfig.SOURCE_PREVIEW_PASSWORD_HINT)
     }
 
     @Test
