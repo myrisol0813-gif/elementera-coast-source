@@ -16,10 +16,10 @@ export async function runChatPrelude() {
   assert.equal(localStorage.getItem('ec.currentConversationId'), null);
   assert.equal(document.querySelectorAll('#coastStatus').length, 1);
   assert.equal(document.querySelectorAll('#mainRooms').length, 1);
-  assert.match(document.querySelector('#coastStatus').textContent, /同轨第\s+\d+\s+日/);
+  assert.match(document.querySelector('#coastStatus').textContent, /共同度过\s+\d+\s+天/);
   assert.ok(document.querySelectorAll('svg.icon').length >= 15);
   assert.equal(document.querySelector('#newChatButton svg').getAttribute('viewBox'), '0 0 32 32');
-  assert.equal(document.querySelector('[data-action="settings:wolf"] svg').getAttribute('viewBox'), '0 0 128 128');
+  assert.equal(document.querySelector('[data-action="settings:wolf"] svg').getAttribute('viewBox'), '0 0 24 24');
   assert.equal(document.querySelector('#modelName').textContent, '4.1 Nano ›');
   assert.equal(document.querySelector('#contextStatus'), null, '旧上下文状态条已删除');
   assert.equal(document.querySelector('#deskStatus')?.hidden, true, '本轮上下文预览在首次回复前不显示空壳');
