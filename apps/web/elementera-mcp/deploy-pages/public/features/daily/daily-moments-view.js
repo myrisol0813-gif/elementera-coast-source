@@ -95,17 +95,17 @@ export function createDailyMomentsView({ state, ensureLoad, syncNotice, profile 
 
   function momentsView() {
     ensureLoad();
-    const feed = state.moments.length ? state.moments.map(momentCard).join('') : '<section class="daily-empty"><h2>暂无动态。</h2><p>写一点今天的海岸风声吧。</p></section>';
+    const feed = state.moments.length ? state.moments.map(momentCard).join('') : '<section class="daily-empty"><h2>暂无动态。</h2><p>写一点今天的新鲜事吧。</p></section>';
     const coverImage = state.profile.momentCoverDataurl || '';
     const cover = coverImage ? `style="background-image:linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),url(${escapeAttribute(coverImage)})"` : '';
     return {
       title: '碳硅圈',
-      subtitle: '海岸内部朋友圈',
+      subtitle: '前端内部朋友圈',
       className: 'moments-panel',
       headerAction: '<button class="feature-head-action" type="button" data-action="daily:moments-compose">＋ 动态</button>',
       body: `<button class="moment-cover${coverImage ? ' has-cover' : ''}" type="button" data-action="daily:cover" aria-label="${coverImage ? '更换碳硅圈封面' : '设置碳硅圈封面'}" ${cover}>${coverImage ? '' : '<span>点击设置封面</span>'}</button>
         <section class="moment-avatar-tools" aria-label="碳硅圈头像设置">
-          <button type="button" data-action="daily:avatar">${profile.xiaohanAvatar()}<span><strong>屋主头像</strong><small>保存在海岸</small></span></button>
+          <button type="button" data-action="daily:avatar">${profile.xiaohanAvatar()}<span><strong>屋主头像</strong><small>保存在前端</small></span></button>
           <button type="button" data-action="daily:myri-avatar">${profile.myriAvatar()}<span><strong>${escapeHtml(myriName())} 头像</strong><small>点击动态里的名字可以修改显示名</small></span></button>
         </section>
         ${syncNotice()}<section class="moment-feed">${feed}</section>`,
