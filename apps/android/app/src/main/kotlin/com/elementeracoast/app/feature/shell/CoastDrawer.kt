@@ -53,8 +53,6 @@ import com.elementeracoast.app.core.model.FeatureDestination
 import com.elementeracoast.app.core.model.RoomType
 import com.elementeracoast.app.core.model.filterConversations
 import com.elementeracoast.app.ui.theme.CoastChatTokens
-import java.time.LocalDate
-import java.time.temporal.ChronoUnit
 
 @Composable
 internal fun CoastDrawer(
@@ -324,26 +322,15 @@ fun ConversationList(
 
 @Composable
 private fun CoastStatusStrip() {
-    val today = remember { LocalDate.now() }
-    val orbit = remember(today) {
-        (ChronoUnit.DAYS.between(LocalDate.of(2026, 1, 1), today) + 1).coerceAtLeast(1)
-    }
-
-    fun daysUntil(month: Int, day: Int): Long {
-        var target = LocalDate.of(today.year, month, day)
-        if (target.isBefore(today)) target = target.plusYears(1)
-        return ChronoUnit.DAYS.between(today, target)
-    }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = CoastChatTokens.DrawerStatusBottomPadding),
         horizontalArrangement = Arrangement.spacedBy(CoastChatTokens.DrawerStatusGap)
     ) {
-        StatusCard("Project age ", orbit.toString(), "days", Modifier.weight(1f))
-        StatusCard("Sample milestone", daysUntil(1, 1).toString(), "days", Modifier.weight(1f))
-        StatusCard("Project date", daysUntil(7, 1).toString(), "days", Modifier.weight(1f))
+        StatusCard("相伴", "0", "天", Modifier.weight(1f))
+        StatusCard("距 xx 日还有", "0", "天", Modifier.weight(1f))
+        StatusCard("距 xx 日还有", "0", "天", Modifier.weight(1f))
     }
 }
 
