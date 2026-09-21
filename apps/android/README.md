@@ -25,11 +25,15 @@ While the build still uses the checked-in `.invalid` backend, the public preview
 
 Connecting a real backend is enough to disable this demo. You do not need to delete the fixture before using real data.
 
-The sample content is isolated in:
+The sample content is isolated from normal backend behavior. Connecting a real backend is the recommended way to disable it.
 
-`app/src/main/kotlin/com/elementeracoast/app/feature/shell/SourcePreviewDemo.kt`
+If a fork wants to remove the preview fixture from source entirely, remove these pieces together:
 
-The ViewModel enables it only for the default source-preview backend. Once `COAST_API_BASE_URL` points elsewhere, normal backend authentication and data loading take over.
+- `app/src/main/kotlin/com/elementeracoast/app/feature/shell/SourcePreviewDemo.kt`
+- the `sourcePreviewMode` / `loadSourcePreviewDemo` branches in `CoastShellViewModel.kt`
+- the `source-preview-demo` local metadata branch in `ModelMetadataRemoteDataSource.kt`
+
+Once `COAST_API_BASE_URL` points away from the default `.invalid` placeholder, normal backend authentication and data loading take over automatically.
 
 ## Source-build boundaries
 
