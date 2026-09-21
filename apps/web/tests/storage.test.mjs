@@ -42,9 +42,9 @@ localStorage.setItem('coast_lighthouse_draft_v095', JSON.stringify({ text: '历�
 const { createStorage } = await import(`${pathToFileURL(storageFile).href}?test=${Date.now()}`);
 const storage = createStorage();
 assert.equal(storage.read().preferences.theme, 'gold');
-assert.equal(storage.read().preferences.xiaohanName, '迁移中的屋主');
-assert.equal(storage.read().preferences.xiaohanSignature, '迁移中的屋主');
-assert.deepEqual(Object.keys(storage.read().preferences).sort(), ['accent', 'theme', 'userBubble', 'xiaohanName', 'xiaohanSignature'].sort());
+assert.equal(storage.read().preferences.ownerName, '迁移中的屋主');
+assert.equal(storage.read().preferences.ownerSignature, '迁移中的屋主');
+assert.deepEqual(Object.keys(storage.read().preferences).sort(), ['accent', 'theme', 'userBubble', 'ownerName', 'ownerSignature'].sort());
 assert.equal(storage.migrationPending, true);
 assert.equal(storage.migrationConversations.length, 1);
 assert.equal(storage.migrationConversations[0].id, 'old-window');
@@ -64,7 +64,7 @@ assert.equal('legacyCache' in storage.read().daily, false);
 
 const persistedBeforeComplete = JSON.parse(localStorage.getItem('elementera.local.v1'));
 assert.equal(persistedBeforeComplete.preferences.systemDraft, undefined);
-assert.equal(persistedBeforeComplete.preferences.myriPortrait, undefined);
+assert.equal(persistedBeforeComplete.preferences.modelPartnerPortrait, undefined);
 assert.equal(persistedBeforeComplete.runControl.maxHandSeeds, undefined);
 
 storage.completeMigration();
@@ -82,12 +82,12 @@ localStorage.setItem('elementera.local.v1', JSON.stringify({
   version: 1,
   preferences: {
     theme: 'light',
-    xiaohanName: '旧资料名',
+    ownerName: '旧资料名',
     systemDraft: '不要写回',
     assistantBubble: 'gold',
-    myriPortrait: '不要写回',
-    myriNote: '不要写回',
-    xiaohanAvatar: 'data:image/png;base64,OLD',
+    modelPartnerPortrait: '不要写回',
+    modelPartnerNote: '不要写回',
+    ownerAvatar: 'data:image/png;base64,OLD',
   },
   runControl: {
     recentTurns: 4,
@@ -108,8 +108,8 @@ localStorage.setItem('elementera.local.v1', JSON.stringify({
 const secondModule = await import(`${pathToFileURL(storageFile).href}?hard-clean=${Date.now()}`);
 const migrated = secondModule.createStorage();
 assert.equal(migrated.read().version, 2);
-assert.equal(migrated.read().preferences.xiaohanName, '旧资料名');
-assert.equal(migrated.read().preferences.xiaohanSignature, '旧资料名');
+assert.equal(migrated.read().preferences.ownerName, '旧资料名');
+assert.equal(migrated.read().preferences.ownerSignature, '旧资料名');
 assert.deepEqual(Object.keys(migrated.read().runControl), ACTIVE_RUN_KEYS);
 assert.equal(migrated.read().runControl.recentTurns, 4);
 assert.equal(migrated.read().runControl.maxHandSeeds, undefined);
@@ -118,7 +118,7 @@ assert.deepEqual(migrated.read().daily.cache.diaries, []);
 assert.equal(migrated.read().daily.momentCover, 'data:image/png;base64,COVER');
 const persisted = JSON.parse(localStorage.getItem('elementera.local.v1'));
 assert.equal(persisted.preferences.systemDraft, undefined);
-assert.equal(persisted.preferences.xiaohanAvatar, undefined);
+assert.equal(persisted.preferences.ownerAvatar, undefined);
 assert.equal(persisted.daily.summaries, undefined);
 assert.equal(persisted.daily.albumItems, undefined);
 assert.equal(persisted.daily.legacyDrafts, undefined);

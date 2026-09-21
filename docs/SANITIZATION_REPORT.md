@@ -68,7 +68,7 @@ This report compares the source candidate against the two ZIP snapshots supplied
 | `elementera-mcp/deploy-pages/public/icons/icon-maskable-512.png` | modified | approved visual substitution/removal |
 | `elementera-mcp/deploy-pages/public/mailbox-entry.js` | modified | fixed UI copy / private identifier/default sanitization |
 | `elementera-mcp/deploy-pages/public/mailbox.js` | modified | approved visual substitution/removal |
-| `elementera-mcp/deploy-pages/public/media/myri-default-avatar.jpg` | modified | approved visual substitution/removal |
+| `elementera-mcp/deploy-pages/public/media/model-partner-default-avatar.jpg` | modified | approved visual substitution/removal |
 | `elementera-mcp/deploy-pages/service-worker.js` | modified | fixed UI copy / private identifier/default sanitization |
 | `functions/_middleware.js` | modified | fixed UI copy / private identifier/default sanitization |
 | `functions/api-router.js` | modified | fixed UI copy / private identifier/default sanitization |
@@ -171,7 +171,7 @@ This report compares the source candidate against the two ZIP snapshots supplied
 | `docs/native/UI_ACTION_TREE.md` | removed | public documentation sanitization / obsolete private-history removal |
 | `elementera-mcp/deploy-pages/public/icons/gptlike-icon.svg` | removed | approved visual substitution/removal |
 | `elementera-mcp/deploy-pages/public/media/mailbox-snake.png` | removed | approved visual substitution/removal |
-| `functions/friend-myrisol-prompt.js` | removed | fixed UI copy / private identifier/default sanitization |
+| `functions/friend-elementera-model-prompt.js` | removed | fixed UI copy / private identifier/default sanitization |
 | `.env.example` | added | empty self-host configuration template |
 | `functions/visitor-model-partner-prompt.js` | added | fixed UI copy / private identifier/default sanitization |
 
@@ -297,4 +297,4 @@ This report compares the source candidate against the two ZIP snapshots supplied
 
 ## Compatibility note
 
-Lowercase legacy wire/database values from the copied application are retained where renaming them would alter stored-data/API compatibility. They are not user-visible display names and are not new source-edition branding.
+Private actor/profile identifiers and private repository examples are rewritten to neutral public-source names across runtime code, schemas, fixtures, tests, and documentation. The source edition is intended to initialize its own public-demo data rather than preserve private-instance naming.
