@@ -2,8 +2,8 @@ import { escapeAttribute, escapeHtml } from './dom.js';
 
 const DANGER_ACTIONS = Object.freeze({
   'settings:logout': Object.freeze({
-    title: '退出海岸账号？',
-    message: '确认后会清除当前登录态并回到登录页面。聊天、记忆与海岸数据不会被删除。',
+    title: '退出前端账号？',
+    message: '确认后会清除当前登录态并回到登录页面。聊天、记忆与前端数据不会被删除。',
     confirmText: '退出账号',
     cancelText: '取消',
     dangerLevel: 'warning',
