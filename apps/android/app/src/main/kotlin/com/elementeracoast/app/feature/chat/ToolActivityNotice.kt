@@ -50,8 +50,8 @@ internal fun friendlyToolActivity(name: String, success: Boolean): String {
         "create_diary" -> "写日记"
         "moment_comment" -> "评论碳硅圈"
         "moment_like" -> "调整碳硅圈点赞"
-        "cross_window_read_recent", "cross_window_search" -> "跨窗口取信"
-        else -> name.replace('_', ' ').ifBlank { "海岸工具" }
+        "cross_window_read_recent", "cross_window_search" -> "跨窗口读取"
+        else -> name.replace('_', ' ').ifBlank { "前端工具" }
     }
     return if (success) "使用工具 · $label" else "工具没有摆好 · $label"
 }
