@@ -119,7 +119,7 @@ export function createLibraryViews({ runtime, currentId, currentPockets, chat })
         ${filterMenu('memoryFilterValueMenu', 'filter-value', valueChoices, selectedValue)}
       </section>`
       : '';
-    return `<div class="memory-tabs memory-tabs-five" role="tablist" aria-label="轨迹记忆入口">
+    return `<div class="memory-tabs memory-tabs-five" role="tablist" aria-label="记忆入口">
       <button class="${runtime.libraryTab === 'memory' ? 'is-active' : ''}" type="button" data-action="memory:tab" data-scope="memory">记忆库</button>
       <button class="${runtime.libraryTab === 'seed' ? 'is-active' : ''}" type="button" data-action="memory:tab" data-scope="seed">种子库</button>
       <button type="button" data-action="desk:worldbook">世界书</button>
@@ -131,7 +131,7 @@ export function createLibraryViews({ runtime, currentId, currentPockets, chat })
   function memoryView() {
     if (runtime.libraryTab === 'custom') {
       return {
-        title: '轨迹记忆',
+        title: '记忆',
         subtitle: '自定义指令 · 独立的单份 active 文档',
         className: 'memory-library',
         body: `${libraryControls()}${customInstructionsBody(runtime.customInstructions)}`,
@@ -142,7 +142,7 @@ export function createLibraryViews({ runtime, currentId, currentPockets, chat })
       .filter((entry) => !['stone', 'archived', 'discarded'].includes(entry.status));
     const isSeed = entryType === 'seed';
     return {
-      title: '轨迹记忆',
+      title: '记忆',
       subtitle: isSeed
         ? '种子库 · 未完成但有生长性的意象，不是已确认事实'
         : '记忆库 · 已经确认的长期纸条',
