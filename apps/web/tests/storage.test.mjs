@@ -37,7 +37,7 @@ localStorage.setItem('elementera.runControlSettings', JSON.stringify({
   conversationSeedLimit: 99,
   globalMemoryLimit: 99,
 }));
-localStorage.setItem('coast_lighthouse_draft_v095', JSON.stringify({ text: '旧灯塔草稿' }));
+localStorage.setItem('coast_lighthouse_draft_v095', JSON.stringify({ text: '历史 MCP 对话区草稿' }));
 
 const { createStorage } = await import(`${pathToFileURL(storageFile).href}?test=${Date.now()}`);
 const storage = createStorage();
@@ -49,7 +49,7 @@ assert.equal(storage.migrationPending, true);
 assert.equal(storage.migrationConversations.length, 1);
 assert.equal(storage.migrationConversations[0].id, 'old-window');
 assert.equal(storage.migrationConversations[0].state.turns[0].user.variants[0].content, '结构化旧问题');
-assert.equal(storage.read().rooms.lighthouse.rooms[0].messages[0].text, '旧灯塔草稿');
+assert.equal(storage.read().rooms.lighthouse.rooms[0].messages[0].text, '历史 MCP 对话区草稿');
 assert.deepEqual(Object.keys(storage.read().runControl), ACTIVE_RUN_KEYS);
 assert.equal(storage.read().runControl.streamingEnabled, true);
 assert.equal(storage.read().runControl.memoryLimit, 5);
