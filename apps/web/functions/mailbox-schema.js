@@ -63,12 +63,12 @@ async function initialize(db) {
   await run(db, `CREATE TABLE IF NOT EXISTS mailbox_messages (
     id TEXT PRIMARY KEY,
     visitor_id TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('visitor', 'myri', 'system')),
+    role TEXT NOT NULL CHECK (role IN ('visitor', 'model_partner', 'system')),
     content TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'sent'
-      CHECK (status IN ('sent', 'waiting_for_myri', 'replied', 'hidden', 'error')),
+      CHECK (status IN ('sent', 'waiting_for_model_partner', 'replied', 'hidden', 'error')),
     reply_batch_id TEXT,
     is_visible_to_owner INTEGER NOT NULL DEFAULT 0
       CHECK (is_visible_to_owner IN (0, 1)),
@@ -111,8 +111,8 @@ async function initialize(db) {
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     confidence REAL NOT NULL DEFAULT 1 CHECK (confidence >= 0 AND confidence <= 1),
-    visibility TEXT NOT NULL DEFAULT 'myri_only'
-      CHECK (visibility IN ('myri_only', 'visitor_visible')),
+    visibility TEXT NOT NULL DEFAULT 'model_partner_only'
+      CHECK (visibility IN ('model_partner_only', 'visitor_visible')),
     status TEXT NOT NULL DEFAULT 'active'
       CHECK (status IN ('active', 'archived')),
     generated_by_model TEXT,
@@ -249,9 +249,9 @@ async function initialize(db) {
     ON mailbox_messages(visitor_id, created_at)`);
   await run(db, `CREATE INDEX IF NOT EXISTS idx_mailbox_messages_waiting
     ON mailbox_messages(visitor_id, status, created_at)`);
-  await run(db, `CREATE UNIQUE INDEX IF NOT EXISTS idx_mailbox_myri_reply_batch
+  await run(db, `CREATE UNIQUE INDEX IF NOT EXISTS idx_mailbox_model_partner_reply_batch
     ON mailbox_messages(visitor_id, reply_batch_id)
-    WHERE role = 'myri' AND reply_batch_id IS NOT NULL`);
+    WHERE role = 'model_partner' AND reply_batch_id IS NOT NULL`);
   await run(db, `CREATE INDEX IF NOT EXISTS idx_mailbox_queue_status_updated
     ON mailbox_reply_queue(status, updated_at)`);
   await run(db, `CREATE INDEX IF NOT EXISTS idx_mailbox_notebook_visitor_active

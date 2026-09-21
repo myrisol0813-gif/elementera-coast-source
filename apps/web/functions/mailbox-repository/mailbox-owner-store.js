@@ -39,7 +39,7 @@ export async function claimMailboxPatrol(db, { messageLimit = 60 } = {}) {
     LEFT JOIN (
       SELECT visitor_id, COUNT(*) AS pending_message_count
       FROM mailbox_messages
-      WHERE role = 'visitor' AND status = 'waiting_for_myri'
+      WHERE role = 'visitor' AND status = 'waiting_for_model_partner'
       GROUP BY visitor_id
     ) pending ON pending.visitor_id = q.visitor_id
     WHERE q.status IN ('pending', 'processing') AND v.is_active = 1
@@ -102,7 +102,7 @@ export async function claimMailboxPatrol(db, { messageLimit = 60 } = {}) {
 export async function writeMailboxReply(db, value) {
   await ensureMailboxSchema(db);
   const existingReply = await first(db, `SELECT * FROM mailbox_messages
-    WHERE visitor_id = ? AND reply_batch_id = ? AND role = 'myri'`, [
+    WHERE visitor_id = ? AND reply_batch_id = ? AND role = 'model_partner'`, [
     value.visitor_id,
     value.batch_id,
   ]);
@@ -156,7 +156,7 @@ export async function writeMailboxReply(db, value) {
     db.prepare(`INSERT INTO mailbox_messages (
       id, visitor_id, role, content, created_at, updated_at, status,
       reply_batch_id, is_visible_to_owner, safety_flag
-    ) SELECT ?, q.visitor_id, 'myri', ?, ?, ?, 'sent', ?, 0, NULL
+    ) SELECT ?, q.visitor_id, 'model_partner', ?, ?, ?, 'sent', ?, 0, NULL
       FROM mailbox_reply_queue q
       JOIN mailbox_patrol_batches b ON b.id = q.processing_batch_id
       WHERE q.id = ? AND q.visitor_id = ? AND q.status = 'processing'
@@ -172,8 +172,8 @@ export async function writeMailboxReply(db, value) {
     ),
     db.prepare(`UPDATE mailbox_messages
       SET status = 'replied', reply_batch_id = ?, updated_at = ?
-      WHERE visitor_id = ? AND role = 'visitor' AND status = 'waiting_for_myri'
-        AND EXISTS (SELECT 1 FROM mailbox_messages WHERE id = ? AND role = 'myri')`).bind(
+      WHERE visitor_id = ? AND role = 'visitor' AND status = 'waiting_for_model_partner'
+        AND EXISTS (SELECT 1 FROM mailbox_messages WHERE id = ? AND role = 'model_partner')`).bind(
       value.batch_id,
       timestamp,
       value.visitor_id,
@@ -183,7 +183,7 @@ export async function writeMailboxReply(db, value) {
       SET status = ?, updated_at = ?, processed_at = ?, processed_by = 'official_mcp',
         error_note = NULL, needs_owner_attention = ?, owner_attention_reason = ?
       WHERE id = ? AND visitor_id = ? AND processing_batch_id = ?
-        AND EXISTS (SELECT 1 FROM mailbox_messages WHERE id = ? AND role = 'myri')`).bind(
+        AND EXISTS (SELECT 1 FROM mailbox_messages WHERE id = ? AND role = 'model_partner')`).bind(
       value.needs_owner_attention ? 'needs_owner_attention' : 'replied',
       timestamp,
       timestamp,
@@ -236,7 +236,7 @@ export async function completeMailboxPatrol(db, batchId) {
   }
   const [replyRow, attentionRow] = await Promise.all([
     first(db, `SELECT COUNT(*) AS count FROM mailbox_messages
-      WHERE role = 'myri' AND reply_batch_id = ?`, [batchId]),
+      WHERE role = 'model_partner' AND reply_batch_id = ?`, [batchId]),
     first(db, `SELECT COUNT(*) AS count FROM mailbox_reply_queue
       WHERE processing_batch_id = ? AND needs_owner_attention = 1`, [batchId]),
   ]);
@@ -276,12 +276,12 @@ export async function listOwnerMailboxVisitors(db, { limit = OWNER_VISITOR_LIMIT
       v.last_seen_at,
       (SELECT COUNT(*) FROM mailbox_messages m
         WHERE m.visitor_id = v.id AND m.role = 'visitor'
-          AND m.status = 'waiting_for_myri') AS pending_count,
+          AND m.status = 'waiting_for_model_partner') AS pending_count,
       (SELECT MAX(created_at) FROM mailbox_messages m
         WHERE m.visitor_id = v.id AND m.role = 'visitor'
           AND m.status != 'hidden') AS last_message_at,
       (SELECT MAX(created_at) FROM mailbox_messages m
-        WHERE m.visitor_id = v.id AND m.role = 'myri'
+        WHERE m.visitor_id = v.id AND m.role = 'model_partner'
           AND m.status != 'hidden') AS last_reply_at,
       COALESCE(q.needs_owner_attention, 0) AS needs_owner_attention
     FROM mailbox_visitors v
@@ -307,9 +307,9 @@ export async function ownerMailboxSummary(db) {
   const [visitors, pendingVisitors, pendingMessages, attention, patrol] = await Promise.all([
     first(db, 'SELECT COUNT(*) AS count FROM mailbox_visitors WHERE is_active = 1'),
     first(db, `SELECT COUNT(DISTINCT visitor_id) AS count FROM mailbox_messages
-      WHERE role = 'visitor' AND status = 'waiting_for_myri'`),
+      WHERE role = 'visitor' AND status = 'waiting_for_model_partner'`),
     first(db, `SELECT COUNT(*) AS count FROM mailbox_messages
-      WHERE role = 'visitor' AND status = 'waiting_for_myri'`),
+      WHERE role = 'visitor' AND status = 'waiting_for_model_partner'`),
     first(db, `SELECT COUNT(*) AS count FROM mailbox_reply_queue
       WHERE needs_owner_attention = 1`),
     first(db, 'SELECT MAX(completed_at) AS last_patrol_at FROM mailbox_patrol_batches'),

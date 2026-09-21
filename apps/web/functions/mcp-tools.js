@@ -128,7 +128,7 @@ const SPECIAL_TOOLS = Object.freeze([
       content: { type: 'string', maxLength: 8000 },
       usage_hint: { type: 'string', maxLength: 2000 },
       avoid_hint: { type: 'string', maxLength: 2000 },
-      visibility: { type: 'string', enum: ['myri_only', 'visitor_visible'] },
+      visibility: { type: 'string', enum: ['model_partner_only', 'visitor_visible'] },
       confidence: { type: 'number', minimum: 0, maximum: 1 },
       source_conversation_id: { type: 'string', maxLength: 200 },
       source_turn_id: { type: 'string', maxLength: 200 },
@@ -415,7 +415,7 @@ async function executeTool(name, rawArgs, request, env, requestMeta, auth) {
   if (name === 'list_daily_diaries') {
     const diaries = await executeRegisteredTool(env.COAST_CHAT_DB, 'daily.diaries.list', {
       date: textInput(args.date, 'date', 10),
-      author: enumInput(args.author, 'author', ['xiaohan', 'myri', 'api', 'mcp'], ''),
+      author: enumInput(args.author, 'author', ['owner', 'model_partner', 'api', 'mcp'], ''),
     }, registryContext(auth, 'daily'));
     return resultContent({ diaries }, `读取了 ${diaries.length} 张日记。`);
   }

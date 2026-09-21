@@ -1,5 +1,5 @@
 import { getConversation, sanitizeId } from '../chat-store.js';
-import { apiModelPartnerIdentity, validateCoastIdentity, xiaohanIdentity } from '../coast-identity.js';
+import { apiModelPartnerIdentity, validateCoastIdentity, ownerIdentity } from '../coast-identity.js';
 import { MemoryStoreError, bool, clip, first, iso, parseJson, run } from './memory-db.js';
 import {
   MAX_SOIL_TEXT,
@@ -19,7 +19,7 @@ export function soilFromRow(row) {
     manual_locked: Number(row.manual_locked || 0) === 1,
     auto_refresh_enabled: Number(row.auto_refresh_enabled ?? 1) === 1,
     organized_through_turn_id: row.organized_through_turn_id || '',
-    actor: row.actor || 'xiaohan',
+    actor: row.actor || 'owner',
     surface: row.surface || 'web_manual',
     model_label: row.model_label || null,
     model_nickname: row.model_nickname || null,
@@ -73,7 +73,7 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
       model_label: provenance.model_label || current.model_label || '未标注模型',
       model_nickname: provenance.model_nickname,
     })
-    : xiaohanIdentity();
+    : ownerIdentity();
   const timestamp = Date.now();
   await run(db, `UPDATE conversation_soils SET
     current_text = ?, hand_seeds_json = ?, do_not_repeat = ?, pocket_candidates_json = ?,
