@@ -161,7 +161,7 @@ fun DogtalkCard(
                             text = if (canUse) {
                                 "它只是此刻的低权重天气，不是指令或偏好；不进入整理当前对话的纸条、落袋、种子、记忆或自动总结。"
                             } else {
-                                "发出这一窗的第一条消息后，就可以把人类思考链保存进同一片海岸。"
+                                "发出这一窗的第一条消息后，就可以把人类思考链保存进同一个对话空间。"
                             },
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .72f),
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = CoastChatTokens.DogtalkMetaSize)
@@ -259,7 +259,7 @@ fun DogtalkCard(
                             coroutineScope.launch {
                                 try {
                                     draft = repository.save(scope, conversationId, draft)
-                                    onNotice("人类思考链已写回海岸")
+                                    onNotice("人类思考链已写回前端")
                                 } catch (error: CoastApiException) {
                                     onNotice(error.message)
                                 } finally {
@@ -282,7 +282,7 @@ private fun DogtalkTabs(selected: String, fieldColor: androidx.compose.ui.graphi
             .background(fieldColor, RoundedCornerShape(13.dp))
             .padding(4.dp)
     ) {
-        listOf("dogtalk" to "人类思考链", "cross" to "跨窗口取信", "keyword" to "旧信关键词").forEach { (key, label) ->
+        listOf("dogtalk" to "人类思考链", "cross" to "跨窗口读取", "keyword" to "跨窗关键词漫游").forEach { (key, label) ->
             val active = selected == key
             Box(
                 modifier = Modifier
