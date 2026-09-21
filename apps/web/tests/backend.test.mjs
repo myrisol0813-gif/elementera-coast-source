@@ -25,6 +25,13 @@ const env = {
   COAST_SESSION_SECRET: '0123456789abcdef0123456789abcdef',
 };
 
+const previewHintPage = await handleLogin(new Request('https://coast.test/login'), {
+  ...env,
+  COAST_PREVIEW_PASSWORD_HINT: '123456',
+});
+assert.equal(previewHintPage.status, 200);
+assert.match(await previewHintPage.text(), /123456/);
+
 const disallowed = methodNotAllowed('GET, POST');
 assert.equal(disallowed.status, 405);
 assert.deepEqual(await disallowed.json(), {
