@@ -4,7 +4,7 @@ enum class CrossWindowMode(val wireValue: String, val label: String) {
     Off("off", "关闭"),
     Manual("manual", "手动选择"),
     ModelDecides("model_decides", "让模型决定"),
-    Keyword("keyword", "旧信关键词");
+    Keyword("keyword", "跨窗关键词漫游");
 
     companion object {
         fun fromWire(value: String): CrossWindowMode = entries.firstOrNull { it.wireValue == value } ?: Off
