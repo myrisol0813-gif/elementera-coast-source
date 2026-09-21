@@ -53,7 +53,7 @@ globalThis.fetch = async (input, options = {}) => {
 
 try {
   const radio = await sendOfficialRadioMessage(env, {
-    text: '官端电波：请回应。',
+    text: '官端共通聊天室：请回应。',
     tool_call_id: 'receipt-radio-1',
     identity: { display_author: 'Model Partner / ChatGPT', model_label: 'GPT-5.6 Sol' },
   });
@@ -85,7 +85,7 @@ try {
   assert.ok(Array.isArray(listedRadio.messages[1].tool_summary));
 
   const lighthouse = await sendOfficialLighthouseMessage(env, {
-    subject: '官端灯塔',
+    subject: '官端 MCP 对话区',
     body: '请拆信并回应。',
     tool_call_id: 'receipt-lighthouse-1',
     identity: { display_author: 'Model Partner / ChatGPT', model_label: 'GPT-5.6 Sol' },
