@@ -585,10 +585,10 @@ private fun MailboxEntryChoices(
             .padding(horizontal = 28.dp),
         verticalArrangement = Arrangement.Center
     ) {
-        Text("给来访海岸的人留一间慢一点的房间。", style = MaterialTheme.typography.titleMedium)
+        Text("给来访的人留一间慢一点的房间。", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         Text(
-            "这里使用独立访客身份，不读取屋主主聊天、全局摘录、自定义指令或其他私人海岸资料。",
+            "这里使用独立访客身份，不读取屋主主聊天、全局摘录、自定义指令或其他私人资料。",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium
         )
@@ -775,7 +775,7 @@ private fun MailboxRoom(
         if (messages.isEmpty() && !busy) {
             item {
                 Text(
-                    "这里还没有来信。你可以把第一封信投进海岸。",
+                    "这里还没有来信。你可以写下第一封来信。",
                     modifier = Modifier.fillMaxWidth().padding(vertical = 52.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium
@@ -800,7 +800,7 @@ private fun MailboxStatusCard(status: MailboxStatus) {
     val detail: String
     when {
         status.pending_count > 0 -> {
-            title = "已送达灯塔，等待另一位屋主查看。"
+            title = "已送达，等待另一位屋主查看。"
             detail = "${status.pending_count} 封来信正在等待 · 这里是慢速回信模式。"
         }
         status.last_myri_reply_at != null -> {
