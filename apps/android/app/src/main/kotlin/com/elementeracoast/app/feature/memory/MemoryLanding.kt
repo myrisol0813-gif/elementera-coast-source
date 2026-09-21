@@ -33,7 +33,7 @@ fun MemoryLanding(
 
     LaunchedEffect(conversationId) {
         runCatching { repository.refresh(conversationId) }
-            .onFailure { onSnackbar(it.message ?: "轨迹记忆刷新失败") }
+            .onFailure { onSnackbar(it.message ?: "记忆刷新失败") }
     }
     LaunchedEffect(openPendingInitially) {
         if (openPendingInitially) {
@@ -81,7 +81,7 @@ fun MemoryLanding(
 
     Column(Modifier.fillMaxSize()) {
         FeaturePageTopBar(
-            title = "轨迹记忆",
+            title = "记忆",
             subtitle = subtitle,
             onBack = {
                 pendingCreate = null
