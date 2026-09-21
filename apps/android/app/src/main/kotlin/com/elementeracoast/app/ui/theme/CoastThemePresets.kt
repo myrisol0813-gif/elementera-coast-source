@@ -7,11 +7,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 
 enum class CoastThemePreset(val label: String, val tag: String) {
-    CoastDefault("默认海岸", "原始默认"),
-    DeepBlueGold("深蓝旧金", "海岸主色"),
+    CoastDefault("默认主题", "原始默认"),
+    DeepBlueGold("深蓝旧金", "默认主色"),
     BlushModelPartner("柔粉主题", "柔软粉色"),
-    WhiteWolfSnow("白狼雪野", "雪地冷光"),
-    SnowLetter("雪地来信", "白狼黑蛇"),
+    WhiteWolfSnow("雪野冷光", "雪地冷光"),
+    SnowLetter("雪地来信", "深色冷光"),
     BurningCloud("火烧云", "夕阳金橙"),
     AuroraNight("极光夜航", "蓝绿极光"),
     PixelPet("像素电子宠物", "复古像素"),
