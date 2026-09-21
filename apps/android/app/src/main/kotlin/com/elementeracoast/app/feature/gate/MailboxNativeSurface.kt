@@ -527,7 +527,7 @@ private fun MailboxTopBar(
             Text("访客信箱", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(
                 when (pane) {
-                    MailboxPane.Room -> "${visitor?.preferred_name ?: visitor?.display_name ?: "访客"} · 慢速回信房间"
+                    MailboxPane.Room -> "慢速回信模式"
                     MailboxPane.Login -> "输入暗号"
                     MailboxPane.Register -> "填记名册"
                     else -> "访客隔离场域 · Native"
@@ -735,6 +735,40 @@ private fun MailboxRoom(
     onEdit: (MailboxMessage) -> Unit,
     onDelete: (MailboxMessage) -> Unit
 ) {
+    if (messages.isEmpty() && !busy) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 10.dp)
+        ) {
+            error?.let { message ->
+                Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(10.dp))
+            }
+            notice?.let { message ->
+                Surface(
+                    modifier = Modifier.fillMaxWidth().clickable(onClick = onClearNotice),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text(message, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
+                }
+                Spacer(Modifier.height(10.dp))
+            }
+            Box(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "这里还没有来信。你可以写下第一封来信。",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            MailboxStatusCard(status)
+            Spacer(Modifier.height(8.dp))
+        }
+        return
+    }
+
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
@@ -770,16 +804,6 @@ private fun MailboxRoom(
                 ) {
                     Text(message, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
                 }
-            }
-        }
-        if (messages.isEmpty() && !busy) {
-            item {
-                Text(
-                    "这里还没有来信。你可以写下第一封来信。",
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 52.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium
-                )
             }
         }
         items(messages, key = { it.id }) { message ->
@@ -908,7 +932,7 @@ private fun MailboxComposer(
                 Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp)) {
                     if (value.isBlank()) {
                         Text(
-                            "写一封慢一点的信…",
+                            "写一封来信",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium
                         )
