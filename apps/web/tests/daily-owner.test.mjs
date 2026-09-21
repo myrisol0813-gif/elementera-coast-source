@@ -153,7 +153,7 @@ const momentsSynced = router.renderers.get('moments')();
 assert.match(momentsSynced.body, /class="moment-cover has-cover"/);
 assert.doesNotMatch(momentsSynced.body, />更换封面</);
 assert.doesNotMatch(momentsSynced.body, /点击设置封面/);
-assert.match(momentsSynced.body, /保存在海岸/);
+assert.match(momentsSynced.body, /保存在前端/);
 assert.match(momentsSynced.body, /moment-text is-collapsed/);
 assert.match(momentsSynced.body, /展开全文/);
 await daily.handleAction('toggle-moment', { dataset: { id: 'moment-long-1' } });
