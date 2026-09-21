@@ -229,11 +229,11 @@ await createEntry(db, {
   entry_type: 'seed',
   scope: 'global',
   title: '同轨燕鸥召回种',
-  life_core: '同轨燕鸥围绕海岸飞行，而不是把深历史塞回 current_text。',
+  life_core: '同轨燕鸥围绕项目世界观飞行，而不是把深历史塞回 current_text。',
   content: '统一种子库继续由语义召回系统负责。',
-  usage_hint: '再次谈到同轨与海岸时召回。',
+  usage_hint: '再次谈到同轨与项目世界观时召回。',
   avoid_hint: '',
-  tag: '海岸世界观',
+  tag: '世界观',
   source_ref: { conversation_id: seedConversation.id },
 });
 const memoryContext = await buildMemoryContext({ COAST_CHAT_DB: db }, 'owner', seedConversation.id, '同轨燕鸥', { limit: 3 });
