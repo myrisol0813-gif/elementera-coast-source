@@ -69,6 +69,7 @@ fun TidalLibraryScreen(
     var index by remember { mutableIntStateOf(0) }
     var start by remember { mutableIntStateOf(0) }
     var focus by remember { mutableIntStateOf(-1) }
+    var focusOffset by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var importing by remember { mutableStateOf<String?>(null) }
     var pendingCoverBook by remember { mutableStateOf<String?>(null) }
@@ -103,6 +104,7 @@ fun TidalLibraryScreen(
                 bookId = result.s("id")
                 index = 0
                 focus = 0
+                focusOffset = 0
                 page = LibraryPage.Chapter
                 revision++
                 onSnackbar("书籍已经放进书房。")
@@ -162,12 +164,13 @@ fun TidalLibraryScreen(
         bookId = entry.s("id")
         index = entry["reader_chapter_index"]?.jsonPrimitive?.intOrNull ?: 0
         focus = entry["reader_paragraph_index"]?.jsonPrimitive?.intOrNull ?: 0
+        focusOffset = 0
         page = LibraryPage.Chapter
     }
     fun openChapter(chapterIndex: Int, paragraph: Int = 0) {
         chapter = null
         index = chapterIndex; start = 0
-        focus = paragraph; page = LibraryPage.Chapter
+        focus = paragraph; focusOffset = 0; page = LibraryPage.Chapter
     }
     fun edit(note: JsonObject?, paragraph: Int = -1) {
         editingNote = note; annotationParagraph = paragraph; writeNote = true
@@ -238,6 +241,7 @@ fun TidalLibraryScreen(
                         paragraphs = pageData.rows("paragraphs"),
                         notes = notes,
                         initialParagraph = focus,
+                        initialOffset = focusOffset,
                         onChapter = { chapterIndex, lastPage -> openChapter(chapterIndex, if(lastPage) -1 else 0) },
                         onHighlight = { paragraph, from, to ->
                             scope.launch {
@@ -255,7 +259,11 @@ fun TidalLibraryScreen(
                             }
                         },
                         onNote = { edit(it) },
-                        onProgress = { paragraph ->
+                        onProgress = { paragraph, textOffset ->
+                            // Preserve a page within long paragraphs, not only the chapter.
+                            // Note refreshes may reconstruct the reader after an annotation.
+                            focus = paragraph
+                            focusOffset = textOffset
                             scope.launch {
                                 try { repository.progress(bookId, index, paragraph) }
                                 catch (error: Exception) { onSnackbar("阅读进度未保存：${error.message}") }
