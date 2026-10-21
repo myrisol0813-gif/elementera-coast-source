@@ -6,8 +6,8 @@ This directory contains the source-available Android client derived from the cur
 
 - App: Elementera Coast Source
 - `applicationId = com.elementeracoast.source`
-- `versionCode = 1`
-- `versionName = 0.1.0-source`
+- `versionCode = 2`
+- `versionName = 0.2.0-source`
 - Kotlin + Jetpack Compose
 - JDK 17 / Android SDK 34 / Gradle 8.9
 
@@ -24,6 +24,10 @@ Source-local configuration uses `BuildConfig.COAST_API_BASE_URL`. The checked-in
 The source build does not include production credentials or distribution machinery. In particular, it ships without production signing configuration, the production APK updater, release publishing, production API origin, or private data. The existing “版本与更新” surface remains part of the copied UI, but only reports source-build metadata and does not download or install production APKs.
 
 No WebView, React Native, TypeScript, or embedded PWA source is used by the Native client.
+
+## Stable source prerelease
+
+The public source app is **not** the private production APK. It preserves the separate `com.elementeracoast.source` install ID. New source prereleases are only produced when the repository administrator enables `COAST_SOURCE_RELEASE_ENABLED` and configures a stable source-only signing keystore in GitHub Secrets. The workflow refuses to publish an unsigned or ephemeral-debug-signed APK. A successful prerelease includes the APK and a SHA-256 checksum directly as **GitHub Release assets**, without uploading Actions artifacts. Do not reuse the private production signing key.
 
 ## Build
 

@@ -7,6 +7,11 @@ plugins {
 
 val sourceApiBaseUrl = providers.gradleProperty("COAST_API_BASE_URL")
     .orElse("https://elementera-coast-source.invalid")
+val sourceSigningPath = providers.environmentVariable("COAST_SOURCE_KEYSTORE_PATH")
+val sourceStorePassword = providers.environmentVariable("COAST_SOURCE_STORE_PASSWORD")
+val sourceKeyAlias = providers.environmentVariable("COAST_SOURCE_KEY_ALIAS")
+val sourceKeyPassword = providers.environmentVariable("COAST_SOURCE_KEY_PASSWORD")
+val sourceSigningConfigured = listOf(sourceSigningPath, sourceStorePassword, sourceKeyAlias, sourceKeyPassword).all { it.isPresent }
 val sourcePreviewPasswordHint = providers.gradleProperty("SOURCE_PREVIEW_PASSWORD_HINT")
     .orElse("")
 
@@ -24,9 +29,21 @@ android {
         buildConfigField("String", "SOURCE_PREVIEW_PASSWORD_HINT", "\"${sourcePreviewPasswordHint.get()}\"")
     }
 
+    signingConfigs {
+        if (sourceSigningConfigured) {
+            create("sourceStable") {
+                storeFile = file(sourceSigningPath.get())
+                storePassword = sourceStorePassword.get()
+                keyAlias = sourceKeyAlias.get()
+                keyPassword = sourceKeyPassword.get()
+            }
+        }
+    }
+
     buildTypes {
         debug { isMinifyEnabled = false }
         release {
+            if (sourceSigningConfigured) signingConfig = signingConfigs.getByName("sourceStable")
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

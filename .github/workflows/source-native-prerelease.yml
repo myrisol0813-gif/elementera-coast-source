@@ -1,0 +1,81 @@
+name: Publish source Native prerelease
+
+on:
+  workflow_run:
+    workflows: ["Source check"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.head_branch == 'main' &&
+          github.event.workflow_run.head_repository.full_name == github.repository &&
+          vars.COAST_SOURCE_RELEASE_ENABLED == 'true' }}
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: apps/android
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Require stable source signing
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.COAST_SOURCE_KEYSTORE_BASE64 }}
+          COAST_SOURCE_STORE_PASSWORD: ${{ secrets.COAST_SOURCE_STORE_PASSWORD }}
+          COAST_SOURCE_KEY_ALIAS: ${{ secrets.COAST_SOURCE_KEY_ALIAS }}
+          COAST_SOURCE_KEY_PASSWORD: ${{ secrets.COAST_SOURCE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${KEYSTORE_BASE64:?Source signing not configured}"
+          : "${COAST_SOURCE_STORE_PASSWORD:?Missing source signing password}"
+          : "${COAST_SOURCE_KEY_ALIAS:?Missing source signing alias}"
+          : "${COAST_SOURCE_KEY_PASSWORD:?Missing source key password}"
+          umask 077
+          echo "${KEYSTORE_BASE64}" | base64 --decode > "${RUNNER_TEMP}/source.keystore"
+          test -s "${RUNNER_TEMP}/source.keystore"
+      - name: Build stable-signed source release
+        shell: bash
+        env:
+          COAST_SOURCE_KEYSTORE_PATH: ${{ runner.temp }}/source.keystore
+          COAST_SOURCE_STORE_PASSWORD: ${{ secrets.COAST_SOURCE_STORE_PASSWORD }}
+          COAST_SOURCE_KEY_ALIAS: ${{ secrets.COAST_SOURCE_KEY_ALIAS }}
+          COAST_SOURCE_KEY_PASSWORD: ${{ secrets.COAST_SOURCE_KEY_PASSWORD }}
+          SOURCE_API_BASE_URL: ${{ vars.COAST_SOURCE_API_BASE_URL }}
+        run: |
+          set -euo pipefail
+          test -n "${SOURCE_API_BASE_URL}"
+          if [[ "${SOURCE_API_BASE_URL}" != https://* ]]; then
+            echo "A self-hosted HTTPS source backend URL is required" >&2
+            exit 1
+          fi
+          gradle :app:assembleRelease --no-daemon --stacktrace -PCOAST_API_BASE_URL="${SOURCE_API_BASE_URL}"
+          test -s app/build/outputs/apk/release/app-release.apk
+          mkdir -p source-release
+          cp app/build/outputs/apk/release/app-release.apk source-release/elementera-coast-source-v0.2.0.apk
+          (cd source-release && sha256sum elementera-coast-source-v0.2.0.apk > SHA256SUMS.txt)
+      - name: Publish signed prerelease (not an Actions artifact)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="source-v0.2.0-${{ github.event.workflow_run.head_sha }}"
+          gh release create "${tag}" \
+            source-release/elementera-coast-source-v0.2.0.apk \
+            source-release/SHA256SUMS.txt \
+            --repo "${GITHUB_REPOSITORY}" --target "${{ github.event.workflow_run.head_sha }}" \
+            --title "Elementera Coast Source Native 0.2.0" --prerelease \
+            --notes "Source-only stable-signed Android build. Not the private production app. Requires your configured source backend; SHA-256 attached."
