@@ -208,6 +208,11 @@ internal fun AppearanceScreen(state: WolfState, store: WolfStore, onSnackbar: (S
                         }
                     }
                 }
+                Text(
+                    "开源版不附带专有字库，缺少预设字体时会回退系统衬线体。可以自行导入有使用授权的 .ttf / .otf。",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
         item {
