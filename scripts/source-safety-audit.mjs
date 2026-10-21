@@ -18,8 +18,8 @@ const exceptions = new Set([
   'scripts/source-safety-audit.mjs', // Rules necessarily contain sensitive marker names.
 ]);
 const redactionTestFixtures = new Map([
-  ['apps/web/tests/snapshot.test.mjs', 'ghp_abcdefghijklmnopqrstuvwxyz123456'],
-  ['apps/web/tests/dev-hands.test.mjs', 'ghp_1234567890abcdefghijkl'],
+  ['apps/web/tests/snapshot.test.mjs', ['ghp_abcdefghijklmnopqrstuvwxyz123456']],
+  ['apps/web/tests/dev-hands.test.mjs', ['ghp_1234567890abcdefghijkl', '-----BEGIN PRIVATE KEY-----']],
 ]);
 const failures = [];
 let scanned = 0;
@@ -29,13 +29,10 @@ for (const path of filenames) {
   const bytes = readFileSync(resolve(root, path));
   if (bytes.includes(0) || bytes.length > 8 * 1024 * 1024) continue;
   let body = bytes.toString('utf8');
-  const synthetic = redactionTestFixtures.get(path);
-  if (synthetic) {
-    if (!body.includes(synthetic)) {
-      failures.push({ category: 'missing_expected_redaction_fixture', path });
-    } else {
-      body = body.replaceAll(synthetic, '[SYNTHETIC-REDACTION-TEST-FIXTURE]');
-    }
+  const synthetic = redactionTestFixtures.get(path) || [];
+  for (const fixture of synthetic) {
+    if (!body.includes(fixture)) failures.push({ category: 'missing_expected_redaction_fixture', path });
+    else body = body.replaceAll(fixture, '[SYNTHETIC-REDACTION-TEST-FIXTURE]');
   }
   scanned++;
   for (const [name, rule] of rules) {
