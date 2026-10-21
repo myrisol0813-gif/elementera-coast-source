@@ -498,6 +498,8 @@ These parts are useful to read if you are exploring how a personal AI workspace 
 
 They should be treated as experimental.
 
+The source Native client now includes the original owner calendar, Tidal Library shelf and reader, EPUB/TXT import and audio-clip actions, using the same source backend contracts as the PWA. Only the interface and generic implementation are mirrored; private data, accounts, identities and signing are excluded. See [Native parity acceptance](docs/SOURCE_NATIVE_PARITY_2026-10-21.md).
+
 ## Preview APK
 
 A debug preview APK is available from the `v0.1-source` GitHub Release.
