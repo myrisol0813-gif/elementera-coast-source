@@ -47,11 +47,12 @@ enum class CoastReadingWeight(val label: String, val fontWeight: FontWeight) {
 fun coastReadingMessageStyle(lineHeight: TextUnit): TextStyle {
     val appearance = LocalCoastAppearance.current
     val base = MaterialTheme.typography.bodyLarge
+    val spacing = if (appearance.fontMode == CoastFontMode.ChillHuoSong) 0.5.sp else 0.02.sp
     return base.copy(
         fontFamily = appearance.readingFontFamily ?: base.fontFamily,
         fontSize = CoastChatTokens.ChatBodySize,
         lineHeight = lineHeight,
         fontWeight = appearance.readingWeight.fontWeight,
-        letterSpacing = 0.02.sp
+        letterSpacing = spacing
     )
 }
