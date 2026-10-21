@@ -365,8 +365,8 @@ Source identity:
 ```text
 App: Elementera Coast Source
 applicationId = com.elementeracoast.source
-versionCode = 1
-versionName = 0.1.0-source
+versionCode = 4
+versionName = 0.2.2-source
 ```
 
 The Android client keeps the copied native application structure, including areas such as:
@@ -500,17 +500,17 @@ They should be treated as experimental.
 
 The source Native client now includes the original owner calendar, Tidal Library shelf and reader, EPUB/TXT import and audio-clip actions, using the same source backend contracts as the PWA. Only the interface and generic implementation are mirrored; private data, accounts, identities and signing are excluded. See [Native parity acceptance](docs/SOURCE_NATIVE_PARITY_2026-10-21.md).
 
-## Source demo PWA + source APK
+## Source PWA + Android APK
 
-For an isolated temporary Cloudflare Pages PWA and source-only signed Android `0.2.0-source` APK, follow [demo deployment and release acceptance](docs/SOURCE_DEMO_PWA_APK.md). The demo password is configured **at the demo server**; merely displaying a password in the APK does not enable login. Neither demo is automatically deployed by the source repository.
+**Current Android source:** `0.2.2-source` (`versionCode=4`, `com.elementeracoast.source`). The latest tested temporary build is [0.2.2-source APK + ZIP prerelease](https://github.com/myrisol0813-gif/elementera-coast-source/releases/tag/source-v1v2-39625851494); see [all releases](https://github.com/myrisol0813-gif/elementera-coast-source/releases) for subsequent builds. Prefer the ZIP-wrapped APK when downloading on phones whose browser corrupts direct APK transfers. Always verify the matching SHA-256.
 
-## Preview APK
+**Important:** That 0.2.2 test APK was compiled against a short-lived Cloudflare Quick Tunnel, which is **not a permanent backend**. You can inspect the APK after the tunnel expires, but cannot log in through it. To test a live matching PWA and APK, manually run [Source Native V1 V2 Diagnostic QA](.github/workflows/source-native-v1v2-diagnostic.yml). It launches isolated empty test storage, verifies real login with password `123456`, publishes a fresh signed APK and ZIP to [Releases](https://github.com/myrisol0813-gif/elementera-coast-source/releases), and keeps the one-time test backend online for approximately 30 minutes after publishing. Do not enter real user data.
 
-The historical `v0.1-source` debug preview remains an older, inspectable build. It does **not** contain the newly synchronized Native calendar, reader or voice screens. The updated source version is `0.2.0-source` with `versionCode=2`.
+For a lasting installation instead, self-host an independent Pages/D1 backend and configure separate source-only signing for [the stable source prerelease workflow](.github/workflows/source-native-prerelease.yml). See [deployment instructions](docs/SOURCE_DEMO_PWA_APK.md). Neither private production backend nor private signing material is included.
 
-For future versions, publishing requires separately configured source-only stable signing and a source backend URL. The GitHub prerelease workflow uploads a signed APK and SHA-256 as Release assets only when the administrator enables it; no new APK is presumed to exist until a Release confirms it.
+## Historical preview APK
 
-Historical v0.1 preview details:
+The original [v0.1-source release](https://github.com/myrisol0813-gif/elementera-coast-source/releases/tag/v0.1-source) is kept for provenance only. It does **not** include the later calendar, reader or voice screens and is **not** the current download. Historical v0.1 preview details:
 
 ```text
 file: elementera-coast-source-v0.1-debug.apk
@@ -625,7 +625,7 @@ Important limitations:
 - production updater and production release publishing are not included;
 - production API origin is not included;
 - real credentials and private data are not included;
-- the published APK is a debug preview build, not a production APK;
+- published Android assets include historical and temporary signed QA builds, not a permanent production service; their embedded test backends expire;
 - self-hosters must provide their own backend, secrets, storage, and deployment configuration;
 - some legacy wire/database values may remain where changing them would break compatibility with copied source contracts;
 - experimental MCP / gateway / memory structures should not be treated as stable public APIs.
