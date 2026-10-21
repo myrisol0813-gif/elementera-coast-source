@@ -73,6 +73,10 @@ jobs:
             *) echo "Expected the independent source demo Pages origin (not private Pages or Quick Tunnel)" >&2; exit 1 ;;
           esac
           : "${SOURCE_DEMO_PASSWORD:?Set source preview login hint in repository variables}"
+          if [[ "${SOURCE_DEMO_PASSWORD}" != '123456' ]]; then
+            echo 'This isolated 0.2.1-source acceptance APK must actually accept demo password 123456' >&2
+            exit 1
+          fi
           cookie="${RUNNER_TEMP}/source-native-login-cookie"
           trap 'rm -f "${cookie}"' EXIT
           # The actual backend must accept the password and serve D1-backed APIs.
@@ -103,10 +107,13 @@ jobs:
           build_tools="$(find "${ANDROID_HOME}/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           test -x "${build_tools}/aapt"
           test -x "${build_tools}/apksigner"
-          package_line="$("${build_tools}/aapt" dump badging "${apk}" | head -n 1)"
+          badging="$("${build_tools}/aapt" dump badging "${apk}")"
+          package_line="$(printf '%s\n' "${badging}" | sed -n '1p')"
           [[ "${package_line}" == *"name='com.elementeracoast.source'"* ]]
           [[ "${package_line}" == *"versionCode='3'"* ]]
           [[ "${package_line}" == *"versionName='0.2.1-source'"* ]]
+          [[ "${badging}" == *"sdkVersion:'26'"* ]]
+          [[ "${badging}" == *"targetSdkVersion:'34'"* ]]
           "${build_tools}/apksigner" verify --verbose --print-certs "${apk}" > "${RUNNER_TEMP}/source-signature-verification.txt"
           fingerprint="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "${RUNNER_TEMP}/source-signature-verification.txt" | head -n 1)"
           : "${fingerprint:?Could not verify source APK signing certificate}"
