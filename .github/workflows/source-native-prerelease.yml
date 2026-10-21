@@ -74,7 +74,7 @@ jobs:
           esac
           : "${SOURCE_DEMO_PASSWORD:?Set source preview login hint in repository variables}"
           if [[ "${SOURCE_DEMO_PASSWORD}" != '123456' ]]; then
-            echo 'This isolated 0.2.1-source acceptance APK must actually accept demo password 123456' >&2
+            echo 'This isolated 0.2.2-source acceptance APK must actually accept demo password 123456' >&2
             exit 1
           fi
           cookie="${RUNNER_TEMP}/source-native-login-cookie"
@@ -110,8 +110,8 @@ jobs:
           badging="$("${build_tools}/aapt" dump badging "${apk}")"
           package_line="$(printf '%s\n' "${badging}" | sed -n '1p')"
           [[ "${package_line}" == *"name='com.elementeracoast.source'"* ]]
-          [[ "${package_line}" == *"versionCode='3'"* ]]
-          [[ "${package_line}" == *"versionName='0.2.1-source'"* ]]
+          [[ "${package_line}" == *"versionCode='4'"* ]]
+          [[ "${package_line}" == *"versionName='0.2.2-source'"* ]]
           [[ "${badging}" == *"sdkVersion:'26'"* ]]
           [[ "${badging}" == *"targetSdkVersion:'34'"* ]]
           "${build_tools}/apksigner" verify --verbose --print-certs "${apk}" > "${RUNNER_TEMP}/source-signature-verification.txt"
@@ -130,7 +130,7 @@ jobs:
             source-release/elementera-coast-source-v0.2.1.apk \
             source-release/SHA256SUMS.txt \
             --repo "${GITHUB_REPOSITORY}" --target "${{ github.event.workflow_run.head_sha || github.sha }}" \
-            --title "Elementera Coast Source Native 0.2.1-source" --prerelease \
+            --title "Elementera Coast Source Native 0.2.2-source" --prerelease \
             --notes "Source-only stable-signed Android build (versionCode 3). Independent demo backend: ${{ vars.COAST_SOURCE_API_BASE_URL }}. Public demo password is only for synthetic data; do not upload private information. Signing cert SHA-256: ${{ steps.apk_verify.outputs.fingerprint }}. Full-file SHA-256 in SHA256SUMS.txt. Do not install over an older debug-signed source APK: uninstall only com.elementeracoast.source if signatures differ. Not the private production app."
           asset_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/elementera-coast-source-v0.2.1.apk"
           echo "### Source Native APK published" >> "${GITHUB_STEP_SUMMARY}"
