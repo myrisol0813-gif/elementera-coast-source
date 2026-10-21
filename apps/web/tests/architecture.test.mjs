@@ -92,7 +92,7 @@ assert.match(devRegistry, /resolveDevHandToolSelection/);
 assert.match(devRegistry, /permission === 'owner'/);
 assert.match(devRegistry, /DEV_HAND_CHAT_SURFACES\.has\(surface\)/);
 assert.match(mcp, /listRegisteredMcpTools/);
-assert.match(mcp, /const VERSION = '2\.0\.2'/);
+assert.match(mcp, /const VERSION = '2\.1\.0'/);
 assert.doesNotMatch(mcp, /RETIRED_MCP_TOOLS|retiredTool\(|retiredToolResult\(|retired_tool/);
 assert.doesNotMatch(mcp, /calendar\.|executeCalendarMcpTool|CALENDAR_MCP_DEFINITIONS/);
 
