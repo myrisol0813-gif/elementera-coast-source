@@ -42,6 +42,8 @@ const ICONS = Object.freeze({
   radio: outline('<circle cx="12" cy="12" r="2"/><path d="M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.5 5.5a9 9 0 0 0 0 13M18.5 5.5a9 9 0 0 1 0 13"/>'),
   letter: outline('<rect x="3.5" y="6" width="17" height="12" rx="2"/><path d="m5 8 7 5 7-5"/>'),
   memory: outline('<path d="M7 5.5A4.5 4.5 0 0 1 12 6a4.5 4.5 0 0 1 5-.5c2 1 2.5 3.5 1.4 5.2 1.1 1.8.4 4.2-1.5 5.1A4.5 4.5 0 0 1 12 18a4.5 4.5 0 0 1-4.9-2.2c-1.9-.9-2.6-3.3-1.5-5.1C4.5 9 5 6.5 7 5.5Z"/><path d="M12 6v12M8.5 9.5H12M12 14.5h3.5"/>'),
+  calendar: outline('<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 9h16M8 13h3M8 16h6"/>'),
+  book: outline('<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Z"/><path d="M12 5v15"/>'),
   daily: outline('<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 9h16M8 13h3M8 16h6"/>'),
   check: outline('<path d="m5 12 4 4 10-10"/>'),
   download: outline('<path d="M12 4v11M8 11l4 4 4-4M5 20h14"/>'),

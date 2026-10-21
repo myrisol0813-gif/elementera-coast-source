@@ -43,3 +43,12 @@ assert.doesNotMatch(actions, /requestJson\(/);
 assert.match(actions, /client\.createMoment/);
 assert.match(actions, /client\.createDiary/);
 console.log(`daily-ui-split: ok (${lines} lines)`);
+
+const html = await read('elementera-mcp/deploy-pages/index.html');
+const icons = await read('elementera-mcp/deploy-pages/public/core/icons.js');
+assert.doesNotMatch(html, /data-action="(?:calendar|library):open"/, 'calendar and shelf live in 小组件, not sidebar');
+for (const [key, route] of [['calendar','calendar'],['library','library-home']]) {
+  assert.match(entry, new RegExp("\\['" + key + "',"), key + ' must have a Daily card');
+  assert.match(actions, new RegExp("name === '" + key + "'[^\\n]*router.open\\('" + route + "'\\)"), key + ' must be routed');
+  assert.match(icons, new RegExp("  " + (key === 'library' ? 'book' : 'calendar') + ": outline\\("));
+}

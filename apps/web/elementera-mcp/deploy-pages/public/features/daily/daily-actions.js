@@ -210,6 +210,8 @@ export function createDailyActions({
         '这页日记已经删除。',
       );
     }
+    if (name === 'calendar') return router.open('calendar');
+    if (name === 'library') return router.open('library-home');
     if (name === 'pets') return router.open('daily-placeholder', { title: '宠物系统' });
     if (name === 'widgets') return router.open('daily-placeholder', { title: '未来小组件' });
   }
