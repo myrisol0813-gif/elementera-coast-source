@@ -53,13 +53,13 @@ The signing key belongs to the public **source** app only. Do not reuse producti
 
 Open **Actions → Publish source Native prerelease → Run workflow**. The release workflow:
 
-- Verifies that the demo server actually accepts the configured password.
-- Builds `applicationId=com.elementeracoast.source`, `versionCode=2`, `versionName=0.2.0-source`, using the verified Pages URL, not the private endpoint.
+- Verifies that the demo server actually accepts the configured password and that authenticated calendar and book APIs respond successfully.
+- Builds `applicationId=com.elementeracoast.source`, `versionCode=3`, `versionName=0.2.1-source`, using the verified independent `-demo.pages.dev` origin, not the private endpoint or an expiring Quick Tunnel.
 - Displays the configured demo password as a *hint* on the source login screen. The APK does not implement an offline password: authentication always happens at the PWA's server.
-- Publishes the stable-signed APK **and its SHA-256** as GitHub **Releases prerelease assets**, never as Actions artifact.
+- Checks the compiled APK package/version and signature with Android SDK tools, then publishes the stable-signed APK **and its SHA-256** as GitHub **Releases prerelease assets**, never as an Actions artifact. The run summary exposes a direct Android download URL, artifact SHA-256 and certificate fingerprint.
 - Refuses to publish without stable source signing and a real HTTPS Pages test backend.
 
-The old `v0.1-source` APK was a debug preview; its temporary signing certificate may differ from the stable source key. In that case, uninstall only the **old source preview** before installing `0.2.0-source`; do **not** remove the private production app.
+The old `v0.1-source` APK was a debug preview; its temporary signing certificate may differ from the stable source key. In that case, uninstall only the **old source preview** before installing `0.2.1-source`; do **not** remove the private production app.
 
 ## 3. Device acceptance and teardown
 
@@ -68,3 +68,11 @@ After a new source prerelease exists, install it and enter `123456`; sign into t
 Keep the PWA up only while testing. When done, switch off GitHub demo/release variables, delete the **demo-only** Pages project and D1 database, and revoke its demo deployment token. Preserve the dedicated source signing keystore for any future source APK upgrade.
 
 **Current status:** These GitHub workflows prepare reproducible deployment, but cannot automatically create an external Pages project, install Cloudflare/GitHub secrets, or produce an APK before the account owner supplies those prerequisites.
+
+## 4. Installing on a phone
+
+Open the direct APK asset shown in the **Publish source Native prerelease** run summary in Chrome or a normal external browser, not an in-app webview. Alternatively open the prerelease page and expand **Assets**. Android may ask for permission to install this APK from that specific browser or Files app. Verify the downloaded file size and SHA-256 against the matching Release asset before installing. If GitHub cannot deliver its asset CDN to the phone, a new build will not solve that network problem; try a different browser/network or a trusted personal transfer of the exact same checksum-verified APK. Avoid third-party APK mirrors.
+
+The historical `source-qa-39588697045` package is **not** a lasting demo. Its test backend was a disposable Quick Tunnel shut down with the workflow runner. It is useful only as a release artifact record, not as a working authenticated client now.
+
+Do not mistake these evidence levels: a Gradle green build proves source compilation; a signed Release proves a downloadable asset was published; a successful server-side login probe proves the demo backend responded **during publishing**; only real phone use proves install, navigation, settings persistence and freedom from Compose lifecycle crashes. See [Native phone acceptance](SOURCE_NATIVE_PHONE_ACCEPTANCE_2026-10-21.md) for the device checks.
