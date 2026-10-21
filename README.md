@@ -500,6 +500,10 @@ They should be treated as experimental.
 
 The source Native client now includes the original owner calendar, Tidal Library shelf and reader, EPUB/TXT import and audio-clip actions, using the same source backend contracts as the PWA. Only the interface and generic implementation are mirrored; private data, accounts, identities and signing are excluded. See [Native parity acceptance](docs/SOURCE_NATIVE_PARITY_2026-10-21.md).
 
+## Source demo PWA + source APK
+
+For an isolated temporary Cloudflare Pages PWA and source-only signed Android `0.2.0-source` APK, follow [demo deployment and release acceptance](docs/SOURCE_DEMO_PWA_APK.md). The demo password is configured **at the demo server**; merely displaying a password in the APK does not enable login. Neither demo is automatically deployed by the source repository.
+
 ## Preview APK
 
 The historical `v0.1-source` debug preview remains an older, inspectable build. It does **not** contain the newly synchronized Native calendar, reader or voice screens. The updated source version is `0.2.0-source` with `versionCode=2`.

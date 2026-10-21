@@ -33,3 +33,7 @@ Self-hosters should set their own source-build backend endpoint at build time. P
 ## Optional voice generation
 
 Set `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` in your server's secret/environment bindings. Both are required for generation. Do not place real values in the repository, client bundle, screenshots, logs or public previews. The voice ID is a user-selected, self-hosted provider profile—not a bundled voice. Generation requires provider credits. The UI displays the backend-reported 2400-character, 40-paragraph and 12-clips-per-message limits; saved audio is capped at 4 MiB per clip. An authenticated full archive includes audio payloads and must be stored privately.
+
+## Disposable public-source demo
+
+For a completely separate, empty Pages + D1 environment, a real test login and a signed-source APK release, follow [the source demo setup](SOURCE_DEMO_PWA_APK.md). Never reuse private production database bindings or keys.
