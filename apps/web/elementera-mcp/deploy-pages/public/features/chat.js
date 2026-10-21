@@ -4,6 +4,7 @@ import { icon } from '../core/icons.js';
 import { activeMessages, createState, flatMessagesToState, normalizeState } from './chat-state.js';
 import { createChatActions } from './chat/chat-actions.js';
 import { createChatAttachments } from './chat/chat-attachments.js';
+import { createChatVoice } from './chat/chat-voice.js';
 import { createChatConversations } from './chat/chat-conversations.js';
 import { createChatGeneration } from './chat/chat-generation.js';
 import {
@@ -170,6 +171,8 @@ export function createChat({ storage, toast, dogtalk }) {
     roomTypeLabels: ROOM_TYPE_LABELS,
   });
 
+  const voice = createChatVoice({ runtime, toast, renderMessages });
+
   async function persistProfile(profile) {
     const data = await requestJson(API.profile, {
       method: 'PUT',
@@ -219,6 +222,7 @@ export function createChat({ storage, toast, dogtalk }) {
     renderConversationList,
     renderMessages,
     closeMenu,
+    voice,
   });
 
   function toggleRikkaHub() {
@@ -295,6 +299,7 @@ export function createChat({ storage, toast, dogtalk }) {
     patchAssistantStreamingText,
     renderConversationList,
     saveHistory,
+    voice,
   });
 
   const {
@@ -324,6 +329,7 @@ export function createChat({ storage, toast, dogtalk }) {
     toggleRikkaHub,
     importRikkaHub,
     attachments: chatAttachments,
+    voice,
   });
 
   async function bootstrap() {

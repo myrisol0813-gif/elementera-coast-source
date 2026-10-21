@@ -29,6 +29,7 @@ export function createChatActions({
   toggleRikkaHub,
   importRikkaHub,
   attachments,
+  voice,
 }) {
   function turnIdFrom(target) {
     return target.dataset.turn || target.closest('[data-turn]')?.dataset.turn || '';
@@ -123,6 +124,7 @@ export function createChatActions({
       if (conversation?.room_type === 'lighthouse') return toast('MCP 对话区只保存文字，不调用 API 模型伙伴回复。');
       return generate(runtime.currentId, turnId);
     }
+    if (name === 'voice') return voice.select(target);
     if (name === 'copy') {
       const turn = currentHistory().turns.find((item) => item.id === turnId);
       const text = turn ? activeBranch(turn).assistant?.content || '' : '';

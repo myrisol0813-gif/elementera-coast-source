@@ -68,6 +68,7 @@ export function createChatGeneration({
   patchAssistantStreamingText,
   renderConversationList,
   saveHistory,
+  voice,
 }) {
   const contextMessages = (history, turnId) => buildContextMessages(history, turnId, runtime.runSettings() || {});
   const chatRequestContext = (conversationId) => buildChatRequestContext(runtime.runSettings, runtime.recallHistory, conversationId);
@@ -203,6 +204,7 @@ export function createChatGeneration({
     composerState();
     await saveHistory(conversationId, latest).catch(() => undefined);
     runtime.desk?.onConversationChanged(latest, conversationId);
+    if (generated) void voice?.load(conversationId, { force: true });
     if (generated) { dogtalk?.resetCrossWindow?.({ room_scope: 'conversation', conversation_id: conversationId }); autoTitle(conversationId, latest, turnId).catch(() => undefined); }
     if (generated) {
       let soilRefresh = null;

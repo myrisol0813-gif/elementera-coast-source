@@ -16,6 +16,7 @@ export function createChatConversations({
   renderConversationList,
   renderMessages,
   closeMenu,
+  voice,
 }) {
   async function fetchConversations() {
     const data = await requestJson(API.conversations);
@@ -110,6 +111,7 @@ export function createChatConversations({
       setStatus('');
       renderMessages(conversationId);
       setComposerReady(true);
+      void voice?.load(conversationId);
       runtime.memory?.onConversationChanged(conversationId)?.catch((error) => console.warn('[memory:conversation]', error));
       runtime.desk?.onConversationChanged(data.history || {}, conversationId);
       dogtalk?.mountComposer(ui.dogtalk, {

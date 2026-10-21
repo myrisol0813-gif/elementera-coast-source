@@ -46,6 +46,7 @@ export function actionButton(action, title, { active = false, reaction = '' } = 
     'edit-user': 'edit',
     'delete-user': 'trash',
     regenerate: 'refresh',
+    voice: 'voice',
     like: 'like',
     favorite: 'heart',
     'delete-assistant': 'trash',
@@ -151,6 +152,16 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
     ui.list.innerHTML = `${coastHtml}<section class="rikkahub-conversation-section"><button class="rikkahub-section-toggle" type="button" data-action="chat:toggle-rikkahub" aria-expanded="${runtime.rikkahubExpanded ? 'true' : 'false'}"><span>RikkaHub</span><span aria-hidden="true">${runtime.rikkahubExpanded ? '⌃' : '⌄'}</span></button>${rikkaBody}</section>`;
   }
 
+  function voiceAudioCards(conversationId, turnId, messageId) {
+    const items = (runtime.voiceClips?.get(conversationId) || []).filter(item =>
+      item.message_id === messageId || (!item.message_id && item.turn_id === turnId));
+    if (!items.length) return '';
+    return `<div class="coast-message-voices">${items.map(item => `<div class="coast-message-voice">
+      <span>语音留存</span>
+      <audio controls preload="none" src="${escapeAttribute(item.audio_url)}" aria-label="播放已保存的语音"></audio>
+    </div>`).join('')}</div>`;
+  }
+
   function renderMessages(conversationId = runtime.currentId) {
     discardStreamingPatches(conversationId);
     if (!ui.messages || conversationId !== runtime.currentId) return;
@@ -175,7 +186,7 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
           ? officialMcpLetter(branch.user, turn.id, userAttachment)
           : `<article class="message user ${userImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}"><div class="content">${branch.user.content ? `<div class="user-bubble">${escapeHtml(branch.user.content)}</div>` : ''}${userAttachment}${userImported ? '<span class="message-dogtalk-mark">RikkaHub 旧档案</span>' : ''}${branch.user.dogtalk_snapshot_id ? '<span class="message-dogtalk-mark">私人草稿 · 随本轮</span>' : ''}<div class="message-actions">${actionButton('edit-user', '编辑')}${actionButton('delete-user', '删除')}${variantControl('user', turn.id, branch.userIndex, turn.user.variants.length)}</div></div></article>`
         : '';
-      const assistant = branch.assistant ? `<article class="message assistant ${assistantImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}" data-message-id="${escapeAttribute(branch.assistant.id || '')}"><button class="avatar" type="button" data-action="settings:avatar" aria-label="更换助手头像"></button><div class="content">${renderFurnitureBubble(branch.assistant.furniture_runs, { conversationId })}<div class="assistant-text">${formatRichText(branch.assistant.content)}${branch.assistant.errorDetail ? `<span class="message-error">${escapeHtml(branch.assistant.errorDetail)}</span>` : ''}${loading ? '<span class="typing-cursor"></span>' : ''}</div>${assistantAttachment}${assistantImported ? `<span class="message-dogtalk-mark">RikkaHub 旧档案${branch.assistant.model_id ? ` · ${escapeHtml(shortModelName(branch.assistant.model_id))}` : ''}</span>` : ''}<div class="message-actions">${actionButton('copy', '复制')}${actionButton('like', '点赞', { active: branch.assistant.liked, reaction: 'liked' })}${actionButton('regenerate', '重新生成')}${actionButton('favorite', '收藏', { active: branch.assistant.favorite, reaction: 'favorite' })}${actionButton('delete-assistant', '删除')}${variantControl('assistant', turn.id, branch.assistantIndex, branch.assistants.length)}${generationFootprint(branch.assistant, turn.id)}</div>${loading ? '' : renderModelMetadataTrace(branch.assistant, conversationId)}</div></article>` : '';
+      const assistant = branch.assistant ? `<article class="message assistant ${assistantImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}" data-message-id="${escapeAttribute(branch.assistant.id || '')}"><button class="avatar" type="button" data-action="settings:avatar" aria-label="更换助手头像"></button><div class="content">${renderFurnitureBubble(branch.assistant.furniture_runs, { conversationId })}<div class="assistant-text">${formatRichText(branch.assistant.content)}${branch.assistant.errorDetail ? `<span class="message-error">${escapeHtml(branch.assistant.errorDetail)}</span>` : ''}${loading ? '<span class="typing-cursor"></span>' : ''}</div>${assistantAttachment}${voiceAudioCards(conversationId, turn.id, branch.assistant.id)}${assistantImported ? `<span class="message-dogtalk-mark">RikkaHub 旧档案${branch.assistant.model_id ? ` · ${escapeHtml(shortModelName(branch.assistant.model_id))}` : ''}</span>` : ''}<div class="message-actions">${actionButton('copy', '复制')}${actionButton('voice', '生成语音')}${actionButton('like', '点赞', { active: branch.assistant.liked, reaction: 'liked' })}${actionButton('regenerate', '重新生成')}${actionButton('favorite', '收藏', { active: branch.assistant.favorite, reaction: 'favorite' })}${actionButton('delete-assistant', '删除')}${variantControl('assistant', turn.id, branch.assistantIndex, branch.assistants.length)}${generationFootprint(branch.assistant, turn.id)}</div>${loading ? '' : renderModelMetadataTrace(branch.assistant, conversationId)}</div></article>` : '';
       const soil = branch.assistant && turn.id === latestAssistantTurnId ? runtime.memory?.renderSoilEntry(conversationId) || '' : '';
       return user + soil + assistant;
     }).join('');
