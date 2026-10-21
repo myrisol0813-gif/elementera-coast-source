@@ -7,7 +7,7 @@ This is a checklist for the **public source Android app only**, application ID `
 1. Confirm the release is a GitHub **prerelease asset**, not an Actions artifact; record release URL, commit, APK filename, size and asset SHA-256.
 2. For a **stable** source build, confirm an independent persistent `*-demo.pages.dev` origin. For a **temporary** QA build, confirm the new `trycloudflare.com` Quick Tunnel, real test password `123456`, and authenticated calendar + book APIs at build time. The Quick Tunnel is not a lasting APK backend; it closes with the test workflow.
 3. For stable releases verify the source-only stable certificate and continuity across upgrades. For temporary QA builds verify `apksigner` V1/V2, embedded signature files, complete ZIP CRC and the release SHA-256; the one-time certificate is deliberately different per run. Never use production signing material.
-4. Confirm `aapt dump badging` reports `com.elementeracoast.source`, version code `3`, version name `0.2.2-source`. Compare the file SHA-256 with the matching Release `SHA256SUMS.txt` and GitHub asset digest.
+4. Confirm `aapt dump badging` reports `com.elementeracoast.source`, version code `4`, version name `0.2.2-source`. Compare the file SHA-256 with the matching Release `SHA256SUMS.txt` and GitHub asset digest.
 5. Record whether device installation was actually tested. Build success or upload success alone is **not** a phone acceptance.
 
 ## Download and install
