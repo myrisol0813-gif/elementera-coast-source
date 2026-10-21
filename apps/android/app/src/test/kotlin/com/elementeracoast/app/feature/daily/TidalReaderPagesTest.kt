@@ -18,4 +18,15 @@ class TidalReaderPagesTest {
         assertTrue(pages[later].first().start > 0)
         assertTrue(tidalPageFor(pages, 1, 0) >= later)
     }
+
+    @Test fun paragraphOffsetRestoresItsActualPageAfterNoteRefresh() {
+        // A paragraph can span many pages. Saving the paragraph number alone
+        // used to jump back to its first page after a note refresh.
+        val pages = paginateTidalChapter(listOf(0 to "海风".repeat(700)), 180)
+        val lastPage = pages.lastIndex
+        val anchor = pages[lastPage].last()
+        assertTrue(lastPage > 1)
+        assertEquals(lastPage, tidalPageFor(pages, anchor.paragraphIndex, anchor.start))
+        assertEquals(0, tidalPageFor(pages, anchor.paragraphIndex, 0))
+    }
 }
