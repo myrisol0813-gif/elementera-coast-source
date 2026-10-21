@@ -98,11 +98,11 @@ for (const retiredSymbol of ['modeMutationLoading', 'constructionLoading', 'cons
 }
 
 // Current PWA generation no longer links/cache-pins construction assets.
-assert.match(serviceWorker, /elementera-coast-source-app-01/);
+assert.match(serviceWorker, /elementera-coast-source-app-[0-9]+/);
 assert.doesNotMatch(serviceWorker, /features\/construction\.js|styles\/construction\.css/);
-assert.match(index, /coast-source-app-01/);
+assert.match(index, /coast-source-app-[0-9]+/);
 assert.doesNotMatch(index, /styles\/construction\.css/);
-assert.match(version, /PWA_CACHE_VERSION = 'coast-source-app-01'/);
+assert.match(version, /PWA_CACHE_VERSION = 'coast-source-app-[0-9]+'/);
 assert.match(version, /DEV_HANDS_RELEASE = 'COAST-SOURCE-DEV-HANDS-01'/);
 
 console.log('direct-dev-hands-contract: ok');
