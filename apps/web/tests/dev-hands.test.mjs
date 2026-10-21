@@ -9,13 +9,14 @@ import { redactSecretText, safeDevSummary } from '../functions/dev-hands-store.j
 import { githubActionPolicy } from '../functions/github-dev-service.js';
 import { notionActionPolicy } from '../functions/notion-notes-service.js';
 import { PWA_CACHE_VERSION, DEV_HANDS_RELEASE } from '../functions/dev-hands-version.js';
+import { APP_CACHE_VERSION } from '../scripts/cache-versions.mjs';
 import { resolveDevHandToolSelection } from '../functions/dev-hand-model-tools.js';
 
 const env = {
   COAST_GITHUB_ALLOWED_REPOS: 'example-owner/example-web-app,example-owner/example-android-app',
 };
 
-assert.equal(PWA_CACHE_VERSION, 'coast-source-app-01');
+assert.equal(PWA_CACHE_VERSION, APP_CACHE_VERSION);
 assert.equal(DEV_HANDS_RELEASE, 'COAST-SOURCE-DEV-HANDS-01');
 assert.deepEqual(allowedRepos(env), [
   'example-owner/example-web-app',
