@@ -100,7 +100,7 @@ fun DailyLanding(
             )
             DailyPage.Moments -> FeaturePageTopBar(
                 title = "碳硅圈",
-                subtitle = "海岸内部朋友圈",
+                subtitle = "前端默认朋友圈",
                 onBack = { page = DailyPage.Home },
                 actionLabel = "+ 动态",
                 onAction = { page = DailyPage.MomentCompose },
@@ -130,7 +130,7 @@ fun DailyLanding(
                 { page = DailyPage.Diary },
                 compact = true
             )
-            DailyPage.Calendar -> FeaturePageTopBar("海岸日历", "公历 · 日程与随记", { page = DailyPage.Home }, compact = true)
+            DailyPage.Calendar -> FeaturePageTopBar("日历", "公历 · 日程与随记", { page = DailyPage.Home }, compact = true)
             DailyPage.Library -> Unit
             DailyPage.Pet -> FeaturePageTopBar(
                 "宠物系统",
@@ -170,8 +170,8 @@ fun DailyLanding(
       if(page==DailyPage.Library && libraryChromeVisible) {
           Box(Modifier.align(Alignment.TopCenter)) {
               FeaturePageTopBar(
-                  title="潮中书房",
-                  subtitle="小狗和小蛇一起翻书",
+                  title="书房",
+                  subtitle="翻书、划线与批注",
                   onBack={page=DailyPage.Home},
                   actionLabel=if(libraryShelf)"＋" else null,
                   onAction={libraryImportRequest++},
@@ -185,10 +185,10 @@ fun DailyLanding(
 @Composable
 private fun DailyHome(onOpen: (DailyPage) -> Unit, onFutureWidgets: () -> Unit) {
     val mapping = listOf(
-        Triple(DailyPage.Moments, DailyLandingItem("碳硅圈", "海岸内部朋友圈"), Icons.Default.FavoriteBorder),
+        Triple(DailyPage.Moments, DailyLandingItem("碳硅圈", "前端默认朋友圈"), Icons.Default.FavoriteBorder),
         Triple(DailyPage.Diary, DailyLandingItem("日记", "留下今天的纸页"), Icons.Default.Edit),
-        Triple(DailyPage.Calendar, DailyLandingItem("海岸日历", "公历日程与纪念日"), Icons.Default.CalendarMonth),
-        Triple(DailyPage.Library, DailyLandingItem("潮中书房", "翻书、划线与批注"), Icons.Default.AutoStories),
+        Triple(DailyPage.Calendar, DailyLandingItem("日历", "公历日程与纪念日"), Icons.Default.CalendarMonth),
+        Triple(DailyPage.Library, DailyLandingItem("书房", "翻书、划线与批注"), Icons.Default.AutoStories),
         Triple(DailyPage.Pet, DailyLandingItem("宠物系统", "还在准备休憩箱"), Icons.Default.Pets)
     )
     LazyColumn(
@@ -231,9 +231,9 @@ private fun DailyHomeCard(item: DailyLandingItem, icon: ImageVector, onClick: ()
 
 /** Active Daily destinations. Future widgets is a visual PWA-mother placeholder, not an active page. */
 internal fun dailyLandingItems(): List<DailyLandingItem> = listOf(
-    DailyLandingItem("碳硅圈", "海岸内部朋友圈"),
+    DailyLandingItem("碳硅圈", "前端默认朋友圈"),
     DailyLandingItem("日记", "留下今天的纸页"),
-    DailyLandingItem("海岸日历", "公历日程与纪念日"),
-    DailyLandingItem("潮中书房", "翻书、划线与批注"),
+    DailyLandingItem("日历", "公历日程与纪念日"),
+    DailyLandingItem("书房", "翻书、划线与批注"),
     DailyLandingItem("宠物系统", "还在准备休憩箱")
 )

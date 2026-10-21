@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.elementeracoast.app.core.model.ChatMessage
 import com.elementeracoast.app.core.model.MessageAction
 import com.elementeracoast.app.ui.theme.CoastChatTokens
+import com.elementeracoast.app.ui.theme.coastReadingMessageStyle
 import com.elementeracoast.app.ui.theme.LocalCoastAppearance
 import com.elementeracoast.app.ui.theme.SnowLetterSurface
 import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
@@ -71,11 +72,7 @@ internal fun UserMessage(
                                     vertical = CoastChatTokens.UserBubbleVerticalPadding
                                 ),
                             color = MaterialTheme.colorScheme.onSurface,
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontSize = CoastChatTokens.ChatBodySize,
-                                lineHeight = CoastChatTokens.UserBodyLineHeight,
-                                fontWeight = FontWeight.Normal
-                            )
+                            style = coastReadingMessageStyle(CoastChatTokens.UserBodyLineHeight)
                         )
                     }
                 }

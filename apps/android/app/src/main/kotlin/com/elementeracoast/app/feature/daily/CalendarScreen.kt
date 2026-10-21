@@ -114,7 +114,7 @@ fun CalendarScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Unit
             TextButton(onClick = { editing = null; formOpen = true }) { Text("＋ 记录") }
         }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (busy) item { Text("正在同步海岸日历…", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            if (busy) item { Text("正在同步日历…", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             if (visible.isEmpty() && !busy) item { Text("这一天还没有记录。", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             items(visible, key = { it.value("id") }) { item ->
                 DailySurfaceCard(onClick = { editing = item; formOpen = true }) {

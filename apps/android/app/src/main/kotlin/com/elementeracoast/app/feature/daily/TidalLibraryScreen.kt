@@ -105,7 +105,7 @@ fun TidalLibraryScreen(
                 focus = 0
                 page = LibraryPage.Chapter
                 revision++
-                onSnackbar("书籍已经放进潮中书房。")
+                onSnackbar("书籍已经放进书房。")
             } catch (error: Exception) { onSnackbar("导入失败：${error.message}") }
             finally { loading = false; importing = null }
         }
@@ -142,7 +142,7 @@ fun TidalLibraryScreen(
                 }
             }
         } catch (error: CancellationException) { throw error }
-        catch (error: Exception) { onSnackbar("潮中书房暂时无法读取：${error.message}") }
+        catch (error: Exception) { onSnackbar("书房暂时无法读取：${error.message}") }
         finally { loading = false }
     }
     LaunchedEffect(page, bookId, index, chapter) {
