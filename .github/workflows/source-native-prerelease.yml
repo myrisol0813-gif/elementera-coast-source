@@ -95,8 +95,8 @@ jobs:
           gradle :app:testDebugUnitTest :app:assembleRelease --no-daemon --stacktrace -PCOAST_API_BASE_URL="${SOURCE_API_BASE_URL}" -PSOURCE_PREVIEW_PASSWORD_HINT="${SOURCE_DEMO_PASSWORD}"
           test -s app/build/outputs/apk/release/app-release.apk
           mkdir -p source-release
-          cp app/build/outputs/apk/release/app-release.apk source-release/elementera-coast-source-v0.2.1.apk
-          (cd source-release && sha256sum elementera-coast-source-v0.2.1.apk > SHA256SUMS.txt)
+          cp app/build/outputs/apk/release/app-release.apk source-release/elementera-coast-source-v0.2.2.apk
+          (cd source-release && sha256sum elementera-coast-source-v0.2.2.apk > SHA256SUMS.txt)
       - name: Verify APK identity and independent signing
         id: apk_verify
         shell: bash
@@ -125,14 +125,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          tag="source-v0.2.1-${{ github.event.workflow_run.head_sha || github.sha }}"
+          tag="source-v0.2.2-${{ github.event.workflow_run.head_sha || github.sha }}"
           gh release create "${tag}" \
-            source-release/elementera-coast-source-v0.2.1.apk \
+            source-release/elementera-coast-source-v0.2.2.apk \
             source-release/SHA256SUMS.txt \
             --repo "${GITHUB_REPOSITORY}" --target "${{ github.event.workflow_run.head_sha || github.sha }}" \
             --title "Elementera Coast Source Native 0.2.2-source" --prerelease \
-            --notes "Source-only stable-signed Android build (versionCode 3). Independent demo backend: ${{ vars.COAST_SOURCE_API_BASE_URL }}. Public demo password is only for synthetic data; do not upload private information. Signing cert SHA-256: ${{ steps.apk_verify.outputs.fingerprint }}. Full-file SHA-256 in SHA256SUMS.txt. Do not install over an older debug-signed source APK: uninstall only com.elementeracoast.source if signatures differ. Not the private production app."
-          asset_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/elementera-coast-source-v0.2.1.apk"
+            --notes "Source-only stable-signed Android build (versionCode 4). Independent demo backend: ${{ vars.COAST_SOURCE_API_BASE_URL }}. Public demo password is only for synthetic data; do not upload private information. Signing cert SHA-256: ${{ steps.apk_verify.outputs.fingerprint }}. Full-file SHA-256 in SHA256SUMS.txt. Do not install over an older debug-signed source APK: uninstall only com.elementeracoast.source if signatures differ. Not the private production app."
+          asset_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/elementera-coast-source-v0.2.2.apk"
           echo "### Source Native APK published" >> "${GITHUB_STEP_SUMMARY}"
           echo "Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}" >> "${GITHUB_STEP_SUMMARY}"
           echo "Direct APK: ${asset_url}" >> "${GITHUB_STEP_SUMMARY}"
