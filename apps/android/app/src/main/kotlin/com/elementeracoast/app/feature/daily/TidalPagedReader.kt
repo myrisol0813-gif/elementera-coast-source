@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import com.elementeracoast.app.ui.theme.LocalCoastAppearance
+import com.elementeracoast.app.ui.theme.CoastFontMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -301,7 +302,7 @@ private fun SelectableBookText(
                     color = ink,
                     fontSize = fontSize.sp,
                     lineHeight = (fontSize * 1.73f).sp,
-                    letterSpacing = .02.sp,
+                    letterSpacing = if (LocalCoastAppearance.current.fontMode == CoastFontMode.ChillHuoSong) .5.sp else .02.sp,
                     fontFamily = fontFamily,
                     fontWeight = fontWeight
                 ),
