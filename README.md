@@ -502,15 +502,15 @@ The source Native client now includes the original owner calendar, Tidal Library
 
 ## Source PWA + Android APK
 
-**Current Android source:** `0.2.2-source` (`versionCode=4`, `com.elementeracoast.source`). The latest tested temporary build is [0.2.2-source APK + ZIP prerelease](https://github.com/myrisol0813-gif/elementera-coast-source/releases/tag/source-v1v2-39625851494); see [all releases](https://github.com/myrisol0813-gif/elementera-coast-source/releases) for subsequent builds. Prefer the ZIP-wrapped APK when downloading on phones whose browser corrupts direct APK transfers. Always verify the matching SHA-256.
+**Current Android source:** `0.2.2-source` (`versionCode=4`, `com.elementeracoast.source`). The latest tested temporary build is [0.2.2-source APK + ZIP prerelease](../../releases/tag/source-v1v2-39625851494); see [all releases](../../releases) for subsequent builds. Prefer the ZIP-wrapped APK when downloading on phones whose browser corrupts direct APK transfers. Always verify the matching SHA-256.
 
-**Important:** That 0.2.2 test APK was compiled against a short-lived Cloudflare Quick Tunnel, which is **not a permanent backend**. You can inspect the APK after the tunnel expires, but cannot log in through it. To test a live matching PWA and APK, manually run [Source Native V1 V2 Diagnostic QA](.github/workflows/source-native-v1v2-diagnostic.yml). It launches isolated empty test storage, verifies real login with password `123456`, publishes a fresh signed APK and ZIP to [Releases](https://github.com/myrisol0813-gif/elementera-coast-source/releases), and keeps the one-time test backend online for approximately 30 minutes after publishing. Do not enter real user data.
+**Important:** That 0.2.2 test APK was compiled against a short-lived Cloudflare Quick Tunnel, which is **not a permanent backend**. You can inspect the APK after the tunnel expires, but cannot log in through it. To test a live matching PWA and APK, manually run [Source Native V1 V2 Diagnostic QA](.github/workflows/source-native-v1v2-diagnostic.yml). It launches isolated empty test storage, verifies real login with password `123456`, publishes a fresh signed APK and ZIP to [Releases](../../releases), and keeps the one-time test backend online for approximately 30 minutes after publishing. Do not enter real user data.
 
 For a lasting installation instead, self-host an independent Pages/D1 backend and configure separate source-only signing for [the stable source prerelease workflow](.github/workflows/source-native-prerelease.yml). See [deployment instructions](docs/SOURCE_DEMO_PWA_APK.md). Neither private production backend nor private signing material is included.
 
 ## Historical preview APK
 
-The original [v0.1-source release](https://github.com/myrisol0813-gif/elementera-coast-source/releases/tag/v0.1-source) is kept for provenance only. It does **not** include the later calendar, reader or voice screens and is **not** the current download. Historical v0.1 preview details:
+The original [v0.1-source release](../../releases/tag/v0.1-source) is kept for provenance only. It does **not** include the later calendar, reader or voice screens and is **not** the current download. Historical v0.1 preview details:
 
 ```text
 file: elementera-coast-source-v0.1-debug.apk
