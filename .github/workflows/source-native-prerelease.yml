@@ -1,6 +1,7 @@
 name: Publish source Native prerelease
 
 on:
+  workflow_dispatch:
   workflow_run:
     workflows: ["Source check"]
     types: [completed]
@@ -11,10 +12,11 @@ permissions:
 jobs:
   publish:
     if: >-
-      ${{ github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.head_branch == 'main' &&
-          github.event.workflow_run.head_repository.full_name == github.repository &&
-          vars.COAST_SOURCE_RELEASE_ENABLED == 'true' }}
+      ${{ vars.COAST_SOURCE_RELEASE_ENABLED == 'true' &&
+          (github.event_name == 'workflow_dispatch' ||
+            (github.event.workflow_run.conclusion == 'success' &&
+             github.event.workflow_run.head_branch == 'main' &&
+             github.event.workflow_run.head_repository.full_name == github.repository)) }}
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -22,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
       - uses: actions/setup-java@v4
         with:
@@ -55,14 +57,22 @@ jobs:
           COAST_SOURCE_KEY_ALIAS: ${{ secrets.COAST_SOURCE_KEY_ALIAS }}
           COAST_SOURCE_KEY_PASSWORD: ${{ secrets.COAST_SOURCE_KEY_PASSWORD }}
           SOURCE_API_BASE_URL: ${{ vars.COAST_SOURCE_API_BASE_URL }}
+          SOURCE_DEMO_PASSWORD: ${{ vars.COAST_SOURCE_PREVIEW_PASSWORD_HINT }}
         run: |
           set -euo pipefail
           test -n "${SOURCE_API_BASE_URL}"
-          if [[ "${SOURCE_API_BASE_URL}" != https://* ]]; then
-            echo "A self-hosted HTTPS source backend URL is required" >&2
+          if [[ "${SOURCE_API_BASE_URL}" != https://*.pages.dev ]]; then
+            echo "The source preview release requires a separate HTTPS Pages demo origin" >&2
             exit 1
           fi
-          gradle :app:assembleRelease --no-daemon --stacktrace -PCOAST_API_BASE_URL="${SOURCE_API_BASE_URL}"
+          : "${SOURCE_DEMO_PASSWORD:?Set source preview login hint in repository variables}"
+          # Verify server-side login, not just a static hint embedded in the APK.
+          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 --data-urlencode "password=${SOURCE_DEMO_PASSWORD}" "${SOURCE_API_BASE_URL}/login")"
+          if [[ "${status}" != "302" ]]; then
+            echo "Demo backend did not accept configured preview password (HTTP ${status})" >&2
+            exit 1
+          fi
+          gradle :app:assembleRelease --no-daemon --stacktrace -PCOAST_API_BASE_URL="${SOURCE_API_BASE_URL}" -PSOURCE_PREVIEW_PASSWORD_HINT="${SOURCE_DEMO_PASSWORD}"
           test -s app/build/outputs/apk/release/app-release.apk
           mkdir -p source-release
           cp app/build/outputs/apk/release/app-release.apk source-release/elementera-coast-source-v0.2.0.apk
@@ -72,10 +82,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          tag="source-v0.2.0-${{ github.event.workflow_run.head_sha }}"
+          tag="source-v0.2.0-${{ github.event.workflow_run.head_sha || github.sha }}"
           gh release create "${tag}" \
             source-release/elementera-coast-source-v0.2.0.apk \
             source-release/SHA256SUMS.txt \
-            --repo "${GITHUB_REPOSITORY}" --target "${{ github.event.workflow_run.head_sha }}" \
+            --repo "${GITHUB_REPOSITORY}" --target "${{ github.event.workflow_run.head_sha || github.sha }}" \
             --title "Elementera Coast Source Native 0.2.0" --prerelease \
             --notes "Source-only stable-signed Android build. Not the private production app. Requires your configured source backend; SHA-256 attached."
