@@ -51,7 +51,7 @@ bash scripts/sign-disposable-qa.sh "$apk"
 bt=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
 package=$("$bt/aapt" dump badging "$apk" | head -n 1)
 [[ "$package" == *"name='com.elementeracoast.source'"* ]]
-[[ "$package" == *"versionCode='3'"* ]]
+[[ "$package" == *"versionCode='4'"* ]]
 [[ "$package" == *"versionName='0.2.2-source'"* ]]
 mkdir -p source-qa
 cp "$apk" source-qa/elementera-coast-source-v0.2.2-signed-qa.apk
