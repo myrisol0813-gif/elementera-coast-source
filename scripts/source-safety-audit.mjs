@@ -16,7 +16,10 @@ const exceptions = new Set([
   'docs/SANITIZATION_REPORT.md', // Immutable baseline: discusses historical private tokens, not production config.
   'scripts/source-safety-audit.mjs', // Rules necessarily contain sensitive marker names.
 ]);
-const expectedTestFixture = 'ghp_abcdefghijklmnopqrstuvwxyz123456';
+const redactionTestFixtures = new Map([
+  ['apps/web/tests/snapshot.test.mjs', 'ghp_abcdefghijklmnopqrstuvwxyz123456'],
+  ['apps/web/tests/dev-hands.test.mjs', 'ghp_1234567890abcdefghijkl'],
+]);
 const failures = [];
 let scanned = 0;
 for (const path of filenames) {
@@ -25,7 +28,14 @@ for (const path of filenames) {
   const bytes = readFileSync(path);
   if (bytes.includes(0) || bytes.length > 8 * 1024 * 1024) continue;
   let body = bytes.toString('utf8');
-  if (path === 'apps/web/tests/snapshot.test.mjs') body = body.replaceAll(expectedTestFixture, '[SYNTHETIC-REDACTION-TEST-FIXTURE]');
+  const synthetic = redactionTestFixtures.get(path);
+  if (synthetic) {
+    if (!body.includes(synthetic)) {
+      failures.push({ category: 'missing_expected_redaction_fixture', path });
+    } else {
+      body = body.replaceAll(synthetic, '[SYNTHETIC-REDACTION-TEST-FIXTURE]');
+    }
+  }
   scanned++;
   for (const [name, rule] of rules) {
     if (rule.test(body)) failures.push({ category: name, path });
