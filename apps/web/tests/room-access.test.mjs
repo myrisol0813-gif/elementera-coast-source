@@ -29,8 +29,10 @@ for (const access of ownerAccess) {
     'daily.create_moment', 'daily.create_diary', 'daily.moment_comment', 'daily.moment_like',
     'dogtalk.read', 'memory.search', 'memory.write_candidate', 'memory.global_excerpt_propose',
     'cross_window.search', 'cross_window.keyword_search', 'cross_window.read_messages', 'cross_window.read_recent',
+    'calendar.list', 'calendar.create', 'calendar.update', 'calendar.delete',
+    'library.books', 'library.read', 'library.notes', 'library.write', 'voice.create',
   ]);
-  assert.deepEqual(access.backendTools, ['daily.*', 'dogtalk.*', 'memory.*', 'cross_window.*']);
+  assert.deepEqual(access.backendTools, ['daily.*', 'dogtalk.*', 'memory.*', 'cross_window.*', 'calendar.*', 'library.*', 'voice.create']);
 }
 for (const access of ownerAccess.slice(1)) {
   assert.deepEqual(access.backendTools, ownerAccess[0].backendTools, 'main/radio/lighthouse backend tools must stay identical');
@@ -57,7 +59,8 @@ for (const [surface, conversation, expected, forbidden] of [
   for (const required of ['create_diary', 'create_moment', 'global_excerpt_propose', 'memory_search', 'memory_write_candidate', 'moment_comment', 'moment_like', 'read_mystic_dogtalk']) {
     assert.ok(functionToolNames.includes(required), `${surface} lost required owner tool ${required}`);
   }
-  assert.equal(functionToolNames.some((name) => name.startsWith('calendar_')), false, `${surface} unexpectedly exposed calendar tools`);
+  assert.ok(functionToolNames.includes('calendar_list'), `${surface} lost owner calendar tool`);
+  assert.ok(functionToolNames.includes('library_read'), `${surface} lost owner reader tool`);
   assert.equal(
     assembled.tools.some((tool) => tool.type === 'openrouter:web_search'),
     surface === 'main_chat' || surface === 'radio',

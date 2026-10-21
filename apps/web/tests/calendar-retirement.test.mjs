@@ -29,10 +29,12 @@ assert.equal(api.status, 404);
 assert.equal((await api.json()).error.type, 'not_found');
 
 const registered = listRegisteredTools({ permission: 'owner', surface: 'main_chat' });
-assert.equal(registered.some((tool) => tool.tool_key.startsWith('calendar.')), false);
+assert.ok(registered.some((tool) => tool.tool_key === 'calendar.list'), 'new calendar v2 is accessible');
 const selected = resolveToolSelection({ permission: 'owner', surface: 'main_chat' });
-assert.equal(selected.modelVisibleTools.some((tool) => tool.function.name.startsWith('calendar_')), false);
-assert.equal(selected.backendTools.some((tool) => tool.tool_key.startsWith('calendar.')), false);
+assert.ok(selected.modelVisibleTools.some((tool) => tool.function.name === 'calendar_list'));
+assert.ok(selected.modelVisibleTools.some((tool) => tool.function.name === 'calendar_create'));
+assert.ok(selected.backendTools.some((tool) => tool.tool_key === 'calendar.create'));
+assert.ok(!selected.backendTools.some((tool) => tool.tool_key.startsWith('calendar.legacy')), 'retired tables do not regrow');
 assert.equal(Object.hasOwn(selected, 'modelTools'), false, 'old modelTools alias must not regrow');
 assert.equal(Object.hasOwn(selected, 'tools'), false, 'old tools alias must not regrow');
 console.log('calendar-retirement: ok');

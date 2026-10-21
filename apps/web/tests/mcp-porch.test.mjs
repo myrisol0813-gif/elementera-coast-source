@@ -90,6 +90,8 @@ assert.deepEqual(baseToolNames, [
   'mcp_mailbox_fetch_unreplied', 'mcp_mailbox_reply', 'mcp_mailbox_resolve_pocket', 'mcp_mailbox_patrol_report',
   'read_mystic_dogtalk', 'search_authorized_memory', 'send_radio_message', 'write_lighthouse_letter',
   'list_daily_moments', 'create_daily_moment', 'list_daily_diaries', 'create_daily_diary',
+  'list_calendar_entries', 'create_calendar_entry', 'update_calendar_entry', 'delete_calendar_entry',
+  'create_voice_clip', 'list_library_books', 'read_library_chapter', 'list_library_notes', 'write_library_note',
 ]);
 assert.deepEqual(toolNames, [...baseToolNames, 'render_thinking_block']);
 for (const tool of toolList.result.tools) {
