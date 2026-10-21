@@ -78,7 +78,7 @@ async function mcp(body, accessToken = '') {
 const initialize = await mcp({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'coast-hard-clean-test', version: '1' } } });
 assert.equal(initialize.result.serverInfo.name, 'elementera-coast-porch');
 assert.equal(initialize.result.serverInfo.version, coastMcpVersion);
-assert.equal(coastMcpVersion, '2.0.2');
+assert.equal(coastMcpVersion, '2.1.0');
 assert.match(initialize.result.instructions, /主聊天、共通聊天室与MCP 对话区共用统一 conversation/);
 assert.match(initialize.result.instructions, /不存在或不再开放/);
 
