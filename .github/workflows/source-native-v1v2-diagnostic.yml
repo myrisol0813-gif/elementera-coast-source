@@ -6,6 +6,10 @@ on:
       - .github/workflows/source-native-v1v2-diagnostic.yml
       - apps/android/scripts/sign-disposable-qa.sh
       - apps/android/scripts/run-signed-qa.sh
+      - apps/android/app/src/main/kotlin/com/elementeracoast/app/feature/daily/**
+      - apps/android/app/src/main/kotlin/com/elementeracoast/app/ui/theme/**
+      - apps/android/app/src/main/kotlin/com/elementeracoast/app/feature/wolf/WolfProfileAppearance.kt
+      - apps/android/app/build.gradle.kts
   workflow_dispatch:
 permissions:
   contents: write
