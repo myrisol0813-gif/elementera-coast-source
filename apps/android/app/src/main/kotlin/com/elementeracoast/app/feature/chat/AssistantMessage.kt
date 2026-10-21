@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -45,6 +46,9 @@ internal fun AssistantMessage(
     avatarBitmap: ImageBitmap?,
     onAvatarClick: () -> Unit,
     onCopy: () -> Unit,
+    voiceClips: List<VoiceClip>,
+    onVoice: () -> Unit,
+    onPlayVoice: (String) -> Unit,
     onAction: (MessageAction) -> Unit,
     onFootprint: () -> Unit
 ) {
@@ -80,10 +84,16 @@ internal fun AssistantMessage(
             Spacer(Modifier.height(CoastChatTokens.MessageActionTopGap))
             MessageActionRow {
                 MessageActionButton(Icons.Default.ContentCopy, "复制", onClick = onCopy)
+                MessageActionButton(Icons.Default.Mic, "生成语音", enabled = !isStreamingTail && !message.remoteVariantId.isNullOrBlank(), onClick = onVoice)
                 MessageActionButton(Icons.Default.ThumbUp, "点赞", active = message.liked, onClick = { onAction(MessageAction.ToggleLike(message.id)) })
                 MessageActionButton(Icons.Default.Refresh, "重新生成", enabled = !isStreamingTail, onClick = { onAction(MessageAction.Regenerate(message.id)) })
                 MessageActionButton(Icons.Default.FavoriteBorder, "收藏", active = message.favorite, onClick = { onAction(MessageAction.ToggleFavorite(message.id)) })
                 MessageActionButton(Icons.Default.DeleteOutline, "删除", enabled = !isStreamingTail, onClick = { onAction(MessageAction.Delete(message.id)) })
+            }
+            voiceClips.forEach { clip ->
+                androidx.compose.material3.TextButton(onClick = { onPlayVoice(clip.id) }) {
+                    Text("▶ 语音留存", style = MaterialTheme.typography.labelSmall)
+                }
             }
             if (message.variantCount > 1) {
                 Spacer(Modifier.height(4.dp))
