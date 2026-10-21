@@ -33,7 +33,7 @@ export function createTidalLibrary({router,toast}) {
     return { title:'潮中书房',subtitle:'与潮水一起翻书',className:'tidal-library',
       headerAction:button('choose','＋','class="feature-head-action tidal-library-add" aria-label="导入书籍" title="导入 EPUB 或 TXT 电子书"'),
       body:`<section class="tidal-library-home">
-        <p class="tidal-library-intro">我们共用一间书房，各自留笔迹。</p><details class="tidal-library-limits"><summary>EPUB / TXT · 导入须知</summary>源文件最多 40 MB；正文最多 1,200 万字、2,048 个正文分段。暂不保留复杂版式和图片。</details>
+        <p class="tidal-library-intro">我们共用一间书房，各自留笔迹。</p><details class="tidal-library-limits"><summary>EPUB / TXT · 导入须知</summary>最多 80 本书；源文件最多 40 MB；正文最多 1,200 万字、2,048 个正文分段。批注最多 4,000 字，封面会压缩至 600 KB 内。暂不保留复杂版式和图片。</details>
         <div class="tidal-library-shelf">${memo.books.map(b=>{
           const chapter=Number.isInteger(b.reader_chapter_index)?b.reader_chapter_index:0;
           const percent=b.reader_chapter_index==null?0:Math.round((chapter+1)/(b.chapters_count||1)*100);

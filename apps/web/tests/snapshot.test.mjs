@@ -38,3 +38,12 @@ assert.match(source, /mailbox_passphrase_verifiers/);
 assert.match(source, /message_bodies_included:\s*false/);
 assert.match(source, /credential_material_included:\s*false/);
 assert.doesNotMatch(source, /tableRows\(db,\s*['"]mailbox_messages['"]/);
+
+const { readFileSync } = await import('node:fs');
+const settings = readFileSync(new URL('../elementera-mcp/deploy-pages/public/features/settings.js', import.meta.url),'utf8');
+for (const name of ['calendar', 'tidal_library']) {
+  assert.match(source, new RegExp(name.replace('_', '[_]')));
+  assert.match(source, new RegExp(name === 'calendar' ? 'calendarEntries' : 'exportLibrary'));
+}
+assert.match(settings, /snapshotDataSection\('公历日历', snapshot\.calendar\)/);
+assert.match(settings, /snapshotDataSection\('潮中书房', snapshot\.tidal_library\)/);

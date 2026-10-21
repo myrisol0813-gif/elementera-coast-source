@@ -241,7 +241,13 @@ These are part of the broader idea that a personal AI workspace is not only a ch
 
 These surfaces should be treated as project-specific early structures, not as a polished generic dashboard framework.
 
-### 10. Snapshot / export direction
+### 10. Tidal Library / reading room
+
+The source edition includes the original Tidal Library interface and layout: TXT/EPUB text import, cover handling, chapter and page navigation, highlights, annotations, reflections and reading progress. The original reader stylesheet is retained unchanged. User names and actor keys are neutralized, and no private books or annotations are included.
+
+The source PWA exposes the same owner-only storage API and exports its own calendar and library records through JSON and HTML. Export files contain the reader's books and notes: handle downloads as personal data.
+
+### 11. Snapshot / export direction
 
 The private V1 project line included anti-loss snapshot work.
 
