@@ -84,6 +84,7 @@ fun ChatWindow(
         val conversationId = state.activeConversationId
         if (conversationId.isBlank() || state.isStreaming) return@LaunchedEffect
         try { voiceClips = decodeVoiceClips(sideRooms.voiceClips(conversationId)) }
+        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch (error: Exception) { onPlaceholder("语音读取失败：${error.message}") }
     }
     val toolNotice by ToolActivityBus.notice.collectAsState()
