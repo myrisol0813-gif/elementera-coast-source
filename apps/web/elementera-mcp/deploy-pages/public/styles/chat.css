@@ -821,3 +821,6 @@
 .coast-voice-dialog-actions button { padding: 10px 15px; border: 0; border-radius: 13px; font: inherit; background: var(--surface-soft); color: var(--text); }
 .coast-voice-dialog-actions [data-voice-generate] { color: white; background: var(--accent); }
 .coast-voice-dialog-error { color: var(--accent) !important; }
+
+.furniture-run-link{border:0;padding:0;margin:0;background:transparent;color:inherit;font:inherit;text-align:left;text-decoration:underline;text-underline-offset:3px;cursor:pointer;}
+.furniture-run-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px;}

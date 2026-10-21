@@ -42,6 +42,17 @@ function genericCount(output) {
   return 1;
 }
 
+function libraryTarget(output) {
+  const note = output?.note;
+  if (!note?.book_id) return null;
+  return {
+    book_id: clean(note.book_id, 160),
+    chapter_index: Number.isInteger(note.chapter_index) ? note.chapter_index : null,
+    paragraph_index: Number.isInteger(note.paragraph_index) ? note.paragraph_index : null,
+    note_id: clean(note.id, 160),
+  };
+}
+
 function successLabel(toolKey, displayName) {
   const labels = {
     'daily.create_moment': '写了一条碳硅圈',
@@ -50,6 +61,7 @@ function successLabel(toolKey, displayName) {
     'daily.moment_like': '调整了碳硅圈点赞',
     'dogtalk.read': '读取了私人草稿',
     'memory.search': '搜索了记忆',
+    'library.write': '在书房留下笔记',
     'memory.write_candidate': '放入待确认区',
     'memory.global_excerpt_propose': '全局摘录：新增 1 条待确认修改',
   };
@@ -77,11 +89,17 @@ export function buildFurnitureSummary({ id, toolKey, displayName, status = 'succ
   if (key === 'memory.search') detail = memorySummary(output);
   else if (key === 'memory.write_candidate') detail = candidateSummary(output);
   else if (key === 'memory.global_excerpt_propose') detail = { count: 1, items: [{ title: '待确认的全局摘录修改', kind: '全局摘录' }], extra_count: 0 };
+  else if (key === 'library.write') detail = {
+    count: 1, items: [], extra_count: 0,
+    target: libraryTarget(output),
+    label: output?.deleted ? '助手删去了一条笔记' : output?.note?.kind === 'annotation' ? '助手写了一条批注' : '助手写了一篇读后感',
+  };
 
   return {
     id: runId,
     tool_key: key,
-    label: successLabel(key, displayName),
+    label: detail.label || successLabel(key, displayName),
+    ...(detail.target ? { target: detail.target } : {}),
     status: 'success',
     count: Math.max(1, detail.count || 0),
     items: detail.items,
@@ -108,6 +126,12 @@ export function sanitizeFurnitureRuns(value) {
       count: Math.max(1, count(run?.count) || 1),
       items,
       extra_count: Math.max(0, count(run?.extra_count)),
+      ...(toolKey === 'library.write' && run?.target?.book_id ? { target: {
+        book_id: clean(run.target.book_id, 160),
+        chapter_index: Number.isInteger(run.target.chapter_index) ? run.target.chapter_index : null,
+        paragraph_index: Number.isInteger(run.target.paragraph_index) ? run.target.paragraph_index : null,
+        note_id: clean(run.target.note_id, 160),
+      } } : {}),
       ...(status === 'error' ? { error_type: clean(run?.error_type || 'tool_execution_failed', 120) } : {}),
     };
   }).filter(Boolean);

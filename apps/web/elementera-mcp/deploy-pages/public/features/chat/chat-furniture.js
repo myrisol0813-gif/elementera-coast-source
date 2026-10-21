@@ -19,7 +19,11 @@ function runLine(run) {
     .join('');
   const extra = Number(run.extra_count || 0) > 0 ? `<li>另有 ${Number(run.extra_count)} 条</li>` : '';
   const error = !ok && run.error_type ? `<small>错误类型：${escapeHtml(run.error_type)}</small>` : '';
-  return `<div class="furniture-run is-${ok ? 'success' : 'error'}"><p><span>${ok ? '✓' : '!'}</span>${escapeHtml(label + suffix)}</p>${items || extra ? `<ul>${items}${extra}</ul>` : ''}${error}</div>`;
+  const target = ok && run.tool_key === 'library.write' ? run.target : null;
+  const destination = target?.book_id
+    ? `<button type="button" class="furniture-run-link" data-action="library:from-furniture" data-book="${escapeAttribute(target.book_id)}" data-index="${Number(target.chapter_index) || 0}" data-paragraph="${Number(target.paragraph_index) || 0}" data-annotation="${target.chapter_index != null}" data-note-id="${escapeAttribute(target.note_id || '')}">${escapeHtml(label + suffix)} ↗</button>`
+    : escapeHtml(label + suffix);
+  return `<div class="furniture-run is-${ok ? 'success' : 'error'}"><p><span>${ok ? '✓' : '!'}</span>${destination}</p>${items || extra ? `<ul>${items}${extra}</ul>` : ''}${error}</div>`;
 }
 
 export function renderFurnitureBubble(value, { conversationId = '' } = {}) {
