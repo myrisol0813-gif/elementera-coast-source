@@ -45,7 +45,7 @@ const receipt = createDeskSlip({ modelVisibleTools: main.modelVisibleToolRecords
 assert.deepEqual(receipt.workbench.labels, { model_visible_tools: '模型可见工具', backend_tools: '后端可用工具', core: '常用工具', side: '小组件小工具' });
 assert.deepEqual(receipt.workbench.core_tools.map((tool) => tool.display_name), ['读取私人草稿', '搜索已确认记忆', '放入待确认区']);
 assert.deepEqual(receipt.workbench.side_tools.map((tool) => tool.display_name), ['写碳硅圈', '写日记', '评论朋友圈', '点赞朋友圈', '念一段留在海岸']);
-assert.deepEqual(receipt.workbench.side_tools.map((tool) => tool.name), ['create_moment', 'create_diary', 'moment_comment', 'moment_like']);
+assert.deepEqual(receipt.workbench.side_tools.map((tool) => tool.name), ['create_moment', 'create_diary', 'moment_comment', 'moment_like', 'voice_create']);
 assert.ok(receipt.workbench.model_visible_tools.length >= 7);
 assert.ok(receipt.workbench.backend_tools.length >= 7);
 
