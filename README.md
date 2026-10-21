@@ -33,7 +33,8 @@ It may be useful if you are exploring:
 - [Model workspace and tool records](#model-workspace-and-tool-records)
 - [Attachments, files, and search surfaces](#attachments-files-and-search-surfaces)
 - [MCP and external-interface experiments](#mcp-and-external-interface-experiments)
-- [Preview APK](#preview-apk)
+- [Current feature status (0.2.2-source)](#current-feature-status-022-source)
+- [Historical preview APK](#historical-preview-apk)
 - [Running and testing](#running-and-testing)
 - [Configuration](#configuration)
 - [Privacy and sanitization](#privacy-and-sanitization)
@@ -500,6 +501,23 @@ They should be treated as experimental.
 
 The source Native client now includes the original owner calendar, Tidal Library shelf and reader, EPUB/TXT import and audio-clip actions, using the same source backend contracts as the PWA. Only the interface and generic implementation are mirrored; private data, accounts, identities and signing are excluded. See [Native parity acceptance](docs/SOURCE_NATIVE_PARITY_2026-10-21.md).
 
+## Current feature status (0.2.2-source)
+
+This section describes the **current source tree**, not the features of the first `v0.1-source` APK. See [release history](docs/SOURCE_RELEASE_HISTORY.md) for the distinction between versioned source, historical assets and temporary QA packages.
+
+| Surface | Available in the current open-source implementation | Configuration / limits |
+| --- | --- | --- |
+| Web / PWA | Conversation UI, streaming/SSE paths, visible context and tool records, owner/visitor separation, memory and world-book workspaces, attachment handling | Model responses and tool integrations need independently configured services; no private production data is distributed |
+| Owner calendar | Entries, notes, edits/deletion and recurrence, with owner-authenticated backend routes | Requires self-hosted backend and storage; tested temporary demos use synthetic data |
+| Tidal Library | TXT/EPUB imports, shelf/cover, chapter and page navigation, saved progress, highlights, annotations, reader options | The PWA and Native clients use the same backend contracts when connected to the same host |
+| Android Native | Jetpack Compose chat and Daily surfaces, calendar, book room, themes, local background selection, reading style/weight and user-supplied local fonts | `0.2.2-source`, `versionCode=4`; proprietary preset fonts are **not** bundled. Missing fonts use visibly different system fallbacks |
+| Voice clips | Message-linked speech clip controls, playback and authorized generation endpoints | Actual speech generation requires self-hosted server-side `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`; no voice credentials or preset voice shipped |
+| Exports / tools | Source JSON/HTML snapshot and authorized calendar/reading/voice tool routes | Do not mistake unconfigured integrations or experimental interfaces for production services |
+
+**0.2.2 Native fixes:** preserve the paragraph + in-paragraph reading offset when notes/highlights trigger refreshes; make the named font choices visibly distinct even without licensed font files; show the actual fallback in appearance settings. The public ZIP-wrapped QA APK was signed and checked for ZIP integrity before publishing, and the Android installation was subsequently checked on a phone. This is not a promise of permanent backend availability.
+
+**Download status:** The published 0.2.2 QA APK is a real, inspectable build, but it embeds a **temporary** Cloudflare Quick Tunnel which expires after its GitHub Actions run. For a working login, rebuild against your own backend or launch a fresh isolated QA run. The original `v0.1-source` release remains a historical milestone, not the current feature build.
+
 ## Source PWA + Android APK
 
 **Current Android source:** `0.2.2-source` (`versionCode=4`, `com.elementeracoast.source`). The latest tested temporary build is [0.2.2-source APK + ZIP prerelease](../../releases/tag/source-v1v2-39625851494); see [all releases](../../releases) for subsequent builds. Prefer the ZIP-wrapped APK when downloading on phones whose browser corrupts direct APK transfers. Always verify the matching SHA-256.
@@ -520,7 +538,7 @@ versionName: 0.1.0-source
 build type: debug
 official_production_apk: false
 preview password: 123456
-SHA-256: 989a8f7f159f251d2f2b0bcc57e915da3724268fa901c2ae182d30c524859beb
+SHA-256: 04c21d8f88f9786ef6caa7c5adaf1838f748f817389cea87337a34444eba7702
 ```
 
 This APK is only a source preview build. It is not an official production APK.
