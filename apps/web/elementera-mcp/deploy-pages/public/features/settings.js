@@ -262,6 +262,8 @@ export function createSettings({ storage, shell, chat, router, toast }) {
       snapshotDataSection('世界书', snapshot.worldbook),
       snapshotDataSection('访客信箱 / 来信（隐私摘要）', snapshot.mailbox),
       snapshotDataSection('日记与动态', snapshot.daily),
+      snapshotDataSection('公历日历', snapshot.calendar),
+      snapshotDataSection('潮中书房', snapshot.tidal_library),
       snapshotDataSection('模型资料与回波摘要', { model_profile: snapshot.model_profile, model_echo_summaries: snapshot.model_echo_summaries }),
       snapshotDataSection('工具日志摘要', snapshot.tools),
       snapshotDataSection('附件索引与元数据', snapshot.attachments),

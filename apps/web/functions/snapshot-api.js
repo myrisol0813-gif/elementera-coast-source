@@ -26,6 +26,8 @@ import { listWorldbookEntries } from './worldbook.js';
 import { listMoments, listDiaries } from './daily-store.js';
 import { listToolRuns } from './tool-run-log.js';
 import { mailboxOwnerSummary } from './mailbox-service.js';
+import { listCalendarEntries } from './calendar-store.js';
+import { exportLibrary } from './tidal-library.js';
 import { apiError, json, methodNotAllowed } from './http.js';
 
 const SNAPSHOT_PATH = '/api/export/v1-snapshot';
@@ -186,6 +188,8 @@ async function buildSnapshot(env) {
     globalExcerptRevisions,
     modelEchoSummaries,
     mailboxSummary,
+    calendarEntries,
+    tidalLibrary,
   ] = await Promise.all([
     allMemoryEntries(db),
     readCustomInstructions(db),
@@ -202,6 +206,8 @@ async function buildSnapshot(env) {
     listGlobalExcerptRevisions(db, 500),
     listAllMessageModelMetadata(db, { includeRaw: false, limit: 10000 }),
     mailboxOwnerSummary(db),
+    listCalendarEntries(db, { all: true }),
+    exportLibrary(db),
   ]);
 
   const raw = {
@@ -222,6 +228,8 @@ async function buildSnapshot(env) {
       'custom_instructions',
       'dogtalk',
       'daily',
+      'calendar',
+      'tidal_library',
       'model_profile',
       'tool_settings',
       'tool_run_summaries',
@@ -286,6 +294,8 @@ async function buildSnapshot(env) {
       credential_material_included: false,
     },
     daily: { moments, diaries },
+    calendar: { entries: calendarEntries },
+    tidal_library: tidalLibrary,
     model_profile: profile,
     model_echo_summaries: modelEchoSummaries,
     tools: {
