@@ -326,7 +326,7 @@ private fun SelectableBookText(
                 tappedNote?.let { note ->
                     DropdownMenuItem(text = {
                         Column {
-                            Text(if (note.field("author") == "owner") "屋主的划线" else "Myri 的划线",
+                            Text(if (note.field("author") == "owner") "屋主的划线" else "模型伙伴 的划线",
                                 style = MaterialTheme.typography.labelSmall)
                             if (note.field("body").isNotBlank()) Text(note.field("body"))
                         }
@@ -342,7 +342,7 @@ private fun SelectableBookText(
         if (fragment.start == 0) notes.filter {
             it.field("kind") == "annotation" && it.intField("start_offset") == null
         }.forEach { note ->
-            Text("${if (note.field("author") == "owner") "屋主" else "Myri"}：${note.field("body")}",
+            Text("${if (note.field("author") == "owner") "屋主" else "模型伙伴"}：${note.field("body")}",
                 fontSize = 12.sp, lineHeight = 19.sp, color = ink.copy(alpha = .77f))
         }
     }

@@ -180,7 +180,7 @@ fun TidalLibraryScreen(
         when (page) {
             LibraryPage.Shelf -> {
                 Text("这里是属于你的书房，可以保存笔迹。", style = MaterialTheme.typography.bodyMedium)
-                Text("支持 EPUB 和 TXT 文字阅读，暂不支持 PDF、图片与复杂版式。源文件最多 40 MB、正文最多 1,200 万字、2,048 个正文分段。",
+                Text("支持 EPUB 和 TXT 文字阅读，暂不支持 PDF、图片与复杂版式。源文件最多 80 本书；单个文件最多 40 MB、正文最多 1,200 万字、2,048 个正文分段；批注最多 4,000 字，封面压缩后最多 600 KB。",
                     color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 importing?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (books.isEmpty() && !loading) Text("书架还空着。挑一本我们一起读的书吧。")
@@ -209,7 +209,7 @@ fun TidalLibraryScreen(
                                     color=MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text("屋主 · ${entry.n("owner_notes")} 条批注与读后感",
                                     style=MaterialTheme.typography.labelSmall)
-                                Text("Myri · ${entry.n("model_partner_notes")} 条批注与读后感",
+                                Text("模型伙伴 · ${entry.n("assistant_notes")} 条批注与读后感",
                                     style=MaterialTheme.typography.labelSmall)
                             }
                             TidalCoverSlot(
@@ -271,8 +271,8 @@ fun TidalLibraryScreen(
                 TextButton(onClick = { page = LibraryPage.Chapter }) { Text("‹ 返回正文") }
                 Text("批注与读后感",style=MaterialTheme.typography.titleLarge)
                 TextButton(onClick = { edit(null) }) { Text("＋ 写一篇读后感") }
-                for (author in listOf("owner","model_partner")) {
-                    Text(if (author=="owner") "屋主的笔记" else "Myri 的笔记", fontWeight = FontWeight.Bold)
+                for (author in listOf("owner","assistant")) {
+                    Text(if (author=="owner") "屋主的笔记" else "模型伙伴 的笔记", fontWeight = FontWeight.Bold)
                     notes.filter { it.s("author")==author && it.s("kind") != "highlight" }.forEach { note ->
                         NoteBlock(note, onJump = {
                             if (note.s("kind")=="annotation") openChapter(note.n("chapter_index"),note.n("paragraph_index"))
@@ -325,7 +325,7 @@ fun TidalLibraryScreen(
     }
     if(pendingBookDelete) {
         AlertDialog(onDismissRequest={pendingBookDelete=false},title={Text("删除这本书？")},
-            text={Text("将连同 Myri 和屋主在这里写的全部批注、读后感与阅读进度一起删除，无法撤销。")},
+            text={Text("将连同 模型伙伴 和屋主在这里写的全部批注、读后感与阅读进度一起删除，无法撤销。")},
             confirmButton={TextButton(onClick={
                 pendingBookDelete=false;scope.launch{
                     try{repository.deleteBook(bookId);page=LibraryPage.Shelf;revision++}
@@ -340,7 +340,7 @@ fun TidalLibraryScreen(
 private fun NoteBlock(note: JsonObject, onJump:()->Unit, onEdit:()->Unit, onDelete:()->Unit) {
     val isHuman=note.s("author")=="owner"
     Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
-        Text("${if(isHuman)"屋主" else "Myri"} · ${if(note.s("kind")=="annotation")"批注" else "读后感"}",
+        Text("${if(isHuman)"屋主" else "模型伙伴"} · ${if(note.s("kind")=="annotation")"批注" else "读后感"}",
             style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         if(note.s("kind")=="annotation") Text(
             note.s("quote").take(180),modifier=Modifier.clickable(onClick=onJump),

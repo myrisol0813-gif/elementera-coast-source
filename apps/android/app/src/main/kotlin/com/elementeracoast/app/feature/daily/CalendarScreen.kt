@@ -119,7 +119,7 @@ fun CalendarScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Unit
             items(visible, key = { it.value("id") }) { item ->
                 DailySurfaceCard(onClick = { editing = item; formOpen = true }) {
                     Text(item.value("title"), fontWeight = FontWeight.SemiBold)
-                    Text("${if (item.kind() == "note") "随记" else "日程"} · ${if (item.value("author") == "owner") "屋主" else "Myri"}" +
+                    Text("${if (item.kind() == "note") "随记" else "日程"} · ${if (item.value("author") == "owner") "屋主" else "模型伙伴"}" +
                         if (item.value("recurrence") == "yearly") " · 每年重复" else "",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)

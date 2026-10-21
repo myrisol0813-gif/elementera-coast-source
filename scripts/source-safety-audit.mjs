@@ -8,7 +8,7 @@ const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: '
 const filenames = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8', cwd: root }).split('\0').filter(Boolean);
 const textExt = new Set(['.js','.mjs','.cjs','.ts','.tsx','.kt','.kts','.md','.json','.xml','.yml','.yaml','.toml','.sh','.html','.css','.properties','.txt','.gradle']);
 const rules = [
-  ['private_identity', /(?:Myraes|Myrisol|千峰寒|小寒|myrisol0813-gif|0CCSU9rcucUCDAHkBgRL)/i],
+  ['private_identity', /(?:Myraes|Myrisol|\bMyri\b|千峰寒|小寒|myrisol0813-gif|0CCSU9rcucUCDAHkBgRL)/i],
   ['private_production_origin', /https?:\/\/(?:app\.)?elementeracoast\.com\b/i],
   ['credential_value', /(?:github_pat_|gh[pousr]_)[A-Za-z0-9_]{18,}|(?:sk-[A-Za-z0-9_-]{25,})|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/],
   ['auth_bearer', /\bAuthorization:\s*Bearer\s+(?!EXAMPLE|REDACTED)[A-Za-z0-9._-]{24,}/i],
