@@ -2,9 +2,10 @@
 // Public source safety gate. Reports rule and path, never matched secret content.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { extname } from 'node:path';
+import { extname, resolve } from 'node:path';
+const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
 
-const filenames = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean);
+const filenames = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8', cwd: root }).split('\0').filter(Boolean);
 const textExt = new Set(['.js','.mjs','.cjs','.ts','.tsx','.kt','.kts','.md','.json','.xml','.yml','.yaml','.toml','.sh','.html','.css','.properties','.txt','.gradle']);
 const rules = [
   ['private_identity', /(?:Myraes|Myrisol|千峰寒|小寒|myrisol0813-gif|0CCSU9rcucUCDAHkBgRL)/i],
@@ -25,7 +26,7 @@ let scanned = 0;
 for (const path of filenames) {
   if (exceptions.has(path)) continue;
   if (!(textExt.has(extname(path)) || path.endsWith('.env.example') || path.endsWith('.gitignore'))) continue;
-  const bytes = readFileSync(path);
+  const bytes = readFileSync(resolve(root, path));
   if (bytes.includes(0) || bytes.length > 8 * 1024 * 1024) continue;
   let body = bytes.toString('utf8');
   const synthetic = redactionTestFixtures.get(path);
