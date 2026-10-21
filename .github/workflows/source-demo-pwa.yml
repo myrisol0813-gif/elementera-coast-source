@@ -1,0 +1,66 @@
+name: Deploy isolated source preview PWA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: ${{ vars.COAST_SOURCE_DEMO_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require separate demo Pages project
+        shell: bash
+        env:
+          PROJECT: ${{ vars.COAST_SOURCE_DEMO_PROJECT }}
+          ACCOUNT: ${{ secrets.COAST_SOURCE_DEMO_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.COAST_SOURCE_DEMO_CF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${ACCOUNT:?Missing source demo Cloudflare account ID}"
+          : "${TOKEN:?Missing source demo Cloudflare API token}"
+          case "${PROJECT}" in
+            *-demo) ;;
+            *) echo "Source preview project must end in -demo" >&2; exit 1 ;;
+          esac
+      - name: Deploy original PWA and Functions
+        id: publish
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.COAST_SOURCE_DEMO_CF_API_TOKEN }}
+          accountId: ${{ secrets.COAST_SOURCE_DEMO_CF_ACCOUNT_ID }}
+          workingDirectory: apps/web
+          wranglerVersion: '4'
+          command: pages deploy elementera-mcp/deploy-pages --project-name=${{ vars.COAST_SOURCE_DEMO_PROJECT }} --branch=main
+      - name: Verify login and source D1 APIs
+        shell: bash
+        env:
+          PREVIEW_URL: ${{ steps.publish.outputs.deployment-url }}
+          PREVIEW_PASSWORD: ${{ vars.COAST_SOURCE_PREVIEW_PASSWORD_HINT }}
+        run: |
+          set -euo pipefail
+          : "${PREVIEW_PASSWORD:?Missing source demo password}"
+          case "${PREVIEW_URL}" in
+            https://*.pages.dev*) ;;
+            *) echo "Expected a dedicated pages.dev preview URL" >&2; exit 1 ;;
+          esac
+          jar="${RUNNER_TEMP}/source-preview-cookie"
+          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' -c "${jar}" --max-time 20 --data-urlencode "password=${PREVIEW_PASSWORD}" "${PREVIEW_URL}/login")"
+          if [[ "${status}" != "302" ]]; then
+            echo "Source demo login failed with HTTP ${status}" >&2
+            exit 1
+          fi
+          for endpoint in /api/calendar/entries /api/library/books; do
+            code="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' -b "${jar}" --max-time 20 "${PREVIEW_URL}${endpoint}")"
+            if [[ "${code}" != "200" ]]; then
+              echo "Source demo backend unavailable at ${endpoint}: HTTP ${code}" >&2
+              exit 1
+            fi
+          done
+          rm -f "${jar}"
+          echo "### Source PWA demo ready" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Preview: ${PREVIEW_URL}" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Real login and D1-backed APIs verified." >> "${GITHUB_STEP_SUMMARY}"
