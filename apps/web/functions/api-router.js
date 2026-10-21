@@ -2,6 +2,7 @@ import { apiError, json, sameOrigin } from './http.js';
 import { isCrossWindowApiPath, routeCrossWindowApi } from './cross-window-api.js';
 import { isDailyApiPath, routeDailyApi } from './daily-api.js';
 import { isCalendarApiPath, routeCalendarApi } from './calendar-api.js';
+import { isLibraryApiPath, routeLibraryApi } from './tidal-library-api.js';
 import { isDogtalkApiPath, routeDogtalkApi } from './dogtalk-api.js';
 import { isMemoryApiPath, routeMemoryApi } from './memory-router.js';
 import { handleModels } from './models.js';
@@ -34,6 +35,7 @@ export async function routeApi(request, env, session) {
   if (isCrossWindowApiPath(url.pathname)) return routeCrossWindowApi(request, env, session);
   if (isDailyApiPath(url.pathname)) return routeDailyApi(request, env, session);
   if (isCalendarApiPath(url.pathname)) return routeCalendarApi(request, env, session);
+  if (isLibraryApiPath(url.pathname)) return routeLibraryApi(request, env, session);
   if (isDogtalkApiPath(url.pathname)) return routeDogtalkApi(request, env, session);
   if (isMemoryApiPath(url.pathname)) return routeMemoryApi(request, env, session);
   if (isOwnerMailboxApiPath(url.pathname)) return routeOwnerMailboxApi(request, env, session);

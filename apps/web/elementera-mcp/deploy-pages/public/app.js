@@ -7,6 +7,7 @@ import { createStorage } from './core/storage.js';
 import { createChat } from './features/chat.js';
 import { createDaily } from './features/daily.js';
 import { createCalendar } from './features/calendar.js';
+import { createTidalLibrary } from './features/library.js';
 import { createDevHands } from './features/dev-hands.js';
 import { createDogtalk } from './features/dogtalk.js';
 import { createLetters } from './features/letters.js';
@@ -58,6 +59,7 @@ const tools = createTools({ storage, router, toast, memory });
 const settings = createSettings({ storage, shell, chat, router, toast });
 const daily = createDaily({ storage, router, toast, chat });
 const calendar = createCalendar({ router, toast });
+const library = createTidalLibrary({ router, toast });
 const letters = createLetters({ storage, chat, models, router, toast });
 const desk = createDesk({ chat, router, toast });
 const toolroom = createToolroom({ chat, router });
@@ -89,6 +91,7 @@ const eventOwners = Object.freeze([
   models,
   daily,
   calendar,
+  library,
   memory,
   desk,
   createActionEventOwner({ id: 'settings', priority: 60, controller: settings }),
