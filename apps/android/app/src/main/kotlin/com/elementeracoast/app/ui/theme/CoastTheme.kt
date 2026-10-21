@@ -49,8 +49,10 @@ private fun zhuqueFallback(context: Context): FontFamily = bundledFontFamily(con
 
 private fun readingFontFamily(mode: CoastFontMode, context: Context, localFontPath: String): FontFamily = when (mode) {
     CoastFontMode.CoastClassic -> zhuqueFallback(context)
-    CoastFontMode.NanoOldSong -> bundledFontFamily(context, NANO_OLD_SONG_RESOURCE) ?: zhuqueFallback(context)
-    CoastFontMode.ChillHuoSong -> bundledFontFamily(context, CHILL_HUO_SONG_RESOURCE) ?: zhuqueFallback(context)
+    // The public source contains no proprietary font assets. Keep the named
+    // presets selectable, but use distinct, honest system families when missing.
+    CoastFontMode.NanoOldSong -> bundledFontFamily(context, NANO_OLD_SONG_RESOURCE) ?: FontFamily.SansSerif
+    CoastFontMode.ChillHuoSong -> bundledFontFamily(context, CHILL_HUO_SONG_RESOURCE) ?: FontFamily.Monospace
     CoastFontMode.CustomLocal -> localFontFamily(localFontPath) ?: zhuqueFallback(context)
 }
 
