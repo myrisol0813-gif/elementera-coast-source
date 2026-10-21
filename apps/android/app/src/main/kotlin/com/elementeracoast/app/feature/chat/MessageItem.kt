@@ -15,6 +15,9 @@ internal fun MessageItem(
     attachmentPreviewSource: AttachmentPreviewRemoteDataSource,
     onAvatarClick: () -> Unit,
     onCopy: (ChatMessage) -> Unit,
+    voiceClips: List<VoiceClip>,
+    onVoice: (ChatMessage) -> Unit,
+    onPlayVoice: (String) -> Unit,
     onEdit: (ChatMessage) -> Unit,
     onAction: (MessageAction) -> Unit,
     onFootprint: (ChatMessage) -> Unit
@@ -34,6 +37,9 @@ internal fun MessageItem(
             avatarBitmap = avatarBitmap,
             onAvatarClick = onAvatarClick,
             onCopy = { onCopy(message) },
+            voiceClips = voiceClips,
+            onVoice = { onVoice(message) },
+            onPlayVoice = onPlayVoice,
             onAction = onAction,
             onFootprint = { onFootprint(message) }
         )
