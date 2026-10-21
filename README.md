@@ -502,9 +502,11 @@ The source Native client now includes the original owner calendar, Tidal Library
 
 ## Preview APK
 
-A debug preview APK is available from the `v0.1-source` GitHub Release.
+The historical `v0.1-source` debug preview remains an older, inspectable build. It does **not** contain the newly synchronized Native calendar, reader or voice screens. The updated source version is `0.2.0-source` with `versionCode=2`.
 
-APK details:
+For future versions, publishing requires separately configured source-only stable signing and a source backend URL. The GitHub prerelease workflow uploads a signed APK and SHA-256 as Release assets only when the administrator enables it; no new APK is presumed to exist until a Release confirms it.
+
+Historical v0.1 preview details:
 
 ```text
 file: elementera-coast-source-v0.1-debug.apk
