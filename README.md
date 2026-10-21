@@ -263,6 +263,12 @@ The source release keeps related structural ideas, such as preserving or exporti
 
 The public source release does not include private snapshot data.
 
+### Voice clips and MCP tool parity
+
+The source edition preserves the original message-anchored voice clip player and text-selection dialogue. Each self-hosting owner may configure `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` **in the server environment**, not in source code. No private or sample production voice ID is bundled. When unconfigured, voice creation fails explicitly; provider usage incurs external costs.
+
+The unified tool registry now exposes owner-authorized calendar, reading-room and voice tools to the model and MCP surfaces. Guest mailboxes cannot access these tools. Voice clips and their audio bytes are included in the authenticated full JSON archive; the lightweight snapshot/HTML view includes metadata only.
+
 ## Repository layout
 
 ```text

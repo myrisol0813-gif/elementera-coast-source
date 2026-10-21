@@ -29,3 +29,7 @@ The checked-in default API base is the non-routable placeholder:
 `https://elementera-coast-source.invalid`
 
 Self-hosters should set their own source-build backend endpoint at build time. Production signing material and production updater/release configuration are intentionally absent.
+
+## Optional voice generation
+
+Set `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` in your server's secret/environment bindings. Both are required for generation. Do not place real values in the repository, client bundle, screenshots, logs or public previews. The voice ID is a user-selected, self-hosted provider profile—not a bundled voice. Generation requires provider credits. The UI displays the backend-reported 2400-character, 40-paragraph and 12-clips-per-message limits; saved audio is capped at 4 MiB per clip. An authenticated full archive includes audio payloads and must be stored privately.

@@ -56,6 +56,7 @@ try {
   assert.equal(assistantClip.message_id, null);
   assert.equal(assistantClip.turn_id, 'turn_voice_1');
   assert.equal(providerCalls, 2);
+  assert.equal(clip.voice_id, 'TestVoice1234');
 
   let response = await routeApi(new Request(`https://coast.test/api/voice/clips?conversation_id=${conversation.id}`), { COAST_CHAT_DB: db }, null);
   assert.equal(response.status, 401);
