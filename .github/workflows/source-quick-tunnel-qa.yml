@@ -1,0 +1,160 @@
+# Single-use, empty-data acceptance preview. Remove after this acceptance session.
+name: One-time source Quick Tunnel QA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/source-quick-tunnel-qa.yml
+
+permissions:
+  contents: write
+
+jobs:
+  quick-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 36
+    env:
+      SOURCE_TEST_PASSWORD: '123456'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Start isolated PWA with fresh local D1
+        working-directory: apps/web
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund wrangler@4
+          hash="$(printf '%s' "${SOURCE_TEST_PASSWORD}" | sha256sum | cut -d' ' -f1)"
+          umask 077
+          printf 'COAST_PASSWORD_HASH=%s\nCOAST_SESSION_SECRET=%s\nCOAST_PREVIEW_PASSWORD_HINT=%s\n' \
+            "${hash}" "$(openssl rand -hex 32)" "${SOURCE_TEST_PASSWORD}" > .dev.vars
+          mkdir -p "${RUNNER_TEMP}/coast-source-test-db"
+          ./node_modules/.bin/wrangler pages dev elementera-mcp/deploy-pages \
+            --ip 127.0.0.1 --port 8788 --d1 COAST_CHAT_DB=source-demo \
+            --persist-to "${RUNNER_TEMP}/coast-source-test-db" --log-level warn \
+            > "${RUNNER_TEMP}/coast-source-pages.log" 2>&1 &
+          echo $! > "${RUNNER_TEMP}/source-pages.pid"
+          for i in $(seq 1 90); do
+            if curl --silent --fail http://127.0.0.1:8788/login > /dev/null; then break; fi
+            if ! kill -0 "$(cat "${RUNNER_TEMP}/source-pages.pid")" 2>/dev/null; then
+              echo "Pages dev process exited" >&2
+              tail -n 45 "${RUNNER_TEMP}/coast-source-pages.log" >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          curl --silent --fail http://127.0.0.1:8788/login >/dev/null
+          echo 'Local PWA ready with a disposable local D1.'
+      - name: Start Cloudflare Quick Tunnel
+        shell: bash
+        id: tunnel
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 --max-time 150 \
+            -o "${RUNNER_TEMP}/cloudflared" \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x "${RUNNER_TEMP}/cloudflared"
+          "${RUNNER_TEMP}/cloudflared" tunnel --url http://127.0.0.1:8788 \
+            --loglevel info > "${RUNNER_TEMP}/source-tunnel.log" 2>&1 &
+          echo $! > "${RUNNER_TEMP}/source-tunnel.pid"
+          url=''
+          for i in $(seq 1 80); do
+            url="$(grep -Eo 'https://[a-zA-Z0-9-]+[.]trycloudflare[.]com' "${RUNNER_TEMP}/source-tunnel.log" | head -n 1 || true)"
+            if [ -n "${url}" ]; then break; fi
+            if ! kill -0 "$(cat "${RUNNER_TEMP}/source-tunnel.pid")" 2>/dev/null; then
+              echo "Tunnel process exited" >&2
+              tail -n 60 "${RUNNER_TEMP}/source-tunnel.log" >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          test -n "${url}"
+          echo "url=${url}" >> "${GITHUB_OUTPUT}"
+          echo "Tunnel host allocated; probing remote HTTPS."
+      - name: Check real login and empty database APIs
+        shell: bash
+        env:
+          URL: ${{ steps.tunnel.outputs.url }}
+        run: |
+          set -euo pipefail
+          cookie="${RUNNER_TEMP}/qa-cookie"
+          logged_in=0
+          for i in $(seq 1 35); do
+            status="$(curl --silent --show-error -c "${cookie}" -o /dev/null --write-out '%{http_code}' \
+              --max-time 15 --data-urlencode "password=${SOURCE_TEST_PASSWORD}" "${URL}/login" || true)"
+            if [ "${status}" = '302' ]; then logged_in=1; break; fi
+            sleep 3
+          done
+          test "${logged_in}" = '1'
+          for path in /api/calendar/entries /api/library/books; do
+            status="$(curl --silent --show-error -b "${cookie}" -o /dev/null --write-out '%{http_code}' \
+              --max-time 15 "${URL}${path}")"
+            if [ "${status}" != '200' ]; then
+              echo "Acceptance API failed: ${path} (HTTP ${status})" >&2
+              exit 1
+            fi
+          done
+          rm -f "${cookie}"
+          echo "LIVE_PWA_URL=${URL}"
+          echo "LIVE_TEST_PASSWORD=${SOURCE_TEST_PASSWORD}"
+          echo '### Live empty-data source acceptance preview' >> "${GITHUB_STEP_SUMMARY}"
+          echo "PWA: ${URL}" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Test login: ${SOURCE_TEST_PASSWORD}" >> "${GITHUB_STEP_SUMMARY}"
+          echo 'Login, calendar and library HTTP checks passed.' >> "${GITHUB_STEP_SUMMARY}"
+          echo 'No real personal data, external provider keys, or production services are connected.' >> "${GITHUB_STEP_SUMMARY}"
+      - name: Build one-off source QA Android APK
+        shell: bash
+        working-directory: apps/android
+        env:
+          URL: ${{ steps.tunnel.outputs.url }}
+        run: |
+          set -euo pipefail
+          gradle :app:assembleDebug --no-daemon --stacktrace \
+            -PCOAST_API_BASE_URL="${URL}" -PSOURCE_PREVIEW_PASSWORD_HINT="${SOURCE_TEST_PASSWORD}"
+          mkdir -p source-qa
+          cp app/build/outputs/apk/debug/app-debug.apk source-qa/elementera-coast-source-v0.2.0-temporary-qa.apk
+          (cd source-qa && sha256sum elementera-coast-source-v0.2.0-temporary-qa.apk > SHA256SUMS.txt)
+      - name: Publish APK and checksum as prerelease assets
+        shell: bash
+        working-directory: apps/android
+        env:
+          GH_TOKEN: ${{ github.token }}
+          URL: ${{ steps.tunnel.outputs.url }}
+        run: |
+          set -euo pipefail
+          tag="source-qa-${GITHUB_RUN_ID}"
+          gh release create "${tag}" \
+            source-qa/elementera-coast-source-v0.2.0-temporary-qa.apk \
+            source-qa/SHA256SUMS.txt \
+            --repo "${GITHUB_REPOSITORY}" --target "${GITHUB_SHA}" \
+            --title "Source 0.2.0 temporary QA · ${GITHUB_RUN_ID}" --prerelease \
+            --notes "ONE-OFF test APK. Separate source app; debug-signed and not guaranteed to cover-install over older source APKs. Uses disposable PWA ${URL} and login 123456; the tunnel expires after this job. Never use personal data."
+          echo "QA_APK_RELEASE=https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}"
+          echo "APK release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}" >> "${GITHUB_STEP_SUMMARY}"
+      - name: Keep test tunnel available for about 26 minutes
+        shell: bash
+        env:
+          URL: ${{ steps.tunnel.outputs.url }}
+        run: |
+          set -euo pipefail
+          echo "PREVIEW_READY=${URL}"
+          echo 'Testing window is approximately 26 minutes from now.'
+          for i in $(seq 1 52); do
+            sleep 30
+            if ! kill -0 "$(cat "${RUNNER_TEMP}/source-tunnel.pid")" 2>/dev/null; then
+              echo 'Tunnel exited before the end of testing.' >&2
+              exit 1
+            fi
+          done
+          echo 'Temporary QA tunnel session ended; disposable runner state will be removed.'
