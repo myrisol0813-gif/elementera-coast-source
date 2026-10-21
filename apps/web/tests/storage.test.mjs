@@ -44,7 +44,7 @@ const storage = createStorage();
 assert.equal(storage.read().preferences.theme, 'gold');
 assert.equal(storage.read().preferences.ownerName, '迁移中的屋主');
 assert.equal(storage.read().preferences.ownerSignature, '迁移中的屋主');
-assert.deepEqual(Object.keys(storage.read().preferences).sort(), ['accent', 'theme', 'userBubble', 'ownerName', 'ownerSignature'].sort());
+assert.deepEqual(Object.keys(storage.read().preferences).sort(), ['accent', 'theme', 'userBubble', 'fontMode', 'ownerName', 'ownerSignature'].sort());
 assert.equal(storage.migrationPending, true);
 assert.equal(storage.migrationConversations.length, 1);
 assert.equal(storage.migrationConversations[0].id, 'old-window');
