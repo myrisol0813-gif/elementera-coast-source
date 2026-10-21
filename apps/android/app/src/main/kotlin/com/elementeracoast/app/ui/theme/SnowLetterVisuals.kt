@@ -1,6 +1,8 @@
 package com.elementeracoast.app.ui.theme
 
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -8,17 +10,25 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 
 @Immutable
 data class SnowLetterVisualSettings(
@@ -36,9 +46,24 @@ fun SnowLetterChatScaffold(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val enabled = LocalCoastAppearance.current.preset.usesSnowLetterDecorations()
+    val appearance = LocalCoastAppearance.current
+    val enabled = appearance.preset.usesSnowLetterDecorations()
+    val backgroundBitmap by rememberChatBackground(appearance.chatBackgroundImagePath)
     Box(modifier = modifier.background(MaterialTheme.colorScheme.background)) {
-        if (enabled) SnowLetterPageTemplate(Modifier.fillMaxSize(), forFeature = false)
+        backgroundBitmap?.let { bitmap ->
+            Image(
+                bitmap = bitmap,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background.copy(alpha = appearance.chatBackgroundDimAlpha.coerceIn(0f, .65f)))
+            )
+        }
+        if (enabled && backgroundBitmap == null) SnowLetterPageTemplate(Modifier.fillMaxSize(), forFeature = false)
         content()
     }
 }
@@ -52,6 +77,16 @@ fun SnowLetterFeatureScaffold(
     Box(modifier = modifier.background(MaterialTheme.colorScheme.background)) {
         if (enabled) SnowLetterPageTemplate(Modifier.fillMaxSize(), forFeature = true)
         content()
+    }
+}
+
+@Composable
+private fun rememberChatBackground(path: String) = produceState<ImageBitmap?>(initialValue = null, path) {
+    value = if (path.isBlank()) null else withContext(Dispatchers.IO) {
+        runCatching {
+            val file = File(path)
+            if (!file.isFile || file.length() <= 0L) null else BitmapFactory.decodeFile(file.absolutePath)?.asImageBitmap()
+        }.getOrNull()
     }
 }
 
