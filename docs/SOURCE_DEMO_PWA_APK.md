@@ -67,7 +67,7 @@ After a new source prerelease exists, install it and enter `123456`; sign into t
 
 Keep the PWA up only while testing. When done, switch off GitHub demo/release variables, delete the **demo-only** Pages project and D1 database, and revoke its demo deployment token. Preserve the dedicated source signing keystore for any future source APK upgrade.
 
-**Current status:** The optional stable source-signed flow still requires a separately configured persistent Pages/D1 demo and independent signing secrets. An **independent temporary alternative has already published 0.2.2-source**: [0.2.2 temporary APK + ZIP](https://github.com/myrisol0813-gif/elementera-coast-source/releases/tag/source-v1v2-39625851494). Its original Quick Tunnel has expired; rerun [Source Native V1 V2 Diagnostic QA](../.github/workflows/source-native-v1v2-diagnostic.yml) for a fresh approximately 30-minute empty-data backend and matching signed APK/ZIP. These temporary signatures change per run, so updates over an older test install may be rejected.
+**Current status:** The optional stable source-signed flow still requires a separately configured persistent Pages/D1 demo and independent signing secrets. An **independent temporary alternative has already published 0.2.2-source**: 0.2.2 temporary APK + ZIP, release tag `source-v1v2-39625851494` (open this repository's Releases tab). Its original Quick Tunnel has expired; rerun [Source Native V1 V2 Diagnostic QA](../.github/workflows/source-native-v1v2-diagnostic.yml) for a fresh approximately 30-minute empty-data backend and matching signed APK/ZIP. These temporary signatures change per run, so updates over an older test install may be rejected.
 
 ## 4. Installing on a phone
 
