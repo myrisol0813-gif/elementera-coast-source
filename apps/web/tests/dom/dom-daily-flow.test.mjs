@@ -37,8 +37,8 @@ export async function runDailyFlow() {
     let danger;
     document.querySelector('[data-action="daily:home"]').click();
     await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'daily-home', 'daily route');
-    await waitFor(() => document.querySelectorAll('.daily-grid button').length === 4, 'trimmed Daily server load');
-    for (const action of ['moments', 'diary', 'pets', 'widgets']) assert.ok(document.querySelector(`[data-action="daily:${action}"]`));
+    await waitFor(() => document.querySelectorAll('.daily-grid button').length === 6, 'trimmed Daily server load');
+    for (const action of ['moments', 'diary', 'calendar', 'library', 'pets', 'widgets']) assert.ok(document.querySelector(`[data-action="daily:${action}"]`));
     for (const retired of ['summary', 'album']) assert.equal(document.querySelector(`[data-action="daily:${retired}"]`), null);
     assert.equal(document.querySelector('.daily-sync-note'), null);
     assert.equal(document.querySelector('.daily-hero'), null);
