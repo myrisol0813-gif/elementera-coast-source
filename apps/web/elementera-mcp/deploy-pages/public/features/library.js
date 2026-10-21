@@ -30,10 +30,10 @@ export function createTidalLibrary({router,toast}) {
   async function homeView() {
     const response=await requestJson(`${BASE}/books`);
     memo.books=response.books||[];memo.limits=response.limits||null;
-    return { title:'潮中书房',subtitle:'与潮水一起翻书',className:'tidal-library',
+    return { title:'书房',subtitle:'电子书与阅读笔记',className:'tidal-library',
       headerAction:button('choose','＋','class="feature-head-action tidal-library-add" aria-label="导入书籍" title="导入 EPUB 或 TXT 电子书"'),
       body:`<section class="tidal-library-home">
-        <p class="tidal-library-intro">我们共用一间书房，各自留笔迹。</p><details class="tidal-library-limits"><summary>EPUB / TXT · 导入须知</summary>最多 80 本书；源文件最多 40 MB；正文最多 1,200 万字、2,048 个正文分段。批注最多 4,000 字，封面会压缩至 600 KB 内。暂不保留复杂版式和图片。</details>
+        <p class="tidal-library-intro">这里是你的书房，可以保存阅读进度与笔记。</p><details class="tidal-library-limits"><summary>EPUB / TXT · 导入须知</summary>最多 80 本书；源文件最多 40 MB；正文最多 1,200 万字、2,048 个正文分段。批注最多 4,000 字，封面会压缩至 600 KB 内。暂不保留复杂版式和图片。</details>
         <div class="tidal-library-shelf">${memo.books.map(b=>{
           const chapter=Number.isInteger(b.reader_chapter_index)?b.reader_chapter_index:0;
           const percent=b.reader_chapter_index==null?0:Math.round((chapter+1)/(b.chapters_count||1)*100);
@@ -45,7 +45,7 @@ export function createTidalLibrary({router,toast}) {
               <span class="tidal-library-reader-count">用户 <small>${b.owner_notes||0} 条批注与读后感</small></span>
               <span class="tidal-library-reader-count">助手 <small>${b.assistant_notes||0} 条批注与读后感</small></span>
             </span></button></article>`;
-        }).join('')||'<p class="feature-empty">书架还空着。点右上角的 ＋，挑一本一起读吧。</p>'}</div>
+        }).join('')||'<p class="feature-empty">书架还空着。点右上角的 ＋，导入一本喜欢的书吧。</p>'}</div>
       </section>` };
   }
   function noteCard(n) {
@@ -99,8 +99,8 @@ export function createTidalLibrary({router,toast}) {
         chapter_index:index,paragraph_index:visible.at(-1).paragraph,
       })});}catch(error){toast(`阅读进度暂未保存：${error.message||'连接失败'}`,2800);}
     }
-    return {title:memo.book.title,subtitle:'潮中书房 · 翻页阅读',className:'tidal-library tidal-reader-route',
-      headerAction:button('notes','双方笔记',`class="feature-head-action" data-book="${escapeAttribute(bookId)}"`),
+    return {title:memo.book.title,subtitle:'书房 · 翻页阅读',className:'tidal-library tidal-reader-route',
+      headerAction:button('notes','阅读笔记',`class="feature-head-action" data-book="${escapeAttribute(bookId)}"`),
       body:renderTidalReader({book:memo.book,chapterTitle:chapter.chapter_title,chapterIndex:index,pages,pageIndex:selectedPage,notes:memo.notes,theme:reader.theme,fontSize:reader.fontSize}),
       afterRender(root){
         for(const [selector,field,allowed] of [['.tidal-reader-color','theme',READER_COLORS],['.tidal-reader-size','fontSize',[14,15,16,17]]]){
@@ -142,7 +142,7 @@ export function createTidalLibrary({router,toast}) {
     if(id && !memo.notes.some(n=>n.id===id)) await loadBook(bookId);
     const existing=memo.notes.find(n=>n.id===id);
     const label=existing?.kind==='reflection'||kind==='reflection'?'读后感':'书页批注';
-    return {title:id?'修改'+label:'写'+label,subtitle:'这张纸由用户自己保管',className:'tidal-library',
+    return {title:id?'修改'+label:'写'+label,subtitle:'此处保存你的阅读笔记',className:'tidal-library',
       body:`<section class="tidal-library-editor">
         <label>正文 · 最多 4000 字<textarea id="tidalLibraryNoteBody" maxlength="4000" rows="9" placeholder="写下你的理解与感受……">${escapeHtml(existing?.body||'')}</textarea></label>
         ${button('save-note','收好这张纸',`class="tidal-library-primary" data-book="${escapeAttribute(bookId)}" data-kind="${label==='读后感'?'reflection':'annotation'}" data-index="${index}" data-paragraph="${paragraph}" data-id="${escapeAttribute(id)}"`)}

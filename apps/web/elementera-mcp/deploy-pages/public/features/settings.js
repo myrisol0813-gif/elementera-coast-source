@@ -57,7 +57,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
       className: 'settings-panel',
       body: group('人类屋主设置',
         row('个人资料', '昵称、聊天署名与显示资料', 'settings:profile')
-        + row('外观', '主题、用户气泡与重点色', 'settings:appearance')
+        + row('外观', '主题、文字气质、用户气泡与重点色', 'settings:appearance')
         + row('账户', '当前登录状态与主动退出', 'settings:account')
         + row('聊天记录', '完整前端包 / 当前窗口导出 / 导入', 'settings:chat-records')
         + row('模型箱', `当前：${shortModelName(currentModel || '未选择')}`, 'models:open')
@@ -114,7 +114,8 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     body: group('外观',
       row('主题', '浅色 / 深色 / 黑金', 'settings:theme')
       + row('用户气泡颜色', '屋主消息气泡', 'settings:bubble')
-      + row('重点色', '橙色 / 金色 / 蓝色 / 粉色', 'settings:accent')),
+      + row('重点色', '橙色 / 金色 / 蓝色 / 粉色', 'settings:accent')
+      + row('文字气质', '经典宋体 / 柔和现代 / 手札', 'settings:font')),
   }));
 
   router.register('settings-chat-records', () => ({
@@ -134,6 +135,18 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     title: '主题',
     subtitle: '选择本地主题',
     body: group('主题', row('浅色', 'Light', 'settings:set-theme', 'data-value="light"') + row('深色', 'Dark', 'settings:set-theme', 'data-value="dark"') + row('黑金', 'Gold', 'settings:set-theme', 'data-value="gold"')),
+  }));
+
+  router.register('settings-font', () => ({
+    title: '文字气质',
+    subtitle: '聊天正文的字形与呼吸 · 仅本机',
+    body: group('文字气质', [
+      ['classic', '经典宋体', '宋体骨架 · 舒展清晰的长文'],
+      ['soft', '柔和现代', '清透易读 · 干净的日常文字'],
+      ['note', '手札', '霞鹜文楷 · 温暖的手写笔触'],
+    ].map(([value, title, subtitle]) =>
+      row(title, subtitle, 'settings:set-font', `class="reading-choice" data-value="${value}" aria-pressed="${preferences().fontMode === value}"`)
+    ).join('')),
   }));
 
   router.register('settings-bubble', () => ({
@@ -311,6 +324,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
       theme: 'settings-theme',
       bubble: 'settings-bubble',
       accent: 'settings-accent',
+      font: 'settings-font',
       diagnostics: 'settings-diagnostics',
     };
     if (routes[name]) return router.open(routes[name]);
@@ -334,6 +348,13 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     }
     if (name === 'set-accent') {
       storage.update((state) => { state.preferences.accent = target.dataset.value || ''; });
+      shell.applyPreferences();
+      return router.refresh();
+    }
+    if (name === 'set-font') {
+      const fontMode = target.dataset.value;
+      if (!['classic', 'soft', 'note'].includes(fontMode)) return;
+      storage.update((state) => { state.preferences.fontMode = fontMode; });
       shell.applyPreferences();
       return router.refresh();
     }

@@ -1561,3 +1561,8 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+/* Reading choices reuse the original rounded feature-row surface. */
+.reading-choice { min-height: 62px; border-radius: 14px; }
+.reading-choice[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised)); }
+.reading-choice[aria-pressed="true"] strong::after { content: "  ✓"; color: var(--accent); }

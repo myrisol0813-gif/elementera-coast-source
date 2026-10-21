@@ -40,6 +40,7 @@ export function createShell({ storage }) {
     const preferences = storage.read().preferences;
     const theme = THEMES.includes(preferences.theme) ? preferences.theme : 'light';
     document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.fontMode = ['classic', 'soft', 'note'].includes(preferences.fontMode) ? preferences.fontMode : 'classic';
     if (preferences.userBubble) document.documentElement.style.setProperty('--user', preferences.userBubble);
     else document.documentElement.style.removeProperty('--user');
     if (preferences.accent) document.documentElement.style.setProperty('--accent', preferences.accent);
