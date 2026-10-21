@@ -26,6 +26,7 @@ export const API = Object.freeze({
   memorySearch: '/api/memory/search',
   memoryRecall: '/api/memory/recall',
   memoryVectorStatus: '/api/memory/vector-status',
+  calendarEntries: '/api/calendar/entries',
   dailyMoments: '/api/daily/moments',
   dailyDiaries: '/api/daily/diaries',
   dailyProfile: '/api/daily/profile',

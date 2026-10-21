@@ -11,14 +11,14 @@
   width: min(760px, 100%);
   min-height: 100%;
   margin: 0 auto;
-  padding: 30px 24px 22px;
+  padding: 18px 16px 16px;
 }
 
 .message {
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr);
   gap: 14px;
-  margin: 0 0 28px;
+  margin: 0 0 20px;
 }
 
 .message.user {
@@ -40,7 +40,9 @@
   padding: 10px 15px;
   border-radius: 20px;
   background: var(--user);
-  line-height: 1.55;
+  font-size: 16px;
+  line-height: 1.58;
+  letter-spacing: normal;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -63,14 +65,15 @@
 }
 
 .assistant-text {
-  padding-top: 4px;
+  padding-top: 0;
   font-size: 16px;
-  line-height: 1.72;
+  line-height: 1.58;
+  letter-spacing: normal;
   overflow-wrap: anywhere;
 }
 
 .assistant-text p {
-  margin: 0 0 12px;
+  margin: 0 0 0.74em;
 }
 
 .assistant-text p:last-child {
@@ -82,7 +85,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 5px;
-  margin-top: 11px;
+  margin-top: 8px;
   color: var(--muted);
 }
 
@@ -730,13 +733,13 @@
 
 @media (max-width: 560px) {
   .messages {
-    padding: 30px 27px 12px;
+    padding: 18px 12px 12px;
   }
 
   .message {
     grid-template-columns: 34px minmax(0, 1fr);
     gap: 12px;
-    margin-bottom: 26px;
+    margin-bottom: 20px;
   }
 
   .assistant-text {

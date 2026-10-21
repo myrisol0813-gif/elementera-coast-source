@@ -15,8 +15,8 @@
   --success: #2f855a;
   --shadow: 0 18px 48px rgba(0, 0, 0, 0.14);
   --sidebar-width: min(86vw, 320px);
-  --topbar-height: 52px;
-  --composer-height: 62px;
+  --topbar-height: 48px;
+  --composer-height: 56px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);

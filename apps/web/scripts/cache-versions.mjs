@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const APP_CACHE_VERSION = 'coast-source-app-01';
+export const APP_CACHE_VERSION = 'coast-source-app-02';
 export const MAILBOX_CACHE_VERSION = 'coast-source-mailbox-01';
 export const MAILBOX_SHARED_CACHE_VERSION = 'coast-app-85';
 export const APP_CACHE_NAME = `elementera-${APP_CACHE_VERSION}`;
@@ -15,6 +15,7 @@ const targets = Object.freeze([
       '/public/styles/tokens.css': APP_CACHE_VERSION,
       '/public/styles/shell.css': APP_CACHE_VERSION,
       '/public/styles/chat.css': APP_CACHE_VERSION,
+      '/public/styles/calendar.css': APP_CACHE_VERSION,
       '/public/styles/mcp-letter.css': APP_CACHE_VERSION,
       '/public/styles/rikkahub.css': APP_CACHE_VERSION,
       '/public/styles/features.css': APP_CACHE_VERSION,
@@ -30,6 +31,7 @@ const targets = Object.freeze([
       '/public/styles/tokens.css': APP_CACHE_VERSION,
       '/public/styles/shell.css': APP_CACHE_VERSION,
       '/public/styles/chat.css': APP_CACHE_VERSION,
+      '/public/styles/calendar.css': APP_CACHE_VERSION,
       '/public/styles/mcp-letter.css': APP_CACHE_VERSION,
       '/public/styles/rikkahub.css': APP_CACHE_VERSION,
       '/public/styles/features.css': APP_CACHE_VERSION,

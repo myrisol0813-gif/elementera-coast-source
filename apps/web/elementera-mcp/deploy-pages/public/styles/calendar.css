@@ -1,0 +1,31 @@
+/* Source calendar inherits accessible Coast UI surfaces. */
+.coast-calendar-panel .feature-body { padding-top: 14px; }
+.coast-calendar-shell { max-width: 650px; margin: 0 auto; }
+.coast-calendar-month { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 18px; }
+.coast-calendar-month strong { font-size: 17px; font-weight: 650; }
+.coast-calendar-month button { width: 40px; height: 40px; border: 0; border-radius: 13px; background: var(--surface-soft); color: var(--text); font-size: 25px; cursor: pointer; }
+.coast-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.coast-calendar-week { display: grid; place-items: center; min-height: 28px; color: var(--muted); font-size: 12px; }
+.coast-calendar-blank { min-height: 45px; }
+.coast-calendar-day { position: relative; display: flex; flex-direction: column; gap: 2px; justify-content: center; align-items: center; min-height: 45px; border: 0; border-radius: 13px; background: transparent; color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
+.coast-calendar-day:hover { background: var(--surface-soft); }
+.coast-calendar-day.is-selected { background: var(--surface-soft); color: var(--accent); font-weight: 700; }
+.coast-calendar-day i { position: absolute; bottom: 5px; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+.coast-calendar-detail { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 18px; }
+.coast-calendar-detail h2 { display: flex; align-items: baseline; gap: 12px; font-size: 15px; font-weight: 650; margin: 0 0 14px; }
+.coast-calendar-detail h2 small { color: var(--muted); font-size: 11px; font-weight: 400; }
+.coast-calendar-entry { margin: 0 0 10px; padding: 14px 16px; background: var(--surface-soft); border-radius: 15px; }
+.coast-calendar-entry > div { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.coast-calendar-entry strong { font-size: 14px; overflow-wrap: anywhere; }
+.coast-calendar-entry small { font-size: 11px; color: var(--muted); }
+.coast-calendar-entry p { color: var(--text-soft); white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; font-size: 13px; }
+.coast-calendar-entry button, .coast-calendar-add, .coast-calendar-remove { border: 0; border-radius: 12px; background: transparent; color: var(--accent); padding: 10px 12px; font: inherit; font-size: 12px; cursor: pointer; }
+.coast-calendar-add { width: 100%; background: var(--surface-soft); min-height: 42px; margin-top: 6px; }
+.coast-calendar-error { color: var(--text-soft); font-size: 13px; }
+.coast-calendar-editor { display: grid; gap: 16px; max-width: 650px; margin: 0 auto; }
+.coast-calendar-editor label { display: grid; gap: 7px; color: var(--text-soft); font-size: 13px; }
+.coast-calendar-editor label small { color: var(--muted); }
+.coast-calendar-editor input, .coast-calendar-editor textarea, .coast-calendar-editor select { width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 13px; background: var(--surface-soft); color: var(--text); font: inherit; font-size: 14px; padding: 11px 13px; }
+.coast-calendar-editor textarea { resize: vertical; min-height: 105px; line-height: 1.6; }
+.coast-calendar-submit { border: 0; border-radius: 14px; padding: 13px 16px; background: var(--accent); color: white; font: inherit; font-weight: 650; cursor: pointer; min-height: 44px; }
+.coast-calendar-remove { justify-self: center; }
