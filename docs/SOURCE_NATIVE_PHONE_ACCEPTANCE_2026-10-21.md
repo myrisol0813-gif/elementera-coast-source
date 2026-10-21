@@ -1,18 +1,18 @@
-# Elementera Coast Source · Native 0.2.1 phone acceptance
+# Elementera Coast Source · Native 0.2.2 phone acceptance
 
-This is a checklist for the **public source Android app only**, application ID `com.elementeracoast.source` (`versionCode=3`, `versionName=0.2.1-source`, minimum Android API 26). It does not modify or validate the personal production app or its updater. The previously accepted PWA needs no additional dedicated test.
+This is a checklist for the **public source Android app only**, application ID `com.elementeracoast.source` (`versionCode=4`, `versionName=0.2.2-source`, minimum Android API 26). It does not modify or validate the personal production app or its updater. The previously accepted PWA needs no additional dedicated test.
 
 ## Required build provenance
 
 1. Confirm the release is a GitHub **prerelease asset**, not an Actions artifact; record release URL, commit, APK filename, size and asset SHA-256.
-2. Confirm the release workflow first verified a **separate, persistent** `*-demo.pages.dev` origin, the real test password `123456`, and authenticated calendar + book API responses. A `trycloudflare.com` Quick Tunnel cannot be treated as an enduring APK backend.
-3. Confirm the release build used a **source-only stable keystore** and `apksigner verify` succeeded. Compare certificate fingerprint with the previously accepted stable source release if one exists. Do not use production signing material.
-4. Confirm `aapt dump badging` reports `com.elementeracoast.source`, version code `3`, version name `0.2.1-source`. Compare the file SHA-256 with the matching Release `SHA256SUMS.txt` and GitHub asset digest.
+2. For a **stable** source build, confirm an independent persistent `*-demo.pages.dev` origin. For a **temporary** QA build, confirm the new `trycloudflare.com` Quick Tunnel, real test password `123456`, and authenticated calendar + book APIs at build time. The Quick Tunnel is not a lasting APK backend; it closes with the test workflow.
+3. For stable releases verify the source-only stable certificate and continuity across upgrades. For temporary QA builds verify `apksigner` V1/V2, embedded signature files, complete ZIP CRC and the release SHA-256; the one-time certificate is deliberately different per run. Never use production signing material.
+4. Confirm `aapt dump badging` reports `com.elementeracoast.source`, version code `3`, version name `0.2.2-source`. Compare the file SHA-256 with the matching Release `SHA256SUMS.txt` and GitHub asset digest.
 5. Record whether device installation was actually tested. Build success or upload success alone is **not** a phone acceptance.
 
 ## Download and install
 
-From the Android phone, open the exact APK asset link reported in the prerelease workflow summary using external Chrome. If it does not download, try the Release page → **Assets** → APK in an external browser, inspect the browser's Downloads list, and check whether the download is blocked by the GitHub asset CDN or system download permission. Do not assume a new APK repairs a browser/network download problem. A trustworthy manual transfer is possible only after checksum comparison. Do not use unknown mirrors.
+For the [latest verified temporary 0.2.2 QA build](https://github.com/myrisol0813-gif/elementera-coast-source/releases/tag/source-v1v2-39625851494), prefer the ZIP-wrapped APK and extract its APK with Files before installing. The original test backend from that run has expired; rerun the QA workflow for live login. For other builds, from the Android phone open the exact APK asset link reported in its own release summary using external Chrome. If it does not download, try the Release page → **Assets** → APK in an external browser, inspect the browser's Downloads list, and check whether the download is blocked by the GitHub asset CDN or system download permission. Do not assume a new APK repairs a browser/network download problem. A trustworthy manual transfer is possible only after checksum comparison. Do not use unknown mirrors.
 
 An older ephemeral debug-signed source package may not share the stable source release signing certificate. If Android reports an incompatible update or different signature, uninstall **only Elementera Coast Source**, not the personal production app, after exporting any source-only sample data you need. Uninstalling clears local source fonts/backgrounds/settings. Package identity alone is not enough for an in-place signing match.
 
