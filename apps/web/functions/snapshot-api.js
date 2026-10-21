@@ -27,6 +27,7 @@ import { listMoments, listDiaries } from './daily-store.js';
 import { listToolRuns } from './tool-run-log.js';
 import { mailboxOwnerSummary } from './mailbox-service.js';
 import { listCalendarEntries } from './calendar-store.js';
+import { listVoiceClips, voiceClipAudio } from './voice-clips.js';
 import { exportLibrary } from './tidal-library.js';
 import { apiError, json, methodNotAllowed } from './http.js';
 
@@ -151,6 +152,7 @@ async function buildSnapshot(env) {
   const conversationRecords = [];
   const attachments = [];
   const webSearches = [];
+  const voiceClips = [];
   const furnitureRuns = [];
   const soils = [];
   const pockets = [];
@@ -167,6 +169,7 @@ async function buildSnapshot(env) {
     soils.push({ conversation_id: conversation.id, soil });
     pockets.push(...pocketItems);
     if (dog?.id || dog?.body) dogtalk.push({ conversation_id: conversation.id, dogtalk: dog });
+    voiceClips.push(...await listVoiceClips(db, conversation.id));
     attachments.push(...attachmentIndex(conversation, state));
     webSearches.push(...webSearchIndex(conversation, state));
     furnitureRuns.push(...furnitureIndex(conversation, state));
@@ -229,6 +232,7 @@ async function buildSnapshot(env) {
       'dogtalk',
       'daily',
       'calendar',
+      'voice_clip_index',
       'tidal_library',
       'model_profile',
       'tool_settings',
@@ -244,6 +248,7 @@ async function buildSnapshot(env) {
     ],
     excluded_modules: [
       'attachment_binary_payloads',
+      'voice_clip_binary_payloads',
       'raw_sensitive_ci_logs',
       'provider_credentials',
       'github_secrets',
@@ -295,6 +300,7 @@ async function buildSnapshot(env) {
     },
     daily: { moments, diaries },
     calendar: { entries: calendarEntries },
+    voice: { clips: voiceClips, binary_included: false },
     tidal_library: tidalLibrary,
     model_profile: profile,
     model_echo_summaries: modelEchoSummaries,
@@ -385,14 +391,24 @@ async function tableRows(db, tableName, { limit = 10000 } = {}) {
   return output;
 }
 
+async function voicePayloads(db, snapshot) {
+  const payloads = [];
+  for (const clip of snapshot.voice?.clips || []) {
+    const bytes = await voiceClipAudio(db, clip.id);
+    payloads.push({ id: clip.id, audio_bytes: bytes.length, mime: 'audio/mpeg', data_b64: base64Bytes(bytes) });
+  }
+  return payloads;
+}
+
 async function buildFullArchive(env) {
   const db = env.COAST_CHAT_DB;
   const [snapshot, modelEchoes] = await Promise.all([
     buildSnapshot(env),
     listAllMessageModelMetadata(db, { includeRaw: true, limit: 10000 }),
   ]);
-  const [attachmentPayloads, toolRunsAll, devRunsAll, updateRecordsAll] = await Promise.all([
+  const [attachmentPayloads, voiceAudioPayloads, toolRunsAll, devRunsAll, updateRecordsAll] = await Promise.all([
     fullAttachmentPayloads(db, snapshot),
+    voicePayloads(db, snapshot),
     tableRows(db, 'coast_tool_runs'),
     tableRows(db, 'coast_dev_runs'),
     tableRows(db, 'coast_update_records'),
@@ -406,13 +422,15 @@ async function buildFullArchive(env) {
       ...(Array.isArray(snapshot.included_modules) ? snapshot.included_modules : []),
       'model_echo_and_reasoning_metadata',
       'attachment_binary_payloads',
+      'voice_clip_binary_payloads',
       'full_tool_run_storage',
       'full_dev_hand_run_storage',
       'full_update_record_storage',
     ].filter((item, index, list) => list.indexOf(item) === index),
     excluded_modules: (Array.isArray(snapshot.excluded_modules) ? snapshot.excluded_modules : [])
-      .filter((item) => item !== 'attachment_binary_payloads'),
+      .filter((item) => !['attachment_binary_payloads', 'voice_clip_binary_payloads'].includes(item)),
     model_echoes: modelEchoes,
+    voice: { ...(snapshot.voice || {}), binary_included: true, payloads: voiceAudioPayloads },
     attachments: {
       ...(snapshot.attachments || {}),
       binary_included: true,

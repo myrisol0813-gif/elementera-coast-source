@@ -31,12 +31,15 @@ try {
   } catch (error) { missingKey = error instanceof VoiceClipError && error.type === 'voice_not_configured'; }
   assert.ok(missingKey);
   assert.equal(providerCalls, 0);
+  await assert.rejects(() => generateVoiceClip(db, { ELEVENLABS_API_KEY: 'test-only-key' }, { conversation_id: conversation.id, message_id: 'assistant_voice_1', paragraph_indices: [0] }), e => e instanceof VoiceClipError && e.type === 'voice_not_configured');
+  assert.equal(providerCalls, 0);
 
   const clip = await generateVoiceClip(db, { ELEVENLABS_API_KEY: 'test-only-key', ELEVENLABS_VOICE_ID: 'TestVoice1234' }, {
     conversation_id: conversation.id, message_id: 'assistant_voice_1', paragraph_indices: [1, 0],
   }, { surface: 'manual' });
   assert.equal(clip.source, 'manual');
   assert.equal(clip.message_id, 'assistant_voice_1');
+  assert.equal(clip.voice_id, 'TestVoice1234');
   assert.equal(clip.turn_id, 'turn_voice_1');
   assert.equal(clip.text, '第一段\n\n第二段。');
   assert.deepEqual([...await voiceClipAudio(db, clip.id)], [73, 68, 51, 1, 2, 3, 4]);
@@ -47,7 +50,7 @@ try {
   }), e => e instanceof VoiceClipError && e.type === 'invalid_selection');
   assert.equal(providerCalls, 1, 'invalid selection must never contact paid provider');
 
-  const assistantClip = await generateVoiceClip(db, { ELEVENLABS_API_KEY: 'test-only-key' }, {
+  const assistantClip = await generateVoiceClip(db, { ELEVENLABS_API_KEY: 'test-only-key', ELEVENLABS_VOICE_ID: 'TestVoice1234' }, {
     conversation_id: conversation.id, text: '今晚翻翻书。',
   }, { surface: 'main_chat', source_turn_id: 'turn_voice_1', model_label: 'Test Model' });
   assert.equal(assistantClip.message_id, null);
