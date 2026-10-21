@@ -19,6 +19,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pets
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -41,7 +44,7 @@ import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
 import kotlinx.coroutines.launch
 
 internal data class DailyLandingItem(val title: String, val subtitle: String)
-internal enum class DailyPage { Home, Moments, MomentCompose, Diary, DiaryCompose, Pet }
+internal enum class DailyPage { Home, Moments, MomentCompose, Diary, DiaryCompose, Calendar, Library, Pet }
 
 @Composable
 fun DailyLanding(
@@ -54,15 +57,20 @@ fun DailyLanding(
     onSnackbar: (String) -> Unit
 ) {
     var page by remember { mutableStateOf(DailyPage.Home) }
+    var libraryShelf by remember { mutableStateOf(true) }
+    var libraryChromeVisible by remember { mutableStateOf(true) }
+    var libraryImportRequest by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val sideRooms = remember(context.applicationContext) { SideRoomsRepository.production(context.applicationContext) }
 
     suspend fun refreshDaily() {
         try {
             repository.refresh()
             onRefreshCoast()
-            onSnackbar("前端状态已刷新")
+            onSnackbar("海岸状态已刷新")
         } catch (error: CoastApiException) {
-            onSnackbar("小组件刷新失败：${error.message}")
+            onSnackbar("海岸日报刷新失败：${error.message}")
         }
     }
 
@@ -70,7 +78,7 @@ fun DailyLanding(
         try {
             repository.refresh()
         } catch (error: CoastApiException) {
-            onSnackbar("小组件载入失败：${error.message}")
+            onSnackbar("海岸日报载入失败：${error.message}")
         }
     }
 
@@ -79,10 +87,11 @@ fun DailyLanding(
         Unit
     }
 
-    Column(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize()) {
+      Column(Modifier.fillMaxSize()) {
         when (page) {
             DailyPage.Home -> FeaturePageTopBar(
-                title = "小组件",
+                title = "海岸日报",
                 subtitle = "朋友圈与日记",
                 onBack = onBackToChat,
                 actionLabel = "刷新",
@@ -91,7 +100,7 @@ fun DailyLanding(
             )
             DailyPage.Moments -> FeaturePageTopBar(
                 title = "碳硅圈",
-                subtitle = "前端内部朋友圈",
+                subtitle = "海岸内部朋友圈",
                 onBack = { page = DailyPage.Home },
                 actionLabel = "+ 动态",
                 onAction = { page = DailyPage.MomentCompose },
@@ -101,13 +110,13 @@ fun DailyLanding(
             )
             DailyPage.MomentCompose -> FeaturePageTopBar(
                 "写碳硅圈",
-                "直接写入前端正式条目",
+                "直接写入海岸正式条目",
                 { page = DailyPage.Moments },
                 compact = true
             )
             DailyPage.Diary -> FeaturePageTopBar(
                 title = "日记",
-                subtitle = "前端里的正式纸页",
+                subtitle = "海岸里的正式纸页",
                 onBack = { page = DailyPage.Home },
                 actionLabel = "+ 日记",
                 onAction = { page = DailyPage.DiaryCompose },
@@ -117,10 +126,12 @@ fun DailyLanding(
             )
             DailyPage.DiaryCompose -> FeaturePageTopBar(
                 "写日记",
-                "直接写入前端正式日记",
+                "直接写入海岸正式日记",
                 { page = DailyPage.Diary },
                 compact = true
             )
+            DailyPage.Calendar -> FeaturePageTopBar("海岸日历", "公历 · 日程与随记", { page = DailyPage.Home }, compact = true)
+            DailyPage.Library -> Unit
             DailyPage.Pet -> FeaturePageTopBar(
                 "宠物系统",
                 "休憩箱尚未展开",
@@ -145,17 +156,39 @@ fun DailyLanding(
                 DailyPage.MomentCompose -> MomentComposeScreen(repository, onActionLogged, onSnackbar) { page = DailyPage.Moments }
                 DailyPage.Diary -> DiaryScreen(repository, onActionLogged, onSnackbar) { page = DailyPage.DiaryCompose }
                 DailyPage.DiaryCompose -> DiaryComposeScreen(repository, onActionLogged, onSnackbar) { page = DailyPage.Diary }
+                DailyPage.Calendar -> CalendarScreen(sideRooms, onSnackbar)
+                DailyPage.Library -> TidalLibraryScreen(
+                    sideRooms, onSnackbar,
+                    importRequest = libraryImportRequest,
+                    onShelfChanged = { libraryShelf = it },
+                    onReadingChromeChanged = { libraryChromeVisible = it }
+                )
                 DailyPage.Pet -> PetScreen()
             }
         }
+      }
+      if(page==DailyPage.Library && libraryChromeVisible) {
+          Box(Modifier.align(Alignment.TopCenter)) {
+              FeaturePageTopBar(
+                  title="潮中书房",
+                  subtitle="小狗和小蛇一起翻书",
+                  onBack={page=DailyPage.Home},
+                  actionLabel=if(libraryShelf)"＋" else null,
+                  onAction={libraryImportRequest++},
+                  compact=true
+              )
+          }
+      }
     }
 }
 
 @Composable
 private fun DailyHome(onOpen: (DailyPage) -> Unit, onFutureWidgets: () -> Unit) {
     val mapping = listOf(
-        Triple(DailyPage.Moments, DailyLandingItem("碳硅圈", "前端内部朋友圈"), Icons.Default.FavoriteBorder),
+        Triple(DailyPage.Moments, DailyLandingItem("碳硅圈", "海岸内部朋友圈"), Icons.Default.FavoriteBorder),
         Triple(DailyPage.Diary, DailyLandingItem("日记", "留下今天的纸页"), Icons.Default.Edit),
+        Triple(DailyPage.Calendar, DailyLandingItem("海岸日历", "公历日程与纪念日"), Icons.Default.CalendarMonth),
+        Triple(DailyPage.Library, DailyLandingItem("潮中书房", "翻书、划线与批注"), Icons.Default.AutoStories),
         Triple(DailyPage.Pet, DailyLandingItem("宠物系统", "还在准备休憩箱"), Icons.Default.Pets)
     )
     LazyColumn(
@@ -198,7 +231,9 @@ private fun DailyHomeCard(item: DailyLandingItem, icon: ImageVector, onClick: ()
 
 /** Active Daily destinations. Future widgets is a visual PWA-mother placeholder, not an active page. */
 internal fun dailyLandingItems(): List<DailyLandingItem> = listOf(
-    DailyLandingItem("碳硅圈", "前端内部朋友圈"),
+    DailyLandingItem("碳硅圈", "海岸内部朋友圈"),
     DailyLandingItem("日记", "留下今天的纸页"),
+    DailyLandingItem("海岸日历", "公历日程与纪念日"),
+    DailyLandingItem("潮中书房", "翻书、划线与批注"),
     DailyLandingItem("宠物系统", "还在准备休憩箱")
 )
