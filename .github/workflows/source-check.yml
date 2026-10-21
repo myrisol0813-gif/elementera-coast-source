@@ -45,8 +45,8 @@ jobs:
         run: |
           set -euo pipefail
           grep -Fq 'applicationId = "com.elementeracoast.source"' app/build.gradle.kts
-          grep -Fq 'versionCode = 2' app/build.gradle.kts
-          grep -Fq 'versionName = "0.2.0-source"' app/build.gradle.kts
+          grep -Fq 'versionCode = 3' app/build.gradle.kts
+          grep -Fq 'versionName = "0.2.1-source"' app/build.gradle.kts
           ! grep -Eiq 'app[.]elementeracoast[.]com' app/build.gradle.kts
       - run: gradle :app:testDebugUnitTest --no-daemon --stacktrace
       - run: gradle :app:assembleDebug --no-daemon --stacktrace

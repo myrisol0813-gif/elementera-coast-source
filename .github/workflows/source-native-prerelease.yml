@@ -75,16 +75,16 @@ jobs:
           gradle :app:assembleRelease --no-daemon --stacktrace -PCOAST_API_BASE_URL="${SOURCE_API_BASE_URL}" -PSOURCE_PREVIEW_PASSWORD_HINT="${SOURCE_DEMO_PASSWORD}"
           test -s app/build/outputs/apk/release/app-release.apk
           mkdir -p source-release
-          cp app/build/outputs/apk/release/app-release.apk source-release/elementera-coast-source-v0.2.0.apk
-          (cd source-release && sha256sum elementera-coast-source-v0.2.0.apk > SHA256SUMS.txt)
+          cp app/build/outputs/apk/release/app-release.apk source-release/elementera-coast-source-v0.2.1.apk
+          (cd source-release && sha256sum elementera-coast-source-v0.2.1.apk > SHA256SUMS.txt)
       - name: Publish signed prerelease (not an Actions artifact)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          tag="source-v0.2.0-${{ github.event.workflow_run.head_sha || github.sha }}"
+          tag="source-v0.2.1-${{ github.event.workflow_run.head_sha || github.sha }}"
           gh release create "${tag}" \
-            source-release/elementera-coast-source-v0.2.0.apk \
+            source-release/elementera-coast-source-v0.2.1.apk \
             source-release/SHA256SUMS.txt \
             --repo "${GITHUB_REPOSITORY}" --target "${{ github.event.workflow_run.head_sha || github.sha }}" \
             --title "Elementera Coast Source Native 0.2.0" --prerelease \

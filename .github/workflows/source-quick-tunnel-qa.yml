@@ -123,8 +123,8 @@ jobs:
           gradle :app:assembleDebug --no-daemon --stacktrace \
             -PCOAST_API_BASE_URL="${URL}" -PSOURCE_PREVIEW_PASSWORD_HINT="${SOURCE_TEST_PASSWORD}"
           mkdir -p source-qa
-          cp app/build/outputs/apk/debug/app-debug.apk source-qa/elementera-coast-source-v0.2.0-temporary-qa.apk
-          (cd source-qa && sha256sum elementera-coast-source-v0.2.0-temporary-qa.apk > SHA256SUMS.txt)
+          cp app/build/outputs/apk/debug/app-debug.apk source-qa/elementera-coast-source-v0.2.1-temporary-qa.apk
+          (cd source-qa && sha256sum elementera-coast-source-v0.2.1-temporary-qa.apk > SHA256SUMS.txt)
       - name: Publish APK and checksum as prerelease assets
         shell: bash
         working-directory: apps/android
@@ -135,7 +135,7 @@ jobs:
           set -euo pipefail
           tag="source-qa-${GITHUB_RUN_ID}"
           gh release create "${tag}" \
-            source-qa/elementera-coast-source-v0.2.0-temporary-qa.apk \
+            source-qa/elementera-coast-source-v0.2.1-temporary-qa.apk \
             source-qa/SHA256SUMS.txt \
             --repo "${GITHUB_REPOSITORY}" --target "${GITHUB_SHA}" \
             --title "Source 0.2.0 temporary QA · ${GITHUB_RUN_ID}" --prerelease \
