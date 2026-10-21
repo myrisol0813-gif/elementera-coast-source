@@ -5,7 +5,7 @@ import { VISITOR_MODEL_PARTNER_PROMPT_ID, VISITOR_MODEL_PARTNER_PROMPT_V1 } from
 import { safeLogError } from './http.js';
 import { McpAuthError, mcpAuthChallenge, requireMcpAuth } from './mcp-auth.js';
 
-const VERSION = '2.0.2';
+const VERSION = '2.1.0';
 const PRIVATE_RECORD_SCHEMA = Object.freeze({ type: 'object', additionalProperties: true });
 
 function objectSchema(properties = {}, required = []) {

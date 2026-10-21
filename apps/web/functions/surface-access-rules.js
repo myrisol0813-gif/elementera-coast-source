@@ -3,7 +3,7 @@ const CONVERSATION_ACCESS = Object.freeze({
   soil: 'conversation',
   memory: 'conversation_and_global',
   worldbook: ['owner', 'both'],
-  backendTools: ['daily.*', 'dogtalk.*', 'memory.*', 'cross_window.*'],
+  backendTools: ['daily.*', 'dogtalk.*', 'memory.*', 'cross_window.*', 'calendar.*', 'library.*', 'voice.create'],
   modelVisibleTools: [
     'daily.create_moment',
     'daily.create_diary',
@@ -17,6 +17,8 @@ const CONVERSATION_ACCESS = Object.freeze({
     'cross_window.keyword_search',
     'cross_window.read_messages',
     'cross_window.read_recent',
+    'calendar.list', 'calendar.create', 'calendar.update', 'calendar.delete',
+    'library.books', 'library.read', 'library.notes', 'library.write', 'voice.create',
   ],
   recentMessages: null,
 });

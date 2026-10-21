@@ -1,3 +1,6 @@
+import { listLibraryBooks, getLibraryBook, readLibraryChapter, listLibraryNotes, writeLibraryNote, editLibraryNote, deleteLibraryNote } from './tidal-library.js';
+import { generateVoiceClip } from './voice-clips.js';
+import { createCalendarEntry, deleteCalendarEntry, listCalendarEntries, updateCalendarEntry } from './calendar-store.js';
 import { searchAuthorizedMemory } from './authorized-memory.js';
 import { CROSS_WINDOW_MODEL_TOOLS, executeCrossWindowModelTool } from './cross-window-model-tool.js';
 import { DAILY_MODEL_TOOLS, dailyWriteReceipt, executeDailyModelTool } from './daily-model-tools.js';
@@ -269,6 +272,187 @@ const REGISTRY = Object.freeze([
       outputSchema: objectSchema({ diaries: { type: 'array', items: PRIVATE_RECORD_SCHEMA } }, ['diaries']), annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false }, invoking: '正在翻阅日记…', invoked: '日记已取回',
     }), handler: (db, input) => listDiaries(db, input),
   }),
+  entry({
+    tool_key: 'calendar.list', display_name: '查看公历日程', description: '查阅一个月的日程与随记。',
+    model_exposed: true, model_group: 'calendar', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
+    model_tool: modelTool('calendar_list', '读取一个公历月份的海岸日程和随记。', {
+      properties: { month: { type: 'string', description: '月份 YYYY-MM，省略则读取本月。' } },
+    }),
+    official_mcp: officialMcpTool({
+      order: 160, name: 'list_calendar_entries', title: '查看海岸日历', description: '按公历月份读取日程、纪念日和随记。',
+      inputSchema: objectSchema({ month: { type: 'string', maxLength: 7 } }),
+      outputSchema: objectSchema({ entries: { type: 'array', items: PRIVATE_RECORD_SCHEMA } }, ['entries']),
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      invoking: '正在翻看日历…', invoked: '日程已取回',
+    }),
+    handler: async (db, input) => ({ entries: await listCalendarEntries(db, input) }),
+  }),
+  entry({
+    tool_key: 'calendar.create', display_name: '写入公历日程', description: '新增日程或随记。',
+    model_exposed: true, model_group: 'calendar', auth_scopes: ['write:soil'],
+    model_tool: modelTool('calendar_create', '新增一条海岸公历记录。', {
+      properties: {
+        day: { type: 'string', description: 'YYYY-MM-DD' }, title: { type: 'string', maxLength: 120 },
+        body: { type: 'string', maxLength: 4000 }, kind: { type: 'string', enum: ['event', 'note'] },
+        recurrence: { type: 'string', enum: ['none', 'yearly'] },
+      },
+      required: ['day', 'title'],
+    }),
+    official_mcp: officialMcpTool({
+      order: 170, name: 'create_calendar_entry', title: '写入海岸日程', description: '新增一条公历日程或随记。',
+      inputSchema: objectSchema({
+        day: { type: 'string', format: 'date' }, title: { type: 'string', minLength: 1, maxLength: 120 },
+        body: { type: 'string', maxLength: 4000 }, kind: { type: 'string', enum: ['event', 'note'] },
+        recurrence: { type: 'string', enum: ['none', 'yearly'] }, ...MCP_MODEL_IDENTITY_PROPERTIES,
+      }, ['day', 'title', 'model_label']),
+      invoking: '正在写下日程…', invoked: '日程已经记下',
+    }),
+    handler: (db, input, context) => createCalendarEntry(db, {
+      day: input.day, title: input.title, body: input.body, kind: input.kind, recurrence: input.recurrence,
+    }, {
+      author: 'assistant', source: context.surface === 'official_mcp' ? 'official_mcp' : 'coast_chat',
+      conversation_id: context.conversation_id || input.source_conversation_id || null,
+      source_turn_id: context.source_turn_id || input.source_turn_id || null,
+      tool_call_id: context.tool_call_id || input.tool_call_id || null,
+      model_label: context.model_label || input.model_label || context.identity?.model_label || null,
+    }),
+  }),
+  entry({
+    tool_key: 'calendar.update', display_name: '修改公历日程', description: '编辑已有日程或随记。',
+    model_exposed: true, model_group: 'calendar', auth_scopes: ['write:soil'],
+    model_tool: modelTool('calendar_update', '凭记录 ID 修改日程。只提供要修改的字段。', {
+      properties: {
+        id: { type: 'string' }, day: { type: 'string' }, title: { type: 'string', maxLength: 120 },
+        body: { type: 'string', maxLength: 4000 }, kind: { type: 'string', enum: ['event', 'note'] },
+        recurrence: { type: 'string', enum: ['none', 'yearly'] },
+      }, required: ['id'],
+    }),
+    official_mcp: officialMcpTool({
+      order: 180, name: 'update_calendar_entry', title: '修改海岸日程', description: '修改已有公历记录。',
+      inputSchema: objectSchema({
+        id: { type: 'string', minLength: 1 }, day: { type: 'string', format: 'date' },
+        title: { type: 'string', maxLength: 120 }, body: { type: 'string', maxLength: 4000 },
+        kind: { type: 'string', enum: ['event', 'note'] }, recurrence: { type: 'string', enum: ['none', 'yearly'] },
+        ...MCP_MODEL_IDENTITY_PROPERTIES,
+      }, ['id', 'model_label']),
+      invoking: '正在修改日程…', invoked: '日程已经改好',
+    }),
+    handler: (db, input) => updateCalendarEntry(db, input.id,
+      Object.fromEntries(Object.entries(input).filter(([name]) => ['day', 'title', 'body', 'kind', 'recurrence'].includes(name)))),
+  }),
+  entry({
+    tool_key: 'calendar.delete', display_name: '删除公历记录', description: '删除指定日程或随记。',
+    model_exposed: true, model_group: 'calendar', auth_scopes: ['write:soil'],
+    model_tool: modelTool('calendar_delete', '仅在需要删除时，通过 ID 删除对应记录。', {
+      properties: { id: { type: 'string' } }, required: ['id'],
+    }),
+    official_mcp: officialMcpTool({
+      order: 190, name: 'delete_calendar_entry', title: '删除海岸日程', description: '删除一条指定的公历记录。',
+      inputSchema: objectSchema({ id: { type: 'string', minLength: 1 }, ...MCP_MODEL_IDENTITY_PROPERTIES }, ['id', 'model_label']),
+      invoking: '正在删除日程…', invoked: '日程已经移走',
+    }),
+    handler: (db, input) => deleteCalendarEntry(db, input.id),
+  }),
+
+  entry({
+    tool_key: 'voice.create', display_name: '念一段留在海岸', description: '使用 模型伙伴 声线生成并保存一段语音，消耗 ElevenLabs 额度。',
+    model_exposed: true, model_group: 'side', auth_scopes: ['write:soil'],
+    model_tool: modelTool('voice_create', '把一小段自己写的文字念成 模型伙伴 语音，保存在当前海岸窗口。会消耗 ElevenLabs 额度。', {
+      properties: { text: { type: 'string', minLength: 1, maxLength: 2400 } }, required: ['text'],
+    }),
+    official_mcp: officialMcpTool({
+      order: 200, name: 'create_voice_clip', title: '留下 模型伙伴 语音', description: '将指定文字生成 ElevenLabs 模型伙伴 v0.1 语音，保存到指定海岸聊天窗口。会消耗额度。',
+      inputSchema: objectSchema({
+        conversation_id: { type: 'string', minLength: 1, maxLength: 160 },
+        text: { type: 'string', minLength: 1, maxLength: 2400 }, ...MCP_MODEL_IDENTITY_PROPERTIES,
+      }, ['conversation_id', 'text', 'model_label']),
+      invoking: '正在轻声念出文字…', invoked: '声音已经留在海岸',
+    }),
+    handler: (db, input, context) => generateVoiceClip(db, context.env, {
+      conversation_id: input.conversation_id || context.conversation_id,
+      text: input.text,
+      model_label: input.model_label || context.model_label,
+    }, context),
+  }),
+
+  entry({
+    tool_key: 'library.books', display_name: '翻潮中书架', description: '查看书房有哪些书或某本书的目录。',
+    model_exposed: true, model_group: 'library', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
+    model_tool: modelTool('library_books', '查看潮中书房里的书，提供 book_id 可查看章节目录。', {
+      properties: { book_id: { type: 'string' } },
+    }),
+    official_mcp: officialMcpTool({
+      order: 210, name: 'list_library_books', title: '查看潮中书架', description: '查看全部书，或指定一本书的章节目录。',
+      inputSchema: objectSchema({ book_id: { type: 'string' } }),
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      invoking: '正在翻书架…', invoked: '书架已经打开',
+    }),
+    handler: async (db,input) => input.book_id ? { book: await getLibraryBook(db,input.book_id) } : { books: await listLibraryBooks(db) },
+  }),
+  entry({
+    tool_key: 'library.read', display_name: '读一段书', description: '按章节和段落范围取书页正文。',
+    model_exposed: true, model_group: 'library', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
+    model_tool: modelTool('library_read', '从潮中书房读某书指定章节的一页原文。start_paragraph 是从零起的段落号，默认每页 12 段，不会暗中裁剪。', {
+      properties: {
+        book_id: { type: 'string' }, chapter_index: { type: 'integer', minimum: 0 },
+        start_paragraph: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 12 },
+      }, required: ['book_id','chapter_index'],
+    }),
+    official_mcp: officialMcpTool({
+      order: 220, name: 'read_library_chapter', title: '读潮中书页', description: '按章节、段号读取一页正文，不会在当前上下文注入全书。',
+      inputSchema: objectSchema({
+        book_id: { type: 'string' }, chapter_index: { type: 'integer', minimum: 0 },
+        start_paragraph: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 12 },
+      }, ['book_id','chapter_index']),
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      invoking: '正在翻阅书页…', invoked: '书页已经读到',
+    }),
+    handler: (db,input) => readLibraryChapter(db,input),
+  }),
+  entry({
+    tool_key: 'library.notes', display_name: '翻两人的书边笔记', description: '读用户与 模型伙伴 的批注、读后感。',
+    model_exposed: true, model_group: 'library', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
+    model_tool: modelTool('library_notes', '读取指定书本的双方批注和读后感，能阅读用户写的东西。', {
+      properties: { book_id: { type: 'string' }, chapter_index: { type: 'integer', minimum: 0 } }, required: ['book_id'],
+    }),
+    official_mcp: officialMcpTool({
+      order: 230, name: 'list_library_notes', title: '阅读书房笔记', description: '读取用户和 模型伙伴 对一本书留下的批注与读后感。',
+      inputSchema: objectSchema({ book_id: { type: 'string' }, chapter_index: { type: 'integer', minimum: 0 } }, ['book_id']),
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      invoking: '正在翻阅书边字迹…', invoked: '书边字迹已取回',
+    }),
+    handler: async (db,input) => ({ notes: await listLibraryNotes(db,input) }),
+  }),
+  entry({
+    tool_key: 'library.write', display_name: '书页边写字', description: '模型伙伴 自主创建、修改或删除自己的批注与读后感。',
+    model_exposed: true, model_group: 'library', auth_scopes: ['write:soil'],
+    model_tool: modelTool('library_write', '在潮中书房里写批注或读后感；允许自主改写、删除自己的文字，不能更改用户写的字。action 为 create/edit/delete。', {
+      properties: {
+        action: { type: 'string', enum: ['create','edit','delete'] }, id: { type: 'string' },
+        book_id: { type: 'string' }, kind: { type: 'string', enum: ['annotation','reflection'] },
+        chapter_index: { type: 'integer', minimum: 0 }, paragraph_index: { type: 'integer', minimum: 0 },
+        body: { type: 'string', maxLength: 4000 },
+      }, required: ['action'],
+    }),
+    official_mcp: officialMcpTool({
+      order: 240, name: 'write_library_note', title: '写、修改或删除书房笔记', description: '由 模型伙伴 创建、修订或删去自己的批注和读后感；不会触碰用户的文字。',
+      inputSchema: objectSchema({
+        action: { type: 'string', enum: ['create','edit','delete'] }, id: { type: 'string' },
+        book_id: { type: 'string' }, kind: { type: 'string', enum: ['annotation','reflection'] },
+        chapter_index: { type: 'integer', minimum: 0 }, paragraph_index: { type: 'integer', minimum: 0 },
+        body: { type: 'string', maxLength: 4000 }, ...MCP_MODEL_IDENTITY_PROPERTIES,
+      }, ['action','model_label']),
+      invoking: '正在书边留下笔迹…', invoked: '书边笔记已处理',
+    }),
+    handler: async (db,input,context) => {
+      const scope={author:'assistant',surface:context.surface,conversation_id:context.conversation_id||null,source_turn_id:context.source_turn_id||null};
+      if(input.action==='create') return { note: await writeLibraryNote(db,input,scope) };
+      if(input.action==='edit') return { note: await editLibraryNote(db,input.id,{body:input.body},scope) };
+      if(input.action==='delete') return deleteLibraryNote(db,input.id,scope);
+      throw new ToolRegistryError('invalid_action','书房笔记操作无效。');
+    },
+  }),
+
 ]);
 
 const BY_KEY = new Map(REGISTRY.map((item) => [item.tool_key, item]));
@@ -318,7 +502,7 @@ export function resolveToolSelection(context = {}) {
   const selected = available
     .filter((definition) => definition.model_exposed && definition.model_tool && !definition.requires_confirmation)
     .filter((definition) => roomAllowsModelTool(access, definition.tool_key))
-    .slice(0, 16);
+    .slice(0, 24);
   return {
     backendTools: available.map(toolReceipt),
     modelVisibleToolRecords: selected.map(toolReceipt),
