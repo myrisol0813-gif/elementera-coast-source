@@ -1,0 +1,49 @@
+name: Sync source release notes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/source-release-notes-sync.yml
+      - docs/release-notes/**
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Synchronize source 0.2.2 temporary QA release description
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag='source-v1v2-39625851494'
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" \
+            --notes-file docs/release-notes/source-v0.2.2-temporary-qa.md
+          echo 'Updated existing 0.2.2 QA release notes; APKs/tags unchanged.'
+      - name: Annotate original 0.1 release without changing its historic content
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag='v0.1-source'
+          old="$RUNNER_TEMP/v0.1-original-notes.md"
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json body --jq '.body' > "$old"
+          if grep -Fq 'Historical update (2026-10-22)' "$old"; then
+            echo 'Historical addendum already present; no change to first release.'
+            exit 0
+          fi
+          printf '\n\n' >> "$old"
+          cat docs/release-notes/v0.1-historical-addendum.md >> "$old"
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes-file "$old"
+          echo 'Appended history-only note to original release; first APK unchanged.'
