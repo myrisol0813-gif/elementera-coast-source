@@ -203,13 +203,27 @@ internal fun AppearanceScreen(state: WolfState, store: WolfStore, onSnackbar: (S
                             }
                         }
                     } else {
-                        ChoiceRow(mode.label, state.appearance.fontMode == mode) {
+                        val bundledName = when (mode) {
+                            CoastFontMode.CoastClassic -> "zhuque_fangsong_regular"
+                            CoastFontMode.NanoOldSong -> "nano_old_song_a_regular"
+                            CoastFontMode.ChillHuoSong -> "chill_huo_song_regular"
+                            CoastFontMode.CustomLocal -> ""
+                        }
+                        val available = context.resources.getIdentifier(bundledName, "font", context.packageName) != 0
+                        val fallback = when (mode) {
+                            CoastFontMode.CoastClassic -> "系统宋体"
+                            CoastFontMode.NanoOldSong -> "系统黑体"
+                            CoastFontMode.ChillHuoSong -> "系统等宽体"
+                            CoastFontMode.CustomLocal -> "本机字体"
+                        }
+                        ChoiceRow(mode.label, state.appearance.fontMode == mode,
+                            subtitle = if (available) "已加载此款字库" else "开源版未内置此款字库 · 实际使用$fallback") {
                             store.setFontMode(mode)
                         }
                     }
                 }
                 Text(
-                    "开源版不附带专有字库，缺少预设字体时会回退系统衬线体。可以自行导入有使用授权的 .ttf / .otf。",
+                    "开源版未附带专有字体文件，三个预设现在使用不同的系统字体作为替代；想使用指定字形，请导入有授权的 .ttf / .otf。",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall
                 )
