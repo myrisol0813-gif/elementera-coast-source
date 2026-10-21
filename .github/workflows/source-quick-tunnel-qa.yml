@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   quick-qa:
@@ -107,6 +108,20 @@ jobs:
           echo "Test login: ${SOURCE_TEST_PASSWORD}" >> "${GITHUB_STEP_SUMMARY}"
           echo 'Login, calendar and library HTTP checks passed.' >> "${GITHUB_STEP_SUMMARY}"
           echo 'No real personal data, external provider keys, or production services are connected.' >> "${GITHUB_STEP_SUMMARY}"
+      - name: Publish verified live PWA link to commit status
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          URL: ${{ steps.tunnel.outputs.url }}
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=success \
+            -f context=source-pwa-live \
+            -f description="Disposable source PWA preview; test password 123456; ~26 minutes" \
+            -f target_url="${URL}" > /dev/null
+          echo "Verified preview link published as the source-pwa-live commit status."
+
       - name: Keep test tunnel available for about 26 minutes
         shell: bash
         env:
