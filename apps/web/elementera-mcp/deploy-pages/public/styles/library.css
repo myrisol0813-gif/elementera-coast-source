@@ -1,0 +1,116 @@
+/* 潮中书房：一间贴着主聊天的安静侧室。 */
+.tidal-library .feature-body{padding-top:16px;}
+.tidal-library-home,.tidal-library-book-detail,.tidal-library-reader,.tidal-library-notes,.tidal-library-editor{max-width:690px;margin:0 auto;}
+.tidal-library-shelf{display:grid;gap:9px;}
+.tidal-library-book{display:flex;align-items:center;gap:14px;width:100%;padding:15px;text-align:left;border:0;border-radius:17px;background:var(--surface-soft);color:var(--text);font:inherit;cursor:pointer;}
+.tidal-library-book span:last-child{display:grid;gap:6px;min-width:0;}
+.tidal-library-book strong{font-size:14px;overflow-wrap:anywhere;}
+.tidal-library-book small,.tidal-library-toc small{font-size:11px;color:var(--muted);}
+.tidal-library-book-spine{display:grid;place-items:center;width:38px;min-width:38px;height:48px;border-radius:8px 5px 5px 8px;background:color-mix(in srgb,var(--accent) 17%,var(--bg));color:var(--accent);}
+.tidal-library-toc{display:grid;gap:6px;padding-bottom:18px;}
+.tidal-library-toc button{display:flex;justify-content:space-between;gap:12px;width:100%;border:0;border-radius:13px;background:var(--surface-soft);padding:13px 15px;text-align:left;color:var(--text);font:inherit;cursor:pointer;}
+.tidal-library-toc button span{min-width:0;overflow-wrap:anywhere;}
+.tidal-library-reflections{padding-top:14px;border-top:1px solid var(--line);}
+.tidal-library-reflections h2,.tidal-library-notes h2{font-size:15px;font-weight:650;margin:14px 0;}
+.tidal-library-primary{width:100%;min-height:44px;border:0;border-radius:15px;padding:12px 15px;background:var(--surface-soft);color:var(--accent);font:inherit;cursor:pointer;}
+.tidal-library-danger{width:100%;margin-top:28px;border:0;background:transparent;color:var(--muted);padding:14px;font:inherit;font-size:12px;cursor:pointer;}
+.tidal-library-paragraph{padding:9px 10px 15px;margin:0 0 18px;border-radius:15px;}
+.tidal-library-paragraph.is-focused{background:color-mix(in srgb,var(--accent) 9%,var(--bg));}
+.tidal-library-paragraph>p{white-space:pre-wrap;font-family:inherit;font-size:16px;line-height:1.94;overflow-wrap:anywhere;margin:0 0 9px;}
+.tidal-library-paragraph>button{padding:6px 2px;border:0;background:transparent;color:var(--muted);font:inherit;font-size:11px;text-decoration:underline;text-underline-offset:3px;cursor:pointer;}
+.tidal-library-note{display:grid;gap:8px;margin:9px 0 13px;padding:13px 14px;border:0;border-radius:15px;background:var(--surface-soft);}
+.tidal-library-note>small{color:var(--muted);font-size:11px;}
+.tidal-library-note>p{white-space:pre-wrap;font-size:13px;line-height:1.7;overflow-wrap:anywhere;margin:0;}
+.tidal-library-note>button{border:0;padding:0;background:transparent;text-align:left;font:inherit;line-height:1.6;font-size:12px;color:var(--accent);cursor:pointer;}
+.tidal-library-note>button u{text-decoration-thickness:1px;text-underline-offset:3px;}
+.tidal-library-note-actions{display:flex;gap:13px;justify-content:flex-end;}
+.tidal-library-note-actions button{border:0;padding:4px;background:transparent;color:var(--muted);font:inherit;font-size:11px;cursor:pointer;}
+.tidal-library-pagination{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-top:18px;padding:17px 0;border-top:1px solid var(--line);}
+.tidal-library-pagination button{background:var(--surface-soft);border:0;border-radius:12px;padding:10px;color:var(--text);font:inherit;font-size:12px;cursor:pointer;}
+.tidal-library-pagination small{color:var(--muted);font-size:10px;text-align:center;}
+.tidal-library-notes-group{margin-bottom:25px;}
+.tidal-library-editor label{display:grid;gap:12px;font-size:13px;color:var(--text-soft);}
+.tidal-library-editor textarea{box-sizing:border-box;width:100%;border:1px solid var(--line);border-radius:17px;background:var(--surface-soft);color:var(--text);padding:15px;font:inherit;font-size:14px;line-height:1.7;resize:vertical;}
+.tidal-library-editor>.tidal-library-primary{margin-top:17px;}
+
+.tidal-library-reading-state{border-radius:15px;padding:13px 15px;background:var(--surface-soft);margin-bottom:16px;}
+.tidal-library-progress{margin:3px 0 8px;color:var(--text-soft);font-size:12px;}
+.tidal-library-reading-state summary{font-size:12px;color:var(--muted);cursor:pointer;}
+.tidal-library-reading-state details div{display:grid;gap:6px;margin-top:8px;}
+.tidal-library-reading-state details span{font-size:11px;color:var(--text-soft);}
+
+/* 潮中书房 V2：纸张优先，页与页之间没有聊天气泡。 */
+.tidal-library-book .tidal-library-book-meta{flex:1;min-width:0;display:grid;gap:6px;}
+.tidal-library-track{height:4px;overflow:hidden;border-radius:999px;background:color-mix(in srgb,var(--accent) 12%,transparent);}
+.tidal-library-track>i{display:block;height:100%;border-radius:999px;background:#b99a66;}
+.tidal-library-reader-count{display:flex;align-items:baseline;gap:10px;color:var(--text);font-size:12px;}
+.tidal-library-reader-count small{font-size:11px;color:var(--muted);}
+.tidal-reader-route .feature-body{padding:0!important;}
+.tidal-reader-frame{--reader-paper:#f8f3e9;--reader-ink:#394451;--reader-muted:#81828a;--reader-mark:#ecd993;max-width:700px;margin:auto;padding:12px 16px 20px;color:var(--reader-ink);}
+.tidal-reader-frame[data-reader-theme="white"]{--reader-paper:#fff;--reader-ink:#283646;--reader-muted:#818a96;--reader-mark:#f2df93;}
+.tidal-reader-frame[data-reader-theme="blue"]{--reader-paper:#edf4f8;--reader-ink:#31475e;--reader-muted:#6d8494;--reader-mark:#d8d1a4;}
+.tidal-reader-frame[data-reader-theme="night"]{--reader-paper:#202a39;--reader-ink:#e5e4df;--reader-muted:#a6afba;--reader-mark:#735d3b;}
+.tidal-reader-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 3px 12px;font-size:12px;color:var(--text-soft);}
+.tidal-reader-settings{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;}
+.tidal-reader-settings label{display:flex;align-items:center;gap:4px;white-space:nowrap;}
+.tidal-reader-settings select{min-height:34px;border:1px solid var(--line);border-radius:11px;padding:5px 7px;background:var(--surface-soft);color:var(--text);font:inherit;}
+.tidal-reader-toc{position:relative;z-index:4;min-width:58px;}
+.tidal-reader-toc summary{cursor:pointer;min-height:35px;display:flex;align-items:center;list-style:none;}
+.tidal-reader-toc summary::-webkit-details-marker{display:none;}
+.tidal-reader-toc>div{position:absolute;top:100%;left:0;width:min(74vw,330px);max-height:56vh;overflow:auto;border-radius:15px;box-shadow:0 12px 35px rgba(0,0,0,.13);padding:8px;background:var(--surface);border:1px solid var(--line);}
+.tidal-reader-toc button{display:block;width:100%;padding:11px 10px;text-align:left;border:0;border-radius:10px;background:transparent;color:var(--text);font:inherit;font-size:12px;cursor:pointer;}
+.tidal-reader-toc button:hover{background:var(--surface-soft);}
+.tidal-reader-paper{min-height:min(70dvh,680px);padding:clamp(18px,5vw,32px);border-radius:10px 10px 15px 15px;background:var(--reader-paper);color:var(--reader-ink);box-shadow:0 3px 16px rgba(18,29,39,.065);}
+.tidal-reader-kicker{font-size:11px;color:var(--reader-muted);letter-spacing:.07em;margin-bottom:9px;}
+.tidal-reader-paper h2{font-weight:600;font-size:17px;line-height:1.45;margin:0 0 22px;color:var(--reader-ink);}
+.tidal-reader-lines{font-size:calc(var(--reader-font-size)*1px);line-height:1.78;letter-spacing:.01em;user-select:text;-webkit-user-select:text;}
+.tidal-reader-fragment{margin-bottom:.9em;overflow-wrap:anywhere;}
+.tidal-reader-fragment>p{font:inherit;margin:0;white-space:pre-wrap;}
+.tidal-reader-mark{padding:1px 0;border-radius:2px;background:var(--reader-mark);color:inherit;box-shadow:0 0 0 1px color-mix(in srgb,var(--reader-mark) 40%,transparent);cursor:pointer;-webkit-box-decoration-break:clone;box-decoration-break:clone;}
+.tidal-reader-oldnote{font-size:12px;line-height:1.6;padding:11px 13px;margin-top:12px;border-inline-start:2px solid #bd9a60;background:color-mix(in srgb,var(--reader-paper) 75%,#a6a6a6 25%);border-radius:0 10px 10px 0;}
+.tidal-reader-oldnote small{font-size:10px;color:var(--reader-muted);}
+.tidal-reader-oldnote p{margin:4px 0 0;}
+.tidal-reader-footer{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:17px 2px 4px;color:var(--text-soft);font-size:11px;}
+.tidal-reader-footer button{min-height:39px;border:0;border-radius:12px;padding:10px 13px;color:var(--text);background:var(--surface-soft);font:inherit;cursor:pointer;}
+.tidal-reader-footer button:disabled{opacity:.35;cursor:default;}
+.tidal-reader-popover{position:fixed;z-index:1000;display:flex;align-items:center;gap:8px;max-width:min(80vw,380px);border:1px solid var(--line);border-radius:14px;padding:7px 9px;background:var(--surface);color:var(--text);box-shadow:0 8px 28px rgba(0,0,0,.19);}
+.tidal-reader-popover:has(p){display:grid;gap:6px;padding:12px;}
+.tidal-reader-popover button{border:0;border-radius:9px;background:var(--surface-soft);padding:7px 12px;min-height:34px;color:var(--accent);font:inherit;font-size:12px;cursor:pointer;}
+.tidal-reader-popover small{font-size:11px;color:var(--muted);line-height:1.5;}
+.tidal-reader-popover p{font-size:12px;line-height:1.65;white-space:pre-wrap;margin:0;overflow-wrap:anywhere;}
+
+/* Header-only book import; covers belong to their individual shelf cards. */
+.tidal-library-add{display:inline-grid;place-items:center;min-width:36px;min-height:36px;padding:0 9px;border:0;border-radius:50%;font-size:21px;font-weight:400;line-height:1;background:var(--surface-soft);color:var(--accent);}
+
+/* Book-shelf typography: owner cover on left, reading card content on right. */
+.tidal-library-intro{font-size:14px;color:var(--text);margin:2px 2px 8px;}
+.tidal-library-limits{font-size:11px;line-height:1.7;color:var(--muted);margin:0 2px 18px;}
+.tidal-library-limits summary{cursor:pointer;list-style:none;min-height:29px;}
+.tidal-library-entry{display:grid;grid-template-columns:88px minmax(0,1fr);gap:14px;align-items:stretch;padding:14px;border-radius:19px;background:var(--surface-soft);}
+.tidal-library-entry .tidal-library-book{padding:0;width:100%;min-width:0;align-items:start;background:transparent;border-radius:0;}
+.tidal-library-entry .tidal-library-book-spine{display:none;}
+.tidal-library-entry .tidal-library-book-meta{display:grid;gap:7px;align-content:start;}
+.tidal-library-entry .tidal-library-book strong{font-size:15px;line-height:1.45;font-weight:650;}
+.tidal-library-entry .tidal-library-reader-count{gap:8px;font-size:11px;}
+.tidal-library-cover{width:88px;min-height:125px;max-height:134px;align-self:start;border:1px dashed color-mix(in srgb,var(--muted) 35%,transparent);border-radius:9px;background:color-mix(in srgb,var(--accent) 7%,var(--bg));color:var(--muted);font:inherit;font-size:11px;overflow:hidden;padding:0;cursor:pointer;}
+.tidal-library-cover img{display:block;width:100%;height:100%;object-fit:cover;}
+
+/* The right-hand dashed frame is reserved for the owner's cover. */
+.tidal-library-entry{grid-template-columns:minmax(0,1fr) 88px;}
+.tidal-library-entry .tidal-library-book{grid-column:1;grid-row:1;}
+.tidal-library-entry .tidal-library-cover{grid-column:2;grid-row:1;font-size:23px;font-weight:300;border-radius:13px;border-style:dashed;}
+
+/* Immersive book pages: the paper fills the available scene, not a floating card. */
+.tidal-reader-route .tidal-reader-frame{position:relative;max-width:none;margin:0;padding:0 6px 8px;}
+.tidal-reader-route .tidal-reader-paper{border-radius:0;box-shadow:none;min-height:calc(100dvh - 175px);
+  padding:clamp(14px,3.4vw,24px);background:var(--reader-paper);}
+.tidal-reader-route .tidal-reader-top{position:absolute;top:3px;left:7px;right:7px;z-index:5;
+  border-radius:13px;background:var(--reader-paper);padding:5px 9px;box-shadow:0 3px 14px rgba(20,30,40,.06);}
+.tidal-reader-route .tidal-reader-footer{position:absolute;bottom:5px;left:7px;right:7px;z-index:5;
+  border-radius:13px;background:var(--reader-paper);padding:3px 9px;}
+.tidal-reader-frame[data-reader-chrome="hidden"] .tidal-reader-top,
+.tidal-reader-frame[data-reader-chrome="hidden"] .tidal-reader-footer{opacity:0;pointer-events:none;}
+.tidal-reader-frame[data-reader-chrome="shown"] .tidal-reader-top,
+.tidal-reader-frame[data-reader-chrome="shown"] .tidal-reader-footer{opacity:1;pointer-events:auto;}
+.tidal-reader-route .tidal-reader-lines{font-family:inherit;line-height:1.72;}
+.tidal-reader-route .tidal-reader-fragment{margin-bottom:.65em;}
