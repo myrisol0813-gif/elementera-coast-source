@@ -21,6 +21,7 @@ const ICONS = Object.freeze({
   more: solid('<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>'),
   image: outline('<rect x="4" y="5" width="16" height="14" rx="3"/><circle cx="9" cy="10" r="1.5"/><path d="m6 17 4-4 3 3 2-2 3 3"/>'),
   file: outline('<path d="M6 3h8l4 4v14H6Z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>'),
+  voice: outline('<rect x="12" y="5" width="8" height="16" rx="4"/><path d="M8.5 16a7.5 7.5 0 0 0 15 0M16 23.5V28M12 28h8"/>', { viewBox: '0 0 32 32', strokeWidth: 2.15 }),
   mic: outline('<rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v4M9 21h6"/>'),
   send: outline('<path d="m4 11 16-7-6.5 16-2.2-6.2Z"/><path d="m11.3 13.8 4.4-4.4"/>'),
   stop: solid('<rect x="7" y="7" width="10" height="10" rx="2"/>'),

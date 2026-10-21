@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const APP_CACHE_VERSION = 'coast-source-app-03';
+export const APP_CACHE_VERSION = 'coast-source-app-04';
 export const MAILBOX_CACHE_VERSION = 'coast-source-mailbox-01';
 export const MAILBOX_SHARED_CACHE_VERSION = 'coast-app-85';
 export const APP_CACHE_NAME = `elementera-${APP_CACHE_VERSION}`;
