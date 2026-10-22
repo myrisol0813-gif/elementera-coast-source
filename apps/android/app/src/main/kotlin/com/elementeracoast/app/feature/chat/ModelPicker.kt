@@ -78,7 +78,7 @@ fun ModelQuickPicker(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                "Native v1 先验证 model_box 的选择身体；真实 profile PUT 在后端接入阶段启用。",
+                "OpenRouter / Fucheers · 选择后保留明确的渠道身份。",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -147,6 +147,11 @@ fun ModelQuickPicker(
                                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                if (model.startsWith("fucheers:")) "Fucheers" else "OpenRouter",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelSmall
                             )
                             if (selected) {
                                 Text(
