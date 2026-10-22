@@ -3,7 +3,7 @@ import {
   DEFAULT_MODEL,
   MAX_FORMAL_TOKENS,
 } from './model-constants.js';
-import { fetchModelCatalog, openRouterKey } from './model-catalog.js';
+import { fetchModelCatalog, modelProvider, providerRoute } from './model-catalog.js';
 import {
   ModelRequestError,
   catalogModel,
@@ -20,7 +20,7 @@ export function chatPayload(modelId, messages, maxTokens, temperature, model, op
   const payload = { model: modelId, messages };
   if (maxTokens !== null) {
     payload.max_completion_tokens = maxTokens;
-    if (!modelId.startsWith('openai/')) payload.max_tokens = maxTokens;
+    if (!/^(?:openai\/|fucheers:(?:gpt-|o\d))/i.test(modelId)) payload.max_tokens = maxTokens;
   }
   if (supportsTemperature(modelId, model)) payload.temperature = temperature;
   if (options.responseFormat && supportsResponseFormat(model)) payload.response_format = options.responseFormat;
@@ -34,14 +34,15 @@ export function chatPayload(modelId, messages, maxTokens, temperature, model, op
 }
 
 export async function prepareFormalChat(env, input, allowSystem) {
-  if (!openRouterKey(env)) throw new ModelRequestError('auth_error', 'OpenRouter key 未配置。', 503);
+  if (!env.OPENROUTER_API_KEY && !env.FUCHEERS_API_KEY) throw new ModelRequestError('auth_error', 'OpenRouter key 未配置。', 503);
   const catalog = await fetchModelCatalog(env);
   const modelId = String(input.model || catalog.defaults.chat || DEFAULT_MODEL);
+  if (!providerRoute(env, modelId).key) throw new ModelRequestError('auth_error', '当前模型渠道的 API key 未配置。', 503);
   if ((catalog.groups.openai_image || []).some((model) => model.id === modelId) || /gpt-image-|dall-e|image/i.test(modelId)) {
     throw new ModelRequestError('image_model_not_supported', '当前是生图模型，不能用于文字聊天。请切换聊天模型。', 400, { model: modelId });
   }
   const model = catalogModel(catalog, modelId);
-  if (!model || ![...(catalog.groups.openai_chat || []), ...(catalog.groups.free_test || [])].some((item) => item.id === modelId)) {
+  if (!model || ![...(catalog.groups.openai_chat || []), ...(catalog.groups.free_test || []), ...(catalog.groups.fucheers_chat || [])].some((item) => item.id === modelId)) {
     throw new ModelRequestError('model_not_allowed', '该模型不在当前正式线允许范围内。', 400, { model: modelId });
   }
   const messages = validateMessages(input.messages, { system: allowSystem });
