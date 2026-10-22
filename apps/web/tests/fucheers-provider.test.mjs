@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { fetchModelCatalog, providerRoute } from '../functions/models/model-catalog.js';
 import { prepareFormalChat } from '../functions/models/model-payload.js';
-import { requestOpenRouter, performFormalChatStream } from '../functions/models/model-formal-chat-core.js';
+import { requestProviderChat, performFormalChatStream } from '../functions/models/model-formal-chat-core.js';
 
 const originalFetch = globalThis.fetch;
 const env = { OPENROUTER_API_KEY: 'test-openrouter', FUCHEERS_API_KEY: 'test-fucheers' };
@@ -49,7 +49,7 @@ try {
 
   const prepared = await prepareFormalChat(env, { model: 'fucheers:gpt-5.5', messages: [{ role: 'user', content: '你好' }] }, false);
   assert.equal(prepared.modelId, 'fucheers:gpt-5.5');
-  const answer = await requestOpenRouter(env, prepared.payload, 'test');
+  const answer = await requestProviderChat(env, prepared.payload, 'test');
   assert.equal(answer.model, 'gpt-5.5');
   const stream = [];
   for await (const event of performFormalChatStream(env, {
