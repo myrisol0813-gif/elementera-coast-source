@@ -23,8 +23,8 @@ android {
         applicationId = "com.elementeracoast.source"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "0.2.2-source"
+        versionCode = 5
+        versionName = "0.2.3-source"
         buildConfigField("String", "COAST_API_BASE_URL", "\"${sourceApiBaseUrl.get()}\"")
         buildConfigField("String", "SOURCE_PREVIEW_PASSWORD_HINT", "\"${sourcePreviewPasswordHint.get()}\"")
     }
