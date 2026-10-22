@@ -9,7 +9,7 @@ import {
   tagText,
 } from './models-format.js';
 
-export function createModelsView({ chat, getCatalog, getSearch, getSearchDraft }) {
+export function createModelsView({ chat, getCatalog, getSearch, getSearchDraft, getProviderFilter }) {
   function row(modelId, groupName, mode = 'box') {
     const catalog = getCatalog();
     const model = modelById(catalog, modelId) || {
@@ -63,24 +63,32 @@ export function createModelsView({ chat, getCatalog, getSearch, getSearchDraft }
     const catalog = getCatalog();
     const profile = chat.getProfile();
     const box = profile.model_box || { chat: [], free: [], image: [] };
-    const groups = catalog?.groups || { openai_chat: [], openai_image: [], free_test: [] };
+    const groups = catalog?.groups || { openai_chat: [], openai_image: [], free_test: [], fucheers_chat: [] };
+    const providerFilter = getProviderFilter();
+    const showOpenRouter = providerFilter !== 'fucheers';
+    const showFucheers = providerFilter !== 'openrouter';
+    const providerStatuses = catalog?.providers || {};
     return {
       title: '模型箱',
       subtitle: '选择、搜索与管理模型',
       className: 'model-box',
-      body: `<form class="model-toolbar" data-submit="models:search">
-          <input type="search" data-input="models:search-draft" placeholder="搜索 OpenAI Chat 模型" value="${escapeAttribute(getSearchDraft())}" autocomplete="off" enterkeyhint="search">
+      body: `<div class="model-provider-tabs" aria-label="模型渠道">
+          ${['all', 'openrouter', 'fucheers'].map((key) => `<button type="button" class="${providerFilter === key ? 'is-active' : ''}" data-action="models:filter-provider" data-provider="${key}" aria-pressed="${providerFilter === key}">${{all:'全部',openrouter:'OpenRouter',fucheers:'Fucheers'}[key]}</button>`).join('')}
+        </div>
+        <form class="model-toolbar" data-submit="models:search">
+          <input type="search" data-input="models:search-draft" placeholder="搜索模型" value="${escapeAttribute(getSearchDraft())}" autocomplete="off" enterkeyhint="search">
           <button type="submit">搜索</button>
           <button type="button" data-action="models:refresh">刷新</button>
         </form>
-        <p class="feature-meta">目录更新：${escapeHtml(catalog?.updated_at || '未刷新')} · 当前模型：${escapeHtml(profile.current_chat_model || '未选择')}</p>
+        <p class="feature-meta model-provider-status">${['openrouter', 'fucheers'].map((key) => { const state = providerStatuses[key]; return `${key === 'openrouter' ? 'OpenRouter' : 'Fucheers'} · ${!state || state.status === 'unconfigured' ? '未配置' : state.status === 'ok' ? '已连接' : '刷新失败，保留上次目录'}${state?.last_success ? ` · 上次成功 ${escapeHtml(state.last_success)}` : ''}`; }).join('　')} · 当前模型：${escapeHtml(profile.current_chat_model || '未选择')}</p>
         ${group('当前聊天模型', profile.current_chat_model ? row(profile.current_chat_model, 'chat', 'current') : '')}
-        ${group('我的 Chat 模型', (box.chat || []).map((id) => row(id, 'chat')).join(''))}
-        ${catalogGroups(groups.openai_chat || [])}
-        ${group('Free Test', (box.free || []).map((id) => row(id, 'free')).join(''))}
-        ${group('Free Test 目录', filtered(groups.free_test || []).map((model) => row(model.id, 'free', 'catalog')).join(''))}
-        ${group('图片模型', (box.image || []).map((id) => row(id, 'image')).join(''))}
-        ${group('图片模型目录', filtered(groups.openai_image || []).map((model) => row(model.id, 'image', 'catalog')).join(''))}`,
+        ${group('我的 Chat 模型', (box.chat || []).filter((id) => providerFilter === 'all' || (id.startsWith('fucheers:') ? 'fucheers' : 'openrouter') === providerFilter).map((id) => row(id, 'chat')).join(''))}
+        ${showOpenRouter ? catalogGroups(groups.openai_chat || []) : ''}
+        ${showFucheers ? group('Fucheers GPT 目录', sortedModels(filtered(groups.fucheers_chat || [])).map((model) => row(model.id, 'chat', 'catalog')).join('')) : ''}
+        ${showOpenRouter ? group('Free Test', (box.free || []).map((id) => row(id, 'free')).join('')) : ''}
+        ${showOpenRouter ? group('Free Test 目录', filtered(groups.free_test || []).map((model) => row(model.id, 'free', 'catalog')).join('')) : ''}
+        ${showOpenRouter ? group('图片模型', (box.image || []).map((id) => row(id, 'image')).join('')) : ''}
+        ${showOpenRouter ? group('图片模型目录', filtered(groups.openai_image || []).map((model) => row(model.id, 'image', 'catalog')).join('')) : ''}`
     };
   }
 
