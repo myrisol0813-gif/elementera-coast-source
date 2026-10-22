@@ -28,5 +28,5 @@ assert.match(library, /这里是你的书房，可以保存阅读进度与笔记
 for (const privateCopy of ['我们共用一间书房', '挑一本一起读', '与潮水一起翻书', '双方笔记']) {
   assert.ok(!library.includes(privateCopy), 'Old shared-library wording remains');
 }
-assert.match(sw, /elementera-coast-source-app-06/);
+assert.match(sw, /elementera-coast-source-app-07/);
 console.log('source reading appearance and neutral library copy: ok');
