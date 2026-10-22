@@ -1566,3 +1566,15 @@
 .reading-choice { min-height: 62px; border-radius: 14px; }
 .reading-choice[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised)); }
 .reading-choice[aria-pressed="true"] strong::after { content: "  ✓"; color: var(--accent); }
+
+/* Provider drawers retain Coast's soft, borderless model-box styling. */
+.model-provider-tabs { display: flex; gap: 7px; flex-wrap: wrap; margin: 0 0 13px; }
+.model-provider-tabs button {
+  border: 0; border-radius: 999px; padding: 9px 16px;
+  background: var(--surface-soft); color: var(--muted); cursor: pointer;
+}
+.model-provider-tabs button.is-active {
+  background: var(--surface-raised); color: var(--accent); font-weight: 650;
+}
+.model-provider-status { margin-bottom: 16px; line-height: 1.65; }
+.model-quick-provider { padding: 10px 9px 5px; font-size: 12px; color: var(--muted); font-weight: 650; }
