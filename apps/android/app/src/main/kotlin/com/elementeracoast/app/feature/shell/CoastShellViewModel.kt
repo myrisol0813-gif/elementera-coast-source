@@ -638,6 +638,7 @@ class CoastShellViewModel(
         if (catalog == null) return
         val models = buildList {
             addAll(catalog.groups.openAiChat.map { it.id })
+            addAll(catalog.groups.fucheersChat.map { it.id })
             addAll(catalog.groups.freeTest.map { it.id })
             addAll(catalog.groups.openAiImage.map { it.id })
         }.filter(String::isNotBlank).distinct()
