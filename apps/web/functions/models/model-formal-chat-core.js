@@ -1,5 +1,5 @@
-import { OPENROUTER_CHAT_URL, OPENROUTER_REFERER } from './model-constants.js';
-import { openRouterKey } from './model-catalog.js';
+import { OPENROUTER_REFERER } from './model-constants.js';
+import { modelProvider, providerRoute } from './model-catalog.js';
 import { prepareFormalChat } from './model-payload.js';
 import { SseParseError, parseSseEventBlock } from '../stream-format.js';
 import {
@@ -26,15 +26,26 @@ async function providerError(response) {
 }
 
 function providerRequest(env, payload, title, signal) {
-  return fetch(OPENROUTER_CHAT_URL, {
+  const route = providerRoute(env, payload.model);
+  if (!route.key) throw new ModelRequestError('auth_error', '当前模型渠道的 API key 未配置。', 503);
+  const upstreamPayload = { ...payload, model: route.upstreamModel };
+  if (route.provider === 'fucheers') {
+    delete upstreamPayload.session_id;
+    const tools = (upstreamPayload.tools || []).filter((tool) => tool.type === 'function');
+    if (tools.length) upstreamPayload.tools = tools;
+    else {
+      delete upstreamPayload.tools;
+      delete upstreamPayload.tool_choice;
+    }
+  }
+  return fetch(route.url, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${openRouterKey(env)}`,
+      Authorization: 'Bearer ' + route.key,
       'Content-Type': 'application/json',
-      'HTTP-Referer': OPENROUTER_REFERER,
-      'X-Title': title,
+      ...(route.provider === 'openrouter' ? { 'HTTP-Referer': OPENROUTER_REFERER, 'X-Title': title } : {}),
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(upstreamPayload),
     signal,
   });
 }
@@ -53,7 +64,6 @@ export async function requestOpenRouter(env, payload, title) {
     throw new ModelRequestError(type, message, status, {
       model: payload.model,
       upstream_status: response.status,
-      provider_message_preview: preview,
     });
   }
   try {
@@ -78,7 +88,6 @@ async function requestOpenRouterStream(env, payload, title, signal) {
     throw new ModelRequestError(type, message, status, {
       model: payload.model,
       upstream_status: response.status,
-      provider_message_preview: preview,
     });
   }
   if (!response.body) throw new ModelRequestError('invalid_provider_response', '上游没有返回可读取的流。', 502, { model: payload.model });
@@ -124,7 +133,6 @@ function streamChunkError(value, modelId) {
   return new ModelRequestError(type, message, 502, {
     model: modelId,
     upstream_status: status,
-    provider_message_preview: preview,
   });
 }
 
@@ -285,7 +293,7 @@ export async function performFormalChat(env, input = {}, {
   const choice = upstream?.choices?.[0] || {};
   const result = {
     ok: true,
-    model: upstream?.model || prepared.modelId,
+    model: modelProvider(prepared.modelId) === 'fucheers' ? prepared.modelId : (upstream?.model || prepared.modelId),
     message: { role: 'assistant', content: typeof choice?.message?.content === 'string' ? choice.message.content : '' },
     usage: normalizeUsage(upstream?.usage),
     finish_reason: choice?.finish_reason || null,
@@ -326,7 +334,7 @@ export async function performFormalChatWithTools(env, input = {}, {
     const calls = normalizeToolCalls(message.tool_calls);
 
     if (!calls.length) {
-      const model = upstream?.model || prepared.modelId;
+      const model = modelProvider(prepared.modelId) === 'fucheers' ? prepared.modelId : (upstream?.model || prepared.modelId);
       const content = completedReply(message, model, choice?.finish_reason, allToolResults.length);
       const result = {
         ok: true,
@@ -439,7 +447,8 @@ export async function* performFormalChatStream(env, input = {}, {
         if (value?.error) throw streamChunkError(value, prepared.modelId);
         metadataCollector?.observe(value);
         webSearch.observe(value);
-        actualModel = String(value?.model || actualModel || prepared.modelId);
+        actualModel = modelProvider(prepared.modelId) === 'fucheers'
+          ? prepared.modelId : String(value?.model || actualModel || prepared.modelId);
         generationId = String(value?.id || generationId);
         if (!metaSent) {
           metaSent = true;
