@@ -2,7 +2,7 @@ const natural = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' 
 
 export function allModels(catalog) {
   const groups = catalog?.groups || {};
-  return [...(groups.openai_chat || []), ...(groups.openai_image || []), ...(groups.free_test || [])];
+  return [...(groups.openai_chat || []), ...(groups.openai_image || []), ...(groups.free_test || []), ...(groups.fucheers_chat || [])];
 }
 
 export function modelById(catalog, modelId) {
@@ -10,7 +10,7 @@ export function modelById(catalog, modelId) {
 }
 
 export function inferredModelName(modelId) {
-  const raw = String(modelId || '').split('/').at(-1)?.replace(/:free$/i, '') || '';
+  const raw = String(modelId || '').replace(/^fucheers:/, '').split('/').at(-1)?.replace(/:free$/i, '') || '';
   return raw.split(/[-_]+/).filter(Boolean).map((part) => {
     if (part.toLowerCase() === 'gpt') return 'GPT';
     if (/^[a-z]\d+[a-z]?$/i.test(part) || /^\d+[a-z]+$/i.test(part)) return part.toUpperCase();
@@ -24,6 +24,7 @@ export function modelName(catalog, modelId) {
 }
 
 export function modelKind(catalog, modelId, model = modelById(catalog, modelId)) {
+  if (String(modelId).startsWith('fucheers:')) return 'Fucheers';
   if (model?.is_free || String(modelId).includes(':free')) return 'Free';
   if (String(modelId).includes('gpt-image')) return 'Image';
   if (String(modelId).startsWith('openai/')) return 'OpenAI';
@@ -50,8 +51,9 @@ export function sortedModelIds(catalog, ids) {
 }
 
 export function priceText(model) {
-  const pricing = model?.pricing || {};
-  return `prompt ${pricing.prompt ?? '?'} / completion ${pricing.completion ?? '?'}`;
+  const pricing = model?.pricing;
+  if (!pricing || pricing.prompt == null || pricing.completion == null) return '价格以渠道实际结算为准';
+  return `prompt ${pricing.prompt} / completion ${pricing.completion}`;
 }
 
 export function tagText(model) {
