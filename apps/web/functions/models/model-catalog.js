@@ -1,9 +1,6 @@
 import { CATALOG_TTL_MS, OPENROUTER_MODELS_URL } from './model-constants.js';
 import { ModelRequestError } from './model-validation.js';
 
-let catalogCache = null;
-let catalogExpiresAt = 0;
-
 export function openRouterKey(env) {
   return env.OPENROUTER_API_KEY;
 }
@@ -99,25 +96,106 @@ export function buildModelCatalog(raw) {
   };
 }
 
+const FUCHEERS_API = 'https://www.fucheers.top/v1';
+export const FUCHEERS_PREFIX = 'fucheers:';
+const cache = {
+  openrouter: { value: null, expiry: 0, updatedAt: null },
+  fucheers: { value: null, expiry: 0, updatedAt: null },
+};
+
+export function modelProvider(id) {
+  return String(id || '').startsWith(FUCHEERS_PREFIX) ? 'fucheers' : 'openrouter';
+}
+
+export function providerRoute(env, modelId) {
+  if (modelProvider(modelId) === 'fucheers') {
+    return {
+      provider: 'fucheers',
+      key: env.FUCHEERS_API_KEY,
+      url: String(env.FUCHEERS_BASE_URL || FUCHEERS_API).replace(/\/$/, '') + '/chat/completions',
+      upstreamModel: String(modelId).slice(FUCHEERS_PREFIX.length),
+    };
+  }
+  return {
+    provider: 'openrouter',
+    key: openRouterKey(env),
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    upstreamModel: modelId,
+  };
+}
+
+function fucheersChatModel(raw) {
+  const id = String(raw?.id || '');
+  if (!/^(?:gpt-|o[1-9][0-9]*(?:-|$))/i.test(id)) return null;
+  return {
+    id: FUCHEERS_PREFIX + id,
+    name: String(raw.name || id),
+    provider: 'fucheers',
+    context_length: raw.context_length ?? null,
+    pricing: raw.pricing && typeof raw.pricing === 'object' ? raw.pricing : null,
+    supported_parameters: Array.isArray(raw.supported_parameters) ? raw.supported_parameters : [],
+    reasoning_efforts: Array.isArray(raw.reasoning_efforts) ? raw.reasoning_efforts : [],
+    architecture: null,
+    top_provider: null,
+    created: raw.created ?? null,
+    is_free: false,
+    available: true,
+  };
+}
+
+async function refreshProvider(provider, url, headers, convert, force = false) {
+  const entry = cache[provider];
+  if (!force && entry.value && entry.expiry > Date.now()) return true;
+  try {
+    const response = await fetch(url, { headers });
+    if (!response.ok) return false;
+    const raw = await response.json();
+    if (!Array.isArray(raw?.data)) return false;
+    entry.value = convert(raw);
+    entry.expiry = Date.now() + CATALOG_TTL_MS;
+    entry.updatedAt = new Date().toISOString();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function fetchModelCatalog(env, force = false) {
-  const now = Date.now();
-  if (!force && catalogCache && catalogExpiresAt > now) return catalogCache;
-  const headers = { Accept: 'application/json' };
-  if (openRouterKey(env)) headers.Authorization = `Bearer ${openRouterKey(env)}`;
-  let response;
-  try {
-    response = await fetch(OPENROUTER_MODELS_URL, { headers });
-  } catch {
-    throw new ModelRequestError('models_fetch_failed', 'Model catalog is unavailable.', 502);
+  const fucheersConfigured = Boolean(env.FUCHEERS_API_KEY);
+  const [openrouterOk, fucheersOk] = await Promise.all([
+    refreshProvider('openrouter', OPENROUTER_MODELS_URL, {
+      Accept: 'application/json',
+      ...(openRouterKey(env) ? { Authorization: 'Bearer ' + openRouterKey(env) } : {}),
+    }, buildModelCatalog, force),
+    fucheersConfigured
+      ? refreshProvider('fucheers',
+        String(env.FUCHEERS_BASE_URL || FUCHEERS_API).replace(/\/$/, '') + '/models',
+        { Accept: 'application/json', Authorization: 'Bearer ' + env.FUCHEERS_API_KEY },
+        (raw) => sortModels(raw.data.map(fucheersChatModel).filter(Boolean)), force)
+      : Promise.resolve(false),
+  ]);
+  if (!cache.openrouter.value && !cache.fucheers.value) {
+    throw new ModelRequestError('models_fetch_failed', '模型目录目前不可用。', 502);
   }
-  if (!response.ok) throw new ModelRequestError('models_fetch_failed', 'Model catalog is unavailable.', 502);
-  let raw;
-  try {
-    raw = await response.json();
-  } catch {
-    throw new ModelRequestError('models_parse_failed', 'Model catalog is invalid.', 502);
-  }
-  catalogCache = buildModelCatalog(raw);
-  catalogExpiresAt = now + CATALOG_TTL_MS;
-  return catalogCache;
+  const base = cache.openrouter.value || buildModelCatalog({ data: [] });
+  return {
+    ...base,
+    groups: {
+      ...base.groups,
+      fucheers_chat: fucheersConfigured ? (cache.fucheers.value || []) : [],
+    },
+    providers: {
+      openrouter: {
+        configured: Boolean(openRouterKey(env)),
+        status: openrouterOk ? 'ok' : 'error',
+        last_success: cache.openrouter.updatedAt,
+      },
+      fucheers: {
+        configured: fucheersConfigured,
+        status: !fucheersConfigured ? 'unconfigured' : fucheersOk ? 'ok' : 'error',
+        last_success: fucheersConfigured ? cache.fucheers.updatedAt : null,
+      },
+    },
+    updated_at: new Date().toISOString(),
+  };
 }
