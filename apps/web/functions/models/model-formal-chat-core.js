@@ -50,7 +50,7 @@ function providerRequest(env, payload, title, signal) {
   });
 }
 
-export async function requestOpenRouter(env, payload, title) {
+export async function requestProviderChat(env, payload, title) {
   let response;
   try {
     response = await providerRequest(env, payload, title);
@@ -73,7 +73,7 @@ export async function requestOpenRouter(env, payload, title) {
   }
 }
 
-async function requestOpenRouterStream(env, payload, title, signal) {
+async function requestProviderStream(env, payload, title, signal) {
   let response;
   try {
     response = await providerRequest(env, payload, title, signal);
@@ -288,7 +288,7 @@ export async function performFormalChat(env, input = {}, {
 } = {}) {
   const prepared = await prepareFormalChat(env, input, allowSystem);
   const webSearch = createWebSearchTracker(input, prepared);
-  const upstream = await requestOpenRouter(env, prepared.payload, 'Elementera Coast Formal Chat');
+  const upstream = await requestProviderChat(env, prepared.payload, 'Elementera Coast Formal Chat');
   webSearch.observe(upstream);
   const choice = upstream?.choices?.[0] || {};
   const result = {
@@ -322,7 +322,7 @@ export async function performFormalChatWithTools(env, input = {}, {
   let messages = [...prepared.payload.messages];
 
   while (true) {
-    const upstream = await requestOpenRouter(env, {
+    const upstream = await requestProviderChat(env, {
       ...prepared.payload,
       messages,
     }, 'Elementera Coast Formal Chat');
@@ -422,7 +422,7 @@ export async function* performFormalChatStream(env, input = {}, {
         stream: true,
         stream_options: { include_usage: true },
       };
-      const response = await requestOpenRouterStream(env, payload, 'Elementera Coast Formal Chat', signal);
+      const response = await requestProviderStream(env, payload, 'Elementera Coast Formal Chat', signal);
       let finishReason = null;
       let providerDone = false;
       let roundContent = '';
