@@ -39,7 +39,11 @@ internal fun ModelBoxScreen(
     onRefresh: () -> Unit
 ) {
     var expandedModel by remember { mutableStateOf<String?>(null) }
-    val grouped = remember(models, current) { groupedUnselectedModels(models, current) }
+    var providerTab by remember { mutableStateOf("全部") }
+    val visibleModels = remember(models, providerTab) {
+        models.filter { providerTab == "全部" || (if (it.startsWith("fucheers:")) "Fucheers" else "OpenRouter") == providerTab }
+    }
+    val grouped = remember(visibleModels, current) { groupedUnselectedModels(visibleModels, current) }
 
     LazyColumn(
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 24.dp),
@@ -50,7 +54,7 @@ internal fun ModelBoxScreen(
                 Column(Modifier.weight(1f)) {
                     Text("模型箱", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
-                        "后端模型目录 · 与 PWA 共用当前模型",
+                        "OpenRouter / Fucheers · 与 PWA 共用当前模型",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -69,13 +73,29 @@ internal fun ModelBoxScreen(
         }
 
         item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("全部", "OpenRouter", "Fucheers").forEach { name ->
+                    Text(name,
+                        modifier = Modifier.background(
+                            if (providerTab == name) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .55f),
+                            RoundedCornerShape(18.dp)
+                        ).clickable { providerTab = name }.padding(horizontal = 14.dp, vertical = 10.dp),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
+        }
+
+        item {
             Text("当前模型", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(6.dp))
             CurrentModelCard(current)
         }
 
         item {
-            Text("模型目录", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(if (providerTab == "全部") "模型目录 · OpenRouter / Fucheers" else "模型目录 · $providerTab", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         ModelSeries.entries.forEach { series ->
@@ -138,12 +158,12 @@ private fun CurrentModelCard(model: String) {
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             Text(
-                model.substringAfterLast('/').ifBlank { "尚未载入" },
+                model.removePrefix("fucheers:").substringAfterLast('/').ifBlank { "尚未载入" },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                "正在使用",
+                (if (model.startsWith("fucheers:")) "Fucheers" else "OpenRouter") + " · 正在使用",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall
             )
@@ -179,6 +199,7 @@ private fun ModelCatalogBubble(
             Spacer(Modifier.height(8.dp))
             Text(item.id, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             Text(item.series.title, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            Text(if (item.id.startsWith("fucheers:")) "Fucheers" else "OpenRouter", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             Text(
                 "目录来源：后端",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
