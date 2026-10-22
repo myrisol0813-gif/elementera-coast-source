@@ -25,7 +25,7 @@ export function createModelsQuickPicker({ chat, toast, getCatalog, fetchCatalog 
       profile.current_chat_model,
       ...(box.chat || []),
       ...(box.free || []),
-    ].filter(Boolean))]);
+    ].filter(Boolean))]).sort((a, b) => Number(a.startsWith('fucheers:')) - Number(b.startsWith('fucheers:')));
   }
 
   function renderQuickPicker(profile = chat.getProfile()) {
@@ -35,9 +35,12 @@ export function createModelsQuickPicker({ chat, toast, getCatalog, fetchCatalog 
     const ids = quickModelIds(profile);
     root.innerHTML = `<div class="model-quick-card" role="dialog" aria-label="快捷选择模型">
       <strong>选择模型</strong>
-      <div class="model-quick-list">${ids.map((modelId) => {
+      <div class="model-quick-list">${ids.map((modelId, index) => {
         const current = modelId === profile.current_chat_model;
-        return `<button class="${current ? 'is-current' : ''}" type="button" data-action="models:quick-select" data-id="${escapeAttribute(modelId)}" aria-pressed="${current}"><span>${escapeHtml(modelName(catalog, modelId))}</span><small>${escapeHtml(modelKind(catalog, modelId))}</small></button>`;
+        const provider = modelId.startsWith('fucheers:') ? 'Fucheers' : 'OpenRouter';
+        const previous = ids[index - 1]?.startsWith('fucheers:') ? 'Fucheers' : 'OpenRouter';
+        const heading = index === 0 || provider !== previous ? `<div class="model-quick-provider">${provider}</div>` : '';
+        return `${heading}<button class="${current ? 'is-current' : ''}" type="button" data-action="models:quick-select" data-id="${escapeAttribute(modelId)}" aria-pressed="${current}"><span>${escapeHtml(modelName(catalog, modelId))}</span><small>${escapeHtml(modelKind(catalog, modelId))}</small></button>`;
       }).join('') || '<p>模型箱里还没有聊天模型。</p>'}</div>
       <button class="model-quick-manage" type="button" data-action="models:open">管理模型箱 ›</button>
     </div>`;
