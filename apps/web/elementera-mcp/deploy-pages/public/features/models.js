@@ -9,12 +9,15 @@ export function createModels({ chat, router, toast }) {
   let catalog = null;
   let search = '';
   let searchDraft = '';
+  let providerFilter = 'all';
   let unsubscribeProfile = null;
 
   const getCatalog = () => catalog;
   const getSearch = () => search;
   const getSearchDraft = () => searchDraft;
   const setSearch = (value) => { search = value; };
+  const getProviderFilter = () => providerFilter;
+  const setProviderFilter = (value) => { providerFilter = ['all', 'openrouter', 'fucheers'].includes(value) ? value : 'all'; };
 
   async function ensureSelections() {
     if (!catalog) return;
@@ -48,13 +51,14 @@ export function createModels({ chat, router, toast }) {
   }
 
   quickPicker = createModelsQuickPicker({ chat, toast, getCatalog, fetchCatalog });
-  const view = createModelsView({ chat, getCatalog, getSearch, getSearchDraft });
+  const view = createModelsView({ chat, getCatalog, getSearch, getSearchDraft, getProviderFilter });
   const actions = createModelsActions({
     chat,
     router,
     toast,
     getSearchDraft,
     setSearch,
+    setProviderFilter,
     fetchCatalog,
     quickPicker,
   });
