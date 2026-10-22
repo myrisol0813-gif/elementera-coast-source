@@ -226,7 +226,8 @@ data class RemoteModelCatalogItem(val id: String, val name: String = "")
 data class RemoteModelGroups(
     @SerialName("openai_chat") val openAiChat: List<RemoteModelCatalogItem> = emptyList(),
     @SerialName("openai_image") val openAiImage: List<RemoteModelCatalogItem> = emptyList(),
-    @SerialName("free_test") val freeTest: List<RemoteModelCatalogItem> = emptyList()
+    @SerialName("free_test") val freeTest: List<RemoteModelCatalogItem> = emptyList(),
+    @SerialName("fucheers_chat") val fucheersChat: List<RemoteModelCatalogItem> = emptyList()
 )
 
 @Serializable
