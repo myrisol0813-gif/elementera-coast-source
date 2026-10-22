@@ -201,7 +201,7 @@ export function createModelMetadataCollector({ requestedModel = '', requestPaylo
   const state = {
     requestedModel: String(requestedModel || requestPayload?.model || '').slice(0, 180),
     resolvedModel: '',
-    provider: 'openrouter',
+    provider: String(requestedModel).startsWith('fucheers:') ? 'fucheers' : 'openrouter',
     providerRoute: null,
     reasoningParts: [],
     summaryParts: [],
@@ -227,8 +227,9 @@ export function createModelMetadataCollector({ requestedModel = '', requestPaylo
     if (summary) state.summaryParts.push(clipText(summary, 8000));
     if (details != null) state.reasoningDetails.push(sanitizeProviderMetadata(details));
     collectEncrypted(value, state.encrypted);
-    state.resolvedModel = String(value.model || state.resolvedModel || '').slice(0, 180);
-    state.provider = providerNameOf(value) || state.provider;
+    state.resolvedModel = state.requestedModel.startsWith('fucheers:')
+      ? state.requestedModel : String(value.model || state.resolvedModel || '').slice(0, 180);
+    if (!state.requestedModel.startsWith('fucheers:')) state.provider = providerNameOf(value) || state.provider;
     state.providerRoute = providerRouteOf(value) ?? state.providerRoute;
     state.usage = addUsageMetadata(state.usage, usageMetadata(value.usage));
     const choice = choiceOf(value);
