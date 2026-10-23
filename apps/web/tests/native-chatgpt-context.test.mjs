@@ -154,7 +154,7 @@ test('Native ChatGPT plan delivers an uploaded image without consulting the Open
   const lastUser = body.model_messages.findLast(message => message.role === 'user');
   assert.ok(Array.isArray(lastUser.content), 'Native ChatGPT receives multimodal content, not an attachment-status text');
   assert.equal(lastUser.content[1].type, 'image_url');
-  assert.match(lastUser.content[1].image_url.url, /^data:image\\/png;base64,/);
+  assert.match(lastUser.content[1].image_url.url, /^data:image[/]png;base64,/);
   assert.equal(body.desk_slip.attachments.vision.images_delivered, 1);
   assert.deepEqual(body.desk_slip.attachments.not_delivered, []);
 });
