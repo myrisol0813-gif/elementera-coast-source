@@ -235,6 +235,12 @@ data class RemoteGlobalExcerptResponse(
 )
 
 @Serializable
+data class RemoteGlobalExcerptClearRequest(
+    val action: String,
+    @SerialName("expected_revision") val expectedRevision: Int
+)
+
+@Serializable
 data class RemoteGlobalExcerptPatchRequest(
     @SerialName("write_enabled") val writeEnabled: Boolean
 )
