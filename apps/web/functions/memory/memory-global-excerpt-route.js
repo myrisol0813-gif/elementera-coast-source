@@ -5,6 +5,7 @@ import {
   discardGlobalExcerptCandidate,
   listGlobalExcerptCandidates,
   listGlobalExcerptRevisions,
+  clearGlobalExcerpt,
   readGlobalExcerpt,
   setGlobalExcerptWriteEnabled,
 } from '../memory-store.js';
@@ -26,6 +27,13 @@ export async function routeGlobalExcerpt(request, env, url) {
     }
     if (request.method === 'PATCH') {
       const value = await body(request);
+      if (value.action === 'clear') {
+        if (!Number.isSafeInteger(value.expected_revision)) return json({
+          ok: false,
+          error: { type: 'invalid_request', message: '清空全局摘录需要当前版本号。' },
+        }, 400);
+        return json({ ok: true, excerpt: await clearGlobalExcerpt(db, value.expected_revision) });
+      }
       if (typeof value.write_enabled !== 'boolean') return json({ ok: false, error: { type: 'invalid_request', message: 'write_enabled 必须是布尔值。' } }, 400);
       return json({ ok: true, excerpt: await setGlobalExcerptWriteEnabled(db, value.write_enabled) });
     }
