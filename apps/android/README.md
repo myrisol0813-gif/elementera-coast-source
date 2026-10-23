@@ -46,13 +46,30 @@ known visiting code is not suitable as authentication for a live backend.
 
 ## Source-build boundaries
 
-The source build does not include production credentials or distribution machinery. In particular, it ships without production signing configuration, the production APK updater, release publishing, production API origin, or private data. The existing “版本与更新” surface remains part of the copied UI, but only reports source-build metadata and does not download or install production APKs.
+The source build does not include private production credentials, production signing keys, production API origin, or private data. Its QA APK delivery is a separate, ephemeral-signed GitHub Release workflow, not the production APK updater. The existing “版本与更新” surface remains part of the copied UI, but does not download or install private production APKs.
 
 No WebView, React Native, TypeScript, or embedded PWA source is used by the Native client.
 
-## Stable source prerelease
+## Public Native visitor QA prerelease
 
-The public source app is **not** the private production APK. It preserves the separate `com.elementeracoast.source` install ID. New source prereleases are only produced when the repository administrator enables `COAST_SOURCE_RELEASE_ENABLED` and configures a stable source-only signing keystore in GitHub Secrets. The workflow refuses to publish an unsigned or ephemeral-debug-signed APK. A successful prerelease includes the APK and a SHA-256 checksum directly as **GitHub Release assets**, without uploading Actions artifacts. Do not reuse the private production signing key.
+The public Android app has its own install ID, `com.elementeracoast.source`, and is
+**not** the private production APK. When the main branch passes **Source check**,
+`.github/workflows/source-native-prerelease.yml` automatically builds and publishes
+a **0.2.6-source visitor QA APK** to GitHub Releases, with its SHA-256 file.
+
+It uses the existing `scripts/sign-disposable-qa.sh` signer to generate a new,
+temporary Source-only signing certificate in each CI runner, then deletes it.
+**No signing Secrets, admin release switch, PWA deployment or Quick Tunnel are
+needed.** The published APK uses the non-routable `.invalid` API placeholder.
+Enter `123456` to tour the original Android UI and local appearance without
+authenticating to or contacting a server.
+
+Important: because every QA release uses a **different** certificate, APK updates
+from older QA/debug Source builds normally **cannot install over** the older app.
+Uninstall only `com.elementeracoast.source` before installing if Android reports a
+signing conflict; deleting the Source app may erase its local settings/data.
+The public visitor APK is a testing/inspection build, not stable application delivery.
+Private production signing material must never be used here.
 
 ## Build
 
