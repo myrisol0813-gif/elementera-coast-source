@@ -44,6 +44,8 @@ import com.elementeracoast.app.ui.theme.CoastThemePreset
 import com.elementeracoast.app.ui.theme.CoastFontMode
 import com.elementeracoast.app.ui.theme.CoastPaperMode
 import com.elementeracoast.app.ui.theme.CoastReadingWeight
+import com.elementeracoast.app.ui.theme.SnowLetterSurface
+import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
 import java.io.File
 
 @Composable
@@ -301,12 +303,17 @@ internal fun WolfTextField(
 
 @Composable
 internal fun SettingGroup(title: String, content: @Composable () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(22.dp)).padding(16.dp)
+    SnowLetterSurface(
+        modifier = Modifier.fillMaxWidth(),
+        role = SnowLetterSurfaceRole.StatusCard,
+        fallbackColor = MaterialTheme.colorScheme.surfaceVariant,
+        fallbackShape = RoundedCornerShape(22.dp)
     ) {
-        Text(title, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(8.dp))
-        content()
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(title, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            content()
+        }
     }
 }
 
