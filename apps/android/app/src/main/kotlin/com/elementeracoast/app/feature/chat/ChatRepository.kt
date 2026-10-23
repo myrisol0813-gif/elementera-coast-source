@@ -189,7 +189,7 @@ class DefaultChatRepository(
         if (!done) throw CoastApiException(
             CoastApiErrorKind.Stream,
             "stream_incomplete",
-            "海岸回复流提前中断。"
+            "回复流提前中断。"
         )
         val completed = ChatSyncMapper.appendAssistant(
             history = ChatSyncMapper.clearUserFailure(historyWithUser, turnId),
@@ -246,14 +246,13 @@ class DefaultChatRepository(
 
     override fun cacheHistory(conversationId: String, history: RemoteHistory) = cache.putHistory(conversationId, history)
 
-}
-
-internal fun CrossWindowRequest.toRemote(): RemoteCrossWindowRequest? {
-    if (mode == CrossWindowMode.Off) return null
-    return RemoteCrossWindowRequest(
-        mode = mode.wireValue,
-        messages = if (mode == CrossWindowMode.Manual) {
-            messages.map { item -> RemoteCrossWindowMessageSelection(item.conversationId, item.messageId) }
-        } else emptyList()
-    )
+    private fun CrossWindowRequest.toRemote(): RemoteCrossWindowRequest? {
+        if (mode == CrossWindowMode.Off) return null
+        return RemoteCrossWindowRequest(
+            mode = mode.wireValue,
+            messages = if (mode == CrossWindowMode.Manual) {
+                messages.map { item -> RemoteCrossWindowMessageSelection(item.conversationId, item.messageId) }
+            } else emptyList()
+        )
+    }
 }
