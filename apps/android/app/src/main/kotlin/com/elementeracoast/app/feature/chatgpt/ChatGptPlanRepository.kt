@@ -214,8 +214,8 @@ class ChatGptPlanRepository(
                     }
                 }
                 val final = completed ?: error("GPT 回复流缺少 response.completed。")
-                require(output.isNotBlank()) { "GPT 没有返回思维壤正文。" }
-                require(output.length <= 10000) { "GPT 思维壤整理结果超过后端允许的 10000 字符。" }
+                require(output.isNotBlank()) { "GPT 没有返回当前对话纸条正文。" }
+                require(output.length <= 10000) { "GPT 当前对话纸条整理结果超过后端允许的 10000 字符。" }
                 val usage = final["usage"] as? JsonObject
                 val inputDetails = usage?.get("input_tokens_details") as? JsonObject
                 ChatGptProbeResult(
