@@ -528,7 +528,7 @@ This section describes the **current source tree**, not the features of the firs
 
 ## Source PWA + Android APK
 
-**Current Android source:** `0.2.2-source` (`versionCode=4`, `com.elementeracoast.source`). The latest tested temporary build is [0.2.2-source APK + ZIP prerelease](../../releases/tag/source-v1v2-39625851494); see [all releases](../../releases) for subsequent builds. Prefer the ZIP-wrapped APK when downloading on phones whose browser corrupts direct APK transfers. Always verify the matching SHA-256.
+**Current Android source:** `0.2.7-source` (`versionCode=9`, `com.elementeracoast.source`). After Source check passes on `main`, the visitor QA workflow publishes the matching APK and SHA-256 directly to GitHub Releases and marks the newest source visitor build as Latest. Historical 0.2.2 temporary-tunnel packages remain documented below for provenance.
 
 **Important:** That 0.2.2 test APK was compiled against a short-lived Cloudflare Quick Tunnel, which is **not a permanent backend**. You can inspect the APK after the tunnel expires, but cannot log in through it. To test a live matching PWA and APK, manually run [Source Native V1 V2 Diagnostic QA](.github/workflows/source-native-v1v2-diagnostic.yml). It launches isolated empty test storage, verifies real login with password `123456`, publishes a fresh signed APK and ZIP to [Releases](../../releases), and keeps the one-time test backend online for approximately 30 minutes after publishing. Do not enter real user data.
 
