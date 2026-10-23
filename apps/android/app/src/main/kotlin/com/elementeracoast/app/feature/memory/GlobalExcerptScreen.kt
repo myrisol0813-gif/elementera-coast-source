@@ -81,7 +81,7 @@ fun GlobalExcerptScreen(
             onDismissRequest = { if (busyId == null) clearConfirmation = false },
             title = { Text("清空全局摘录正文？") },
             text = {
-                Text("正式正文会变为空白；已有修改历史仍保留，待确认候选不会删除。不会影响思维壤、记忆、种子或聊天。")
+                Text("正式正文会变为空白；已有修改历史仍保留，待确认候选不会删除。不会影响当前对话纸条、记忆、种子或聊天。")
             },
             confirmButton = {
                 Button(
