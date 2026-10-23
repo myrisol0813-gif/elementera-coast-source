@@ -26,7 +26,8 @@ enum class CoastFontMode(val label: String) {
 enum class CoastPaperMode(val label: String) {
     Wave("浅浮雕边"),
     Smooth("圆润无框信纸"),
-    Cut("锯齿裁纸边");
+    Cut("锯齿裁纸边"),
+    Cloud("云朵浮雕边");
 
     companion object {
         fun fromStored(value: String): CoastPaperMode = entries.firstOrNull { it.name == value } ?: Wave
