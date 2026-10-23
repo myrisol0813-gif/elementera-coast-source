@@ -41,7 +41,7 @@ try {
     'OPS/content.opf':'<?xml version="1.0"?><package><manifest><item id="chap" href="one.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="chap"/></spine></package>',
     'OPS/one.xhtml':'<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><body><h1>第一章</h1><p>潮水从窗边经过。</p><p>我们一起读书。</p></body></html>',
   });
-  const epub=await importBookFile({name:'潮中书房.epub',size:bytes.length,arrayBuffer:async()=>bytes});
+  const epub=await importBookFile({name:'书房.epub',size:bytes.length,arrayBuffer:async()=>bytes});
   assert.equal(epub.format,'epub');
   assert.equal(epub.chapters.length,1);
   assert.match(epub.chapters[0].body,/潮水从窗边经过。/);
