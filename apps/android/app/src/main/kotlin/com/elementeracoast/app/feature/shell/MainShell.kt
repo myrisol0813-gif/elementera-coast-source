@@ -1,6 +1,9 @@
 package com.elementeracoast.app.feature.shell
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DrawerValue
@@ -9,6 +12,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -21,6 +25,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.elementeracoast.app.core.model.ChatMessage
+import com.elementeracoast.app.core.tour.SourceVisitGate
+import androidx.compose.ui.unit.dp
 import com.elementeracoast.app.core.model.CoastShellState
 import com.elementeracoast.app.core.model.FeatureDestination
 import com.elementeracoast.app.core.model.MessageAction
@@ -135,16 +141,28 @@ fun MainShell(
                 containerColor = MaterialTheme.colorScheme.background,
                 snackbarHost = { SnackbarHost(snackbar) },
                 topBar = {
-                    if (!ownsPageChrome) {
-                        CoastTopBar(
-                            state = state,
-                            onOpenDrawer = { coroutineScope.launch { drawerState.open() } },
-                            onBack = onBackToChat,
-                            onOpenModels = onOpenModels,
-                            onRefresh = onRefresh,
-                            onNewConversation = onNewConversation,
-                            onMore = { onOpenFeature(FeatureDestination.IslandLetter) }
-                        )
+                    Column {
+                        if (!ownsPageChrome) {
+                            CoastTopBar(
+                                state = state,
+                                onOpenDrawer = { coroutineScope.launch { drawerState.open() } },
+                                onBack = onBackToChat,
+                                onOpenModels = onOpenModels,
+                                onRefresh = onRefresh,
+                                onNewConversation = onNewConversation,
+                                onMore = { onOpenFeature(FeatureDestination.IslandLetter) }
+                            )
+                        }
+                        if (SourceVisitGate.isActive) {
+                            Text(
+                                text = "参观模式 · 原有页面可浏览 · 不连接云端",
+                                modifier = Modifier.fillMaxWidth()
+                                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                     }
                 }
             ) { innerPadding ->
