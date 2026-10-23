@@ -1,4 +1,4 @@
-// Text-only EPUB/TXT import for 潮中书房. Images, DRM and complex layout are intentionally not supported.
+// Text-only EPUB/TXT import for 书房. Images, DRM and complex layout are intentionally not supported.
 const MAX_CHARS=12000000, MAX_CHAPTERS=2048, MAX_CHAPTER_CHARS=32000, MAX_PARAGRAPH=4000;
 const decoder=new TextDecoder();
 const u16=(view,at)=>view.getUint16(at,true);
@@ -144,7 +144,7 @@ export function decodeTaggedTxt(text) {
 export async function importBookFile(file) {
   const name=String(file?.name||'');
   const ext=name.split('.').pop().toLowerCase();
-  if(!['txt','epub'].includes(ext))throw Error('潮中书房目前只支持 TXT 和 EPUB 文件。');
+  if(!['txt','epub'].includes(ext))throw Error('书房目前只支持 TXT 和 EPUB 文件。');
   if(file.size>40*1024*1024)throw Error('书籍源文件不能超过 40 MB，不会截断。');
   const sections=ext==='txt'
     ?[{title:'正文',body:decodeTaggedTxt(await file.text())}]
