@@ -141,6 +141,7 @@ fun ChatWindow(
                 messages = state.messages,
                 thoughtSoil = state.thoughtSoil,
                 isStreaming = state.isStreaming,
+                isFinalizing = state.isFinalizing,
                 streamingMessageId = state.streamingMessageId,
                 avatarBitmap = avatarBitmap,
                 metadataSource = metadataSource,
