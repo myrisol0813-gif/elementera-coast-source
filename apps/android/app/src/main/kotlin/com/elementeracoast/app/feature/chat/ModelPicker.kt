@@ -93,7 +93,7 @@ fun ModelQuickPicker(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                "海岸 / OpenRouter 与官端 ChatGPT 套餐均可设为当前聊天模型。官端套餐参数按官方能力生效。",
+                "Elementera Coast / OpenRouter 与 ChatGPT 套餐均可设为当前聊天模型。ChatGPT 套餐参数按账户与模型实际能力生效。",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -232,7 +232,7 @@ fun ModelQuickPicker(
 
                 item(key = "chatgpt-provider-heading") {
                     ProviderSectionHeading(
-                        "官端 GPT · ChatGPT 套餐",
+                        "ChatGPT 套餐",
                         if (chatGpt.connected) "本机已连接 · 可选择正式聊天 / 测试回复"
                         else "未连接 · 在此登录后可测试可用模型"
                     )
@@ -246,14 +246,14 @@ fun ModelQuickPicker(
                 } else {
                     item(key = "chatgpt-provider-refresh") {
                         TextButton(onClick = onChatGptRefresh, enabled = !chatGpt.busy) {
-                            Text("刷新官端 GPT 目录")
+                            Text("刷新 ChatGPT 模型目录")
                         }
                     }
                     if (filtered.official.isEmpty()) {
                         item(key = "chatgpt-provider-empty") {
                             ProviderEmptyHint(
                                 if (chatGpt.availableModels.isEmpty()) "尚未读取到模型；可点上方刷新目录。"
-                                else "没有符合搜索条件的官端 GPT 模型。"
+                                else "没有符合搜索条件的 ChatGPT 模型。"
                             )
                         }
                     }
@@ -286,7 +286,7 @@ fun ModelQuickPicker(
                                 )
                             }
                             if (currentModel == "chatgpt-plan:" + item.slug) {
-                                Icon(Icons.Default.Check, contentDescription = "当前官端 GPT 模型")
+                                Icon(Icons.Default.Check, contentDescription = "当前 ChatGPT 模型")
                             }
                             TextButton(
                                 onClick = { onChatGptProbe(item.slug) },
