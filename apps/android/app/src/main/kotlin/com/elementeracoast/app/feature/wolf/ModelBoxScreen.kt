@@ -227,14 +227,14 @@ private fun ChatGptPlanCard(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .65f)
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            Text("官端 GPT · ChatGPT 套餐", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("ChatGPT 套餐", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
                 if (state.connected) "已授权：" + state.accountLabel
                 else "通过系统浏览器授权；凭证只加密保存在本机。",
                 color = muted, style = MaterialTheme.typography.bodySmall
             )
             Text(
-                "官端 GPT 已可用于普通聊天。模型推理走套餐额度；思维壤仍由海岸后端的独立模型整理。",
+                "ChatGPT 套餐可用于普通聊天。当前对话纸条由后端准备任务，再由本机已授权的 ChatGPT 模型完成整理；账户授权不会上传到 Coast 后端。",
                 color = muted, style = MaterialTheme.typography.bodySmall
             )
             if (state.busy) {
