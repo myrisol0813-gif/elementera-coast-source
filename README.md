@@ -19,8 +19,66 @@ It may be useful if you are exploring:
 - early MCP / OpenAI-compatible interface experiments;
 - the process of turning a private long-term conversation workspace into a public source release.
 
+## Quick testing
+
+There are two different ways to try this repository. They are intentionally not the same.
+
+### 1. Inspect the current public Android build
+
+Download the newest **Source Native Visitor QA** APK from [Latest Releases](../../releases/latest) and enter:
+
+```text
+123456
+```
+
+This opens the real Native page structure and local appearance for inspection. Visitor mode is deliberately **offline-only**: account login, ChatGPT authorization, model calls, and other cloud actions are blocked before network transmission.
+
+The published visitor APK is compiled with the non-routable backend placeholder:
+
+```text
+https://elementera-coast-source.invalid
+```
+
+That backend URL is part of the APK build configuration. **The published visitor APK cannot be repointed to a Cloudflare Tunnel after installation.**
+
+### 2. Run a live source test with your own ChatGPT account
+
+To test the complete Native flow, run your own source backend, expose it temporarily or permanently, and build a fresh APK against that backend.
+
+A convenient disposable setup is:
+
+```text
+local source backend
+        ↓
+Cloudflare Quick Tunnel
+        ↓
+fresh Source Native APK
+```
+
+Build the Android app with the tunnel URL and disable the public visitor doorway:
+
+```bash
+cd apps/android
+gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon \
+  -PCOAST_API_BASE_URL="https://YOUR-TUNNEL.trycloudflare.com" \
+  -PSOURCE_TOUR_ENABLED=false
+```
+
+Then:
+
+1. sign in through the normal Coast backend login;
+2. open the model box;
+3. choose the **ChatGPT plan** section;
+4. select **Continue with ChatGPT** and complete browser authorization;
+5. return to the app, refresh the account model list, choose a model, and send a test reply.
+
+The ChatGPT OAuth credentials are stored on the Android device with Android Keystore and are not sent to the Coast backend. The device calls the OpenAI Responses API directly; the Coast backend is used for workspace context, history, authorized tool operations, and sanitized receipts.
+
+For a longer-lived setup, replace the Quick Tunnel with your own hosted source backend. See [Running and testing](#running-and-testing), [Configuration](#configuration), and `apps/android/README.md`.
+
 ## Table of contents
 
+- [Quick testing](#quick-testing)
 - [What is Elementera Coast?](#what-is-elementera-coast)
 - [High-level architecture](#high-level-architecture)
 - [Main features](#main-features)
