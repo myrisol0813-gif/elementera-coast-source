@@ -26,9 +26,13 @@ internal fun ThoughtSoilEntry(
             .padding(horizontal = 3.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val lock = if (soil.manualLocked) " · 已锁定" else ""
+        val state = when {
+            !soil.autoRefreshEnabled -> " · 已关闭"
+            soil.manualLocked -> " · 已锁定"
+            else -> ""
+        }
         Text(
-            "整理当前对话的纸条 · ${soil.handSeeds.size.coerceAtMost(7)} 粒当前活跃线索$lock",
+            "整理当前对话的纸条 · ${soil.handSeeds.size.coerceAtMost(7)} 粒当前活跃线索$state",
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Medium,
