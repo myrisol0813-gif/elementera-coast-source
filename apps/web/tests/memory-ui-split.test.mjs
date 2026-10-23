@@ -51,6 +51,9 @@ assert.match(moduleSources.get('memory-global-excerpt-view.js'), /修改记录/)
 assert.match(moduleSources.get('memory-custom-view.js'), /自定义指令已保存|当前自定义指令/);
 assert.match(moduleSources.get('memory-actions.js'), /已经写入种子库/);
 assert.match(moduleSources.get('memory-actions.js'), /整理当前对话的纸条已保存/);
+assert.match(moduleSources.get('memory-actions.js'), /name === 'soil-toggle'/);
+assert.match(moduleSources.get('memory-soil-view.js'), /停止自动整理，也不递入模型上下文/);
+assert.match(moduleSources.get('memory-soil-view.js'), /data-action="memory:soil-toggle"/);
 
 const serviceWorker = await readFile(resolve(root, 'elementera-mcp/deploy-pages/service-worker.js'), 'utf8');
 assert.ok(serviceWorker.includes(`const CACHE_NAME = '${APP_CACHE_NAME}';`));
