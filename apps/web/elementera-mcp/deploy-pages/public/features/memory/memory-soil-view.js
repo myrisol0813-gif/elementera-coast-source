@@ -71,8 +71,8 @@ export function createSoilViews({ runtime, currentId, maxHandSeeds, currentSoil 
   function renderSoilEntry(conversationId) {
     const soil = runtime.soils.get(conversationId) || emptySoil(conversationId);
     const handSeeds = Array.isArray(soil.hand_seeds) ? soil.hand_seeds : [];
-    const locked = soil.manual_locked ? ' · 已锁定' : '';
-    return `<div class="thought-soil-row"><button class="thought-soil-entry" type="button" data-action="memory:soil-open" data-scope="conversation" data-conversation-id="${escapeAttribute(conversationId)}">整理当前对话的纸条 · ${Math.min(handSeeds.length, maxHandSeeds())} 粒当前活跃线索${locked} <span aria-hidden="true">›</span></button></div>`;
+    const state = soil.auto_refresh_enabled === false ? ' · 已关闭' : soil.manual_locked ? ' · 已锁定' : '';
+    return `<div class="thought-soil-row"><button class="thought-soil-entry" type="button" data-action="memory:soil-open" data-scope="conversation" data-conversation-id="${escapeAttribute(conversationId)}">整理当前对话的纸条 · ${Math.min(handSeeds.length, maxHandSeeds())} 粒当前活跃线索${state} <span aria-hidden="true">›</span></button></div>`;
   }
 
   function soilProvenance(soil) {
@@ -107,14 +107,20 @@ export function createSoilViews({ runtime, currentId, maxHandSeeds, currentSoil 
         <button class="feature-row" type="button" data-action="memory:pockets" data-scope="${escapeAttribute(scope)}"${sourceSurface ? ` data-source-surface="${escapeAttribute(sourceSurface)}"` : ''}><span><strong>待确认区 · ${pendingPockets.length}</strong><small>候选会停在这里；确认前不会参与召回。</small></span><span>›</span></button>
       </div></section>`
       : '';
+    const enabled = soil.auto_refresh_enabled !== false;
+    const switchCard = scope === 'conversation'
+      ? `<section class="feature-group"><div class="feature-card">
+        <button class="feature-row" type="button" data-action="memory:soil-toggle" data-value="${enabled ? 'false' : 'true'}"><span><strong>${enabled ? '当前对话纸条已开启' : '当前对话纸条已关闭'}</strong><small>${enabled ? (soil.manual_locked ? '当前为手动锁定：不会自动覆盖，但仍会递入模型上下文。' : '每轮回复后自动整理，并递入下一轮模型上下文。') : '停止自动整理，也不递入模型上下文；已有内容会原样保留。'}</small></span><span>${enabled ? '关闭' : '开启'}</span></button>
+      </div></section>`
+      : '';
     const controls = scope === 'conversation'
       ? `<div class="button-row">
         <button type="button" data-action="memory:soil-edit">编辑</button>
         <button type="button" data-action="memory:soil-clear">清空</button>
-        ${soil.manual_locked ? '<button type="button" data-action="memory:soil-auto">恢复自动整理</button>' : ''}
+        ${enabled && soil.manual_locked ? '<button type="button" data-action="memory:soil-auto">解除手动锁定</button>' : ''}
       </div>`
       : '';
-    return `${section('当前', textBlock(soil.current_text, '还没有整理当前方向。'))}
+    return `${switchCard}${section('当前', textBlock(soil.current_text, '还没有整理当前方向。'))}
       ${section(`当前活跃线索 · ${activeSeeds.length}/${limit}`, seeds)}
       ${section('勿复读', textBlock(soil.do_not_repeat))}
       ${section('可落袋', candidates)}
@@ -129,7 +135,7 @@ export function createSoilViews({ runtime, currentId, maxHandSeeds, currentSoil 
     const pockets = runtime.pockets.get(id) || [];
     return {
       title: '整理当前对话的纸条',
-      subtitle: soil.manual_locked ? '手动内容已锁定' : '当前窗口的滚动工作上下文',
+      subtitle: soil.auto_refresh_enabled === false ? '已关闭 · 不整理，也不递入模型上下文' : soil.manual_locked ? '手动内容已锁定 · 仍会递入模型上下文' : '当前窗口的滚动工作上下文',
       className: 'memory-soil',
       headerAction: '<button class="feature-head-action" type="button" data-action="memory:done">完成</button>',
       body: soilBody(soil, { scope: 'conversation', pendingPockets: pockets }),
