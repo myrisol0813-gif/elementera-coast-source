@@ -28,6 +28,7 @@ interface MemoryRepository {
     suspend fun refreshInstructions()
     suspend fun refreshGlobalExcerpt()
     suspend fun setGlobalExcerptWriteEnabled(enabled: Boolean)
+    suspend fun clearGlobalExcerpt(expectedRevision: Int)
     suspend fun confirmGlobalExcerptCandidate(id: String, editedBody: String? = null)
     suspend fun discardGlobalExcerptCandidate(id: String)
     suspend fun saveEntry(entry: MemoryEntry): MemoryEntry
@@ -138,6 +139,11 @@ class DefaultMemoryRepository(
 
     override suspend fun setGlobalExcerptWriteEnabled(enabled: Boolean) {
         remote.setGlobalExcerptWriteEnabled(enabled)
+        refreshGlobalExcerpt()
+    }
+
+    override suspend fun clearGlobalExcerpt(expectedRevision: Int) {
+        remote.clearGlobalExcerpt(expectedRevision)
         refreshGlobalExcerpt()
     }
 
