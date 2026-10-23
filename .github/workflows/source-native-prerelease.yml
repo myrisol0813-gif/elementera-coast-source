@@ -1,4 +1,4 @@
-name: Publish source Native prerelease
+name: Publish Source Native visitor QA APK
 
 on:
   workflow_dispatch:
@@ -9,15 +9,21 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: source-native-visitor-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: false
+
 jobs:
   publish:
+    # The visitor APK is offline-only. No external demo backend, production secrets,
+    # stable signing keys, or administrator release flag are needed.
     if: >-
-      ${{ vars.COAST_SOURCE_RELEASE_ENABLED == 'true' &&
-          (github.event_name == 'workflow_dispatch' ||
-            (github.event.workflow_run.conclusion == 'success' &&
-             github.event.workflow_run.head_branch == 'main' &&
-             github.event.workflow_run.head_repository.full_name == github.repository)) }}
+      ${{ github.event_name == 'workflow_dispatch' ||} 
+          (github.event.workflow_run.conclusion == 'success' &&
+           github.event.workflow_run.head_branch == 'main' &&
+           github.event.workflow_run.head_repository.full_name == github.repository) }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 35
     defaults:
       run:
         working-directory: apps/android
@@ -33,77 +39,71 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Require stable source signing
-        shell: bash
-        env:
-          KEYSTORE_BASE64: ${{ secrets.COAST_SOURCE_KEYSTORE_BASE64 }}
-          COAST_SOURCE_STORE_PASSWORD: ${{ secrets.COAST_SOURCE_STORE_PASSWORD }}
-          COAST_SOURCE_KEY_ALIAS: ${{ secrets.COAST_SOURCE_KEY_ALIAS }}
-          COAST_SOURCE_KEY_PASSWORD: ${{ secrets.COAST_SOURCE_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          : "${KEYSTORE_BASE64:?Source signing not configured}"
-          : "${COAST_SOURCE_STORE_PASSWORD:?Missing source signing password}"
-          : "${COAST_SOURCE_KEY_ALIAS:?Missing source signing alias}"
-          : "${COAST_SOURCE_KEY_PASSWORD:?Missing source key password}"
-          umask 077
-          echo "${KEYSTORE_BASE64}" | base64 --decode > "${RUNNER_TEMP}/source.keystore"
-          test -s "${RUNNER_TEMP}/source.keystore"
-      - name: Build isolated visit-only Source APK
-        shell: bash
-        env:
-          COAST_SOURCE_KEYSTORE_PATH: ${{ runner.temp }}/source.keystore
-          COAST_SOURCE_STORE_PASSWORD: ${{ secrets.COAST_SOURCE_STORE_PASSWORD }}
-          COAST_SOURCE_KEY_ALIAS: ${{ secrets.COAST_SOURCE_KEY_ALIAS }}
-          COAST_SOURCE_KEY_PASSWORD: ${{ secrets.COAST_SOURCE_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          # No live demo backend is needed: 123456 only opens a local, read-only
-          # tour; outgoing Source HTTP calls are blocked while touring.
-          gradle :app:testDebugUnitTest :app:assembleRelease --no-daemon --stacktrace -PSOURCE_TOUR_ENABLED=true
-          test -s app/build/outputs/apk/release/app-release.apk
-          mkdir -p source-release
-          cp app/build/outputs/apk/release/app-release.apk source-release/elementera-coast-source-v0.2.6-visitor.apk
-          (cd source-release && sha256sum elementera-coast-source-v0.2.6-visitor.apk > SHA256SUMS.txt)
-      - name: Verify APK identity and independent signing
-        id: apk_verify
+
+      - name: Verify visitor-only source build identity
         shell: bash
         run: |
           set -euo pipefail
-          apk="app/build/outputs/apk/release/app-release.apk"
-          : "${ANDROID_HOME:?Missing Android SDK}"
+          grep -Fq 'applicationId = "com.elementeracoast.source"' app/build.gradle.kts
+          grep -Fq 'versionCode = 8' app/build.gradle.kts
+          grep -Fq 'versionName = "0.2.6-source"' app/build.gradle.kts
+          test -f scripts/sign-disposable-qa.sh
+          ! grep -Eiq 'app[.]elementeracoast[.]com' app/build.gradle.kts
+
+      - name: Build visitor APK and run unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace \
+            -PSOURCE_TOUR_ENABLED=true \
+            -PCOAST_API_BASE_URL=https://elementera-coast-source.invalid
+          test -s app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Sign with a disposable Source-only QA certificate
+        id: signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          # Existing public-source QA signer creates a fresh temporary keystore
+          # in the runner, signs V1/V2/V3 and deletes the key on exit.
+          bash scripts/sign-disposable-qa.sh "$apk"
           build_tools="$(find "${ANDROID_HOME}/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          test -x "${build_tools}/aapt"
-          test -x "${build_tools}/apksigner"
-          badging="$("${build_tools}/aapt" dump badging "${apk}")"
-          package_line="$(printf '%s\n' "${badging}" | sed -n '1p')"
-          [[ "${package_line}" == *"name='com.elementeracoast.source'"* ]]
-          [[ "${package_line}" == *"versionCode='8'"* ]]
-          [[ "${package_line}" == *"versionName='0.2.6-source'"* ]]
-          [[ "${badging}" == *"sdkVersion:'26'"* ]]
-          [[ "${badging}" == *"targetSdkVersion:'34'"* ]]
-          "${build_tools}/apksigner" verify --verbose --print-certs "${apk}" > "${RUNNER_TEMP}/source-signature-verification.txt"
-          fingerprint="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "${RUNNER_TEMP}/source-signature-verification.txt" | head -n 1)"
-          : "${fingerprint:?Could not verify source APK signing certificate}"
-          echo "fingerprint=${fingerprint}" >> "${GITHUB_OUTPUT}"
-          echo "APK manifest: ${package_line}"
-          echo "Signing certificate SHA-256: ${fingerprint}"
-      - name: Publish signed prerelease (not an Actions artifact)
+          badging="$("${build_tools}/aapt" dump badging "$apk")"
+          line="$(printf '%s\n' "$badging" | head -n 1)"
+          [[ "$line" == *"name='com.elementeracoast.source'"* ]]
+          [[ "$line" == *"versionCode='8'"* ]]
+          [[ "$line" == *"versionName='0.2.6-source'"* ]]
+          "${build_tools}/apksigner" verify --verbose --print-certs "$apk" > "${RUNNER_TEMP}/source-visitor-apk-certs.txt"
+          fingerprint="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "${RUNNER_TEMP}/source-visitor-apk-certs.txt" | head -n 1)"
+          : "${fingerprint:?Missing source certificate fingerprint}"
+          echo "fingerprint=$fingerprint" >> "${GITHUB_OUTPUT}"
+          mkdir -p source-release
+          cp "$apk" source-release/elementera-coast-source-v0.2.6-visitor-qa.apk
+          (cd source-release && sha256sum elementera-coast-source-v0.2.6-visitor-qa.apk > SHA256SUMS.txt)
+          unzip -t source-release/elementera-coast-source-v0.2.6-visitor-qa.apk >/dev/null
+
+      - name: Publish visitor APK directly to Releases
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
           set -euo pipefail
-          tag="source-v0.2.6-${{ github.event.workflow_run.head_sha || github.sha }}"
-          gh release create "${tag}" \
-            source-release/elementera-coast-source-v0.2.6-visitor.apk \
+          tag="source-visitor-v0.2.6-${{ github.event.workflow_run.head_sha || github.sha }}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release already exists: $tag" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh release create "$tag" \
+            source-release/elementera-coast-source-v0.2.6-visitor-qa.apk \
             source-release/SHA256SUMS.txt \
-            --repo "${GITHUB_REPOSITORY}" --target "${{ github.event.workflow_run.head_sha || github.sha }}" \
-            --title "Elementera Coast Source Native 0.2.6-source" --prerelease \
-            --notes "Source-only stable-signed Android visitor APK (versionCode 8). Public local tour passcode 123456, no backend authentication, no remote API requests while touring. Pages remain intact; cloud-dependent operations are not available in tour mode. Signing cert SHA-256: ${{ steps.apk_verify.outputs.fingerprint }}. Full-file SHA-256 in SHA256SUMS.txt. To install over an older QA/debug source APK, signatures must match; otherwise uninstall only com.elementeracoast.source. Not the private production app."
-          asset_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/elementera-coast-source-v0.2.6-visitor.apk"
-          echo "### Source Native APK published" >> "${GITHUB_STEP_SUMMARY}"
-          echo "Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}" >> "${GITHUB_STEP_SUMMARY}"
-          echo "Direct APK: ${asset_url}" >> "${GITHUB_STEP_SUMMARY}"
-          echo "SHA-256: $(cut -d' ' -f1 source-release/SHA256SUMS.txt)" >> "${GITHUB_STEP_SUMMARY}"
-          echo "Signing certificate SHA-256: ${{ steps.apk_verify.outputs.fingerprint }}" >> "${GITHUB_STEP_SUMMARY}"
-          echo "Source-only package, independent demo backend; installation and UI still require real-device acceptance." >> "${GITHUB_STEP_SUMMARY}"
+            --repo "$GITHUB_REPOSITORY" \
+            --target "${{ github.event.workflow_run.head_sha || github.sha }}" \
+            --title "Elementera Coast Source Native 0.2.6 · Visitor QA" \
+            --prerelease \
+            --notes "Public visitor-only Source Native APK, password 123456. Original Native pages and appearance are retained; remote operations are blocked while visiting. Built against a non-routable .invalid API host; no real account, production backend or model budget is included. QA uses a NEW disposable signing certificate for each build, so it cannot upgrade prior Source APKs with different signing keys. If necessary uninstall ONLY com.elementeracoast.source before installing. Source code and private production app are separate. This is a QA prerelease, not a stable-signed app."
+          echo "### Source visitor APK published" >> "$GITHUB_STEP_SUMMARY"
+          echo "Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"
+          echo "APK: https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/elementera-coast-source-v0.2.6-visitor-qa.apk" >> "$GITHUB_STEP_SUMMARY"
+          echo "SHA256: $(cut -d' ' -f1 source-release/SHA256SUMS.txt)" >> "$GITHUB_STEP_SUMMARY"
+          echo "QA signing cert SHA256: ${{ steps.signing.outputs.fingerprint }}" >> "$GITHUB_STEP_SUMMARY"
