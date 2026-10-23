@@ -658,6 +658,24 @@ assert.equal(manualClearData.soil.do_not_repeat, '');
 assert.deepEqual(manualClearData.soil.pocket_candidates, []);
 assert.equal(manualClearData.soil.manual_locked, true, 'an explicit manual clear must still clear and lock the soil');
 
+const partialToggleResponse = await routeMemoryApi(new Request(`https://coast.test/api/memory/soil?conversation_id=${conversationD.id}`, {
+  method: 'PUT',
+  headers: { Origin: 'https://coast.test', 'Content-Type': 'application/json' },
+  body: JSON.stringify({ auto_refresh_enabled: false }),
+}), { COAST_CHAT_DB: db, OPENROUTER_API_KEY: 'test-key' });
+const partialToggleData = await partialToggleResponse.json();
+assert.equal(partialToggleResponse.status, 200);
+assert.equal(partialToggleData.soil.auto_refresh_enabled, false);
+assert.equal(partialToggleData.soil.manual_locked, true, 'partial toggle must preserve the existing manual lock');
+const partialReenableResponse = await routeMemoryApi(new Request(`https://coast.test/api/memory/soil?conversation_id=${conversationD.id}`, {
+  method: 'PUT',
+  headers: { Origin: 'https://coast.test', 'Content-Type': 'application/json' },
+  body: JSON.stringify({ auto_refresh_enabled: true }),
+}), { COAST_CHAT_DB: db, OPENROUTER_API_KEY: 'test-key' });
+const partialReenableData = await partialReenableResponse.json();
+assert.equal(partialReenableData.soil.auto_refresh_enabled, true);
+assert.equal(partialReenableData.soil.manual_locked, true, 're-enable must not silently unlock hand-edited soil');
+
 await writeConversationState(db, conversationC.id, {
   version: 4,
   turns: [
