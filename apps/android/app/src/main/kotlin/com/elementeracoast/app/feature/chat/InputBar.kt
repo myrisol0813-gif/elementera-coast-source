@@ -24,9 +24,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.InsertDriveFile
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -42,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import com.elementeracoast.app.core.model.ChatAttachment
@@ -59,7 +61,10 @@ fun CoastComposer(
     attachmentUploading: Boolean,
     previewSource: AttachmentPreviewRemoteDataSource,
     isStreaming: Boolean,
+    isFinalizing: Boolean = false,
     enabled: Boolean = true,
+    drawerOpen: Boolean = false,
+    onToggleDrawer: (() -> Unit)? = null,
     onPickImage: () -> Unit,
     onPickFile: () -> Unit,
     onRemoveAttachment: (String) -> Unit,
@@ -72,7 +77,8 @@ fun CoastComposer(
     val canSend = enabled &&
         (value.trim().isNotEmpty() || pendingAttachments.isNotEmpty()) &&
         !attachmentUploading &&
-        !isStreaming
+        !isStreaming &&
+        !isFinalizing
     val plusGlyphColor = snowLetterComposerGlyphColor(MaterialTheme.colorScheme.onSurface)
 
     Column(
@@ -174,7 +180,7 @@ fun CoastComposer(
                     ) {
                         if (value.isEmpty()) {
                             Text(
-                                if (enabled) "询问任何问题" else "正在准备聊天…",
+                                if (enabled) "把话放进这片海岸" else "正在把灯点亮…",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .8f),
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     fontSize = CoastChatTokens.ComposerTextSize,
@@ -197,17 +203,18 @@ fun CoastComposer(
                         )
                     }
                     if (value.isBlank() && pendingAttachments.isEmpty()) {
+                        val toggleDrawer = onToggleDrawer
                         Box(
                             modifier = Modifier
                                 .size(CoastChatTokens.ComposerMicTouch)
-                                .clickable(enabled = enabled && !isStreaming) {
-                                    onPlaceholder("语音输入不在 V1 范围内。")
+                                .clickable(enabled = enabled && !isStreaming && toggleDrawer != null) {
+                                    toggleDrawer?.invoke()
                                 },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                Icons.Default.Mic,
-                                contentDescription = "语音输入",
+                                imageVector = if (drawerOpen) Icons.Default.ExpandMore else Icons.Default.ExpandLess,
+                                contentDescription = if (drawerOpen) "收起狗话与本轮抽屉" else "展开狗话与本轮抽屉",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .78f),
                                 modifier = Modifier.size(CoastChatTokens.ComposerMicGlyph)
                             )
@@ -225,7 +232,8 @@ fun CoastComposer(
             RoundComposerButton(
                 background = actionBackground,
                 foreground = actionForeground,
-                enabled = (enabled && !attachmentUploading) || isStreaming,
+                alpha = if (isFinalizing) .45f else 1f,
+                enabled = !isFinalizing && ((enabled && !attachmentUploading) || isStreaming),
                 onClick = {
                     when {
                         isStreaming -> onStop()
@@ -272,12 +280,14 @@ private fun RoundComposerButton(
     background: Color,
     foreground: Color,
     enabled: Boolean = true,
+    alpha: Float = 1f,
     onClick: () -> Unit,
     content: @Composable () -> Unit
 ) {
     Box(
         modifier = Modifier
             .size(CoastChatTokens.ComposerTouchTarget)
+            .alpha(alpha)
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
