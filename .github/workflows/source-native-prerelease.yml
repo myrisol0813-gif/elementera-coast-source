@@ -32,15 +32,37 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
+      - name: Skip packaging when this Source APK version is already published
+        id: version_gate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)".*/\1/p' app/build.gradle.kts | sed -n '1p')"
+          : "${version:?Source Android versionName is missing}"
+          [[ "$version" == *-source ]] || { echo "Unexpected Source version: $version" >&2; exit 1; }
+          release_prefix="source-visitor-v${version%-source}-"
+          tags="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName')"
+          if [[ "$tags" == *"$release_prefix"* ]]; then
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+            echo "Existing ${version} visitor APK kept; workflow-only edits will not publish another copy." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'skip=false' >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-java@v4
+        if: steps.version_gate.outputs.skip != 'true'
         with:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
+        if: steps.version_gate.outputs.skip != 'true'
         with:
           gradle-version: '8.9'
 
       - name: Verify visitor-only source build identity
+        if: steps.version_gate.outputs.skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -51,6 +73,7 @@ jobs:
           ! grep -Eiq 'app[.]elementeracoast[.]com' app/build.gradle.kts
 
       - name: Build visitor APK and run unit tests
+        if: steps.version_gate.outputs.skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -60,6 +83,7 @@ jobs:
           test -s app/build/outputs/apk/debug/app-debug.apk
 
       - name: Sign with a disposable Source-only QA certificate
+        if: steps.version_gate.outputs.skip != 'true'
         id: signing
         shell: bash
         run: |
@@ -84,6 +108,7 @@ jobs:
           unzip -t source-release/elementera-coast-source-v0.2.6-visitor-qa.apk >/dev/null
 
       - name: Publish visitor APK directly to Releases
+        if: steps.version_gate.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -100,8 +125,8 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "${{ github.event.workflow_run.head_sha || github.sha }}" \
             --title "Elementera Coast Source Native 0.2.6 · Visitor QA" \
-            --prerelease \
-            --notes "Public visitor-only Source Native APK, password 123456. Original Native pages and appearance are retained; remote operations are blocked while visiting. Built against a non-routable .invalid API host; no real account, production backend or model budget is included. QA uses a NEW disposable signing certificate for each build, so it cannot upgrade prior Source APKs with different signing keys. If necessary uninstall ONLY com.elementeracoast.source before installing. Source code and private production app are separate. This is a QA prerelease, not a stable-signed app."
+            --latest \
+            --notes "Public visitor-only Source Native APK, password 123456. Original Native pages and appearance are retained; remote operations are blocked while visiting. Built against a non-routable .invalid API host; no real account, production backend or model budget is included. QA uses a NEW disposable signing certificate for each build, so it cannot upgrade prior Source APKs with different signing keys. If necessary uninstall ONLY com.elementeracoast.source before installing. Source code and private production app are separate. This is the latest public visitor build, QA-signed with a disposable certificate, not a stable-signed production app."
           echo "### Source visitor APK published" >> "$GITHUB_STEP_SUMMARY"
           echo "Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"
           echo "APK: https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/elementera-coast-source-v0.2.6-visitor-qa.apk" >> "$GITHUB_STEP_SUMMARY"
