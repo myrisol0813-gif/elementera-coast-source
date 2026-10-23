@@ -22,6 +22,8 @@ data class RemoteModelUsage(
     @SerialName("completion_tokens") val completionTokens: Long? = null,
     @SerialName("reasoning_tokens") val reasoningTokens: Long? = null,
     @SerialName("cached_tokens") val cachedTokens: Long? = null,
+    @SerialName("cache_write_tokens") val cacheWriteTokens: Long? = null,
+    @SerialName("cache_discount") val cacheDiscount: Double? = null,
     @SerialName("total_tokens") val totalTokens: Long? = null,
     val cost: Double? = null
 )
