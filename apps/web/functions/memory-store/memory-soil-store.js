@@ -64,7 +64,7 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
     do_not_repeat: has('do_not_repeat') ? clip(value.do_not_repeat, MAX_SOIL_TEXT) : current.do_not_repeat,
     pocket_candidates: has('pocket_candidates') ? normalizePocketCandidates(value.pocket_candidates) : current.pocket_candidates,
     organized_through_turn_id: has('organized_through_turn_id') ? clip(value.organized_through_turn_id, 180) : current.organized_through_turn_id,
-    manual_locked: has('manual_locked') ? bool(value.manual_locked) : !automatic,
+    manual_locked: has('manual_locked') ? bool(value.manual_locked) : current.manual_locked,
     auto_refresh_enabled: has('auto_refresh_enabled') ? bool(value.auto_refresh_enabled) : current.auto_refresh_enabled,
   };
   const identity = provenance.identity
