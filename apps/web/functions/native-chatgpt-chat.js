@@ -24,7 +24,7 @@ function parsedMessages(value) {
 }
 function assertConversationTurn(history, turnId) {
   const target = history.turns?.find(t => t.id === turnId);
-  if (!target) throw new ChatStoreError('turn_not_found', '本轮消息不存在，不能递给官端 GPT。', 409);
+  if (!target) throw new ChatStoreError('turn_not_found', '本轮消息不存在，不能递给 ChatGPT 套餐模型。', 409);
   const variant = target.user?.variants?.[target.user.active || 0];
   if (!variant || variant.hidden) throw new ChatStoreError('turn_not_found', '本轮用户消息已被删除。', 409);
 }
@@ -53,7 +53,7 @@ function asNativeTools(tools) {
 }
 function acceptedModel(value) {
   const model = String(value.model || '').trim().slice(0, 128);
-  if (!/^[a-z0-9][a-z0-9._-]{1,127}$/i.test(model)) throw new ChatStoreError('invalid_model', '官端 GPT 型号格式无效。', 400);
+  if (!/^[a-z0-9][a-z0-9._-]{1,127}$/i.test(model)) throw new ChatStoreError('invalid_model', 'ChatGPT 套餐模型名称格式无效。', 400);
   return model;
 }
 async function contextFromRequest(env, value, { preview = false } = {}) {
@@ -156,7 +156,7 @@ export async function saveNativeChatGptEcho(request, env) {
   const snapshot=value.snapshot;
   const metadata=snapshot?.metadata;
   if(!metadata||metadata.provider!=='chatgpt_plan'||snapshot.sanitized!==true) {
-    throw new ChatStoreError('invalid_metadata','官端模型回波格式无效。',400);
+    throw new ChatStoreError('invalid_metadata','ChatGPT 模型回波格式无效。',400);
   }
   const safeSnapshot={
     status:'saved',sanitized:true,
