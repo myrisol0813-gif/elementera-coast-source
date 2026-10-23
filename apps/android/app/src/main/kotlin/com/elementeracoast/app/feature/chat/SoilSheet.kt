@@ -27,6 +27,7 @@ import com.elementeracoast.app.ui.theme.snowLetterSheetContainerColor
 @Composable
 internal fun SoilBottomSheet(
     soil: ThoughtSoilSnapshot,
+    onSetEnabled: (Boolean) -> Unit,
     onOpenPendingBag: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -44,10 +45,30 @@ internal fun SoilBottomSheet(
             Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
                 Text("整理当前对话的纸条", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                 Text(
-                    if (soil.manualLocked) "当前窗口 · 手动内容已锁定" else "当前窗口 · 滚动工作上下文",
+                    when {
+                        !soil.autoRefreshEnabled -> "当前窗口 · 已关闭，不整理也不递入上下文"
+                        soil.manualLocked -> "当前窗口 · 手动内容已锁定，仍递入上下文"
+                        else -> "当前窗口 · 滚动工作上下文"
+                    },
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall
                 )
+            }
+
+            SoilCard(
+                title = if (soil.autoRefreshEnabled) "当前对话纸条已开启" else "当前对话纸条已关闭",
+                meta = if (soil.autoRefreshEnabled) "自动整理 · 注入上下文" else "停止整理 · 不注入上下文"
+            ) {
+                Text(
+                    if (soil.autoRefreshEnabled)
+                        if (soil.manualLocked) "当前内容由屋主手动锁定，不会自动覆盖；仍会递给模型。" else "每轮回复后会自动整理，并递入下一轮模型上下文。"
+                    else "旧内容会原样保留；关闭期间不会继续整理，也不会递给模型。",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                TextButton(onClick = { onSetEnabled(!soil.autoRefreshEnabled) }) {
+                    Text(if (soil.autoRefreshEnabled) "关闭当前对话纸条" else "开启当前对话纸条")
+                }
             }
 
             SoilCard(
