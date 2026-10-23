@@ -14,6 +14,9 @@ val sourceKeyPassword = providers.environmentVariable("COAST_SOURCE_KEY_PASSWORD
 val sourceSigningConfigured = listOf(sourceSigningPath, sourceStorePassword, sourceKeyAlias, sourceKeyPassword).all { it.isPresent }
 val sourcePreviewPasswordHint = providers.gradleProperty("SOURCE_PREVIEW_PASSWORD_HINT")
     .orElse("")
+val sourceTourEnabled = providers.gradleProperty("SOURCE_TOUR_ENABLED")
+    .orElse("true")
+    .map { it.equals("true", ignoreCase = true) }
 
 android {
     namespace = "com.elementeracoast.app"
@@ -23,10 +26,11 @@ android {
         applicationId = "com.elementeracoast.source"
         minSdk = 26
         targetSdk = 34
-        versionCode = 7
-        versionName = "0.2.5-source"
+        versionCode = 8
+        versionName = "0.2.6-source"
         buildConfigField("String", "COAST_API_BASE_URL", "\"${sourceApiBaseUrl.get()}\"")
         buildConfigField("String", "SOURCE_PREVIEW_PASSWORD_HINT", "\"${sourcePreviewPasswordHint.get()}\"")
+        buildConfigField("boolean", "SOURCE_TOUR_ENABLED", sourceTourEnabled.get().toString())
     }
 
     signingConfigs {
