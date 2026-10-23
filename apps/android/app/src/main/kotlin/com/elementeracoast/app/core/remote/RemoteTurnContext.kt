@@ -310,6 +310,19 @@ data class RemoteSoilOrganizeResponse(
 )
 
 @Serializable
+data class RemotePlanSoilPrepareResponse(
+    val ok: Boolean = false,
+    val skipped: Boolean = false,
+    val reason: String = "",
+    val prompt: String = "",
+    val model: String = "",
+    @SerialName("expected_turn_id") val expectedTurnId: String = "",
+    @SerialName("expected_assistant_id") val expectedAssistantId: String = "",
+    @SerialName("expected_soil_revision") val expectedSoilRevision: Int = 0,
+    @SerialName("max_result_chars") val maxResultChars: Int = 10000
+)
+
+@Serializable
 data class RemoteThoughtSoil(
     @SerialName("conversation_id") val conversationId: String = "",
     @SerialName("current_text") val currentText: String = "",
