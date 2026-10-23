@@ -80,8 +80,8 @@ internal class NativeChatGptTurnRepository(
                 is NativeChatEvent.Tool -> {
                     ToolActivityBus.publish(
                         id = event.id,
-                        text = if (event.ok) "官端 GPT 工具完成 · " + event.name
-                            else "官端 GPT 工具失败 · " + event.name,
+                        text = if (event.ok) "ChatGPT 工具完成 · " + event.name
+                            else "ChatGPT 工具失败 · " + event.name,
                         success = event.ok
                     )
                 }
@@ -142,7 +142,7 @@ internal class NativeChatGptTurnRepository(
         }
         if (!completed) throw CoastApiException(
             CoastApiErrorKind.Stream, "chatgpt_plan_stream_incomplete",
-            "官端 GPT 回复流提前结束，没有写入假成功消息。"
+            "ChatGPT 回复流提前结束，没有写入假成功消息。"
         )
     }
 }
