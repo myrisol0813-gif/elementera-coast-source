@@ -1,6 +1,8 @@
 package com.elementeracoast.app
 
 import android.os.Bundle
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.LaunchedEffect
@@ -26,6 +28,7 @@ class MainActivity : ComponentActivity() {
             val devHands = remember(applicationContext) { DevHandsProvider.production(applicationContext) }
             val state by vm.state.collectAsState()
             val crossWindow by vm.crossWindow.collectAsState()
+            val chatGpt by vm.chatGptState.collectAsState()
             val wolf by vm.local.wolf.state.collectAsState()
             var mailboxOpen by rememberSaveable { mutableStateOf(false) }
             LaunchedEffect(wolf.appearance) { vm.syncAppearance() }
@@ -57,6 +60,7 @@ class MainActivity : ComponentActivity() {
                 } else {
                     MainShell(
                         state = state,
+                        chatGpt = chatGpt,
                         services = vm.local,
                         daily = vm.daily,
                         memory = vm.memory,
@@ -92,6 +96,14 @@ class MainActivity : ComponentActivity() {
                         onDismissModels = vm::dismissModelPicker,
                         onSelectModel = vm::selectModel,
                         onRefreshModels = vm::refreshModels,
+                        onChatGptConnect = {
+                            vm.connectChatGpt { url ->
+                                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                            }
+                        },
+                        onChatGptDisconnect = vm::disconnectChatGpt,
+                        onChatGptRefresh = vm::refreshChatGptModels,
+                        onChatGptProbe = vm::probeChatGpt,
                         onLogout = vm::logout,
                         onPlaceholder = vm::showPlaceholder,
                         onSnackbarShown = vm::clearSnackbar
