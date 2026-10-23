@@ -12,6 +12,8 @@ internal fun MessageItem(
     message: ChatMessage,
     isStreamingTail: Boolean,
     avatarBitmap: ImageBitmap?,
+    metadataMessageId: String?,
+    metadataSource: ModelMetadataRemoteDataSource,
     attachmentPreviewSource: AttachmentPreviewRemoteDataSource,
     onAvatarClick: () -> Unit,
     onCopy: (ChatMessage) -> Unit,
@@ -32,7 +34,10 @@ internal fun MessageItem(
             onAction = onAction
         )
         MessageRole.Assistant -> AssistantMessage(
+            conversationId = conversationId,
             message = message,
+            metadataMessageId = metadataMessageId,
+            metadataSource = metadataSource,
             isStreamingTail = isStreamingTail,
             avatarBitmap = avatarBitmap,
             onAvatarClick = onAvatarClick,
