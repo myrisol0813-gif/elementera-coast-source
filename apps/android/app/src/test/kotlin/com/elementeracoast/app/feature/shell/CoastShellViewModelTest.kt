@@ -434,6 +434,7 @@ class CoastShellViewModelTest {
         override suspend fun refreshInstructions() = Unit
         override suspend fun refreshGlobalExcerpt() = Unit
         override suspend fun setGlobalExcerptWriteEnabled(enabled: Boolean) = Unit
+        override suspend fun clearGlobalExcerpt(expectedRevision: Int) = Unit
         override suspend fun confirmGlobalExcerptCandidate(id: String, editedBody: String?) = Unit
         override suspend fun discardGlobalExcerptCandidate(id: String) = Unit
         override suspend fun saveEntry(entry: MemoryEntry): MemoryEntry = unsupported()
