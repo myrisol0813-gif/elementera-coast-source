@@ -11,6 +11,9 @@ import com.elementeracoast.app.core.network.CoastHttpClient
 import com.elementeracoast.app.core.remote.RemoteCacheStore
 import com.elementeracoast.app.feature.chat.ChatRepository
 import com.elementeracoast.app.feature.chat.DefaultChatRepository
+import com.elementeracoast.app.feature.chat.ReasoningEffortStore
+import com.elementeracoast.app.feature.chat.NativeChatGptTurnRepository
+import com.elementeracoast.app.feature.chatgpt.ChatGptPlanRepository
 import com.elementeracoast.app.feature.chat.ModelMetadataRemoteDataSource
 import com.elementeracoast.app.feature.daily.DailyRepository
 import com.elementeracoast.app.feature.daily.DefaultDailyRepository
@@ -36,10 +39,14 @@ data class CoastBackendGraph(
     val memory: MemoryRepository,
     val dogtalk: DogtalkRepository,
     val crossWindow: CrossWindowRepository,
-    val archive: GlobalArchiveRepository
+    val archive: GlobalArchiveRepository,
+    val officialChat: ChatRepository? = null
 ) {
     companion object {
-        fun production(context: Context, persistence: LocalPersistence): CoastBackendGraph {
+        fun production(
+            context: Context, persistence: LocalPersistence,
+            chatGptPlan: ChatGptPlanRepository? = null
+        ): CoastBackendGraph {
             val authStore = AndroidKeystoreAuthStore(context.applicationContext)
             val config = CoastApiConfig.production()
             val http = CoastHttpClient(config, authStore).client
@@ -48,17 +55,20 @@ data class CoastBackendGraph(
             val memoryRemote = MemoryRemoteDataSource(config, http)
             val metadataRemote = ModelMetadataRemoteDataSource(config, http)
             val titleRemote = ConversationTitleRemoteDataSource(config, http)
+            val reasoning = ReasoningEffortStore.production(context)
+            val chatRepository = DefaultChatRepository(api, cache, metadataRemote, reasoningStore = reasoning)
             return CoastBackendGraph(
                 auth = DefaultAuthRepository(authStore, api),
                 conversations = DefaultConversationRepository(api, cache, titleRemote),
                 profile = DefaultProfileRepository(api, cache),
-                chat = DefaultChatRepository(api, cache, metadataRemote),
-                thoughtSoil = DefaultThoughtSoilRepository(api),
+                chat = chatRepository,
+                thoughtSoil = DefaultThoughtSoilRepository(api, chatGptPlan),
                 daily = DefaultDailyRepository(api, cache),
                 memory = DefaultMemoryRepository(memoryRemote, cache),
                 dogtalk = DefaultDogtalkRepository(config, http),
                 crossWindow = DefaultCrossWindowRepository(config, http),
-                archive = DefaultGlobalArchiveRepository(api)
+                archive = DefaultGlobalArchiveRepository(api),
+                officialChat = chatGptPlan?.let { NativeChatGptTurnRepository(api, chatRepository, it, reasoning) }
             )
         }
     }
