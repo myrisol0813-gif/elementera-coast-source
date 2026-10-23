@@ -2,6 +2,8 @@ package com.elementeracoast.app.feature.chat
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -101,13 +103,86 @@ internal fun MessageAttachmentList(
         horizontalAlignment = Alignment.End
     ) {
         attachments.forEach { attachment ->
-            AttachmentCard(
-                conversationId = conversationId,
-                attachment = attachment,
-                previewSource = previewSource
+            if (attachment.type == "image") {
+                InlineMessageImage(conversationId, attachment, previewSource)
+            } else {
+                AttachmentCard(
+                    conversationId = conversationId,
+                    attachment = attachment,
+                    previewSource = previewSource
+                )
+            }
+        }
+    }
+}
+
+/** Full-size image message; unlike pending uploads, sent images are not file cards. */
+@Composable
+private fun InlineMessageImage(
+    conversationId: String,
+    attachment: ChatAttachment,
+    previewSource: AttachmentPreviewRemoteDataSource
+) {
+    val state = attachmentPreview(conversationId, attachment, previewSource)
+    val preview = state?.getOrNull()
+    if (preview != null) {
+        val aspect = (preview.width.toFloat() / preview.height.coerceAtLeast(1))
+            .coerceIn(0.65f, 2.6f)
+        Image(
+            bitmap = preview,
+            contentDescription = attachment.name,
+            modifier = Modifier
+                .width(238.dp)
+                .aspectRatio(aspect)
+                .clip(RoundedCornerShape(18.dp)),
+            contentScale = ContentScale.Fit
+        )
+    } else {
+        SnowLetterSurface(
+            role = SnowLetterSurfaceRole.StatusCard,
+            fallbackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .54f),
+            fallbackShape = RoundedCornerShape(17.dp)
+        ) {
+            Text(
+                if (state == null) "正在载入图片…" else "图片暂时无法预览 · ${attachment.name}",
+                modifier = Modifier.padding(14.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
+}
+
+/** Decode large camera photos at display resolution; keep saved original untouched. */
+@Composable
+private fun attachmentPreview(
+    conversationId: String,
+    attachment: ChatAttachment,
+    previewSource: AttachmentPreviewRemoteDataSource
+): Result<ImageBitmap>? {
+    val preview by produceState<Result<ImageBitmap>?>(
+        initialValue = null,
+        conversationId,
+        attachment.id,
+        attachment.type
+    ) {
+        value = if (attachment.type == "image" && conversationId.isNotBlank()) {
+            runCatching {
+                val bytes = previewSource.get(conversationId, attachment.id)
+                withContext(Dispatchers.Default) {
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                    var sample = 1
+                    while (bounds.outWidth / sample > 1600 || bounds.outHeight / sample > 1600) sample *= 2
+                    BitmapFactory.decodeByteArray(
+                        bytes, 0, bytes.size,
+                        BitmapFactory.Options().apply { inSampleSize = sample }
+                    )?.asImageBitmap() ?: error("image_decode_failed")
+                }
+            }
+        } else null
+    }
+    return preview
 }
 
 @Composable
@@ -118,21 +193,7 @@ private fun AttachmentCard(
     removable: Boolean = false,
     onRemove: () -> Unit = {}
 ) {
-    val preview by produceState<ImageBitmap?>(
-        initialValue = null,
-        conversationId,
-        attachment.id,
-        attachment.type
-    ) {
-        value = if (attachment.type == "image" && conversationId.isNotBlank()) {
-            runCatching {
-                val bytes = previewSource.get(conversationId, attachment.id)
-                withContext(Dispatchers.Default) {
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-                }
-            }.getOrNull()
-        } else null
-    }
+    val preview = attachmentPreview(conversationId, attachment, previewSource)?.getOrNull()
 
     SnowLetterSurface(
         role = SnowLetterSurfaceRole.StatusCard,
