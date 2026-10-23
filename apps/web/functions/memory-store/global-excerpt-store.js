@@ -57,6 +57,23 @@ export async function readGlobalExcerpt(db) {
   return excerptFromRow(await first(db, 'SELECT * FROM global_excerpt WHERE id = ?', [GLOBAL_EXCERPT_ID]));
 }
 
+export async function clearGlobalExcerpt(db, expectedRevision) {
+  await ensureSchema(db);
+  const current = await readGlobalExcerpt(db);
+  if (!Number.isSafeInteger(expectedRevision) || expectedRevision !== current.revision) {
+    throw new MemoryStoreError('global_excerpt_revision_conflict', '全局摘录已经更新，请刷新后重新确认。', 409);
+  }
+  if (!current.body) return current;
+  const now = Date.now();
+  const nextRevision = current.revision + 1;
+  await db.batch([
+    db.prepare('UPDATE global_excerpt SET body = ?, revision = ?, updated_at = ? WHERE id = ? AND revision = ?')
+      .bind('', nextRevision, now, GLOBAL_EXCERPT_ID, expectedRevision),
+    db.prepare('INSERT INTO global_excerpt_revisions (id, revision, before_body, after_body, model_reason, confirmation_mode, operator, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), nextRevision, current.body, '', '用户主动清空正式正文', 'clear', 'user', now),
+  ]);
+  return readGlobalExcerpt(db);
+}
 export async function setGlobalExcerptWriteEnabled(db, enabled) {
   await ensureSchema(db);
   await run(db, 'UPDATE global_excerpt SET write_enabled = ?, updated_at = ? WHERE id = ?',
