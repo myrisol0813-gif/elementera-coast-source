@@ -275,7 +275,9 @@ class CoastApiClient(
         jsonRequest(Request.Builder().url(config.url("/api/memory/soil?conversation_id=${encodeQuery(conversationId)}")).get().build(), RemoteThoughtSoilResponse.serializer()).soil
 
     suspend fun setThoughtSoilEnabled(conversationId: String, enabled: Boolean): RemoteThoughtSoil {
-        val payload = kotlinx.serialization.json.buildJsonObject { put("auto_refresh_enabled", enabled) }.toString()
+        val payload = kotlinx.serialization.json.buildJsonObject {
+            put("auto_refresh_enabled", kotlinx.serialization.json.JsonPrimitive(enabled))
+        }.toString()
         return jsonRequest(
             Request.Builder().url(config.url("/api/memory/soil?conversation_id=${encodeQuery(conversationId)}"))
                 .put(jsonBody(payload)).build(),
