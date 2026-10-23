@@ -142,8 +142,6 @@ class CoastShellViewModel(
         stopGeneration()
         resetCrossWindow()
         historyJob?.cancel()
-        soilJobs.values.forEach(Job::cancel)
-        soilJobs.clear()
         if (SourceVisitGate.isActive) {
             SourceVisitGate.leave()
             _state.update {
@@ -315,11 +313,11 @@ class CoastShellViewModel(
                     it.copy(
                         currentModel = model,
                         showModelPicker = false,
-                        snackbarMessage = "已切换官端 GPT；它使用 ChatGPT 套餐，不走后端模型额度。"
+                        snackbarMessage = "已切换 ChatGPT 套餐模型；推理额度由本机已授权账户提供。"
                     )
                 }
             } else {
-                _state.update { it.copy(snackbarMessage = "请先刷新官端 GPT 目录，确认该模型可用。") }
+                _state.update { it.copy(snackbarMessage = "请先刷新 ChatGPT 模型目录，确认该模型可用。") }
             }
             return
         }
@@ -366,7 +364,7 @@ class CoastShellViewModel(
                     it.copy(
                         availableModels = models,
                         message = if (models.isEmpty()) "授权成功，但本账户暂时没有返回可显示模型。"
-                        else "已读到 " + models.size + " 个账户可用模型，可以点测试回复。"
+                        else "已读取 ${models.size} 个账户可用模型。"
                     )
                 }
             } catch (error: Exception) {
@@ -391,7 +389,9 @@ class CoastShellViewModel(
             _chatGptState.update { it.copy(busy = true, message = "") }
             try {
                 val models = client.models()
-                _chatGptState.update { it.copy(availableModels = models, message = "模型目录刷新完成：" + models.size + " 项。") }
+                _chatGptState.update {
+                    it.copy(availableModels = models, message = "模型目录刷新完成：${models.size} 项。")
+                }
             } catch (error: Exception) {
                 _chatGptState.update { it.copy(message = safeChatGptError(error)) }
             } finally {
@@ -408,7 +408,7 @@ class CoastShellViewModel(
             _chatGptState.update { it.copy(busy = true, probe = null, message = "正在验证真实模型回复。") }
             try {
                 val probe = client.probe(model)
-                _chatGptState.update { it.copy(probe = probe, message = "这是一条独立的本机模型测试，未写进聊天历史。") }
+                _chatGptState.update { it.copy(probe = probe, message = "独立本机测试已完成；未写入聊天历史。") }
             } catch (error: Exception) {
                 _chatGptState.update { it.copy(message = safeChatGptError(error)) }
             } finally {
@@ -689,6 +689,7 @@ class CoastShellViewModel(
         _state.update {
             it.copy(
                 isStreaming = false,
+                isFinalizing = false,
                 streamingMessageId = null,
                 streamingVariantIndex = null
             )
@@ -809,7 +810,7 @@ class CoastShellViewModel(
         val model_partner = profile?.assistantAvatarDataUrl.orEmpty().ifBlank { daily.modelPartnerAvatarDataUrl }
         _state.update {
             it.copy(
-                currentModel = current.ifBlank { it.currentModel },
+                currentModel = if (isChatGptPlanModel(it.currentModel)) it.currentModel else current.ifBlank { it.currentModel },
                 modelPartnerAvatarDataUrl = model_partner,
                 ownerAvatarDataUrl = daily.ownerAvatarDataUrl,
                 coverDataUrl = daily.momentCoverDataUrl
@@ -827,7 +828,8 @@ class CoastShellViewModel(
         val current = _state.value.currentModel
         _state.update {
             it.copy(
-                models = if (current.isNotBlank() && current !in models) listOf(current) + models else models,
+                models = if (current.isNotBlank() && !isChatGptPlanModel(current) && current !in models) listOf(current) + models else models,
+                modelReasoningChoices = (catalog.groups.openAiChat + catalog.groups.freeTest).associate { it.id to it.reasoningEfforts },
                 currentModel = current.ifBlank { models.firstOrNull().orEmpty() }
             )
         }
@@ -891,24 +893,24 @@ class CoastShellViewModel(
         }
     }
 
-    private fun organizeThoughtSoilAfterReply(conversationId: String, modelId: String) {
-        val previous = soilJobs[conversationId]
-        val job = viewModelScope.launch(workDispatcher) {
-            previous?.join()
-            try {
-                val soil = backend.thoughtSoil.organizeAfterReply(conversationId, modelId)
-                if (_state.value.activeConversationId == conversationId) {
-                    _state.update { it.copy(thoughtSoil = soil) }
-                }
-            } catch (error: CoastApiException) {
-                if (error.kind == CoastApiErrorKind.Unauthorized) {
-                    handleBackendError(error, "整理当前对话的纸条整理失败", keepAuthenticatedOnNetworkError = true)
-                }
+    private suspend fun organizeThoughtSoilAfterReply(conversationId: String, modelId: String) {
+        try {
+            val soil = backend.thoughtSoil.organizeAfterReply(conversationId, modelId)
+            if (_state.value.activeConversationId == conversationId) {
+                _state.update { it.copy(thoughtSoil = soil) }
             }
-        }
-        soilJobs[conversationId] = job
-        job.invokeOnCompletion {
-            if (soilJobs[conversationId] === job) soilJobs.remove(conversationId)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            if (error is CoastApiException && error.kind == CoastApiErrorKind.Unauthorized) {
+                handleBackendError(error, "当前对话纸条整理失败", keepAuthenticatedOnNetworkError = true)
+            } else {
+                _state.update { it.copy(snackbarMessage =
+                    if (isChatGptPlanModel(modelId))
+                        "ChatGPT 套餐整理失败；原纸条保留，不会调用另一模型供应商。"
+                    else "当前对话纸条整理失败；本轮回复已保存，可以继续聊天。"
+                ) }
+            }
         }
     }
 
@@ -946,6 +948,7 @@ class CoastShellViewModel(
         crossWindowRequest: CrossWindowRequest
     ) {
         var partial = ""
+        var replySaved = false
         val cleared = backend.chat.clearFailure(history, turnId)
         val titleUserText = ChatSyncMapper.contextMessages(cleared, turnId, local.wolf.state.value.basic.recentTurns)
             .lastOrNull { it.role == "user" }
@@ -963,13 +966,19 @@ class CoastShellViewModel(
             )
         }
         try {
-            backend.chat.streamReply(
+            (if (isChatGptPlanModel(modelId)) backend.officialChat
+                ?: throw CoastApiException(
+                    CoastApiErrorKind.Model, "chatgpt_plan_unavailable",
+                    "当前安装包没有可用的 ChatGPT 套餐聊天执行器。"
+                ) else backend.chat).streamReply(
                 conversationId,
                 cleared,
                 turnId,
                 modelId,
                 local.wolf.state.value.basic.recentTurns,
                 local.wolf.state.value.basic.contextBudget,
+                local.wolf.state.value.basic.outputLength,
+                local.wolf.state.value.basic.maxOutputTokens,
                 crossWindowRequest
             ).collect { progress ->
                 when (progress) {
@@ -978,21 +987,25 @@ class CoastShellViewModel(
                         showStreaming(conversationId, cleared, turnId, modelId, partial)
                     }
                     is ChatProgress.Completed -> {
+                        replySaved = true
                         showHistory(conversationId, progress.history)
                         if (_state.value.activeConversationId == conversationId) {
                             _state.update {
                                 it.copy(
                                     backendOffline = false,
-                                    turnDeskReceipt = progress.deskReceipt
+                                    turnDeskReceipt = progress.deskReceipt,
+                                    isStreaming = false,
+                                    isFinalizing = true
                                 )
                             }
                         }
-                        refreshGeneratedTitle(conversationId, titleUserText, partial)
+                        if (!isChatGptPlanModel(progress.modelId)) refreshGeneratedTitle(conversationId, titleUserText, partial)
                         organizeThoughtSoilAfterReply(conversationId, progress.modelId)
                     }
                 }
             }
         } catch (cancelled: CancellationException) {
+            if (replySaved) throw cancelled
             val stopped = backend.chat.cancelledHistory(cleared, turnId, modelId, partial)
             backend.chat.cacheHistory(conversationId, stopped)
             withContext(NonCancellable) {
@@ -1014,6 +1027,7 @@ class CoastShellViewModel(
                 _state.update {
                     it.copy(
                         isStreaming = false,
+                        isFinalizing = false,
                         streamingMessageId = null,
                         streamingVariantIndex = null
                     )
@@ -1225,6 +1239,7 @@ class CoastShellViewModel(
                 turnDeskReceipt = null,
                 showModelPicker = false,
                 isStreaming = false,
+                isFinalizing = false,
                 streamingMessageId = null,
                 streamingVariantIndex = null
             )
@@ -1247,6 +1262,7 @@ class CoastShellViewModel(
                 showModelPicker = false,
                 historyLoading = false,
                 isStreaming = false,
+                isFinalizing = false,
                 streamingMessageId = null,
                 streamingVariantIndex = null
             )
@@ -1279,8 +1295,6 @@ class CoastShellViewModel(
             backend.auth.clearConfirmedInvalidSession()
             generationJob?.cancel()
             historyJob?.cancel()
-            soilJobs.values.forEach(Job::cancel)
-            soilJobs.clear()
             _state.update {
                 it.copy(
                     authenticated = false,
@@ -1331,8 +1345,9 @@ class CoastShellViewModel(
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 val appContext = context.applicationContext
                 val persistence = SharedPreferencesLocalPersistence(appContext)
-                val backend = CoastBackendGraph.production(appContext, persistence)
-                return CoastShellViewModel(persistence, backend) as T
+                val chatGpt = ChatGptPlanRepository(ChatGptSecureStore(appContext))
+                val backend = CoastBackendGraph.production(appContext, persistence, chatGpt)
+                return CoastShellViewModel(persistence, backend, chatGpt = chatGpt) as T
             }
         }
     }
