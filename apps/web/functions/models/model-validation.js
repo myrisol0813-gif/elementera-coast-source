@@ -15,12 +15,39 @@ export function clamp(value, fallback, min, max) {
   return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
 }
 
+function nonnegativeUsageInteger(value) {
+  if (value == null || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? Math.trunc(number) : null;
+}
+
+function validUsageDiscount(value) {
+  if (value == null || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 export function normalizeUsage(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const fields = ['prompt_tokens', 'completion_tokens', 'total_tokens'];
-  const values = fields.map((field) => Number(value[field]));
-  if (!values.every((number) => Number.isFinite(number) && number >= 0)) return null;
-  return Object.fromEntries(fields.map((field, index) => [field, Math.trunc(values[index])]));
+  const values = fields.map((field) => nonnegativeUsageInteger(value[field]));
+  if (values.some((number) => number == null)) return null;
+  const cached = nonnegativeUsageInteger(
+    value.cached_tokens ?? value.prompt_tokens_details?.cached_tokens
+      ?? value.input_tokens_details?.cached_tokens,
+  );
+  const written = nonnegativeUsageInteger(
+    value.cache_write_tokens ?? value.prompt_tokens_details?.cache_write_tokens
+      ?? value.input_tokens_details?.cache_write_tokens
+      ?? value.prompt_tokens_details?.cache_creation_tokens,
+  );
+  const discount = validUsageDiscount(value.cache_discount);
+  return {
+    ...Object.fromEntries(fields.map((field, index) => [field, values[index]])),
+    ...(cached != null ? { cached_tokens: cached } : {}),
+    ...(written != null ? { cache_write_tokens: written } : {}),
+    ...(discount != null ? { cache_discount: discount } : {}),
+  };
 }
 
 const MAX_IMAGE_DATA_URL_CHARS = 12 * 1024 * 1024;
@@ -30,7 +57,7 @@ function validateTextContent(content, maxContent) {
     const tooLong = typeof content === 'string' && content.length > maxContent;
     throw new ModelRequestError(
       tooLong ? 'request_body_too_large' : 'invalid_messages',
-      tooLong ? `单条模型消息超过前端技术保护上限 ${maxContent} 字符，前端没有静默裁剪。` : '消息内容无效。',
+      tooLong ? `单条模型消息超过海岸技术保护上限 ${maxContent} 字符，海岸没有静默裁剪。` : '消息内容无效。',
       tooLong ? 413 : 400,
       tooLong ? { technical_max_message_chars: maxContent, attempted_chars: content.length } : {},
     );
@@ -50,7 +77,7 @@ function validateUserMultimodalContent(content, maxContent) {
       if (textChars > maxContent) {
         throw new ModelRequestError(
           'request_body_too_large',
-          `单条模型消息超过前端技术保护上限 ${maxContent} 字符，前端没有静默裁剪。`,
+          `单条模型消息超过海岸技术保护上限 ${maxContent} 字符，海岸没有静默裁剪。`,
           413,
           { technical_max_message_chars: maxContent, attempted_chars: textChars },
         );
@@ -107,7 +134,8 @@ export function supportsTemperature(modelId, model) {
 
 export function supportsReasoningControl(modelId, model) {
   const parameters = Array.isArray(model?.supported_parameters) ? model.supported_parameters : [];
-  return parameters.includes('reasoning') || /^openai\/(?:o|gpt-5)/i.test(String(modelId || ''));
+  return (Array.isArray(model?.reasoning_efforts) && model.reasoning_efforts.length > 0)
+    || parameters.includes('reasoning') || /^openai\/(?:o|gpt-5)/i.test(String(modelId || ''));
 }
 
 export function supportsResponseFormat(model) {
@@ -198,9 +226,9 @@ export function normalizedProviderError(status, model, preview = '') {
     if (credit) return ['insufficient_credits', `OpenRouter 额度预检未通过：本次最大输出设为 ${credit.requested} tokens，当前余额最多负担 ${credit.affordable}，还差 ${credit.missing} tokens。请在 API 小屋把“最大输出 token”调到 ${credit.affordable} 或更低。`];
     return ['insufficient_credits', 'OpenRouter 余额或 credits 不足。可以在 API 小屋调低“最大输出 token”。'];
   }
-  if (status === 413) return ['request_body_too_large', 'provider 拒绝了过大的请求体；前端没有偷偷缩短跨窗口内容。'];
-  if (contextLimitPreview(lower)) return ['context_length_exceeded', 'provider / 模型拒绝了这次完整上下文；应用没有自动裁剪跨窗口内容。'];
-  if (status === 408 || lower.includes('timed out') || lower.includes('timeout')) return ['provider_timeout', 'provider 在等待完整请求时超时；前端没有自动缩短后重试。'];
+  if (status === 413) return ['request_body_too_large', 'provider 拒绝了过大的请求体；海岸没有偷偷缩短跨窗口内容。'];
+  if (contextLimitPreview(lower)) return ['context_length_exceeded', 'provider / 模型拒绝了这次完整上下文；海岸没有偷偷裁剪跨窗口内容。'];
+  if (status === 408 || lower.includes('timed out') || lower.includes('timeout')) return ['provider_timeout', 'provider 在等待完整请求时超时；海岸没有自动缩短后重试。'];
   if (status === 403 && lower.includes('not available in your region')) return ['region_unavailable', '该模型在当前网络地区不可用。可以切换网络出口，或换用其他模型。'];
   if (status === 403) return ['forbidden', '当前 key 或账户没有权限使用该模型。'];
   if (status === 404) return ['model_not_found', '模型不存在或已下架。'];
@@ -237,9 +265,12 @@ export function addUsage(left, right) {
   const next = normalizeUsage(right);
   if (!current) return next;
   if (!next) return current;
+  const optional = ['cached_tokens', 'cache_write_tokens', 'cache_discount'];
   return {
     prompt_tokens: current.prompt_tokens + next.prompt_tokens,
     completion_tokens: current.completion_tokens + next.completion_tokens,
     total_tokens: current.total_tokens + next.total_tokens,
+    ...Object.fromEntries(optional.filter((field) => current[field] != null || next[field] != null)
+      .map((field) => [field, (current[field] ?? 0) + (next[field] ?? 0)])),
   };
 }
