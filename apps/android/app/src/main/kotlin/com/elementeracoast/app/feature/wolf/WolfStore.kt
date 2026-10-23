@@ -88,6 +88,10 @@ class WolfStore(private val persistence: LocalPersistence) {
         it.copy(appearance = it.appearance.copy(paperMode = value))
     }
 
+    fun setCloudOutlineEnabled(enabled: Boolean) = update {
+        it.copy(appearance = it.appearance.copy(cloudOutlineEnabled = enabled))
+    }
+
     fun updateBasic(transform: (BasicSettings) -> BasicSettings) = update {
         it.copy(basic = transform(it.basic).normalized())
     }
@@ -118,6 +122,7 @@ class WolfStore(private val persistence: LocalPersistence) {
                     if (mode == CoastFontMode.CustomLocal && localFontPath.isBlank()) CoastFontMode.CoastClassic else mode
                 },
                 paperMode = CoastPaperMode.fromStored(persistence.get(KEY_PAPER_MODE)),
+                cloudOutlineEnabled = bool(KEY_CLOUD_OUTLINE_ENABLED, true),
                 readingWeight = CoastReadingWeight.fromStored(persistence.get(KEY_READING_WEIGHT)),
                 messageSurfaceAlpha = float(KEY_MESSAGE_SURFACE_ALPHA, .94f).coerceIn(.55f, 1f),
                 chatBackgroundImageName = persistence.get(KEY_CHAT_BACKGROUND_NAME).take(120),
@@ -150,6 +155,7 @@ class WolfStore(private val persistence: LocalPersistence) {
         persistence.put(KEY_ACCENT, value.appearance.accentHex)
         persistence.put(KEY_FONT_MODE, value.appearance.fontMode.name)
         persistence.put(KEY_PAPER_MODE, value.appearance.paperMode.name)
+        persistence.put(KEY_CLOUD_OUTLINE_ENABLED, value.appearance.cloudOutlineEnabled.toString())
         persistence.put(KEY_READING_WEIGHT, value.appearance.readingWeight.name)
         persistence.put(KEY_MESSAGE_SURFACE_ALPHA, value.appearance.messageSurfaceAlpha.toString())
         persistence.put(KEY_CHAT_BACKGROUND_NAME, value.appearance.chatBackgroundImageName)
@@ -198,6 +204,7 @@ class WolfStore(private val persistence: LocalPersistence) {
         private const val KEY_ACCENT = ROOT + "accent"
         private const val KEY_FONT_MODE = ROOT + "fontMode"
         private const val KEY_PAPER_MODE = ROOT + "paperMode"
+        private const val KEY_CLOUD_OUTLINE_ENABLED = ROOT + "cloudOutlineEnabled"
         private const val KEY_READING_WEIGHT = ROOT + "readingWeight"
         private const val KEY_MESSAGE_SURFACE_ALPHA = ROOT + "messageSurfaceAlpha"
         private const val KEY_CHAT_BACKGROUND_NAME = ROOT + "chatBackgroundName"
