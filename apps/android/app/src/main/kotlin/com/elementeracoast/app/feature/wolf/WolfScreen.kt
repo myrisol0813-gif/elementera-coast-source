@@ -139,6 +139,7 @@ private fun AccountScreen(
 ) {
     var confirming by remember { mutableStateOf(false) }
     val persistence = when (shellState.sessionPersistence) {
+        "source_tour" -> "仅本次参观 · 不创建账户会话"
         "until_logout" -> "持续保持，直到主动退出"
         "legacy_expiring" -> if (shellState.sessionExpiresAtEpochSeconds > 0L) {
             "旧会话 · 会在原到期时间失效"
@@ -160,8 +161,8 @@ private fun AccountScreen(
                 Column(Modifier.fillMaxWidth().padding(18.dp)) {
                     Text("当前账户", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(12.dp))
-                    WolfUpdateFact("登录状态", if (shellState.authenticated) "已登录" else "未登录")
-                    WolfUpdateFact("账号", "前端屋主")
+                    WolfUpdateFact("登录状态", if (shellState.sessionPersistence == "source_tour") "参观模式" else if (shellState.authenticated) "已登录" else "未登录")
+                    WolfUpdateFact("账号", if (shellState.sessionPersistence == "source_tour") "公开参观者" else "前端屋主")
                     WolfUpdateFact("登录保持", persistence)
                     if (shellState.sessionPersistence == "legacy_expiring") {
                         Text(
@@ -176,15 +177,15 @@ private fun AccountScreen(
         }
         item {
             Button(onClick = { confirming = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("退出账号")
+                Text(if (shellState.sessionPersistence == "source_tour") "离开参观" else "退出账号")
             }
         }
     }
     if (confirming) {
         AlertDialog(
             onDismissRequest = { confirming = false },
-            title = { Text("退出当前账号？") },
-            text = { Text("只会清除当前登录态；聊天、记忆与后端数据不会被删除。") },
+            title = { Text(if (shellState.sessionPersistence == "source_tour") "离开参观模式？" else "退出当前账号？") },
+            text = { Text(if (shellState.sessionPersistence == "source_tour") "返回入口；参观模式不创建云端会话。" else "只会清除当前登录态；聊天、记忆与后端数据不会被删除。") },
             confirmButton = {
                 TextButton(onClick = {
                     confirming = false
