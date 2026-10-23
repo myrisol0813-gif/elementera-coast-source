@@ -21,22 +21,6 @@ export async function routeSoil(request, env, url) {
 export async function routeSoilOrganize(request, env) {
   if (request.method !== 'POST') return methodNotAllowed('POST');
   const value = await body(request);
-  if (value.plan_phase || String(value.model || '').startsWith('chatgpt-plan:')) {
-    throw new MemoryStoreError('plan_soil_requires_native', '官端 GPT 思维壤须通过本机套餐整理接口。', 409);
-  }
   const conversationId = conversationIdFrom(new URL(request.url), value);
   return json(await organizeConversationSoil(env, conversationId, value));
-}
-
-export async function routeNativePlanSoil(request, env) {
-  if (request.method !== 'POST') return methodNotAllowed('POST');
-  const value = await body(request);
-  const conversationId = conversationIdFrom(new URL(request.url), value);
-  const planPhase = String(value.action || '');
-  if (!['prepare', 'commit'].includes(planPhase)) {
-    throw new MemoryStoreError('invalid_plan_phase', '只支持准备或提交本机思维壤。', 400);
-  }
-  return json(await organizeConversationSoil(env, conversationId, {
-    ...value, trigger: 'reply', plan_phase: planPhase,
-  }));
 }
