@@ -6,8 +6,8 @@ This directory contains the source-available Android client derived from the cur
 
 - App: Elementera Coast Source
 - `applicationId = com.elementeracoast.source`
-- `versionCode = 10`
-- `versionName = 0.2.8-source`
+- `versionCode = 11`
+- `versionName = 0.2.9-source`
 - Kotlin + Jetpack Compose
 - JDK 17 / Android SDK 34 / Gradle 8.9
 
@@ -61,7 +61,7 @@ No WebView, React Native, TypeScript, or embedded PWA source is used by the Nati
 The public Android app has its own install ID, `com.elementeracoast.source`, and is
 **not** the private production APK. When the main branch passes **Source check**,
 `.github/workflows/source-native-prerelease.yml` automatically builds and publishes
-a **0.2.8-source visitor QA APK** to GitHub Releases, with its SHA-256 file.
+a **0.2.9-source visitor QA APK** to GitHub Releases, with its SHA-256 file.
 GitHub marks each new version as **Latest** instead of a prerelease; publishing
 is skipped when that APK version already exists in Releases.
 
