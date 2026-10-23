@@ -1,6 +1,8 @@
 package com.elementeracoast.app.core.network
 
 import com.elementeracoast.app.core.auth.AuthStore
+import com.elementeracoast.app.core.tour.SourceVisitGate
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -17,6 +19,10 @@ class CoastHttpClient(
 ) {
     val client: OkHttpClient = baseClient.newBuilder()
         .addInterceptor(Interceptor { chain ->
+            // The Source tour never sends requests or cookies to any server.
+            if (SourceVisitGate.shouldBlockRemoteRequest()) {
+                throw IOException("参观模式：云端请求已在本机拦截")
+            }
             val original = chain.request()
             val builder = original.newBuilder()
                 .header("Accept", original.header("Accept") ?: "application/json")
