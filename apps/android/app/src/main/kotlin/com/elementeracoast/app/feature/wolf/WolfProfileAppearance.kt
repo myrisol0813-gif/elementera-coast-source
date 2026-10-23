@@ -22,8 +22,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.Role
 import com.elementeracoast.app.ui.theme.CoastThemePreset
 import com.elementeracoast.app.ui.theme.CoastFontMode
 import com.elementeracoast.app.ui.theme.CoastPaperMode
@@ -251,6 +254,28 @@ internal fun AppearanceScreen(state: WolfState, store: WolfStore, onSnackbar: (S
                 CoastPaperMode.entries.forEach { mode ->
                     ChoiceRow(mode.label, state.appearance.paperMode == mode) {
                         store.setPaperMode(mode)
+                    }
+                }
+                if (state.appearance.paperMode == CoastPaperMode.Cloud) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .toggleable(
+                                value = state.appearance.cloudOutlineEnabled,
+                                role = Role.Switch,
+                                onValueChange = store::setCloudOutlineEnabled
+                            )
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("云朵浅描边")
+                            Text(
+                                "跟随主题颜色；关闭描边后仍保留柔和阴影",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = state.appearance.cloudOutlineEnabled, onCheckedChange = null)
                     }
                 }
             }
