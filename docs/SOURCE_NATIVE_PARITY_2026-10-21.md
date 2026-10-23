@@ -27,7 +27,7 @@ The original Compose page implementations are retained, with only public identit
 1. Install a **source-only**, independently signed prerelease APK if publishing is enabled. Confirm it is a separate app, not the private production app.
 2. Connect your own HTTPS source API and log in as the owner.
 3. Open 小组件 → 日历, create an event, edit and delete it; verify the same event appears in source PWA.
-4. Open 小组件 → 潮中书房; import a synthetic TXT/EPUB; page, bookmark, highlight, annotate, cover, reopen and check persistence from the PWA.
+4. Open 小组件 → 书房; import a synthetic TXT/EPUB; page, bookmark, highlight, annotate, cover, reopen and check persistence from the PWA.
 5. Open chat, choose a stored assistant reply → 生成语音; select paragraphs, generate, then play the attached clip. With no ElevenLabs configuration, verify a real error is shown and no fake audio appears.
 6. Export the source web full JSON/HTML archive and confirm calendar, book and recorded audio records are included.
 7. Verify all existing chat, memory, mailbox, owner options and Native navigation still open; verify no production credentials or personal names are present.
