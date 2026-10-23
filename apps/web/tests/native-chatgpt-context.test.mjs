@@ -24,27 +24,32 @@ for (const action of [prepareNativeChatGpt, executeNativeChatGptTool, saveNative
   });
 }
 
-test('native tool request accepts context payloads above the former 128 KiB cap', async () => {
-  const request = new Request('https://coast.example/api/chat/native-tool', {
+test('native context accepts payloads above the former 128 KiB cap', async () => {
+  const { createConversation, writeConversationState } = await import('../functions/chat-store.js');
+  const { D1Database } = await import('./d1-helper.mjs');
+  const db = new D1Database();
+  const conversation = await createConversation(db, 'Large native context', 'main');
+  const turnId = 'turn_large_native_context';
+  await writeConversationState(db, conversation.id, { turns: [{
+    id: turnId,
+    user: { active: 0, variants: [{ id: 'user_large_native_context', content: '测试大上下文' }] },
+    assistant: { activeByUserVariant: {}, variantsByUserVariant: {} },
+  }] });
+  const request = new Request('https://coast.example/api/chat/native-context', {
     method: 'POST',
     headers: { Origin: 'https://coast.example', 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      conversation_id: 'conversation_for_limit_test',
-      source_turn_id: 'turn_for_limit_test',
-      messages: [{ role: 'user', content: '测试' }],
+      conversation_id: conversation.id,
+      source_turn_id: turnId,
+      model: 'gpt-5.5',
+      messages: [{ role: 'user', content: '测试大上下文' }],
+      settings: { recentTurns: 4, contextBudget: 6000 },
       extra_context_padding: 'x'.repeat(150 * 1024),
     }),
   });
-  await assert.rejects(
-    executeNativeChatGptTool(request, {}),
-    (error) => {
-      assert.notEqual(error?.status, 413, 'Native tool context was rejected before execution');
-      assert.notEqual(error?.message, 'body_too_large');
-      return true;
-    },
-  );
+  const response = await prepareNativeChatGpt(request, { COAST_CHAT_DB: db });
+  assert.notEqual(response.status, 413, 'Native context was rejected by the former 128 KiB cap');
 });
-
 
 test('Native ChatGPT plan receives voice_create and can execute it against canonical Coast store', async () => {
   const { createConversation, writeConversationState } = await import('../functions/chat-store.js');
@@ -69,7 +74,7 @@ test('Native ChatGPT plan receives voice_create and can execute it against canon
     headers: { Origin: 'https://coast.example', 'Content-Type': 'application/json' },
     body: JSON.stringify(content),
   });
-  const env = { COAST_CHAT_DB: db, ELEVENLABS_API_KEY: 'test-only-key' };
+  const env = { COAST_CHAT_DB: db, ELEVENLABS_API_KEY: 'test-only-key', ELEVENLABS_VOICE_ID: 'test-voice-id' };
   const prepared = await prepareNativeChatGpt(makeRequest('/api/chat/native-context', envelope), env);
   assert.equal(prepared.status, 200);
   const body = await prepared.json();
