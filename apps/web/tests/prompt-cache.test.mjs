@@ -37,11 +37,11 @@ const stable = {
   maxTokens: 20000,
 };
 const first = trimContextToComfortRange({
-  ...stable, soilText: '思维壤第一种状态',
+  ...stable, soilText: '当前对话纸条第一种状态',
   messages: [{ role: 'user', content: '第一问' }],
 });
 const second = trimContextToComfortRange({
-  ...stable, soilText: '思维壤第二种状态',
+  ...stable, soilText: '当前对话纸条第二种状态',
   messages: [{ role: 'user', content: '第二问' }],
 });
 const stablePrefix = '你是模型伙伴。\n\n';
