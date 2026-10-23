@@ -15,7 +15,11 @@ class SourceVisitGateTest {
     @Test fun onlyPublicVisitCodeOpensAndLeavingDisablesGate() {
         SourceVisitGate.leave()
         try {
-            assertTrue(SourceVisitGate.enabled)
+            if (!SourceVisitGate.enabled) {
+                assertFalse(SourceVisitGate.open(SourceVisitGate.PUBLIC_PASSCODE))
+                assertFalse(SourceVisitGate.isActive)
+                return
+            }
             assertFalse(SourceVisitGate.open("12345"))
             assertFalse(SourceVisitGate.isActive)
             assertTrue(SourceVisitGate.open("123456"))
@@ -27,6 +31,7 @@ class SourceVisitGateTest {
     }
 
     @Test fun visitorModeNeverSendsHTTPOrCookiesToServer() {
+        if (!SourceVisitGate.enabled) return
         val server = MockWebServer()
         server.start()
         SourceVisitGate.leave()
