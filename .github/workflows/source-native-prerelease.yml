@@ -49,54 +49,22 @@ jobs:
           umask 077
           echo "${KEYSTORE_BASE64}" | base64 --decode > "${RUNNER_TEMP}/source.keystore"
           test -s "${RUNNER_TEMP}/source.keystore"
-      - name: Build stable-signed source release
+      - name: Build isolated visit-only Source APK
         shell: bash
         env:
           COAST_SOURCE_KEYSTORE_PATH: ${{ runner.temp }}/source.keystore
           COAST_SOURCE_STORE_PASSWORD: ${{ secrets.COAST_SOURCE_STORE_PASSWORD }}
           COAST_SOURCE_KEY_ALIAS: ${{ secrets.COAST_SOURCE_KEY_ALIAS }}
           COAST_SOURCE_KEY_PASSWORD: ${{ secrets.COAST_SOURCE_KEY_PASSWORD }}
-          SOURCE_API_BASE_URL: ${{ vars.COAST_SOURCE_API_BASE_URL }}
-          SOURCE_DEMO_PROJECT: ${{ vars.COAST_SOURCE_DEMO_PROJECT }}
-          SOURCE_DEMO_PASSWORD: ${{ vars.COAST_SOURCE_PREVIEW_PASSWORD_HINT }}
         run: |
           set -euo pipefail
-          test -n "${SOURCE_API_BASE_URL}"
-          : "${SOURCE_DEMO_PROJECT:?Set the separate Cloudflare Pages demo project name}"
-          case "${SOURCE_DEMO_PROJECT}" in
-            *-demo) ;;
-            *) echo "Source demo project name must end in -demo" >&2; exit 1 ;;
-          esac
-          # Never sign a public APK against an arbitrary Pages host or an expired Quick Tunnel.
-          case "${SOURCE_API_BASE_URL}" in
-            "https://${SOURCE_DEMO_PROJECT}.pages.dev"|"https://"*".${SOURCE_DEMO_PROJECT}.pages.dev") ;;
-            *) echo "Expected the independent source demo Pages origin (not private Pages or Quick Tunnel)" >&2; exit 1 ;;
-          esac
-          : "${SOURCE_DEMO_PASSWORD:?Set source preview login hint in repository variables}"
-          if [[ "${SOURCE_DEMO_PASSWORD}" != '123456' ]]; then
-            echo 'This isolated 0.2.5-source acceptance APK must actually accept demo password 123456' >&2
-            exit 1
-          fi
-          cookie="${RUNNER_TEMP}/source-native-login-cookie"
-          trap 'rm -f "${cookie}"' EXIT
-          # The actual backend must accept the password and serve D1-backed APIs.
-          status="$(curl --silent --show-error --output /dev/null --cookie-jar "${cookie}" --write-out '%{http_code}' --max-time 20 --data-urlencode "password=${SOURCE_DEMO_PASSWORD}" "${SOURCE_API_BASE_URL}/login")"
-          if [[ "${status}" != "302" ]]; then
-            echo "Demo backend did not accept configured preview password (HTTP ${status})" >&2
-            exit 1
-          fi
-          for endpoint in /api/calendar/entries /api/library/books; do
-            status="$(curl --silent --show-error --output /dev/null --cookie "${cookie}" --write-out '%{http_code}' --max-time 20 "${SOURCE_API_BASE_URL}${endpoint}")"
-            if [[ "${status}" != "200" ]]; then
-              echo "Demo backend unavailable at ${endpoint} (HTTP ${status})" >&2
-              exit 1
-            fi
-          done
-          gradle :app:testDebugUnitTest :app:assembleRelease --no-daemon --stacktrace -PCOAST_API_BASE_URL="${SOURCE_API_BASE_URL}" -PSOURCE_PREVIEW_PASSWORD_HINT="${SOURCE_DEMO_PASSWORD}"
+          # No live demo backend is needed: 123456 only opens a local, read-only
+          # tour; outgoing Source HTTP calls are blocked while touring.
+          gradle :app:testDebugUnitTest :app:assembleRelease --no-daemon --stacktrace -PSOURCE_TOUR_ENABLED=true
           test -s app/build/outputs/apk/release/app-release.apk
           mkdir -p source-release
-          cp app/build/outputs/apk/release/app-release.apk source-release/elementera-coast-source-v0.2.5.apk
-          (cd source-release && sha256sum elementera-coast-source-v0.2.5.apk > SHA256SUMS.txt)
+          cp app/build/outputs/apk/release/app-release.apk source-release/elementera-coast-source-v0.2.6-visitor.apk
+          (cd source-release && sha256sum elementera-coast-source-v0.2.6-visitor.apk > SHA256SUMS.txt)
       - name: Verify APK identity and independent signing
         id: apk_verify
         shell: bash
@@ -110,8 +78,8 @@ jobs:
           badging="$("${build_tools}/aapt" dump badging "${apk}")"
           package_line="$(printf '%s\n' "${badging}" | sed -n '1p')"
           [[ "${package_line}" == *"name='com.elementeracoast.source'"* ]]
-          [[ "${package_line}" == *"versionCode='7'"* ]]
-          [[ "${package_line}" == *"versionName='0.2.5-source'"* ]]
+          [[ "${package_line}" == *"versionCode='8'"* ]]
+          [[ "${package_line}" == *"versionName='0.2.6-source'"* ]]
           [[ "${badging}" == *"sdkVersion:'26'"* ]]
           [[ "${badging}" == *"targetSdkVersion:'34'"* ]]
           "${build_tools}/apksigner" verify --verbose --print-certs "${apk}" > "${RUNNER_TEMP}/source-signature-verification.txt"
@@ -125,14 +93,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          tag="source-v0.2.5-${{ github.event.workflow_run.head_sha || github.sha }}"
+          tag="source-v0.2.6-${{ github.event.workflow_run.head_sha || github.sha }}"
           gh release create "${tag}" \
-            source-release/elementera-coast-source-v0.2.5.apk \
+            source-release/elementera-coast-source-v0.2.6-visitor.apk \
             source-release/SHA256SUMS.txt \
             --repo "${GITHUB_REPOSITORY}" --target "${{ github.event.workflow_run.head_sha || github.sha }}" \
-            --title "Elementera Coast Source Native 0.2.5-source" --prerelease \
-            --notes "Source-only stable-signed Android build (versionCode 7). Independent demo backend: ${{ vars.COAST_SOURCE_API_BASE_URL }}. Public demo password is only for synthetic data; do not upload private information. Signing cert SHA-256: ${{ steps.apk_verify.outputs.fingerprint }}. Full-file SHA-256 in SHA256SUMS.txt. Do not install over an older debug-signed source APK: uninstall only com.elementeracoast.source if signatures differ. Not the private production app."
-          asset_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/elementera-coast-source-v0.2.5.apk"
+            --title "Elementera Coast Source Native 0.2.6-source" --prerelease \
+            --notes "Source-only stable-signed Android visitor APK (versionCode 8). Public local tour passcode 123456, no backend authentication, no remote API requests while touring. Pages remain intact; cloud-dependent operations are not available in tour mode. Signing cert SHA-256: ${{ steps.apk_verify.outputs.fingerprint }}. Full-file SHA-256 in SHA256SUMS.txt. To install over an older QA/debug source APK, signatures must match; otherwise uninstall only com.elementeracoast.source. Not the private production app."
+          asset_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/elementera-coast-source-v0.2.6-visitor.apk"
           echo "### Source Native APK published" >> "${GITHUB_STEP_SUMMARY}"
           echo "Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}" >> "${GITHUB_STEP_SUMMARY}"
           echo "Direct APK: ${asset_url}" >> "${GITHUB_STEP_SUMMARY}"
