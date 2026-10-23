@@ -576,7 +576,7 @@ The source Native client now includes the original owner calendar, Tidal Library
 
 This section describes the **current source tree**, not the features of the first `v0.1-source` APK.
 
-**0.2.8 Native layout:** the public Android client now places the assistant avatar above the full-width reply paper and uses current compact chat spacing while keeping source-public names and assets.
+**0.2.8 Native layout:** the public Android client now places the assistant avatar above the full-width reply paper, uses current compact chat spacing, and combines the public private-draft / cross-window and current-turn desk controls in a composer-adjacent drawer. Source-public naming and assets remain distinct; the private Starry Coast artwork and ornamental frame padding are not included.
 
 **0.2.7 Native parity:** device-local ChatGPT account authorization and model catalog, same-provider thought-soil finalization, model reasoning capability controls, sent-image inline rendering, prompt-cache read/write receipts, output-limit/finalization locking, and revision-safe global-excerpt clear. PWA backend contracts and cache receipts were synchronized without adding private production configuration. See [release history](docs/SOURCE_RELEASE_HISTORY.md) for the distinction between versioned source, historical assets and temporary QA packages.
 
