@@ -13,7 +13,7 @@ concurrency:
 jobs:
   live-chatgpt:
     runs-on: ubuntu-24.04
-    timeout-minutes: 42
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
