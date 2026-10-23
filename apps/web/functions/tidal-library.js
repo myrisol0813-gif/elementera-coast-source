@@ -1,4 +1,4 @@
-// 潮中书房：书与批注是永久资料，阅读工具按需把小段原文送回当前聊天。
+// 书房：书与批注是永久资料，阅读工具按需把小段原文送回当前聊天。
 export const LIBRARY_LIMITS = Object.freeze({
   max_books: 80, max_chapters: 2048, max_chars: 12000000, chapter_chars: 32000,
   paragraph_chars: 4000, note_chars: 4000, title_chars: 160, page_paragraphs: 12,
@@ -65,7 +65,7 @@ async function init(db) {
   )`);
 }
 export async function ensureLibrarySchema(db) {
-  if (!db) throw new LibraryError('database_unavailable', '潮中书房暂时无法连接数据库。', 503);
+  if (!db) throw new LibraryError('database_unavailable', '书房暂时无法连接数据库。', 503);
   let task = pending.get(db);
   if (!task) { task = init(db); pending.set(db, task); }
   try { await task; } catch (e) { pending.delete(db); throw e; }
