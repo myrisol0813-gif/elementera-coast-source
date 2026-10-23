@@ -21,8 +21,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import com.elementeracoast.app.core.remote.RemoteMessageModelMetadataResponse
@@ -77,11 +78,13 @@ internal fun rememberModelMetadataTraceState(
 @Composable
 internal fun ModelMetadataTraceChip(
     state: ModelMetadataTraceState,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean = false
 ) {
     Text(
-        text = "推理痕迹与模型回波",
+        text = if (compact) "模型回波" else "推理痕迹与模型回波",
         modifier = modifier
+            .semantics { contentDescription = "推理痕迹与模型回波" }
             .background(
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (state.expanded) .68f else .50f),
                 RoundedCornerShape(CoastChatTokens.MetadataRadius)
@@ -138,26 +141,6 @@ internal fun ModelMetadataTracePanel(
                 onToggleRaw = { state.rawExpanded = !state.rawExpanded },
                 errorText = state.errorText
             )
-        }
-    }
-}
-
-@Composable
-internal fun ModelMetadataTraceCard(
-    conversationId: String,
-    messageId: String,
-    source: ModelMetadataRemoteDataSource,
-    modifier: Modifier = Modifier
-) {
-    val state = rememberModelMetadataTraceState(conversationId, messageId, source)
-    Column(
-        modifier = modifier.padding(top = CoastChatTokens.MetadataTopGap),
-        horizontalAlignment = Alignment.End
-    ) {
-        ModelMetadataTraceChip(state = state)
-        if (state.expanded) {
-            Spacer(Modifier.height(CoastChatTokens.MetadataRowGap))
-            ModelMetadataTracePanel(state = state)
         }
     }
 }
