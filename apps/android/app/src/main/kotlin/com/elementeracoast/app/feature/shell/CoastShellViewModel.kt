@@ -26,6 +26,11 @@ import com.elementeracoast.app.feature.chat.ChatBranchNavigator
 import com.elementeracoast.app.feature.chat.ChatHistoryMutations
 import com.elementeracoast.app.feature.chat.ChatProgress
 import com.elementeracoast.app.feature.chat.ChatSyncMapper
+import com.elementeracoast.app.feature.chat.CHATGPT_PLAN_PREFIX
+import com.elementeracoast.app.feature.chat.isChatGptPlanModel
+import com.elementeracoast.app.feature.chatgpt.ChatGptConnectState
+import com.elementeracoast.app.feature.chatgpt.ChatGptPlanRepository
+import com.elementeracoast.app.feature.chatgpt.ChatGptSecureStore
 import com.elementeracoast.app.feature.daily.DailyProfile
 import com.elementeracoast.app.feature.daily.DailyRepository
 import com.elementeracoast.app.feature.dogtalk.CrossWindowRepository
@@ -48,14 +53,25 @@ import kotlinx.coroutines.withContext
 class CoastShellViewModel(
     private val persistence: LocalPersistence,
     private val backend: CoastBackendGraph,
-    private val workDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate
+    private val workDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
+    private val chatGpt: ChatGptPlanRepository? = null
 ) : ViewModel() {
-    private val _state = MutableStateFlow(CoastShellState())
+    private val _state = MutableStateFlow(CoastShellState(
+        currentModel = chatGpt?.preferredModel()?.let { CHATGPT_PLAN_PREFIX + it }.orEmpty()
+    ))
     val state: StateFlow<CoastShellState> = _state.asStateFlow()
     private val _crossWindow = MutableStateFlow(CrossWindowUiState())
     val crossWindow: StateFlow<CrossWindowUiState> = _crossWindow.asStateFlow()
 
     val local = LocalFeatureServices(persistence)
+    private val _chatGptState = MutableStateFlow(
+        ChatGptConnectState(
+            connected = chatGpt?.currentAccount() != null,
+            accountLabel = chatGpt?.currentAccount()?.email.orEmpty()
+                .ifBlank { "已保存的 ChatGPT 账户" }
+        )
+    )
+    val chatGptState: StateFlow<ChatGptConnectState> = _chatGptState.asStateFlow()
     val daily: DailyRepository get() = backend.daily
     val memory: MemoryRepository get() = backend.memory
     val dogtalk: DogtalkRepository get() = backend.dogtalk
@@ -64,7 +80,6 @@ class CoastShellViewModel(
     private var generationJob: Job? = null
     private var historyJob: Job? = null
     private var attachmentUploadsInFlight = 0
-    private val soilJobs = mutableMapOf<String, Job>()
 
     init {
         syncAppearance()
