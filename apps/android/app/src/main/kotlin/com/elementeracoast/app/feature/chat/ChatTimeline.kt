@@ -93,11 +93,19 @@ internal fun ChatTimeline(
                             modifier = Modifier.padding(bottom = 5.dp)
                         )
                     }
+                    val metadataMessageId = message.remoteVariantId?.takeIf {
+                        message.role == MessageRole.Assistant &&
+                            !streamingTail &&
+                            message.generationSource in setOf("chat", "landing", "radio", "lighthouse") &&
+                            it.isNotBlank()
+                    }
                     MessageItem(
                         conversationId = conversationId,
                         message = message,
                         isStreamingTail = streamingTail,
                         avatarBitmap = avatarBitmap,
+                        metadataMessageId = metadataMessageId,
+                        metadataSource = metadataSource,
                         attachmentPreviewSource = attachmentPreviewSource,
                         onAvatarClick = onAvatarClick,
                         onCopy = onCopy,
@@ -108,26 +116,12 @@ internal fun ChatTimeline(
                         onAction = onAction,
                         onFootprint = onFootprint
                     )
-                    val remoteMessageId = message.remoteVariantId
-                    if (
-                        message.role == MessageRole.Assistant &&
-                        !streamingTail &&
-                        message.generationSource in setOf("chat", "landing", "radio", "lighthouse") &&
-                        !remoteMessageId.isNullOrBlank()
-                    ) {
+                    if (metadataMessageId != null) {
                         ModelUsageFooter(
                             conversationId = conversationId,
-                            messageId = remoteMessageId,
+                            messageId = metadataMessageId,
                             source = metadataSource,
                             modifier = Modifier.align(Alignment.End).padding(top = 1.dp)
-                        )
-                        ModelMetadataTraceCard(
-                            conversationId = conversationId,
-                            messageId = remoteMessageId,
-                            source = metadataSource,
-                            modifier = Modifier.padding(
-                                start = CoastChatTokens.AssistantAvatarSize + CoastChatTokens.AssistantAvatarGap
-                            )
                         )
                     }
                 }
