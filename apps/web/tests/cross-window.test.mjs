@@ -220,7 +220,7 @@ const modelKeywordHits = await executeCrossWindowModelTool(db, 'keyword_search',
 assert.ok(modelKeywordHits.hits.length > 0);
 assert.ok(modelKeywordHits.hits.length <= 10);
 assert.equal(modelKeywordHits.status, 'matched');
-const noKeywordHits = await executeCrossWindowModelTool(db, 'keyword_search', { query: '绝对不存在的旧信关键词', limit: 10 }, recallToolContext);
+const noKeywordHits = await executeCrossWindowModelTool(db, 'keyword_search', { query: '绝对不存在的历史消息搜索', limit: 10 }, recallToolContext);
 assert.equal(noKeywordHits.status, 'no_match');
 assert.equal(noKeywordHits.message, '本地历史无命中。');
 const modelExact = await executeCrossWindowModelTool(db, 'read_messages', {
