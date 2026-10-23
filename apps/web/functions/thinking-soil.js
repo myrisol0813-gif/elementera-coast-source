@@ -30,6 +30,14 @@ function soilLines(soil, { currentLimit, maxHandSeeds, includeLabel = false } = 
   return lines;
 }
 
+export function isThinkingSoilEnabled(value) {
+  if (value?.sources && typeof value.sources === 'object') {
+    return Object.values(value.sources).some((soil) => soil?.auto_refresh_enabled !== false);
+  }
+  const soil = value?.soil || value;
+  return soil?.auto_refresh_enabled !== false;
+}
+
 export function formatThinkingSoil(value, {
   maxCharacters = 1800,
   maxHandSeeds = 7,
@@ -38,6 +46,7 @@ export function formatThinkingSoil(value, {
   let lines = [];
   if (value?.sources && typeof value.sources === 'object') {
     for (const soil of Object.values(value.sources)) {
+      if (!isThinkingSoilEnabled(soil)) continue;
       lines.push(...soilLines(soil, {
         currentLimit: Math.max(240, Math.floor(limit / 2)),
         maxHandSeeds: Math.max(1, Math.ceil(maxHandSeeds / 2)),
@@ -46,6 +55,7 @@ export function formatThinkingSoil(value, {
     }
   } else {
     const soil = value?.soil || value;
+    if (!isThinkingSoilEnabled(soil)) return '';
     lines = soilLines(soil, { currentLimit: limit, maxHandSeeds });
   }
   if (!lines.length) return '';
