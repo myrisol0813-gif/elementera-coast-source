@@ -6,8 +6,8 @@ This directory contains the source-available Android client derived from the cur
 
 - App: Elementera Coast Source
 - `applicationId = com.elementeracoast.source`
-- `versionCode = 8`
-- `versionName = 0.2.6-source`
+- `versionCode = 9`
+- `versionName = 0.2.7-source`
 - Kotlin + Jetpack Compose
 - JDK 17 / Android SDK 34 / Gradle 8.9
 
@@ -44,6 +44,12 @@ gradle :app:assembleDebug -PSOURCE_TOUR_ENABLED=false
 Rebuilding without this flag restores the original backend login only. A publicly
 known visiting code is not suitable as authentication for a live backend.
 
+## Local ChatGPT plan connection
+
+The Native source includes an optional device-local ChatGPT account connection. OAuth tokens are encrypted with Android Keystore and are not sent to the Coast backend. The backend only assembles authenticated workspace context, validates owner-authorized tool calls, and stores sanitized model receipts. The selected ChatGPT model then runs through the authorized account on the device.
+
+The source visitor doorway remains offline-only. In visitor mode, account connection and other cloud actions are blocked before network transmission. To use this feature, self-host the source backend, sign in normally, and authorize a ChatGPT account on that device.
+
 ## Source-build boundaries
 
 The source build does not include private production credentials, production signing keys, production API origin, or private data. Its QA APK delivery is a separate, ephemeral-signed GitHub Release workflow, not the production APK updater. The existing “版本与更新” surface remains part of the copied UI, but does not download or install private production APKs.
@@ -55,7 +61,7 @@ No WebView, React Native, TypeScript, or embedded PWA source is used by the Nati
 The public Android app has its own install ID, `com.elementeracoast.source`, and is
 **not** the private production APK. When the main branch passes **Source check**,
 `.github/workflows/source-native-prerelease.yml` automatically builds and publishes
-a **0.2.6-source visitor QA APK** to GitHub Releases, with its SHA-256 file.
+a **0.2.7-source visitor QA APK** to GitHub Releases, with its SHA-256 file.
 GitHub marks each new version as **Latest** instead of a prerelease; publishing
 is skipped when that APK version already exists in Releases.
 
