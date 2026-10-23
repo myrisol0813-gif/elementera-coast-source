@@ -168,7 +168,7 @@ export function parseStrictJson(value) {
       }
     }
   }
-  throw new MemoryStoreError('soil_organize_invalid', '思维壤整理结果格式无效。', 502);
+  throw new MemoryStoreError('soil_organize_invalid', '整理当前对话的纸条整理结果格式无效。', 502);
 }
 
 export function normalizeSoilMode(value) {
@@ -272,7 +272,7 @@ export function soilPrompt(turns, oldSoil, maxHandSeeds, options = {}) {
   const context = options.landing
     ? landingSoilContext(turns)
     : boundedSoilContext(replySoilContext(turns, oldSoil));
-  return `你只负责整理当前对话的一小捧“思维壤”。它是当前窗口的工作台小纸条，不是永久档案馆，不是长期记忆，也不是思考过程。
+  return `你只负责整理当前对话的一小捧“整理当前对话的纸条”。它是当前窗口的工作台小纸条，不是永久档案馆，不是长期记忆，也不是思考过程。
 请只返回一个 JSON 对象，不要 Markdown，不要解释：
 {
   "current_text": "当前窗口此刻的滚动承接便签，通常 600–1800 中文字符，不要流水账",
@@ -295,15 +295,15 @@ export function soilPrompt(turns, oldSoil, maxHandSeeds, options = {}) {
 
 mode 含义：
 - replace：使用你本轮返回的新纸条。旧纸条可以退出、被改写、合并或替换；新内容比旧内容少也没关系。
-- keep：这一栏原样保留旧思维壤。
+- keep：这一栏原样保留旧整理当前对话的纸条。
 - clear：你明确判断这一栏已经过时、重复、已经落袋或不再适合当前窗口，因此清空这一栏。
 不要把空数组或空字符串当作失败占位。如果你确实要清空，请使用 clear mode；如果你没有要改这一栏，请使用 keep mode。
 
 current_text 是“滚动承接便签”，不是最近十二轮聊天摘要。普通回复整理时，约 60–70% 注意力放在 latest_turn，约 20–30% 保留 old_current_text 中仍直接连接当前话题的未完成线索，极少量使用 previous_turn_excerpt 与 missed_since_success 防止断层。允许改写、压缩、删除已经结束的话题，用最新一轮重新解释上一段。不要累加“先聊 A、再聊 B、然后 C”的流水账；不要每轮继续背着登岛信；不要把远古精华长期塞在 current_text。
 
-hand_seeds 不是永久收藏夹，而是“此刻最值得手持”的最多 ${maxHandSeeds} 粒。每轮都可以保留仍有用的旧种、删除过时旧种、替换旧种、合并重复旧种、改写旧种或加入新种。满 ${maxHandSeeds} 粒时主动做取舍。不要因为旧思维壤里已经有旧种就机械保留，也不要害怕让旧纸条退出手持。
+hand_seeds 不是永久收藏夹，而是“此刻最值得手持”的最多 ${maxHandSeeds} 粒。每轮都可以保留仍有用的旧种、删除过时旧种、替换旧种、合并重复旧种、改写旧种或加入新种。满 ${maxHandSeeds} 粒时主动做取舍。不要因为旧整理当前对话的纸条里已经有旧种就机械保留，也不要害怕让旧纸条退出手持。
 do_not_repeat 也只是当前窗口的工作提醒。已经不再需要防复读的提醒可以改写、合并或 clear。
-pocket_candidates 只放“现在不用、但仍有再生力”的内容，并使用上方真实 turn_id。旧候选会由系统先 upsert 到 pending；已经进入 pending、已经落袋或已经不适合当前窗口的候选可以从思维壤展示层退出，不要为了保留展示而反复挂在手上。当前确实没有候选时使用 pocket_candidates_mode=clear。
+pocket_candidates 只放“现在不用、但仍有再生力”的内容，并使用上方真实 turn_id。旧候选会由系统先 upsert 到 pending；已经进入 pending、已经落袋或已经不适合当前窗口的候选可以从整理当前对话的纸条展示层退出，不要为了保留展示而反复挂在手上。当前确实没有候选时使用 pocket_candidates_mode=clear。
 
 你只能整理 current_text、hand_seeds、do_not_repeat、pocket_candidates 这四块临时工作台内容。不要创建或删除长期记忆，不要删除聊天记录、pending pocket、confirmed pocket、seed、memory 或向量索引中的已确认内容；不要判断 core，不要把候选升级为 seed 或 memory，不要替用户做决定，不要复述整段聊天。
 
@@ -316,12 +316,12 @@ export async function organizeConversationSoil(env, conversationId, value) {
   const reply = value.trigger === 'reply';
   const force = value.force === true || reply;
   const requestedModel = String(value.model || '').trim().slice(0, 180);
-  const planPhase = value.plan_phase || '';
+  const planPhase = String(value.plan_phase || '').trim();
   if (planPhase && !['prepare', 'commit'].includes(planPhase)) {
-    throw new MemoryStoreError('invalid_plan_phase', '无效的本机 GPT 思维壤操作。', 400);
+    throw new MemoryStoreError('invalid_plan_phase', '无效的本机 GPT 对话纸条操作。', 400);
   }
   if (planPhase && !/^chatgpt-plan:gpt-[a-z0-9._-]+$/.test(requestedModel)) {
-    throw new MemoryStoreError('invalid_plan_model', '思维壤只能使用已选择的本机 GPT 模型。', 400);
+    throw new MemoryStoreError('invalid_plan_model', '整理当前对话的纸条只能使用已选择的本机 GPT 模型。', 400);
   }
   const settings = soilSettings(value.settings || {});
   const oldSoil = await decorateSoilProvenance(
@@ -343,13 +343,15 @@ export async function organizeConversationSoil(env, conversationId, value) {
   if (!turns.length) return { ok: true, skipped: true, reason: 'no_completed_turns', soil: oldSoil };
   const latestTurn = turns.at(-1);
   const activeModel = String(latestTurn?.assistant?.model_id || '').trim();
-  // An older Native app must not silently fall through to a billed Coast
-  // provider when a ChatGPT-plan assistant has just completed.
   if (!planPhase && activeModel.startsWith('chatgpt-plan:')) {
-    throw new MemoryStoreError('plan_soil_requires_native', '官端 GPT 思维壤必须由本机套餐模型整理；未调用其他 API。请更新 Native。', 409);
+    throw new MemoryStoreError(
+      'plan_soil_requires_native',
+      'ChatGPT 套餐轮次的当前对话纸条必须由本机套餐模型整理；未调用其他模型供应商。',
+      409,
+    );
   }
   if (planPhase && activeModel !== requestedModel) {
-    throw new MemoryStoreError('plan_soil_model_mismatch', '本轮模型与思维壤整理模型不一致。', 409);
+    throw new MemoryStoreError('plan_soil_model_mismatch', '本轮模型与当前对话纸条整理模型不一致。', 409);
   }
   const scheduledTurn = landing
     || reply
@@ -380,7 +382,11 @@ export async function organizeConversationSoil(env, conversationId, value) {
       && Number.isSafeInteger(value.expected_soil_revision)
       && value.expected_soil_revision === oldSoil.revision;
     if (!matches) {
-      throw new MemoryStoreError('plan_soil_stale', '整理期间思维壤或聊天记录已经改变；未覆盖较新的资料。', 409);
+      throw new MemoryStoreError(
+        'plan_soil_stale',
+        '整理期间当前对话纸条或聊天记录已经改变；未覆盖较新的资料。',
+        409,
+      );
     }
     if (typeof value.result_text !== 'string' || value.result_text.length > PLAN_SOIL_MAX_RESULT_CHARS) {
       throw new MemoryStoreError('plan_soil_result_invalid', '本轮整理内容长度无效。', 400);
@@ -400,7 +406,11 @@ export async function organizeConversationSoil(env, conversationId, value) {
         || typeof organized.do_not_repeat !== 'string'
         || !modes.includes(organized.pocket_candidates_mode)
         || !Array.isArray(organized.pocket_candidates)) {
-        throw new MemoryStoreError('soil_organize_invalid', 'GPT 整理结果不符合思维壤格式；旧资料保持不变。', 422);
+        throw new MemoryStoreError(
+          'soil_organize_invalid',
+          'GPT 整理结果不符合当前对话纸条格式；旧资料保持不变。',
+          422,
+        );
       }
       const safeUsage = (key) => {
         const n = value.usage?.[key];
@@ -436,7 +446,7 @@ export async function organizeConversationSoil(env, conversationId, value) {
           reasoning: { effort: 'minimal', exclude: true },
         });
         if (result?.finish_reason === 'length') {
-          throw new MemoryStoreError('soil_organize_truncated', '思维壤整理结果被模型长度上限截断。', 502);
+          throw new MemoryStoreError('soil_organize_truncated', '整理当前对话的纸条整理结果被模型长度上限截断。', 502);
         }
         organized = parseStrictJson(result?.message?.content);
         organizedBy = {
