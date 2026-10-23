@@ -31,10 +31,10 @@ assert.equal(cacheHitRate({ prompt_tokens: 100, cached_tokens: 101 }), null);
 // Changing later sources must not perturb the reusable system prompt prefix.
 const stable = {
   basePrompt: '你是模型伙伴。',
-  customInstructionsText: '稳定的核心自定义内容'.repeat(140),
+  customInstructionsText: '稳定的核心自定义内容'.repeat(320),
   globalExcerptText: '长期保留的摘录内容'.repeat(100),
   recentTurns: 8,
-  maxTokens: 6000,
+  maxTokens: 20000,
 };
 const first = trimContextToComfortRange({
   ...stable, soilText: '思维壤第一种状态',
