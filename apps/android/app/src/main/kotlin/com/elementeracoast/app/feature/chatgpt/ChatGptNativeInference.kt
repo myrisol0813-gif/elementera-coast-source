@@ -75,7 +75,7 @@ internal fun normalizeNativeInput(obj: JsonObject): JsonObject {
                     }
                     else -> throw CoastApiException(
                         CoastApiErrorKind.Request, "unsupported_native_input",
-                        "此附件格式不被官端 GPT 认可。"
+                        "此附件格式不被当前 ChatGPT 模型接受。"
                     )
                 }
             }
@@ -92,7 +92,7 @@ internal fun parseNativeCoastToolCall(tool: JsonObject): NativeCoastToolCall {
     val name = rawName.removePrefix("coast.")
     val callId = tool["call_id"]?.jsonPrimitive?.contentOrNull.orEmpty()
     if ((namespace != null && namespace != "coast") || callId.isBlank() || name.isBlank()) {
-        throw CoastApiException(CoastApiErrorKind.Decode, "invalid_tool_call", "官端 GPT 工具调用信息不完整或不属于海岸。")
+        throw CoastApiException(CoastApiErrorKind.Decode, "invalid_tool_call", "ChatGPT 工具调用信息不完整或不属于当前 Coast 工具清单。")
     }
     return NativeCoastToolCall(callId, name)
 }
@@ -238,7 +238,7 @@ internal fun diagnoseNativeInferenceFailure(
     return CoastApiException(
         if (error is java.io.IOException) CoastApiErrorKind.Network else CoastApiErrorKind.Decode,
         "chatgpt_plan_${failure}_${validStage}",
-        "官端 GPT ${description}（阶段=${validStage}；图片数=${imageCount.coerceAtLeast(0)}；请求长度约=${requestCharsK.coerceAtLeast(0)}K字符）。未传输私密错误细节。",
+        "ChatGPT ${description}（阶段=${validStage}；图片数=${imageCount.coerceAtLeast(0)}；请求长度约=${requestCharsK.coerceAtLeast(0)}K字符）。未传输私密错误细节。",
         cause = error
     )
 }
@@ -344,7 +344,7 @@ internal class ChatGptNativeInference(
                         if (!response.isSuccessful) throw CoastApiException(
                             CoastApiErrorKind.Model,
                             "chatgpt_plan_http_" + response.code,
-                            (if (round > 0) "官端 GPT 接收工具结果后无法继续（HTTP " else "官端 GPT 未接受请求（HTTP ") +
+                            (if (round > 0) "ChatGPT 接收工具结果后无法继续（HTTP " else "ChatGPT 未接受请求（HTTP ") +
                                 response.code + "）。" + if (searchEnabled && response.code in listOf(400, 403))
                                 "本轮请求包含网页搜索，当前模型或账号可能不支持；可换模型或不请求联网。"
                             else "请检查模型权限或本轮工具调用。",
@@ -376,7 +376,7 @@ internal class ChatGptNativeInference(
                                         throw CoastApiException(
                                             CoastApiErrorKind.Model,
                                             code.ifBlank { "chatgpt_plan_failed" }.take(80),
-                                            "官端 GPT 返回失败；请检查账户额度或模型权限。"
+                                            "ChatGPT 返回失败；请检查账户额度或模型权限。"
                                         )
                                     }
                                     "response.incomplete" -> throw CoastApiException(
@@ -389,7 +389,7 @@ internal class ChatGptNativeInference(
                     activeCall.set(null)
                     stage = "output_processing"
                     val response = completed ?: throw CoastApiException(
-                        CoastApiErrorKind.Stream, "chatgpt_plan_incomplete", "官端 GPT 回复流提前中断。"
+                        CoastApiErrorKind.Stream, "chatgpt_plan_incomplete", "ChatGPT 回复流提前中断。"
                     )
                     returnedReasoningEffort = (response["reasoning"] as? JsonObject)
                         ?.get("effort")?.jsonPrimitive?.contentOrNull ?: returnedReasoningEffort
@@ -437,7 +437,7 @@ internal class ChatGptNativeInference(
                             val status = response["status"]?.jsonPrimitive?.contentOrNull ?: "unknown"
                             throw CoastApiException(
                                 CoastApiErrorKind.Model, "chatgpt_plan_empty",
-                                "官端 GPT $detail。$guidance（状态=$status；工具数=${prepared.tools.size}；流输出项=${streamedItems.size}；类型=${nativeOutputKinds(output)}）"
+                                "ChatGPT $detail。$guidance（状态=$status；工具数=${prepared.tools.size}；流输出项=${streamedItems.size}；类型=${nativeOutputKinds(output)}）"
                             )
                         }
                         if (didSearch) {
