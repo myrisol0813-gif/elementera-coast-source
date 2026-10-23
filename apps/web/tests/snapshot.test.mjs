@@ -46,4 +46,4 @@ for (const name of ['calendar', 'tidal_library']) {
   assert.match(source, new RegExp(name === 'calendar' ? 'calendarEntries' : 'exportLibrary'));
 }
 assert.match(settings, /snapshotDataSection\('公历日历', snapshot\.calendar\)/);
-assert.match(settings, /snapshotDataSection\('潮中书房', snapshot\.tidal_library\)/);
+assert.match(settings, /snapshotDataSection\('书房', snapshot\.tidal_library\)/);
