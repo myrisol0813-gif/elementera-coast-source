@@ -49,6 +49,7 @@ export {
   GLOBAL_EXCERPT_WRITE_GUIDANCE,
   readGlobalExcerpt,
   setGlobalExcerptWriteEnabled,
+  clearGlobalExcerpt,
   listGlobalExcerptCandidates,
   createGlobalExcerptCandidate,
   discardGlobalExcerptCandidate,
