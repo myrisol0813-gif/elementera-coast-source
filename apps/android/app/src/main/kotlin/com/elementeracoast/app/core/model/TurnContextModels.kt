@@ -24,6 +24,7 @@ data class ThoughtSoilSnapshot(
     val doNotRepeat: String,
     val pocketCandidates: List<ThoughtPocketSnapshot>,
     val manualLocked: Boolean,
+    val autoRefreshEnabled: Boolean = true,
     val revision: Int,
     val organizer: String,
     val updatedAt: String
