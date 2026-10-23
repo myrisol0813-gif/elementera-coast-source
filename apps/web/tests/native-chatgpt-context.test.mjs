@@ -112,3 +112,49 @@ test('Native ChatGPT plan receives voice_create and can execute it against canon
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test('Native ChatGPT plan delivers an uploaded image without consulting the OpenRouter vision catalog', async () => {
+  const { createConversation, writeConversationState } = await import('../functions/chat-store.js');
+  const { uploadChatAttachment } = await import('../functions/chat-attachments.js');
+  const { D1Database } = await import('./d1-helper.mjs');
+  const db = new D1Database();
+  const conversation = await createConversation(db, 'Native image delivery', 'main');
+  const turnId = 'turn_native_vision_1';
+  const userMessage = '请看这张图片';
+  await writeConversationState(db, conversation.id, { turns: [{
+    id: turnId,
+    user: { active: 0, variants: [{ id: 'user_native_vision_1', content: userMessage }] },
+    assistant: { activeByUserVariant: {}, variantsByUserVariant: {} },
+  }] });
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+S0zkAAAAASUVORK5CYII=',
+    'base64',
+  );
+  const image = await uploadChatAttachment(db, conversation.id, {
+    name: 'tiny.png',
+    type: 'image/png',
+    size: png.length,
+    async arrayBuffer() { return png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength); },
+  });
+  const response = await prepareNativeChatGpt(new Request('https://coast.example/api/chat/native-context', {
+    method: 'POST',
+    headers: { Origin: 'https://coast.example', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      conversation_id: conversation.id,
+      source_turn_id: turnId,
+      model: 'gpt-5.6-sol',
+      messages: [{ role: 'user', content: userMessage }],
+      attachment_ids: [image.id],
+      settings: { recentTurns: 4, contextBudget: 6000 },
+    }),
+  }), { COAST_CHAT_DB: db });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  const lastUser = body.model_messages.findLast(message => message.role === 'user');
+  assert.ok(Array.isArray(lastUser.content), 'Native ChatGPT receives multimodal content, not an attachment-status text');
+  assert.equal(lastUser.content[1].type, 'image_url');
+  assert.match(lastUser.content[1].image_url.url, /^data:image\\/png;base64,/);
+  assert.equal(body.desk_slip.attachments.vision.images_delivered, 1);
+  assert.deepEqual(body.desk_slip.attachments.not_delivered, []);
+});
