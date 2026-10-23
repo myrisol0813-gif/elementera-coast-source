@@ -33,7 +33,7 @@ It may be useful if you are exploring:
 - [Model workspace and tool records](#model-workspace-and-tool-records)
 - [Attachments, files, and search surfaces](#attachments-files-and-search-surfaces)
 - [MCP and external-interface experiments](#mcp-and-external-interface-experiments)
-- [Current feature status (0.2.2-source)](#current-feature-status-022-source)
+- [Current feature status (0.2.4-source)](#current-feature-status-024-source)
 - [Historical preview APK](#historical-preview-apk)
 - [Running and testing](#running-and-testing)
 - [Configuration](#configuration)
@@ -366,8 +366,8 @@ Source identity:
 ```text
 App: Elementera Coast Source
 applicationId = com.elementeracoast.source
-versionCode = 4
-versionName = 0.2.2-source
+versionCode = 6
+versionName = 0.2.4-source
 ```
 
 The Android client keeps the copied native application structure, including areas such as:
@@ -501,7 +501,7 @@ They should be treated as experimental.
 
 The source Native client now includes the original owner calendar, Tidal Library shelf and reader, EPUB/TXT import and audio-clip actions, using the same source backend contracts as the PWA. Only the interface and generic implementation are mirrored; private data, accounts, identities and signing are excluded. See [Native parity acceptance](docs/SOURCE_NATIVE_PARITY_2026-10-21.md).
 
-## Current feature status (0.2.2-source)
+## Current feature status (0.2.4-source)
 
 This section describes the **current source tree**, not the features of the first `v0.1-source` APK. See [release history](docs/SOURCE_RELEASE_HISTORY.md) for the distinction between versioned source, historical assets and temporary QA packages.
 
@@ -510,7 +510,7 @@ This section describes the **current source tree**, not the features of the firs
 | Web / PWA | Conversation UI, streaming/SSE paths, visible context and tool records, owner/visitor separation, memory and world-book workspaces, attachment handling | Model responses and tool integrations need independently configured services; no private production data is distributed |
 | Owner calendar | Entries, notes, edits/deletion and recurrence, with owner-authenticated backend routes | Requires self-hosted backend and storage; tested temporary demos use synthetic data |
 | Tidal Library | TXT/EPUB imports, shelf/cover, chapter and page navigation, saved progress, highlights, annotations, reader options | The PWA and Native clients use the same backend contracts when connected to the same host |
-| Android Native | Jetpack Compose chat and Daily surfaces, calendar, book room, themes, local background selection, reading style/weight and user-supplied local fonts | `0.2.2-source`, `versionCode=4`; proprietary preset fonts are **not** bundled. Missing fonts use visibly different system fallbacks |
+| Android Native | Jetpack Compose chat and Daily surfaces, calendar, book room, themes, local background selection, reading style/weight and user-supplied local fonts | `0.2.4-source`, `versionCode=6`; proprietary preset fonts are **not** bundled. Missing fonts use visibly different system fallbacks |
 | Voice clips | Message-linked speech clip controls, playback and authorized generation endpoints | Actual speech generation requires self-hosted server-side `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`; no voice credentials or preset voice shipped |
 | Exports / tools | Source JSON/HTML snapshot and authorized calendar/reading/voice tool routes | Do not mistake unconfigured integrations or experimental interfaces for production services |
 
