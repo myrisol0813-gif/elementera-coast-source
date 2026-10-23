@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -57,6 +58,7 @@ fun GlobalExcerptScreen(
     var editingCandidateId by remember { mutableStateOf<String?>(null) }
     var editBody by remember { mutableStateOf("") }
     var busyId by remember { mutableStateOf<String?>(null) }
+    var clearConfirmation by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         runCatching { repository.refreshGlobalExcerpt() }
@@ -72,6 +74,35 @@ fun GlobalExcerptScreen(
                 .onFailure { onSnackbar("全局摘录操作失败：${it.message ?: "未知错误"}") }
             busyId = null
         }
+    }
+
+    if (clearConfirmation) {
+        AlertDialog(
+            onDismissRequest = { if (busyId == null) clearConfirmation = false },
+            title = { Text("清空全局摘录正文？") },
+            text = {
+                Text("正式正文会变为空白；已有修改历史仍保留，待确认候选不会删除。不会影响思维壤、记忆、种子或聊天。")
+            },
+            confirmButton = {
+                Button(
+                    enabled = busyId == null,
+                    onClick = {
+                        val version = excerpt.revision
+                        runAction("clear", "全局摘录正文已清空，历史仍可查看。") {
+                            repository.clearGlobalExcerpt(version)
+                            clearConfirmation = false
+                        }
+                    }
+                ) { Text("确认清空") }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = busyId == null,
+                    onClick = { clearConfirmation = false }
+                ) { Text("保留正文") }
+            },
+            shape = RoundedCornerShape(24.dp)
+        )
     }
 
     LazyColumn(
@@ -145,7 +176,19 @@ fun GlobalExcerptScreen(
         }
 
         item {
-            Text("正式正文", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                Text("正式正文", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                if (excerpt.body.isNotBlank()) {
+                    TextButton(
+                        enabled = busyId == null,
+                        onClick = { clearConfirmation = true }
+                    ) { Text("清空正文", color = MaterialTheme.colorScheme.error) }
+                }
+            }
             Spacer(Modifier.height(6.dp))
             SnowLetterSurface(
                 modifier = Modifier.fillMaxWidth(),
@@ -154,7 +197,7 @@ fun GlobalExcerptScreen(
                 fallbackShape = RoundedCornerShape(20.dp)
             ) {
                 Text(
-                    excerpt.body.ifBlank { "正在读取正式正文……" },
+                    excerpt.body.ifBlank { "这里还是空白的。今后确认的摘录会出现在这里。" },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 18.dp),
                     style = MaterialTheme.typography.bodyLarge
                 )
