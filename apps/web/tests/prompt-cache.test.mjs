@@ -46,10 +46,10 @@ const second = trimContextToComfortRange({
 });
 const stablePrefix = '你是模型伙伴。\n\n';
 assert.ok(first.modelMessages[0].content.startsWith(stablePrefix));
-const stableEnd = first.modelMessages[0].content.indexOf('【思维壤】');
+const stableEnd = first.modelMessages[0].content.indexOf('【整理当前对话的纸条】');
 assert.ok(stableEnd > 1024);
 assert.equal(first.modelMessages[0].content.slice(0, stableEnd),
-  second.modelMessages[0].content.slice(0, second.modelMessages[0].content.indexOf('【思维壤】')));
+  second.modelMessages[0].content.slice(0, second.modelMessages[0].content.indexOf('【整理当前对话的纸条】')));
 
 const originalFetch = globalThis.fetch;
 const requested = [];
