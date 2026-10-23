@@ -4,6 +4,9 @@ import com.elementeracoast.app.core.auth.AndroidKeystoreAuthStore
 import com.elementeracoast.app.core.auth.AuthSession
 import com.elementeracoast.app.core.remote.RemoteAttachment
 import com.elementeracoast.app.core.remote.RemoteAttachmentResponse
+import com.elementeracoast.app.core.remote.RemoteNativeChatContext
+import com.elementeracoast.app.core.remote.RemoteNativeToolResult
+import com.elementeracoast.app.core.remote.RemotePlanSoilPrepareResponse
 import com.elementeracoast.app.core.remote.RemoteChatRequest
 import com.elementeracoast.app.core.remote.RemoteConversation
 import com.elementeracoast.app.core.remote.RemoteConversationListResponse
@@ -44,6 +47,10 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
@@ -266,6 +273,47 @@ class CoastApiClient(
         return jsonRequest(Request.Builder().url(config.url("/api/chat/history?conversation_id=${encodeQuery(conversationId)}")).put(jsonBody(payload)).build(), RemoteHistoryResponse.serializer()).history
     }
 
+    /** Authenticated context assembly; ChatGPT bearer tokens stay on this device. */
+    suspend fun prepareNativeChatGpt(value: RemoteChatRequest): RemoteNativeChatContext {
+        val payload = json.encodeToString(RemoteChatRequest.serializer(), value)
+        return jsonRequest(
+            Request.Builder().url(config.url("/api/chat/native-context")).post(jsonBody(payload)).build(),
+            RemoteNativeChatContext.serializer()
+        )
+    }
+
+    suspend fun executeNativeChatGptTool(
+        value: RemoteChatRequest,
+        call: JsonObject,
+        toolIndex: Int
+    ): RemoteNativeToolResult {
+        val body = buildJsonObject {
+            json.encodeToJsonElement(RemoteChatRequest.serializer(), value).jsonObject.forEach { (key, entry) ->
+                put(key, entry)
+            }
+            put("tool_call", call)
+            put("tool_index", toolIndex)
+        }
+        return jsonRequest(
+            Request.Builder().url(config.url("/api/chat/native-tool")).post(jsonBody(body.toString())).build(),
+            RemoteNativeToolResult.serializer()
+        )
+    }
+
+    suspend fun saveNativeChatGptEcho(
+        conversationId: String, messageId: String, snapshot: JsonObject
+    ) {
+        val body = buildJsonObject {
+            put("conversation_id", conversationId)
+            put("message_id", messageId)
+            put("snapshot", snapshot)
+        }
+        jsonRequestElement(
+            Request.Builder().url(config.url("/api/chat/native-echo"))
+                .post(jsonBody(body.toString())).build()
+        )
+    }
+
     suspend fun listModels(refresh: Boolean = false): RemoteModelCatalogResponse {
         val suffix = if (refresh) "?refresh=1" else ""
         return jsonRequest(Request.Builder().url(config.url("/api/models$suffix")).get().build(), RemoteModelCatalogResponse.serializer())
@@ -288,6 +336,45 @@ class CoastApiClient(
     suspend fun organizeThoughtSoil(conversationId: String, modelId: String): RemoteSoilOrganizeResponse {
         val payload = json.encodeToString(RemoteSoilOrganizeRequest.serializer(), RemoteSoilOrganizeRequest(conversationId = conversationId, model = modelId))
         return jsonRequest(Request.Builder().url(config.url("/api/memory/soil/organize")).post(jsonBody(payload)).build(), RemoteSoilOrganizeResponse.serializer())
+    }
+
+    suspend fun preparePlanSoil(conversationId: String, modelId: String): RemotePlanSoilPrepareResponse {
+        val payload = buildJsonObject {
+            put("conversation_id", conversationId)
+            put("model", modelId)
+            put("action", "prepare")
+        }.toString()
+        return jsonRequest(
+            Request.Builder().url(config.url("/api/memory/soil/plan"))
+                .post(jsonBody(payload)).build(),
+            RemotePlanSoilPrepareResponse.serializer()
+        )
+    }
+
+    suspend fun commitPlanSoil(
+        conversationId: String, modelId: String,
+        prepared: RemotePlanSoilPrepareResponse, text: String,
+        inputTokens: Long?, cachedTokens: Long?, outputTokens: Long?
+    ): RemoteSoilOrganizeResponse {
+        val payload = buildJsonObject {
+            put("conversation_id", conversationId)
+            put("model", modelId)
+            put("action", "commit")
+            put("expected_turn_id", prepared.expectedTurnId)
+            put("expected_assistant_id", prepared.expectedAssistantId)
+            put("expected_soil_revision", prepared.expectedSoilRevision)
+            put("result_text", text)
+            put("usage", buildJsonObject {
+                inputTokens?.let { put("input_tokens", it) }
+                cachedTokens?.let { put("cached_tokens", it) }
+                outputTokens?.let { put("output_tokens", it) }
+            })
+        }.toString()
+        return jsonRequest(
+            Request.Builder().url(config.url("/api/memory/soil/plan"))
+                .post(jsonBody(payload)).build(),
+            RemoteSoilOrganizeResponse.serializer()
+        )
     }
 
     fun streamChat(payload: RemoteChatRequest): Flow<ApiStreamEvent> = callbackFlow {
