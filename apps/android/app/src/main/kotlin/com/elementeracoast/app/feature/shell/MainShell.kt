@@ -32,6 +32,7 @@ import com.elementeracoast.app.core.model.FeatureDestination
 import com.elementeracoast.app.core.model.MessageAction
 import com.elementeracoast.app.core.model.RoomType
 import com.elementeracoast.app.feature.chat.ChatWindow
+import com.elementeracoast.app.feature.chatgpt.ChatGptConnectState
 import com.elementeracoast.app.feature.chat.ModelQuickPicker
 import com.elementeracoast.app.feature.daily.DailyRepository
 import com.elementeracoast.app.feature.dogtalk.CrossWindowRepository
@@ -48,6 +49,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun MainShell(
     state: CoastShellState,
+    chatGpt: ChatGptConnectState,
     services: LocalFeatureServices,
     daily: DailyRepository,
     memory: MemoryRepository,
@@ -80,6 +82,10 @@ fun MainShell(
     onDismissModels: () -> Unit,
     onSelectModel: (String) -> Unit,
     onRefreshModels: () -> Unit,
+    onChatGptConnect: () -> Unit,
+    onChatGptDisconnect: () -> Unit,
+    onChatGptRefresh: () -> Unit,
+    onChatGptProbe: (String) -> Unit,
     onLogout: () -> Unit,
     onPlaceholder: (String) -> Unit,
     onSnackbarShown: () -> Unit
@@ -192,6 +198,7 @@ fun MainShell(
                         FeatureLandingScreen(
                             feature = feature,
                             shellState = state,
+                            chatGpt = chatGpt,
                             services = services,
                             daily = daily,
                             memory = memory,
@@ -205,6 +212,10 @@ fun MainShell(
                             onUpdateModelPartnerAvatar = onUpdateModelPartnerAvatar,
                             onSelectModel = onSelectModel,
                             onRefreshModels = onRefreshModels,
+                            onChatGptConnect = onChatGptConnect,
+                            onChatGptDisconnect = onChatGptDisconnect,
+                            onChatGptRefresh = onChatGptRefresh,
+                            onChatGptProbe = onChatGptProbe,
                             onLogout = onLogout,
                             onImportMessages = onImportMessages,
                             onLocalActionLogged = onLocalActionLogged,
@@ -216,7 +227,17 @@ fun MainShell(
         }
 
         if (state.showModelPicker && state.activeFeature == null) {
-            ModelQuickPicker(state.models, state.currentModel, onSelectModel, onDismissModels)
+            ModelQuickPicker(
+                models = state.models,
+                modelReasoningChoices = state.modelReasoningChoices,
+                currentModel = state.currentModel,
+                onPick = onSelectModel,
+                onDismiss = onDismissModels,
+                chatGpt = chatGpt,
+                onChatGptConnect = onChatGptConnect,
+                onChatGptRefresh = onChatGptRefresh,
+                onChatGptProbe = onChatGptProbe
+            )
         }
         if (showThemeWardrobe) {
             ThemeWardrobeSheet(
