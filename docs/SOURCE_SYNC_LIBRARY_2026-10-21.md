@@ -22,7 +22,7 @@
 - Supported text-only EPUB is not a full EPUB rendering engine; DRM, complex layout and embedded images are unsupported.
 
 ## Acceptance
-1. Open source-edition PWA and look for "潮中书房" in sidebar. Visually compare its shelves/reader to the original; no replacement component should appear.
+1. Open source-edition PWA and look for "书房" in sidebar. Visually compare its shelves/reader to the original; no replacement component should appear.
 2. Create a small synthetic TXT or text-only EPUB and import it. Open chapters, swipe pages and change theme / font size.
 3. Highlight a sentence; add, edit, delete notes and reflections; upload a sample cover.
 4. Verify reading position after closing and reopening a book.
