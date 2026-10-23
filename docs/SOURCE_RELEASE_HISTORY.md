@@ -28,6 +28,8 @@ Only the tagged source revision and the matching Release assets describe what wa
 ## Current source Native QA — 0.2.8-source (2026-10-24)
 
 - Public Native conversation geometry now matches the private version's general layout: assistant avatar in its own header row above the reply paper, full-width reply cards, closer message spacing, body line-height and horizontal padding.
+- Public Native also unifies the private-draft / cross-window panel and current-turn desk in one collapsible composer-adjacent drawer, replacing the nonfunctional microphone placeholder and standalone turn desk strip. The full desk bottom sheet remains available within the drawer.
+- The private Starry Coast bundled artwork, overlay frames, and frame-specific scroll clearance remain intentionally excluded; custom public backgrounds continue to work independently.
 - Preserves public-only UI semantics such as the generalized model identity, like button, neutral voice caption, visitor doorway and public background/skin assets; no private imagery, identity or secrets are imported.
 - The Source backend ChatGPT image-delivery fix was merged separately in PR #30. Source Native builds from main include it only when paired with that updated backend.
 - No private updater/signing chain changes; visitor QA continues to be disposable-signed. Confirm the visual result on a real device.
