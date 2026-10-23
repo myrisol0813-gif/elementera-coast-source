@@ -246,7 +246,7 @@ class DefaultChatRepository(
 
     override fun cacheHistory(conversationId: String, history: RemoteHistory) = cache.putHistory(conversationId, history)
 
-    private fun CrossWindowRequest.toRemote(): RemoteCrossWindowRequest? {
+    internal fun CrossWindowRequest.toRemote(): RemoteCrossWindowRequest? {
         if (mode == CrossWindowMode.Off) return null
         return RemoteCrossWindowRequest(
             mode = mode.wireValue,
