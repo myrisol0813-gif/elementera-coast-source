@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import com.elementeracoast.app.core.model.ChatMessage
 import com.elementeracoast.app.core.model.CoastShellState
 import com.elementeracoast.app.core.model.FeatureDestination
+import com.elementeracoast.app.feature.chatgpt.ChatGptConnectState
 import com.elementeracoast.app.feature.daily.DailyLanding
 import com.elementeracoast.app.feature.daily.DailyRepository
 import com.elementeracoast.app.feature.letters.IslandLetterScreen
@@ -19,6 +20,7 @@ import com.elementeracoast.app.ui.theme.SnowLetterFeatureScaffold
 internal fun FeatureLandingScreen(
     feature: FeatureDestination,
     shellState: CoastShellState,
+    chatGpt: ChatGptConnectState,
     services: LocalFeatureServices,
     daily: DailyRepository,
     memory: MemoryRepository,
@@ -32,6 +34,10 @@ internal fun FeatureLandingScreen(
     onUpdateModelPartnerAvatar: (String) -> Unit,
     onSelectModel: (String) -> Unit,
     onRefreshModels: () -> Unit,
+    onChatGptConnect: () -> Unit,
+    onChatGptDisconnect: () -> Unit,
+    onChatGptRefresh: () -> Unit,
+    onChatGptProbe: (String) -> Unit,
     onLogout: () -> Unit,
     onImportMessages: (List<ChatMessage>) -> Unit,
     onLocalActionLogged: (String, String, String) -> Unit,
@@ -60,11 +66,16 @@ internal fun FeatureLandingScreen(
             FeatureDestination.Wolf -> WolfScreen(
                 store = services.wolf,
                 shellState = shellState,
+                chatGpt = chatGpt,
                 messages = messages,
                 devHands = devHands,
                 archive = archive,
                 onSelectModel = onSelectModel,
                 onRefreshModels = onRefreshModels,
+                onChatGptConnect = onChatGptConnect,
+                onChatGptDisconnect = onChatGptDisconnect,
+                onChatGptRefresh = onChatGptRefresh,
+                onChatGptProbe = onChatGptProbe,
                 onLogout = onLogout,
                 onImportMessages = onImportMessages,
                 onActionLogged = onLocalActionLogged,
