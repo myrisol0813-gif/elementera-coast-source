@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.elementeracoast.app.core.auth.SessionRestoreResult
+import com.elementeracoast.app.core.tour.SourceVisitGate
 import com.elementeracoast.app.core.local.LocalPersistence
 import com.elementeracoast.app.core.local.SharedPreferencesLocalPersistence
 import com.elementeracoast.app.core.model.ChatAttachment
@@ -77,6 +78,22 @@ class CoastShellViewModel(
     fun enterCoast() {
         val password = _state.value.password
         if (password.isBlank() || _state.value.authBusy) return
+        // A public, non-authenticated doorway into the existing UI. Never call login/bootstrap.
+        if (SourceVisitGate.open(password)) {
+            _state.update {
+                CoastShellState(
+                    authenticated = true,
+                    authBusy = false,
+                    backendOffline = true,
+                    sessionPersistence = SourceVisitGate.SESSION_KIND,
+                    theme = it.theme,
+                    userBubbleHex = it.userBubbleHex,
+                    accentHex = it.accentHex,
+                    snackbarMessage = "已进入参观模式：可浏览所有页面与本机外观；云端功能不连接。"
+                )
+            }
+            return
+        }
         viewModelScope.launch(workDispatcher) {
             _state.update { it.copy(authBusy = true, authMessage = null) }
             try {
@@ -112,6 +129,17 @@ class CoastShellViewModel(
         historyJob?.cancel()
         soilJobs.values.forEach(Job::cancel)
         soilJobs.clear()
+        if (SourceVisitGate.isActive) {
+            SourceVisitGate.leave()
+            _state.update {
+                CoastShellState(
+                    theme = it.theme,
+                    userBubbleHex = it.userBubbleHex,
+                    accentHex = it.accentHex
+                )
+            }
+            return
+        }
         viewModelScope.launch(workDispatcher) {
             backend.auth.logout()
             _state.update {
@@ -160,6 +188,7 @@ class CoastShellViewModel(
     }
 
     fun newConversation() {
+        if (tourBlocksCloudAction()) return
         stopGeneration()
         discardPendingAttachments()
         val roomType = _state.value.activeRoomType
@@ -182,6 +211,7 @@ class CoastShellViewModel(
     }
 
     fun renameConversation(id: String, rawTitle: String) {
+        if (tourBlocksCloudAction()) return
         val clean = rawTitle.trim()
         if (clean.isBlank()) return
         viewModelScope.launch(workDispatcher) {
@@ -200,6 +230,7 @@ class CoastShellViewModel(
     }
 
     fun deleteConversation(id: String) {
+        if (tourBlocksCloudAction()) return
         val target = _state.value.conversations.firstOrNull { it.id == id } ?: return
         if (target.id == _state.value.activeConversationId) stopGeneration()
         viewModelScope.launch(workDispatcher) {
@@ -256,6 +287,7 @@ class CoastShellViewModel(
     }
 
     fun selectModel(model: String) {
+        if (tourBlocksCloudAction()) return
         if (model !in _state.value.models || model == _state.value.currentModel) {
             _state.update { it.copy(showModelPicker = false) }
             return
@@ -279,6 +311,7 @@ class CoastShellViewModel(
     }
 
     fun refreshModels() {
+        if (tourBlocksCloudAction()) return
         viewModelScope.launch(workDispatcher) {
             try {
                 val catalog = backend.profile.refreshModels(force = true)
@@ -291,6 +324,7 @@ class CoastShellViewModel(
     }
 
     fun refreshCoastState() {
+        if (tourBlocksCloudAction()) return
         if (!_state.value.authenticated || generationJob?.isActive == true || _state.value.isStreaming) return
         viewModelScope.launch(workDispatcher) {
             val remoteProfile = remoteOrNull("读取个人资料") { backend.profile.refreshProfile() }
@@ -315,6 +349,7 @@ class CoastShellViewModel(
     }
 
     fun updateModelPartnerAvatar(dataUrl: String) {
+        if (tourBlocksCloudAction()) return
         if (dataUrl.isBlank()) return
         viewModelScope.launch(workDispatcher) {
             try {
@@ -340,6 +375,7 @@ class CoastShellViewModel(
     }
 
     fun sendMessage(text: String) {
+        if (tourBlocksCloudAction()) return
         val clean = text.trim()
         val pendingAttachments = _state.value.pendingAttachments
         if ((clean.isBlank() && pendingAttachments.isEmpty()) || generationJob?.isActive == true || _state.value.isStreaming || _state.value.attachmentUploading) return
@@ -398,6 +434,7 @@ class CoastShellViewModel(
     }
 
     fun uploadAttachment(name: String, mime: String, bytes: ByteArray) {
+        if (tourBlocksCloudAction()) return
         if (
             bytes.isEmpty() ||
             bytes.size > 8 * 1024 * 1024 ||
@@ -456,6 +493,7 @@ class CoastShellViewModel(
     }
 
     fun removePendingAttachment(attachmentId: String) {
+        if (tourBlocksCloudAction()) return
         val id = attachmentId.trim()
         val conversationId = _state.value.activeConversationId
         if (id.isBlank() || conversationId.isBlank()) return
@@ -485,6 +523,10 @@ class CoastShellViewModel(
     }
 
     fun handleMessageAction(action: MessageAction) {
+        if (SourceVisitGate.isActive && action !is MessageAction.Copy && action !is MessageAction.SelectVariant) {
+            tourBlocksCloudAction()
+            return
+        }
         val current = _state.value
         val message = current.messages.firstOrNull { it.id == action.messageId } ?: return
         when (action) {
@@ -520,6 +562,12 @@ class CoastShellViewModel(
 
     fun showPlaceholder(message: String) {
         _state.update { it.copy(snackbarMessage = message) }
+    }
+
+    private fun tourBlocksCloudAction(): Boolean {
+        if (!SourceVisitGate.isActive) return false
+        showPlaceholder("参观模式只供浏览；此操作需要连接自己的后端。")
+        return true
     }
 
     fun clearSnackbar() {
