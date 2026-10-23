@@ -75,7 +75,7 @@ jobs:
           [[ "$line" == *"versionCode='8'"* ]]
           [[ "$line" == *"versionName='0.2.6-source'"* ]]
           "${build_tools}/apksigner" verify --verbose --print-certs "$apk" > "${RUNNER_TEMP}/source-visitor-apk-certs.txt"
-          fingerprint="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "${RUNNER_TEMP}/source-visitor-apk-certs.txt" | head -n 1)"
+          fingerprint="$(grep -m1 'certificate SHA-256 digest:' \"${RUNNER_TEMP}/source-visitor-apk-certs.txt\" | awk '{print $NF}')"
           : "${fingerprint:?Missing source certificate fingerprint}"
           echo "fingerprint=$fingerprint" >> "${GITHUB_OUTPUT}"
           mkdir -p source-release
