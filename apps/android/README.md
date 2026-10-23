@@ -6,8 +6,8 @@ This directory contains the source-available Android client derived from the cur
 
 - App: Elementera Coast Source
 - `applicationId = com.elementeracoast.source`
-- `versionCode = 6`
-- `versionName = 0.2.4-source`
+- `versionCode = 7`
+- `versionName = 0.2.5-source`
 - Kotlin + Jetpack Compose
 - JDK 17 / Android SDK 34 / Gradle 8.9
 
@@ -18,6 +18,10 @@ The Kotlin namespace remains the original internal namespace so the copied sourc
 PWA and Native share the same canonical backend contracts. The source build keeps the real page structure, navigation, themes, repositories, HTTP/SSE transport, conversation flow, Daily surfaces, memory surfaces, visitor mailbox, model workspace, owner settings and diagnostic UI from the copied Native tree.
 
 Source-local configuration uses `BuildConfig.COAST_API_BASE_URL`. The checked-in default is the non-routable placeholder `https://elementera-coast-source.invalid`; self-hosters should point their own build at their own backend.
+
+## Native-only cloud paper
+
+The source APK includes a fourth paper mode, **云朵浮雕边**, in Wolf Den > Appearance. Its Compose path adapts to bubble dimensions; it draws a theme-derived 0.75dp border at 70% of the selected message opacity plus a 2dp soft shadow. A default-on local switch can disable only the border. This implementation includes no private artwork, no proprietary fonts, and no changes to the source PWA.
 
 ## Source-build boundaries
 
