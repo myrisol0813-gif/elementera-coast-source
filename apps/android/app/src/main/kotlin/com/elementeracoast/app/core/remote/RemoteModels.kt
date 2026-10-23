@@ -220,7 +220,7 @@ data class RemoteLandingLetterResponse(
 )
 
 @Serializable
-data class RemoteModelCatalogItem(val id: String, val name: String = "")
+data class RemoteModelCatalogItem(\n    val id: String,\n    val name: String = "",\n    @SerialName("reasoning_efforts") val reasoningEfforts: List<String> = emptyList()\n)
 
 @Serializable
 data class RemoteModelGroups(
