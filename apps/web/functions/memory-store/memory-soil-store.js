@@ -58,13 +58,14 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
     throw new MemoryStoreError('soil_locked', '整理当前对话的纸条已由屋主手动锁定。', 409);
   }
   const has = (name) => Object.prototype.hasOwnProperty.call(value, name);
+  const changesContent = ['current_text', 'hand_seeds', 'do_not_repeat', 'pocket_candidates', 'organized_through_turn_id'].some(has);
   const next = {
     current_text: has('current_text') ? clip(value.current_text, MAX_SOIL_TEXT) : current.current_text,
     hand_seeds: has('hand_seeds') ? normalizeHandSeeds(value.hand_seeds) : current.hand_seeds,
     do_not_repeat: has('do_not_repeat') ? clip(value.do_not_repeat, MAX_SOIL_TEXT) : current.do_not_repeat,
     pocket_candidates: has('pocket_candidates') ? normalizePocketCandidates(value.pocket_candidates) : current.pocket_candidates,
     organized_through_turn_id: has('organized_through_turn_id') ? clip(value.organized_through_turn_id, 180) : current.organized_through_turn_id,
-    manual_locked: has('manual_locked') ? bool(value.manual_locked) : current.manual_locked,
+    manual_locked: has('manual_locked') ? bool(value.manual_locked) : (!automatic && changesContent ? true : current.manual_locked),
     auto_refresh_enabled: has('auto_refresh_enabled') ? bool(value.auto_refresh_enabled) : current.auto_refresh_enabled,
   };
   const identity = provenance.identity
