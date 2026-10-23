@@ -95,6 +95,6 @@ export async function routeLibraryApi(request,env,session) {
       const mapped=requestBodyError(error,{invalidMessage:'书房请求不是有效 JSON。',tooLargeMessage:`书房单次上传不得超过 ${LIBRARY_LIMITS.import_batch_bytes} 字节；请缩小批次。`});
       return apiError(mapped.type,mapped.message,mapped.status);
     }
-    return unexpectedApiError('tidal-library',error,'library_failed','潮中书房暂时无法完成操作');
+    return unexpectedApiError('tidal-library',error,'library_failed','书房暂时无法完成操作');
   }
 }
