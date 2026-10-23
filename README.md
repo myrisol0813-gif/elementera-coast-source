@@ -43,19 +43,36 @@ That backend URL is part of the APK build configuration. **The published visitor
 
 ### 2. Run a live source test with your own ChatGPT account
 
-To test the complete Native flow, run your own source backend, expose it temporarily or permanently, and build a fresh APK against that backend.
+The fastest path does **not** require a Cloudflare account.
 
-A convenient disposable setup is:
+In your own copy of the repository, open **Actions → Live ChatGPT Test → Run workflow**. The workflow automatically:
 
 ```text
-local source backend
+fresh empty Coast backend
         ↓
 Cloudflare Quick Tunnel
         ↓
-fresh Source Native APK
+fresh Native APK with visitor mode OFF
+        ↓
+private Draft Release with APK + temporary login details
 ```
 
-Build the Android app with the tunnel URL and disable the public visitor doorway:
+Open the Draft Release as soon as the workflow says the package is ready. Install the APK, use the random Coast password shown in the Draft Release, then:
+
+1. open the model box;
+2. choose the **ChatGPT plan** section;
+3. select **Continue with ChatGPT** and complete browser authorization;
+4. return to the app, refresh the account model list, choose a model, and send a test reply.
+
+The temporary backend and Quick Tunnel stay alive only for the workflow's test window. The APK uses a disposable QA signing certificate and is meant for testing, not permanent installation.
+
+If you are testing from a **new GitHub account**, fork this repository first. GitHub may ask you to enable Actions on the fork. Once enabled, run **Live ChatGPT Test** from the fork's **Actions** tab. Running workflows in the original repository requires write access to that repository.
+
+The ChatGPT OAuth credentials are stored on the Android device with Android Keystore and are not sent to the Coast backend. The device calls the OpenAI Responses API directly; the Coast backend is used for workspace context, history, authorized tool operations, and sanitized receipts.
+
+#### Manual equivalent
+
+You can also run your own source backend, expose it with a temporary or permanent HTTPS URL, and build a fresh APK against it:
 
 ```bash
 cd apps/android
@@ -63,16 +80,6 @@ gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon \
   -PCOAST_API_BASE_URL="https://YOUR-TUNNEL.trycloudflare.com" \
   -PSOURCE_TOUR_ENABLED=false
 ```
-
-Then:
-
-1. sign in through the normal Coast backend login;
-2. open the model box;
-3. choose the **ChatGPT plan** section;
-4. select **Continue with ChatGPT** and complete browser authorization;
-5. return to the app, refresh the account model list, choose a model, and send a test reply.
-
-The ChatGPT OAuth credentials are stored on the Android device with Android Keystore and are not sent to the Coast backend. The device calls the OpenAI Responses API directly; the Coast backend is used for workspace context, history, authorized tool operations, and sanitized receipts.
 
 For a longer-lived setup, replace the Quick Tunnel with your own hosted source backend. See [Running and testing](#running-and-testing), [Configuration](#configuration), and `apps/android/README.md`.
 
