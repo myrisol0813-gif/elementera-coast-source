@@ -44,6 +44,12 @@ internal fun SnowLetterSurfaceRole.usesEmbossedPaper(paperMode: CoastPaperMode):
 internal fun SnowLetterSurfaceRole.usesCutPaper(paperMode: CoastPaperMode): Boolean =
     paperMode == CoastPaperMode.Cut
 
+/** Shared cloud paper; small icon buttons keep a round, easily tapped silhouette. */
+internal fun SnowLetterSurfaceRole.usesCloudPaper(paperMode: CoastPaperMode): Boolean =
+    paperMode == CoastPaperMode.Cloud &&
+        this != SnowLetterSurfaceRole.ActionButton &&
+        this != SnowLetterSurfaceRole.ComposerButton
+
 @Composable
 fun SnowLetterSurface(
     modifier: Modifier = Modifier,
@@ -58,6 +64,7 @@ fun SnowLetterSurface(
     val appearance = LocalCoastAppearance.current
     val isMessageSurface = role == SnowLetterSurfaceRole.AssistantBubble || role == SnowLetterSurfaceRole.UserBubble
     val messageAlpha = appearance.messageSurfaceAlpha.coerceIn(.55f, 1f)
+    val cloud = role.usesCloudPaper(appearance.paperMode)
     val embossed = role.usesEmbossedPaper(appearance.paperMode)
     val cut = role.usesCutPaper(appearance.paperMode)
 
@@ -73,6 +80,35 @@ fun SnowLetterSurface(
     }
 
     val surfaceModifier = when {
+        cloud -> {
+            val shape = CoastCloudShape
+            val cloudFill = if (role == SnowLetterSurfaceRole.UserBubble && appearance.userBubbleColor == null) {
+                fallbackColor.copy(alpha = fallbackColor.alpha * messageAlpha)
+            } else {
+                paperFill
+            }
+            val shadowTint = MaterialTheme.colorScheme.onSurface
+            Modifier
+                .shadow(
+                    elevation = 2.dp,
+                    shape = shape,
+                    clip = false,
+                    ambientColor = shadowTint.copy(alpha = .20f * messageAlpha),
+                    spotColor = shadowTint.copy(alpha = .16f * messageAlpha)
+                )
+                .background(cloudFill, shape)
+                .then(
+                    if (appearance.cloudOutlineEnabled) {
+                        Modifier.border(
+                            0.75.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = .70f * messageAlpha),
+                            shape
+                        )
+                    } else {
+                        Modifier
+                    }
+                )
+        }
         embossed -> {
             val paperShape = if (role == SnowLetterSurfaceRole.UserBubble) fallbackShape else RoundedCornerShape(17.dp)
             val shadowTint = Color(0xFF8495A6)
