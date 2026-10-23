@@ -25,6 +25,7 @@ import {
 import { estimateContextTokens as estimateTokens } from './context-comfort-range.js';
 import { executeRegisteredTool } from './tool-registry.js';
 import { encodeSseEvent } from './stream-format.js';
+import { prepareNativeChatGpt, executeNativeChatGptTool, saveNativeChatGptEcho } from './native-chatgpt-chat.js';
 import {
   ModelRequestError,
   modelErrorResponse,
@@ -722,6 +723,9 @@ export function isChatApiPath(pathname) {
     || pathname.startsWith(`${ATTACHMENTS_PATH}/`)
     || pathname === LANDING_LETTER_PATH
     || pathname === MODEL_METADATA_PATH
+    || pathname === '/api/chat/native-context'
+    || pathname === '/api/chat/native-tool'
+    || pathname === '/api/chat/native-echo'
     || pathname === '/api/chat/history'
     || pathname === '/api/chat/profile'
     || pathname === '/api/chat/title'
@@ -737,6 +741,9 @@ export async function routeChatApi(request, env) {
     if (pathname === ATTACHMENTS_PATH || pathname.startsWith(`${ATTACHMENTS_PATH}/`)) return await attachments(request, env, pathname);
     if (pathname === LANDING_LETTER_PATH) return await landingLetter(request, env);
     if (pathname === MODEL_METADATA_PATH) return await modelMetadataApi(request, env);
+    if (pathname === '/api/chat/native-context') return await prepareNativeChatGpt(request, env);
+    if (pathname === '/api/chat/native-tool') return await executeNativeChatGptTool(request, env);
+    if (pathname === '/api/chat/native-echo') return await saveNativeChatGptEcho(request, env);
     if (pathname === '/api/chat/history') return await history(request, env);
     if (pathname === '/api/chat/profile') return await profile(request, env);
     if (pathname === '/api/chat/title') return await title(request, env);
