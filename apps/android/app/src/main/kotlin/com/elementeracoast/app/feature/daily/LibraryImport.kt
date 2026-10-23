@@ -29,7 +29,7 @@ internal object LibraryImport {
             if (it.moveToFirst()) it.getString(0) else null
         } ?: uri.lastPathSegment.orEmpty()
         val ext = name.substringAfterLast('.', "").lowercase()
-        require(ext in listOf("txt", "epub")) { "潮中书房目前只支持 TXT 和 EPUB。" }
+        require(ext in listOf("txt", "epub")) { "书房目前只支持 TXT 和 EPUB。" }
         val bytes = context.contentResolver.openInputStream(uri)?.use { it.readNBytes(FILE_LIMIT + 1) }
             ?: throw IllegalArgumentException("无法读取选中的书籍文件。")
         require(bytes.size <= FILE_LIMIT) { "源文件超过 40 MB，不会截断导入。" }
