@@ -18,7 +18,7 @@ jobs:
     # The visitor APK is offline-only. No external demo backend, production secrets,
     # stable signing keys, or administrator release flag are needed.
     if: >-
-      ${{ github.event_name == 'workflow_dispatch' ||} 
+      ${{ github.event_name == 'workflow_dispatch' ||
           (github.event.workflow_run.conclusion == 'success' &&
            github.event.workflow_run.head_branch == 'main' &&
            github.event.workflow_run.head_repository.full_name == github.repository) }}
@@ -70,7 +70,7 @@ jobs:
           bash scripts/sign-disposable-qa.sh "$apk"
           build_tools="$(find "${ANDROID_HOME}/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           badging="$("${build_tools}/aapt" dump badging "$apk")"
-          line="$(printf '%s\n' "$badging" | head -n 1)"
+          line="$(printf '%s\n' "$badging" | sed -n '1p')"
           [[ "$line" == *"name='com.elementeracoast.source'"* ]]
           [[ "$line" == *"versionCode='8'"* ]]
           [[ "$line" == *"versionName='0.2.6-source'"* ]]
