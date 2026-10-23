@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,7 +26,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -53,14 +51,17 @@ internal fun AssistantMessage(
     onAction: (MessageAction) -> Unit,
     onFootprint: () -> Unit
 ) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-        AssistantAvatar(avatarBitmap, onAvatarClick)
-        Spacer(Modifier.width(CoastChatTokens.AssistantAvatarGap))
-        Column(modifier = Modifier.weight(1f)) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            AssistantAvatar(avatarBitmap, onAvatarClick)
+        }
+        Spacer(Modifier.height(8.dp))
+        Column(modifier = Modifier.fillMaxWidth()) {
             SnowLetterSurface(
+                modifier = Modifier.fillMaxWidth(),
                 role = SnowLetterSurfaceRole.AssistantBubble,
-                fallbackColor = Color.Transparent,
-                fallbackShape = RoundedCornerShape(20.dp)
+                fallbackColor = MaterialTheme.colorScheme.surface.copy(alpha = .34f),
+                fallbackShape = RoundedCornerShape(18.dp)
             ) {
                 Column(modifier = Modifier.padding(snowLetterInnerPadding(SnowLetterSurfaceRole.AssistantBubble))) {
                     Text(
@@ -111,8 +112,8 @@ internal fun AssistantMessage(
 @Composable
 private fun AssistantAvatar(bitmap: ImageBitmap?, onClick: () -> Unit) {
     val modifier = Modifier.size(CoastChatTokens.AssistantAvatarSize).clip(CircleShape)
-        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
-        .background(MaterialTheme.colorScheme.surfaceVariant).clickable(onClick = onClick)
+        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .65f), CircleShape)
+        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .82f)).clickable(onClick = onClick)
     if (bitmap != null) {
         Image(bitmap = bitmap, contentDescription = "更换助手头像", contentScale = ContentScale.Crop, modifier = modifier)
     } else {
