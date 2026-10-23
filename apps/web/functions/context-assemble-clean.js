@@ -11,7 +11,7 @@ import { MEMORY_OWNER_ID, readCustomInstructions, readGlobalExcerpt } from './me
 import { currentMailboxVisitor, mailboxMessages } from './mailbox-service.js';
 import { listVisitorNotebook, readMailboxThoughtSoil } from './mailbox-repository.js';
 import { roomAccess } from './surface-access-rules.js';
-import { formatThinkingSoil } from './thinking-soil.js';
+import { formatThinkingSoil, isThinkingSoilEnabled } from './thinking-soil.js';
 import { executeModelTool, resolveToolSelection } from './tool-registry.js';
 import { sanitizeFurnitureRuns } from './tool-furniture-summary.js';
 import { matchWorldbook } from './worldbook.js';
@@ -184,6 +184,7 @@ export async function assembleCleanContext(env, {
       ? readCrossWindow(env.COAST_CHAT_DB, { ...crossWindowRequest, current_conversation_id: conversationId })
       : Promise.resolve(null),
   ]);
+  const soilEnabled = isThinkingSoilEnabled(papers.soil);
   const soilText = formatThinkingSoil(papers.soil, { maxCharacters: request.soilCharacters, maxHandSeeds: 7 });
   const memoryRecords = papers.memory?.visitor_memories ? [] : (Array.isArray(papers.memory?.items) ? papers.memory.items.slice(0, request.memoryLimit) : []);
   const memoryItems = papers.memory?.visitor_memories ? notebookItems(papers.memory.visitor_memories) : recallMemoryItems({ items: memoryRecords });
@@ -196,7 +197,9 @@ export async function assembleCleanContext(env, {
   });
   const deliveredMessages = comfort.keptMessages || comfort.modelMessages.filter((message) => message.role !== 'system');
   const currentDelivered = deliveredMessages.at(-1)?.role === 'user'; const deliveredRecent = currentDelivered ? deliveredMessages.slice(0, -1) : deliveredMessages;
-  const deliveredMemoryRecords = memoryRecords.slice(0, comfort.kept.memory); const soilDesk = soilDeskSnapshot(comfort.keptSoilText, papers.soil);
+  const deliveredMemoryRecords = memoryRecords.slice(0, comfort.kept.memory); const soilDesk = soilEnabled
+    ? soilDeskSnapshot(comfort.keptSoilText, papers.soil)
+    : soilDeskSnapshot('', null);
   const usedFurniture = [...new Set((Array.isArray(initialFurniture) ? initialFurniture : []).map((item) => String(item || '').trim()).filter(Boolean))]; const toolResults = []; const furnitureRuns = [];
   const toolGroups = { core: modelVisibleToolRecords.filter((tool) => tool.model_group === 'core'), side: modelVisibleToolRecords.filter((tool) => tool.model_group === 'side') };
   const onToolUsed = (name) => { const clean = String(name || '').trim(); if (clean && !usedFurniture.includes(clean)) usedFurniture.push(clean); };
@@ -215,7 +218,7 @@ export async function assembleCleanContext(env, {
     customInstructions: comfort.keptCustomInstructionsText, customInstructionsDelivered: comfort.kept.custom_instructions,
     globalExcerpt: comfort.keptGlobalExcerptText, globalExcerptStatus: comfort.globalExcerptStatus, globalExcerptTokens: comfort.globalExcerptTokens,
     estimatedTokens: comfort.estimatedTokens, comfortCeiling: comfort.comfortCeiling, exceedsComfortCeiling: comfort.exceedsComfortCeiling,
-    soil: comfort.kept.soil, soilContext: soilDesk.context,
+    soil: comfort.kept.soil, soilEnabled, soilContext: soilDesk.context,
     soilCurrentText: soilDesk.current_text, soilHandSeeds: soilDesk.hand_seeds, soilPocketCandidatesCount: soilDesk.pocket_candidates_count, memoryItems: deliveredMemoryRecords,
     memoryDeliveredTexts: comfort.keptMemoryItems, worldbookItems: worldbook, worldbookDeliveredCount: comfort.kept.worldbook, worldbookDeliveredTexts: comfort.keptWorldbookItems,
     dogtalk: comfort.kept.dogtalk, dogtalkContext: comfort.keptDogtalkText, crossWindow: currentCrossWindowDesk(), workbenchPrompt: comfort.kept.workbench, workbenchPromptText: comfort.keptWorkbenchText,
