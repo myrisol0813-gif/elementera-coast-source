@@ -18,6 +18,11 @@ import {
 
 export function chatPayload(modelId, messages, maxTokens, temperature, model, options = {}) {
   const payload = { model: modelId, messages };
+  // Only the server-generated SHA-256 session key is accepted. This keeps
+  // OpenRouter provider routing sticky without exposing a raw conversation ID.
+  if (/^[0-9a-f]{64}$/.test(String(options.sessionId || ''))) {
+    payload.session_id = options.sessionId;
+  }
   if (maxTokens !== null) {
     payload.max_completion_tokens = maxTokens;
     if (!modelId.startsWith('openai/')) payload.max_tokens = maxTokens;
@@ -46,24 +51,29 @@ export async function prepareFormalChat(env, input, allowSystem) {
   }
   const messages = validateMessages(input.messages, { system: allowSystem });
   const settings = input.settings || {};
-  const configuredMaxTokens = clamp(settings.maxOutputTokens, DEFAULT_FORMAL_TOKENS, 64, MAX_FORMAL_TOKENS);
-  const explicitMaxTokens = Object.prototype.hasOwnProperty.call(settings, 'max_tokens')
-    ? settings.max_tokens
-    : input.max_tokens;
-  const requestedMaxTokens = explicitMaxTokens === null
-    ? configuredMaxTokens
-    : explicitMaxTokens === undefined
-      ? (Number.isFinite(Number(settings.maxOutputTokens)) ? configuredMaxTokens : 600)
-      : explicitMaxTokens;
-  const maxTokens = clamp(requestedMaxTokens, 600, 1, MAX_FORMAL_TOKENS);
+  // Absent/null per-request ceilings use the same visible 8,000-token default
+  // as PWA and Native. A caller-provided ceiling (including short mode) wins.
+  const configuredMaxTokens = settings.maxOutputTokens == null
+    ? DEFAULT_FORMAL_TOKENS
+    : clamp(settings.maxOutputTokens, DEFAULT_FORMAL_TOKENS, 64, MAX_FORMAL_TOKENS);
+  const requestedMaxTokens = settings.max_tokens ?? input.max_tokens ?? configuredMaxTokens;
+  const maxTokens = clamp(requestedMaxTokens, configuredMaxTokens, 1, MAX_FORMAL_TOKENS);
   const temperature = clamp(settings.temperature ?? input.temperature, 0.7, 0, 2);
+  const effort = String(settings.reasoningEffort || '').trim();
+  const allowedEfforts = Array.isArray(model.reasoning_efforts) ? model.reasoning_efforts : [];
+  if (effort && !allowedEfforts.includes(effort)) {
+    throw new ModelRequestError('reasoning_effort_unsupported',
+      '当前模型没有提供此推理档位的可靠能力信息，请刷新模型目录或恢复默认档位。', 400,
+      { model: modelId, requested_effort: effort, supported_efforts: allowedEfforts });
+  }
   return {
     modelId,
     payload: chatPayload(modelId, messages, maxTokens, temperature, model, {
       responseFormat: input.response_format || null,
-      reasoning: input.reasoning || null,
+      reasoning: effort ? { effort } : (input.reasoning || null),
       tools: input.tools,
       toolChoice: input.tool_choice,
+      sessionId: input.session_id,
     }),
   };
 }
