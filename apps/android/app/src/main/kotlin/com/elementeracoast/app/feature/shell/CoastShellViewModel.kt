@@ -303,6 +303,26 @@ class CoastShellViewModel(
 
     fun selectModel(model: String) {
         if (tourBlocksCloudAction()) return
+        if (generationJob?.isActive == true || _state.value.isStreaming || _state.value.isFinalizing) {
+            _state.update { it.copy(snackbarMessage = "当前对话还未结束，请稍后切换模型。") }
+            return
+        }
+        if (isChatGptPlanModel(model)) {
+            val slug = model.removePrefix(CHATGPT_PLAN_PREFIX)
+            if (_chatGptState.value.connected && _chatGptState.value.availableModels.any { it.slug == slug }) {
+                chatGpt?.selectModel(slug)
+                _state.update {
+                    it.copy(
+                        currentModel = model,
+                        showModelPicker = false,
+                        snackbarMessage = "已切换官端 GPT；它使用 ChatGPT 套餐，不走后端模型额度。"
+                    )
+                }
+            } else {
+                _state.update { it.copy(snackbarMessage = "请先刷新官端 GPT 目录，确认该模型可用。") }
+            }
+            return
+        }
         if (model !in _state.value.models || model == _state.value.currentModel) {
             _state.update { it.copy(showModelPicker = false) }
             return
@@ -310,6 +330,7 @@ class CoastShellViewModel(
         viewModelScope.launch(workDispatcher) {
             try {
                 val profile = backend.profile.setCurrentChatModel(model)
+                chatGpt?.selectModel(null)
                 _state.update {
                     it.copy(
                         currentModel = profile.currentChatModel.ifBlank { model },
@@ -323,6 +344,105 @@ class CoastShellViewModel(
                 handleBackendError(error, "模型切换失败")
             }
         }
+    }
+
+    fun connectChatGpt(openBrowser: (String) -> Unit) {
+        if (tourBlocksCloudAction()) return
+        val client = chatGpt ?: return
+        if (_chatGptState.value.busy) return
+        viewModelScope.launch(workDispatcher) {
+            _chatGptState.update { it.copy(busy = true, message = "", probe = null) }
+            try {
+                val account = client.connect(openBrowser)
+                _chatGptState.update {
+                    it.copy(
+                        connected = true,
+                        accountLabel = account.email.ifBlank { "已验证的 ChatGPT 账户" },
+                        message = "授权成功，正在读取可用模型。"
+                    )
+                }
+                val models = client.models()
+                _chatGptState.update {
+                    it.copy(
+                        availableModels = models,
+                        message = if (models.isEmpty()) "授权成功，但本账户暂时没有返回可显示模型。"
+                        else "已读到 " + models.size + " 个账户可用模型，可以点测试回复。"
+                    )
+                }
+            } catch (error: Exception) {
+                _chatGptState.update {
+                    it.copy(
+                        connected = client.currentAccount() != null,
+                        accountLabel = client.currentAccount()?.email.orEmpty(),
+                        message = safeChatGptError(error)
+                    )
+                }
+            } finally {
+                _chatGptState.update { it.copy(busy = false) }
+            }
+        }
+    }
+
+    fun refreshChatGptModels() {
+        if (tourBlocksCloudAction()) return
+        val client = chatGpt ?: return
+        if (_chatGptState.value.busy) return
+        viewModelScope.launch(workDispatcher) {
+            _chatGptState.update { it.copy(busy = true, message = "") }
+            try {
+                val models = client.models()
+                _chatGptState.update { it.copy(availableModels = models, message = "模型目录刷新完成：" + models.size + " 项。") }
+            } catch (error: Exception) {
+                _chatGptState.update { it.copy(message = safeChatGptError(error)) }
+            } finally {
+                _chatGptState.update { it.copy(busy = false) }
+            }
+        }
+    }
+
+    fun probeChatGpt(model: String) {
+        if (tourBlocksCloudAction()) return
+        val client = chatGpt ?: return
+        if (_chatGptState.value.busy || _chatGptState.value.availableModels.none { it.slug == model }) return
+        viewModelScope.launch(workDispatcher) {
+            _chatGptState.update { it.copy(busy = true, probe = null, message = "正在验证真实模型回复。") }
+            try {
+                val probe = client.probe(model)
+                _chatGptState.update { it.copy(probe = probe, message = "这是一条独立的本机模型测试，未写进聊天历史。") }
+            } catch (error: Exception) {
+                _chatGptState.update { it.copy(message = safeChatGptError(error)) }
+            } finally {
+                _chatGptState.update { it.copy(busy = false) }
+            }
+        }
+    }
+
+    fun disconnectChatGpt() {
+        if (tourBlocksCloudAction()) return
+        val client = chatGpt ?: return
+        if (_chatGptState.value.busy) return
+        viewModelScope.launch(workDispatcher) {
+            _chatGptState.update { it.copy(busy = true) }
+            try {
+                val revoked = client.disconnect()
+                if (isChatGptPlanModel(_state.value.currentModel)) {
+                    _state.update { it.copy(currentModel = backend.profile.cachedProfile()?.currentChatModel.orEmpty()) }
+                }
+                _chatGptState.value = ChatGptConnectState(
+                    message = if (revoked) "已断开 ChatGPT，授权已撤销。"
+                    else "本机授权已清除；远端撤销未确认，可在 ChatGPT 设置中解除应用授权。"
+                )
+            } catch (_: Exception) {
+                _chatGptState.value = ChatGptConnectState(message = "断开操作未完成，请重试。")
+            }
+        }
+    }
+
+    private fun safeChatGptError(error: Exception): String {
+        val message = error.message.orEmpty()
+        val allowed = listOf("ChatGPT", "GPT", "模型", "当前账户", "未批准", "请先", "Missing", "Unexpected")
+        return if (allowed.any(message::startsWith)) message.take(150)
+        else "ChatGPT 连接或请求未完成，请检查网络和账户授权。"
     }
 
     fun refreshModels() {
