@@ -335,7 +335,7 @@ private fun TurnDeskPane(receipt: TurnDeskReceipt?, onOpenTurnDesk: () -> Unit, 
 @Composable
 private fun DogtalkTabs(selected: String, fieldColor: androidx.compose.ui.graphics.Color, onSelect: (String) -> Unit) {
     Row(modifier = Modifier.fillMaxWidth().background(fieldColor, RoundedCornerShape(13.dp)).padding(4.dp)) {
-        listOf("dogtalk" to "私人草稿", "cross" to "跨窗口取信", "keyword" to "旧信关键词").forEach { (key, label) ->
+        listOf("dogtalk" to "私人草稿", "cross" to "跨窗口选取", "keyword" to "历史消息搜索").forEach { (key, label) ->
             val active = selected == key
             Box(
                 modifier = Modifier.weight(1f).background(
