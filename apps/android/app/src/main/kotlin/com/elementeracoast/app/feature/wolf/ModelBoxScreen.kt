@@ -18,6 +18,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
+import com.elementeracoast.app.feature.chatgpt.ChatGptConnectState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -36,7 +39,12 @@ internal fun ModelBoxScreen(
     models: List<String>,
     current: String,
     onSelect: (String) -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    chatGpt: ChatGptConnectState,
+    onChatGptConnect: () -> Unit,
+    onChatGptDisconnect: () -> Unit,
+    onChatGptRefresh: () -> Unit,
+    onChatGptProbe: (String) -> Unit
 ) {
     var expandedModel by remember { mutableStateOf<String?>(null) }
     val grouped = remember(models, current) { groupedUnselectedModels(models, current) }
@@ -50,7 +58,7 @@ internal fun ModelBoxScreen(
                 Column(Modifier.weight(1f)) {
                     Text("模型箱", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
-                        "后端模型目录 · 与 PWA 共用当前模型",
+                        "海岸 · OpenRouter 模型目录，与 PWA 共用当前聊天模型",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -75,7 +83,11 @@ internal fun ModelBoxScreen(
         }
 
         item {
-            Text("模型目录", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            ChatGptPlanCard(chatGpt, onChatGptConnect, onChatGptDisconnect, onChatGptRefresh, onSelect, onChatGptProbe)
+        }
+
+        item {
+            Text("海岸 · OpenRouter", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         ModelSeries.entries.forEach { series ->
@@ -117,7 +129,7 @@ internal fun ModelBoxScreen(
 
         item {
             Text(
-                "刷新读取 /api/models；设为当前后写回共享 profile，PWA 与 Native 会读取同一状态。",
+                "刷新读取海岸 /api/models；设为当前后写回共享 profile，PWA 与 Native 会读取同一状态。",
                 modifier = Modifier.padding(top = 4.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall
@@ -180,7 +192,7 @@ private fun ModelCatalogBubble(
             Text(item.id, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             Text(item.series.title, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             Text(
-                "目录来源：后端",
+                "目录来源：海岸后端",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall
             )
@@ -195,6 +207,78 @@ private fun ModelCatalogBubble(
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold
             )
+        }
+    }
+}
+
+
+@Composable
+private fun ChatGptPlanCard(
+    state: ChatGptConnectState,
+    onConnect: () -> Unit,
+    onDisconnect: () -> Unit,
+    onRefresh: () -> Unit,
+    onSelect: (String) -> Unit,
+    onProbe: (String) -> Unit
+) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .65f)
+    ) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Text("官端 GPT · ChatGPT 套餐", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                if (state.connected) "已授权：" + state.accountLabel
+                else "通过系统浏览器授权；凭证只加密保存在本机。",
+                color = muted, style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                "官端 GPT 已可用于普通聊天。模型推理走套餐额度；思维壤仍由海岸后端的独立模型整理。",
+                color = muted, style = MaterialTheme.typography.bodySmall
+            )
+            if (state.busy) {
+                Text("正在与 ChatGPT 建立连接，请稍候……", color = muted, style = MaterialTheme.typography.bodySmall)
+            }
+            if (state.connected) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Button(onClick = onRefresh, enabled = !state.busy) { Text("刷新可用模型") }
+                    TextButton(onClick = onDisconnect, enabled = !state.busy) { Text("断开授权") }
+                }
+                state.availableModels.forEach { model ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(model.displayName, style = MaterialTheme.typography.bodyMedium)
+                            if (model.slug != model.displayName) {
+                                Text(model.slug, color = muted, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        TextButton(onClick = { onSelect("chatgpt-plan:" + model.slug) }, enabled = !state.busy) {
+                            Text("设为当前")
+                        }
+                        TextButton(onClick = { onProbe(model.slug) }, enabled = !state.busy) {
+                            Text("测试回复")
+                        }
+                    }
+                }
+            } else {
+                Button(onClick = onConnect, enabled = !state.busy) { Text("Continue with ChatGPT") }
+            }
+            if (state.message.isNotBlank()) {
+                Text(state.message, color = muted, style = MaterialTheme.typography.bodySmall)
+            }
+            state.probe?.let { result ->
+                Text(result.text, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "真实用量 · 输入 " + (result.inputTokens?.toString() ?: "未报告") +
+                        " · 缓存读取 " + (result.cachedTokens?.toString() ?: "未报告") +
+                        " · 输出 " + (result.outputTokens?.toString() ?: "未报告"),
+                    color = muted, style = MaterialTheme.typography.bodySmall
+                )
+            }
         }
     }
 }
