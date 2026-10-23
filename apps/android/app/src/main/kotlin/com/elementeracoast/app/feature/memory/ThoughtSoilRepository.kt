@@ -9,6 +9,7 @@ import com.elementeracoast.app.core.remote.RemoteThoughtSoil
 
 interface ThoughtSoilRepository {
     suspend fun load(conversationId: String): ThoughtSoilSnapshot
+    suspend fun setEnabled(conversationId: String, enabled: Boolean): ThoughtSoilSnapshot
     suspend fun organizeAfterReply(conversationId: String, modelId: String): ThoughtSoilSnapshot
 }
 
@@ -17,6 +18,9 @@ class DefaultThoughtSoilRepository(
 ) : ThoughtSoilRepository {
     override suspend fun load(conversationId: String): ThoughtSoilSnapshot =
         api.getThoughtSoil(conversationId).toSnapshot(conversationId)
+
+    override suspend fun setEnabled(conversationId: String, enabled: Boolean): ThoughtSoilSnapshot =
+        api.setThoughtSoilEnabled(conversationId, enabled).toSnapshot(conversationId)
 
     override suspend fun organizeAfterReply(conversationId: String, modelId: String): ThoughtSoilSnapshot {
         return try {
@@ -51,6 +55,7 @@ internal fun RemoteThoughtSoil.toSnapshot(fallbackConversationId: String = ""): 
         )
     },
     manualLocked = manualLocked,
+    autoRefreshEnabled = autoRefreshEnabled,
     revision = revision.coerceAtLeast(1),
     organizer = displayAuthor.ifBlank { organizedByModel.substringAfterLast('/').ifBlank { "尚未整理" } },
     updatedAt = updatedAt.ifBlank { organizedAt }
