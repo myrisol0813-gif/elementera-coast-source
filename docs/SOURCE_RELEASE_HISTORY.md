@@ -25,6 +25,13 @@ Only the tagged source revision and the matching Release assets describe what wa
 - APK SHA-256: `4319dcca4bfe7424e5e27ff9181c0b87d8508795ba227ecab4cf58b7ab763abf`.
 - Live login depends on the original temporary test backend, which has expired. For self-hosting, supply an independent server and rebuild; for short phone QA, run the dedicated isolated test workflow.
 
+## Current source Native QA — 0.2.8-source (2026-10-24)
+
+- Public Native conversation geometry now matches the private version's general layout: assistant avatar in its own header row above the reply paper, full-width reply cards, closer message spacing, body line-height and horizontal padding.
+- Preserves public-only UI semantics such as the generalized model identity, like button, neutral voice caption, visitor doorway and public background/skin assets; no private imagery, identity or secrets are imported.
+- The Source backend ChatGPT image-delivery fix was merged separately in PR #30. Source Native builds from main include it only when paired with that updated backend.
+- No private updater/signing chain changes; visitor QA continues to be disposable-signed. Confirm the visual result on a real device.
+
 ## Current source Native QA — 0.2.7-source (2026-10-23)
 
 - Native identity: `com.elementeracoast.source`, `versionCode=9`, `versionName=0.2.7-source`.
