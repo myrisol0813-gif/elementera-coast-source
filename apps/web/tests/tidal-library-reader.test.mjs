@@ -16,7 +16,7 @@ assert.match(marked,/data-action="library:mark"/);
 assert.match(marked,/>cd。efg<\/mark>/);
 assert.ok(marked.includes('ab'));
 const html=renderTidalReader({
-  book:{id:'book_1',title:'潮中书房测试',chapters:[{title:'第一章',chapter_index:0}]},
+  book:{id:'book_1',title:'书房测试',chapters:[{title:'第一章',chapter_index:0}]},
   chapterTitle:'第一章',chapterIndex:0,pages,pageIndex:0,notes:[note],theme:'paper',fontSize:15,
 });
 assert.match(html,/tidal-reader-paper/);
