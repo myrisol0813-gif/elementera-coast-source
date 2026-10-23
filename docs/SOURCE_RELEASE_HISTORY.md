@@ -25,6 +25,13 @@ Only the tagged source revision and the matching Release assets describe what wa
 - APK SHA-256: `4319dcca4bfe7424e5e27ff9181c0b87d8508795ba227ecab4cf58b7ab763abf`.
 - Live login depends on the original temporary test backend, which has expired. For self-hosting, supply an independent server and rebuild; for short phone QA, run the dedicated isolated test workflow.
 
+## Current source Native QA — 0.2.9-source (2026-10-24)
+
+- Moved the Native model metadata trace button into each assistant message action row, with an abbreviated label on narrower phones. Full reasoning, provider, request, cache, and tool trace details remain available directly beneath the relevant reply.
+- Generalized remaining public-visible “潮中书房” labels to “书房” and updated the related book tool names/descriptions. Renamed Native cross-window tabs to “跨窗口选取” and “历史消息搜索”; internal model tool IDs, database keys, and archived data remain stable.
+- Source PWA cache: `coast-source-app-08` → `coast-source-app-09`. Public Native: versionCode 10 → 11, versionName 0.2.8-source → 0.2.9-source.
+- Does not include Starry Coast private artwork, personal prompts, or stable private production signing. Device-specific layout verification remains required.
+
 ## Current source Native QA — 0.2.8-source (2026-10-24)
 
 - Public Native conversation geometry now matches the private version's general layout: assistant avatar in its own header row above the reply paper, full-width reply cards, closer message spacing, body line-height and horizontal padding.
