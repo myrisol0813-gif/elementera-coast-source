@@ -25,6 +25,16 @@ Only the tagged source revision and the matching Release assets describe what wa
 - APK SHA-256: `4319dcca4bfe7424e5e27ff9181c0b87d8508795ba227ecab4cf58b7ab763abf`.
 - Live login depends on the original temporary test backend, which has expired. For self-hosting, supply an independent server and rebuild; for short phone QA, run the dedicated isolated test workflow.
 
+## Current source Native QA — 0.2.7-source (2026-10-23)
+
+- Native identity: `com.elementeracoast.source`, `versionCode=9`, `versionName=0.2.7-source`.
+- Adds optional device-local ChatGPT account authorization, account model discovery and direct Responses inference while keeping tokens in Android Keystore.
+- Reuses the existing source backend for context assembly, owner-authorized tools, attachments and sanitized model receipts; no second conversation store is introduced.
+- Adds same-provider thought-soil prepare/commit after ChatGPT-plan turns, provider-advertised reasoning effort controls, prompt-cache read/write receipts, inline sent-image rendering, output/finalization locking and revision-safe global excerpt clearing.
+- Source visitor mode remains offline-only and blocks cloud/account actions before network transmission.
+- PWA cache advances to `coast-source-app-08`; backend model/cache contracts are synchronized with Native.
+- Public QA APKs are still disposable-signed inspection builds, not the private production updater/signing chain.
+
 ## Scope and limitations
 
 - These releases are inspectable open-source evidence, not promises of an enduring hosted service.
