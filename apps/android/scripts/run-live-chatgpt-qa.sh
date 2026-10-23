@@ -105,33 +105,33 @@ unzip -t "live-chatgpt-release/$apk_name" >/dev/null
 
 tag="source-live-chatgpt-$GITHUB_RUN_ID"
 notes="$RUNNER_TEMP/live-chatgpt-release-notes.md"
-cat > "$notes" <<EOF
-# Live ChatGPT Test
-
-This is a disposable, owner-only test package for this workflow run.
-
-- **Temporary Coast backend:** $url
-- **Coast login password:** `$QA_PASSWORD`
-- **Visitor gate:** OFF
-- **Android package:** `com.elementeracoast.source`
-- **Version:** `$version_name`
-- **Backend lifetime:** about 30 minutes after this package is published
-
-## Test
-
-1. Install the APK below.
-2. Open the app and enter the Coast login password above.
-3. Open the model box.
-4. Choose **ChatGPT plan**.
-5. Tap **Continue with ChatGPT** and finish authorization in the browser.
-6. Return to the app, refresh the account model list, select a model, and send a test reply.
-
-The ChatGPT OAuth token stays on the Android device and is protected by Android Keystore. It is not sent through this temporary Coast backend.
-
-This APK uses a disposable QA signing certificate. If Android reports a signature conflict with an older Source QA build, uninstall only `com.elementeracoast.source` and install this APK again.
-
-When the workflow finishes, the Quick Tunnel and temporary backend stop. The APK will no longer have a live Coast backend after that.
-EOF
+{
+  echo '# Live ChatGPT Test'
+  echo
+  echo 'This is a disposable test package for this workflow run. Draft Releases are only visible to people with repository write access.'
+  echo
+  printf '%s\n' "- **Temporary Coast backend:** $url"
+  printf '%s\n' "- **Coast login password:** **$QA_PASSWORD**"
+  echo '- **Visitor gate:** OFF'
+  echo '- **Android package:** com.elementeracoast.source'
+  printf '%s\n' "- **Version:** $version_name"
+  echo '- **Backend lifetime:** about 30 minutes after this package is published'
+  echo
+  echo '## Test'
+  echo
+  echo '1. Install the APK below.'
+  echo '2. Open the app and enter the Coast login password above.'
+  echo '3. Open the model box.'
+  echo '4. Choose **ChatGPT plan**.'
+  echo '5. Tap **Continue with ChatGPT** and finish authorization in the browser.'
+  echo '6. Return to the app, refresh the account model list, select a model, and send a test reply.'
+  echo
+  echo 'The ChatGPT OAuth token stays on the Android device and is protected by Android Keystore. It is not sent through this temporary Coast backend.'
+  echo
+  echo 'This APK uses a disposable QA signing certificate. If Android reports a signature conflict with an older Source QA build, uninstall only com.elementeracoast.source and install this APK again.'
+  echo
+  echo 'When the workflow finishes, the Quick Tunnel and temporary backend stop. The APK will no longer have a live Coast backend after that.'
+} > "$notes"
 
 release_url="$(gh release create "$tag" \
   "live-chatgpt-release/$apk_name" \
