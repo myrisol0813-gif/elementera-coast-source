@@ -84,6 +84,7 @@ class MainActivity : ComponentActivity() {
                         onStop = vm::stopGeneration,
                         onMessageAction = vm::handleMessageAction,
                         onOpenActionLog = vm::openActionLog,
+                        onSetThoughtSoilEnabled = vm::setThoughtSoilEnabled,
                         onImportMessages = vm::importMessages,
                         onLocalActionLogged = vm::logLocalAction,
                         onOpenModels = vm::openModelPicker,
