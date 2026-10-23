@@ -114,6 +114,22 @@ assert.equal(slip.external_tide.label, '外部入口消息');
 assert.equal(slip.external_tide.status, '未递给');
 assert.equal(slip.external_tide.content, '本轮没有递入外部材料。');
 
+await writeSoil(db, conversation.id, { auto_refresh_enabled: false });
+const soilOff = await assembleCleanContext(env, {
+  surface: 'main_chat', conversationId: conversation.id, messages, lastUser: messages.at(-1),
+  settings: { recentTurns: 2, contextBudget: 6000, memoryLimit: 8, worldbookLimit: 6 }, permission: 'owner', preview: true,
+});
+const soilOffPrompt = soilOff.modelMessages.map((message) => message.content).join('\n\n');
+assert.equal(soilOffPrompt.includes('当前思维壤只承接透明上下文。'), false, 'disabled thought soil must not enter model context');
+assert.equal(soilOffPrompt.includes('透明纸条'), false, 'disabled hand seeds must not enter model context');
+const soilOffSlip = soilOff.deskSlip();
+assert.equal(soilOffSlip.thinking_soil.status, '已关闭 · 本轮未递给');
+assert.equal(soilOffSlip.thinking_soil.enabled, false);
+assert.equal(soilOffSlip.thinking_soil.delivered, false);
+assert.equal(soilOffSlip.thinking_soil.context, '');
+assert.equal(soilOffSlip.context_budget.sources_preserved.includes('整理当前对话的纸条'), false);
+await writeSoil(db, conversation.id, { auto_refresh_enabled: true });
+
 const emptyDb = new D1Database();
 const emptyConversation = await createConversation(emptyDb, '空上下文');
 await writeCustomInstructions(emptyDb, { content: '' });
