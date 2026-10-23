@@ -245,14 +245,14 @@ class DefaultChatRepository(
         ChatSyncMapper.clearUserFailure(history, turnId)
 
     override fun cacheHistory(conversationId: String, history: RemoteHistory) = cache.putHistory(conversationId, history)
+}
 
-    internal fun CrossWindowRequest.toRemote(): RemoteCrossWindowRequest? {
-        if (mode == CrossWindowMode.Off) return null
-        return RemoteCrossWindowRequest(
-            mode = mode.wireValue,
-            messages = if (mode == CrossWindowMode.Manual) {
-                messages.map { item -> RemoteCrossWindowMessageSelection(item.conversationId, item.messageId) }
-            } else emptyList()
-        )
-    }
+internal fun CrossWindowRequest.toRemote(): RemoteCrossWindowRequest? {
+    if (mode == CrossWindowMode.Off) return null
+    return RemoteCrossWindowRequest(
+        mode = mode.wireValue,
+        messages = if (mode == CrossWindowMode.Manual) {
+            messages.map { item -> RemoteCrossWindowMessageSelection(item.conversationId, item.messageId) }
+        } else emptyList()
+    )
 }
