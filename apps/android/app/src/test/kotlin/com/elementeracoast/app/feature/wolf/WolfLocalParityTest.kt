@@ -2,8 +2,10 @@ package com.elementeracoast.app.feature.wolf
 
 import com.elementeracoast.app.core.local.MemoryLocalPersistence
 import com.elementeracoast.app.ui.theme.CoastThemePreset
+import com.elementeracoast.app.ui.theme.CoastPaperMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WolfLocalParityTest {
@@ -43,6 +45,22 @@ class WolfLocalParityTest {
         assertEquals("#f5e8ee", reloaded.appearance.userBubbleHex)
         assertEquals(5, reloaded.basic.memoryLimit)
         assertEquals("long", reloaded.basic.outputLength)
+    }
+
+    @Test fun cloudSettingsStayLocalAndSurviveThemeChanges() {
+        val persistence = MemoryLocalPersistence()
+        val store = WolfStore(persistence)
+        assertTrue(store.state.value.appearance.cloudOutlineEnabled)
+        store.setPaperMode(CoastPaperMode.Cloud)
+        store.setCloudOutlineEnabled(false)
+        store.setTheme(CoastThemePreset.BlushModelPartner)
+        val restored = WolfStore(persistence).state.value.appearance
+        assertEquals(CoastPaperMode.Cloud, restored.paperMode)
+        assertFalse(restored.cloudOutlineEnabled)
+        store.setPaperMode(CoastPaperMode.Cut)
+        store.setCloudOutlineEnabled(true)
+        assertEquals(CoastPaperMode.Cut, WolfStore(persistence).state.value.appearance.paperMode)
+        assertTrue(WolfStore(persistence).state.value.appearance.cloudOutlineEnabled)
     }
 
     @Test fun legacyThreeModeThemeReadsIntoPresetWardrobeOnce() {
