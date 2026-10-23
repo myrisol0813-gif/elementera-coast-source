@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.elementeracoast.app.BuildConfig
+import com.elementeracoast.app.core.tour.SourceVisitGate
 import com.elementeracoast.app.ui.brand.CoastBrandMarkAnimation
 import com.elementeracoast.app.ui.brand.CoastMuted
 import com.elementeracoast.app.ui.brand.rememberCoastGateMotion
@@ -112,7 +113,16 @@ fun GateScreen(
                     modifier = Modifier.width(GateVisualTokens.PasswordWidth)
                 )
 
-                if (BuildConfig.SOURCE_PREVIEW_PASSWORD_HINT.isNotBlank()) {
+                if (SourceVisitGate.enabled) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "参观口令：123456 · 可以看原有页面，不连接云端",
+                        modifier = Modifier.width(GateVisualTokens.PasswordWidth),
+                        color = CoastMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center
+                    )
+                } else if (BuildConfig.SOURCE_PREVIEW_PASSWORD_HINT.isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
                     Text(
                         text = "source debug 默认预览密码：${BuildConfig.SOURCE_PREVIEW_PASSWORD_HINT} · 部署时请修改",
