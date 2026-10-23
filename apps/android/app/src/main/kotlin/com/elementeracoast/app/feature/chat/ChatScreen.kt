@@ -63,6 +63,7 @@ fun ChatWindow(
     onMessageAction: (MessageAction) -> Unit,
     onOpenActionLog: (Set<String>) -> Unit,
     onOpenPendingMemory: () -> Unit,
+    onSetThoughtSoilEnabled: (Boolean) -> Unit,
     onPlaceholder: (String) -> Unit
 ) {
     var input by rememberSaveable(state.activeConversationId) { mutableStateOf("") }
@@ -212,6 +213,7 @@ fun ChatWindow(
     if (soilOpen && soil != null) {
         SoilBottomSheet(
             soil = soil,
+            onSetEnabled = onSetThoughtSoilEnabled,
             onOpenPendingBag = onOpenPendingMemory,
             onDismiss = { soilOpen = false }
         )
