@@ -26,7 +26,8 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.InsertDriveFile
-import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -61,6 +62,8 @@ fun CoastComposer(
     isStreaming: Boolean,
     isFinalizing: Boolean = false,
     enabled: Boolean = true,
+    drawerOpen: Boolean = false,
+    onToggleDrawer: (() -> Unit)? = null,
     onPickImage: () -> Unit,
     onPickFile: () -> Unit,
     onRemoveAttachment: (String) -> Unit,
@@ -199,17 +202,18 @@ fun CoastComposer(
                         )
                     }
                     if (value.isBlank() && pendingAttachments.isEmpty()) {
+                        val toggleDrawer = onToggleDrawer
                         Box(
                             modifier = Modifier
                                 .size(CoastChatTokens.ComposerMicTouch)
-                                .clickable(enabled = enabled && !isStreaming && !isFinalizing) {
-                                    onPlaceholder("语音输入不在 V1 范围内。")
+                                .clickable(enabled = enabled && !isStreaming && !isFinalizing && toggleDrawer != null) {
+                                    toggleDrawer?.invoke()
                                 },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                Icons.Default.Mic,
-                                contentDescription = "语音输入",
+                                imageVector = if (drawerOpen) Icons.Default.ExpandMore else Icons.Default.ExpandLess,
+                                contentDescription = if (drawerOpen) "收起私人草稿与本轮桌面" else "展开私人草稿与本轮桌面",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .78f),
                                 modifier = Modifier.size(CoastChatTokens.ComposerMicGlyph)
                             )
