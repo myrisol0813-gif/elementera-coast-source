@@ -63,6 +63,8 @@ interface ChatRepository {
         modelId: String,
         recentTurns: Int,
         contextBudget: Int,
+        outputLength: String,
+        maxOutputTokens: Int,
         crossWindow: CrossWindowRequest = CrossWindowRequest()
     ): Flow<ChatProgress>
     fun failedHistory(historyWithUser: RemoteHistory, turnId: String, modelId: String, error: CoastApiException, partialContent: String = ""): RemoteHistory
@@ -75,7 +77,8 @@ class DefaultChatRepository(
     private val api: CoastApiClient,
     private val cache: RemoteCacheStore,
     private val metadataRemote: ModelMetadataRemoteDataSource? = null,
-    private val json: Json = Json { ignoreUnknownKeys = true; explicitNulls = false }
+    private val json: Json = Json { ignoreUnknownKeys = true; explicitNulls = false },
+    private val reasoningStore: ReasoningEffortStore? = null
 ) : ChatRepository {
     override fun cachedHistory(conversationId: String): RemoteHistory? = cache.history(conversationId)
 
@@ -106,6 +109,8 @@ class DefaultChatRepository(
         modelId: String,
         recentTurns: Int,
         contextBudget: Int,
+        outputLength: String,
+        maxOutputTokens: Int,
         crossWindow: CrossWindowRequest
     ): Flow<ChatProgress> = flow {
         var content = ""
@@ -116,6 +121,9 @@ class DefaultChatRepository(
         var done = false
         val normalizedRecentTurns = recentTurns.coerceAtLeast(1)
         val assistantVariantId = ChatSyncMapper.nextAssistantVariantId(historyWithUser, turnId)
+        val offered = cache.modelCatalog()?.groups?.let { it.openAiChat + it.freeTest }
+            ?.firstOrNull { it.id == modelId }?.reasoningEfforts.orEmpty()
+        val effort = reasoningStore?.get(modelId, offered)
         val request = RemoteChatRequest(
             conversationId = conversationId,
             sourceTurnId = turnId,
@@ -127,8 +135,10 @@ class DefaultChatRepository(
             localDateTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
             settings = mapOf(
                 "recentTurns" to normalizedRecentTurns.toString(),
-                "contextBudget" to contextBudget.coerceAtLeast(1800).toString()
-            ),
+                "contextBudget" to contextBudget.coerceAtLeast(1800).toString(),
+                "outputLength" to outputLength,
+                "maxOutputTokens" to maxOutputTokens.coerceIn(64, 65536).toString()
+            ) + (effort?.let { mapOf("reasoningEffort" to it) } ?: emptyMap()),
             crossWindow = crossWindow.toRemote(),
             stream = true
         )
@@ -179,7 +189,7 @@ class DefaultChatRepository(
         if (!done) throw CoastApiException(
             CoastApiErrorKind.Stream,
             "stream_incomplete",
-            "回复流提前中断。"
+            "海岸回复流提前中断。"
         )
         val completed = ChatSyncMapper.appendAssistant(
             history = ChatSyncMapper.clearUserFailure(historyWithUser, turnId),
@@ -236,13 +246,14 @@ class DefaultChatRepository(
 
     override fun cacheHistory(conversationId: String, history: RemoteHistory) = cache.putHistory(conversationId, history)
 
-    private fun CrossWindowRequest.toRemote(): RemoteCrossWindowRequest? {
-        if (mode == CrossWindowMode.Off) return null
-        return RemoteCrossWindowRequest(
-            mode = mode.wireValue,
-            messages = if (mode == CrossWindowMode.Manual) {
-                messages.map { item -> RemoteCrossWindowMessageSelection(item.conversationId, item.messageId) }
-            } else emptyList()
-        )
-    }
+}
+
+internal fun CrossWindowRequest.toRemote(): RemoteCrossWindowRequest? {
+    if (mode == CrossWindowMode.Off) return null
+    return RemoteCrossWindowRequest(
+        mode = mode.wireValue,
+        messages = if (mode == CrossWindowMode.Manual) {
+            messages.map { item -> RemoteCrossWindowMessageSelection(item.conversationId, item.messageId) }
+        } else emptyList()
+    )
 }
