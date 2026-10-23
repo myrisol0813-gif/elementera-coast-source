@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -40,7 +41,10 @@ import com.elementeracoast.app.ui.theme.snowLetterInnerPadding
 
 @Composable
 internal fun AssistantMessage(
+    conversationId: String,
     message: ChatMessage,
+    metadataMessageId: String?,
+    metadataSource: ModelMetadataRemoteDataSource,
     isStreamingTail: Boolean,
     avatarBitmap: ImageBitmap?,
     onAvatarClick: () -> Unit,
@@ -51,6 +55,14 @@ internal fun AssistantMessage(
     onAction: (MessageAction) -> Unit,
     onFootprint: () -> Unit
 ) {
+    val metadataTraceState = metadataMessageId?.takeIf(String::isNotBlank)?.let {
+        rememberModelMetadataTraceState(
+            conversationId = conversationId,
+            messageId = it,
+            source = metadataSource
+        )
+    }
+
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             AssistantAvatar(avatarBitmap, onAvatarClick)
@@ -80,13 +92,24 @@ internal fun AssistantMessage(
                 }
             }
             Spacer(Modifier.height(CoastChatTokens.MessageActionTopGap))
-            MessageActionRow {
-                MessageActionButton(Icons.Default.ContentCopy, "复制", onClick = onCopy)
-                MessageActionButton(Icons.Default.Mic, "生成语音", enabled = !isStreamingTail && !message.remoteVariantId.isNullOrBlank(), onClick = onVoice)
-                MessageActionButton(Icons.Default.ThumbUp, "点赞", active = message.liked, onClick = { onAction(MessageAction.ToggleLike(message.id)) })
-                MessageActionButton(Icons.Default.Refresh, "重新生成", enabled = !isStreamingTail, onClick = { onAction(MessageAction.Regenerate(message.id)) })
-                MessageActionButton(Icons.Default.FavoriteBorder, "收藏", active = message.favorite, onClick = { onAction(MessageAction.ToggleFavorite(message.id)) })
-                MessageActionButton(Icons.Default.DeleteOutline, "删除", enabled = !isStreamingTail, onClick = { onAction(MessageAction.Delete(message.id)) })
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val compactTraceLabel = maxWidth < 410.dp
+                MessageActionRow(modifier = Modifier.fillMaxWidth()) {
+                    MessageActionButton(Icons.Default.ContentCopy, "复制", onClick = onCopy)
+                    MessageActionButton(Icons.Default.Mic, "生成语音", enabled = !isStreamingTail && !message.remoteVariantId.isNullOrBlank(), onClick = onVoice)
+                    MessageActionButton(Icons.Default.ThumbUp, "点赞", active = message.liked, onClick = { onAction(MessageAction.ToggleLike(message.id)) })
+                    MessageActionButton(Icons.Default.Refresh, "重新生成", enabled = !isStreamingTail, onClick = { onAction(MessageAction.Regenerate(message.id)) })
+                    MessageActionButton(Icons.Default.FavoriteBorder, "收藏", active = message.favorite, onClick = { onAction(MessageAction.ToggleFavorite(message.id)) })
+                    MessageActionButton(Icons.Default.DeleteOutline, "删除", enabled = !isStreamingTail, onClick = { onAction(MessageAction.Delete(message.id)) })
+                    if (metadataTraceState != null) {
+                        Spacer(Modifier.weight(1f))
+                        ModelMetadataTraceChip(state = metadataTraceState, compact = compactTraceLabel)
+                    }
+                }
+            }
+            if (metadataTraceState?.expanded == true) {
+                Spacer(Modifier.height(CoastChatTokens.MetadataRowGap))
+                ModelMetadataTracePanel(state = metadataTraceState, modifier = Modifier.fillMaxWidth())
             }
             voiceClips.forEach { clip ->
                 androidx.compose.material3.TextButton(onClick = { onPlayVoice(clip.id) }) {
