@@ -12,13 +12,14 @@ import {
   routeMemorySearch,
   routeVectorStatus,
 } from './memory/memory-search-route.js';
-import { routeSoil, routeSoilOrganize } from './memory/memory-soil-route.js';
+import { routeSoil, routeSoilOrganize, routeNativePlanSoil } from './memory/memory-soil-route.js';
 
 const MEMORY_PATH = '/api/memory';
 
 export function isMemoryApiPath(pathname) {
   return pathname === `${MEMORY_PATH}/soil`
     || pathname === `${MEMORY_PATH}/soil/organize`
+    || pathname === `${MEMORY_PATH}/soil/plan`
     || pathname === `${MEMORY_PATH}/pockets`
     || pathname.startsWith(`${MEMORY_PATH}/pockets/`)
     || pathname === `${MEMORY_PATH}/entries`
@@ -37,6 +38,7 @@ export async function routeMemoryApi(request, env, session = null) {
   try {
     if (url.pathname === `${MEMORY_PATH}/soil`) return await routeSoil(request, env, url);
     if (url.pathname === `${MEMORY_PATH}/soil/organize`) return await routeSoilOrganize(request, env);
+    if (url.pathname === `${MEMORY_PATH}/soil/plan`) return await routeNativePlanSoil(request, env);
     if (url.pathname === `${MEMORY_PATH}/search`) return await routeMemorySearch(request, env);
     if (url.pathname === `${MEMORY_PATH}/recall`) return await routeMemoryRecall(request, env);
     if (url.pathname === `${MEMORY_PATH}/custom-instructions`) return await routeCustomInstructions(request, env);
