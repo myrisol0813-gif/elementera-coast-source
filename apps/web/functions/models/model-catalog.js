@@ -48,6 +48,15 @@ function isOpenAiImage(model, version) {
     && modelText(model).includes(`gpt-image-${version}`);
 }
 
+/** Only advertise exact effort values explicitly supplied by the model catalog. */
+export function catalogReasoningEfforts(model) {
+  const values = model?.supported_reasoning_efforts ?? model?.reasoning_efforts
+    ?? model?.reasoning?.efforts ?? model?.reasoning?.supported_efforts;
+  const order = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+  if (!Array.isArray(values)) return [];
+  return order.filter((value) => values.includes(value));
+}
+
 function safeModel(model, extra = {}) {
   return {
     id: String(model?.id || extra.id || ''),
@@ -55,6 +64,7 @@ function safeModel(model, extra = {}) {
     context_length: model?.context_length ?? null,
     pricing: model?.pricing || null,
     supported_parameters: Array.isArray(model?.supported_parameters) ? model.supported_parameters : [],
+    reasoning_efforts: catalogReasoningEfforts(model),
     architecture: model?.architecture || null,
     top_provider: model?.top_provider || null,
     created: model?.created ?? null,
