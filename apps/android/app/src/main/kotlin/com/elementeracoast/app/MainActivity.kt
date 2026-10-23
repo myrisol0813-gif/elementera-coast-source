@@ -36,6 +36,7 @@ class MainActivity : ComponentActivity() {
                 userBubbleHex = wolf.appearance.userBubbleHex,
                 fontMode = wolf.appearance.fontMode,
                 paperMode = wolf.appearance.paperMode,
+                cloudOutlineEnabled = wolf.appearance.cloudOutlineEnabled,
                 readingWeight = wolf.appearance.readingWeight,
                 messageSurfaceAlpha = wolf.appearance.messageSurfaceAlpha,
                 chatBackgroundImagePath = wolf.appearance.chatBackgroundImagePath,
