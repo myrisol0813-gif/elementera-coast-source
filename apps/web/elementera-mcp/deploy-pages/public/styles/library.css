@@ -1,4 +1,4 @@
-/* 潮中书房：一间贴着主聊天的安静侧室。 */
+/* 书房：一间贴着主聊天的安静侧室。 */
 .tidal-library .feature-body{padding-top:16px;}
 .tidal-library-home,.tidal-library-book-detail,.tidal-library-reader,.tidal-library-notes,.tidal-library-editor{max-width:690px;margin:0 auto;}
 .tidal-library-shelf{display:grid;gap:9px;}
@@ -39,7 +39,7 @@
 .tidal-library-reading-state details div{display:grid;gap:6px;margin-top:8px;}
 .tidal-library-reading-state details span{font-size:11px;color:var(--text-soft);}
 
-/* 潮中书房 V2：纸张优先，页与页之间没有聊天气泡。 */
+/* 书房 V2：纸张优先，页与页之间没有聊天气泡。 */
 .tidal-library-book .tidal-library-book-meta{flex:1;min-width:0;display:grid;gap:6px;}
 .tidal-library-track{height:4px;overflow:hidden;border-radius:999px;background:color-mix(in srgb,var(--accent) 12%,transparent);}
 .tidal-library-track>i{display:block;height:100%;border-radius:999px;background:#b99a66;}
