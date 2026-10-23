@@ -6,8 +6,8 @@ This directory contains the source-available Android client derived from the cur
 
 - App: Elementera Coast Source
 - `applicationId = com.elementeracoast.source`
-- `versionCode = 7`
-- `versionName = 0.2.5-source`
+- `versionCode = 8`
+- `versionName = 0.2.6-source`
 - Kotlin + Jetpack Compose
 - JDK 17 / Android SDK 34 / Gradle 8.9
 
@@ -22,6 +22,27 @@ Source-local configuration uses `BuildConfig.COAST_API_BASE_URL`. The checked-in
 ## Native-only cloud paper
 
 The source APK includes a fourth paper mode, **云朵浮雕边**, in Wolf Den > Appearance. Its Compose path adapts to bubble dimensions; it draws a theme-derived 0.75dp border at 70% of the selected message opacity plus a 2dp soft shadow. A default-on local switch can disable only the border. This implementation includes no private artwork, no proprietary fonts, and no changes to the source PWA.
+
+## Optional Native-only visiting doorway
+
+The unmodified Source Android pages are accessible for visual inspection with the public
+**123456** visiting code at the existing Native entrance. This is an optional,
+removable **entry adapter**, not a second app, a backend password, or real authentication.
+The visit opens the **same** navigation/screens, locally, without creating an account
+cookie. A small banner marks visiting mode. Browsing the existing rooms and changing
+local appearance is allowed; server-dependent actions are visibly unavailable.
+The shared Source HTTP client rejects requests **before network transmission** while
+visiting. No private services, conversations, memory databases, or AI budgets are exposed.
+The app does not promise functional cloud operations or keep a live shared server.
+
+Builders can remove the visiting doorway without deleting source files:
+
+```bash
+gradle :app:assembleDebug -PSOURCE_TOUR_ENABLED=false
+```
+
+Rebuilding without this flag restores the original backend login only. A publicly
+known visiting code is not suitable as authentication for a live backend.
 
 ## Source-build boundaries
 
