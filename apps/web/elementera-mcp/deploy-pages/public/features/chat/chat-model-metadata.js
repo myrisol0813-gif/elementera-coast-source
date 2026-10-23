@@ -74,13 +74,25 @@ function reasoningSection(metadata = {}) {
   return section('推理痕迹', body, '本轮模型没有返回可展示的推理痕迹。');
 }
 
+export function cacheHitRate(usage = {}) {
+  const prompt = usage?.prompt_tokens;
+  const cached = usage?.cached_tokens;
+  if (!Number.isFinite(prompt) || prompt <= 0
+    || !Number.isFinite(cached) || cached < 0 || cached > prompt) return null;
+  return `${Number((cached * 100 / prompt).toFixed(1))}%`;
+}
+
 function usageSection(metadata = {}) {
   const usage = metadata.usage || {};
+  const rate = cacheHitRate(usage);
   const body = [
     row('输入', usage.prompt_tokens != null ? `${usage.prompt_tokens} tokens` : ''),
     row('输出', usage.completion_tokens != null ? `${usage.completion_tokens} tokens` : ''),
     row('推理', usage.reasoning_tokens != null ? `${usage.reasoning_tokens} tokens` : ''),
-    row('缓存', usage.cached_tokens != null ? `${usage.cached_tokens} tokens` : ''),
+    row('缓存读取', usage.cached_tokens != null ? `${usage.cached_tokens} tokens` : ''),
+    row('缓存写入', usage.cache_write_tokens != null ? `${usage.cache_write_tokens} tokens` : ''),
+    row('缓存命中率', rate ?? (usage.prompt_tokens != null ? '供应商未报告有效缓存读取数据' : '')),
+    row('缓存折扣', usage.cache_discount != null ? `${usage.cache_discount} USD（供应商回执；负数表示额外写入成本）` : ''),
     row('总计', usage.total_tokens != null ? `${usage.total_tokens} tokens` : ''),
     row('成本', usage.cost != null ? String(usage.cost) : ''),
   ].join('');
@@ -133,7 +145,7 @@ function requestSection(metadata = {}) {
 
 function summaryHtml(response, conversationId, messageId) {
   if (!response?.metadata) {
-    return `<p class="model-metadata-empty">本轮模型没有返回可展示的模型后端返回原文。</p>`;
+    return `<p class="model-metadata-empty">本轮模型没有返回可展示的模型回波。</p>`;
   }
   const sanitized = response.sanitized ? ' · 已脱敏' : '';
   return `<p class="model-metadata-status">${escapeHtml(statusLabel(response.status))}${escapeHtml(sanitized)}</p>
@@ -157,7 +169,7 @@ async function loadSummary(details) {
   const body = details.querySelector('.model-metadata-body');
   if (!body) return;
   details.dataset.loading = 'true';
-  body.innerHTML = '<p class="model-metadata-empty">正在读取模型后端返回原文……</p>';
+  body.innerHTML = '<p class="model-metadata-empty">正在读取模型回波……</p>';
   try {
     const response = summaryCache.get(cacheKey)
       || await requestJson(metadataUrl(conversationId, messageId));
@@ -166,7 +178,7 @@ async function loadSummary(details) {
     details.dataset.loaded = 'true';
     bindRawDetails(body);
   } catch (error) {
-    body.innerHTML = `<p class="model-metadata-empty">${escapeHtml(error?.message || '模型后端返回原文读取失败。')}</p>`;
+    body.innerHTML = `<p class="model-metadata-empty">${escapeHtml(error?.message || '模型回波读取失败。')}</p>`;
   } finally {
     delete details.dataset.loading;
   }
@@ -212,7 +224,7 @@ export function renderModelMetadataTrace(variant, conversationId) {
   const source = String(variant?.generation_source || '');
   if (!messageId || !['chat', 'landing', 'radio', 'lighthouse'].includes(source)) return '';
   return `<details class="model-metadata-trace" data-model-metadata-trace data-conversation-id="${escapeAttribute(conversationId)}" data-message-id="${escapeAttribute(messageId)}">
-    <summary>推理文本与模型后端返回原文</summary>
+    <summary>推理痕迹与模型回波</summary>
     <div class="model-metadata-body"><p class="model-metadata-empty">展开后读取。</p></div>
   </details>`;
 }
