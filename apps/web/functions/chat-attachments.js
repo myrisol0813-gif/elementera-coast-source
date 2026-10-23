@@ -332,10 +332,13 @@ export async function resolveChatAttachmentsForModel(env, db, {
   turnId = null,
   attachmentIds = [],
   modelId = '',
+  visionSupportedOverride = null,
 } = {}) {
   await ensureChatAttachmentSchema(db);
   const ids = normalizeAttachmentIds(attachmentIds);
-  const visionSupported = ids.length ? await modelSupportsVision(env, modelId) : false;
+  const visionSupported = ids.length
+    ? (typeof visionSupportedOverride === 'boolean' ? visionSupportedOverride : await modelSupportsVision(env, modelId))
+    : false;
   const delivered = [];
   const notDelivered = [];
   const imageParts = [];
