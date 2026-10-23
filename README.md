@@ -98,7 +98,7 @@ For a longer-lived setup, replace the Quick Tunnel with your own hosted source b
 - [Model workspace and tool records](#model-workspace-and-tool-records)
 - [Attachments, files, and search surfaces](#attachments-files-and-search-surfaces)
 - [MCP and external-interface experiments](#mcp-and-external-interface-experiments)
-- [Current feature status (0.2.7-source)](#current-feature-status-027-source)
+- [Current feature status (0.2.8-source)](#current-feature-status-028-source)
 - [Historical preview APK](#historical-preview-apk)
 - [Running and testing](#running-and-testing)
 - [Configuration](#configuration)
@@ -437,8 +437,8 @@ Source identity:
 ```text
 App: Elementera Coast Source
 applicationId = com.elementeracoast.source
-versionCode = 9
-versionName = 0.2.7-source
+versionCode = 10
+versionName = 0.2.8-source
 ```
 
 The Android client keeps the copied native application structure, including areas such as:
@@ -572,9 +572,11 @@ They should be treated as experimental.
 
 The source Native client now includes the original owner calendar, Tidal Library shelf and reader, EPUB/TXT import and audio-clip actions, using the same source backend contracts as the PWA. Only the interface and generic implementation are mirrored; private data, accounts, identities and signing are excluded. See [Native parity acceptance](docs/SOURCE_NATIVE_PARITY_2026-10-21.md).
 
-## Current feature status (0.2.7-source)
+## Current feature status (0.2.8-source)
 
 This section describes the **current source tree**, not the features of the first `v0.1-source` APK.
+
+**0.2.8 Native layout:** the public Android client now places the assistant avatar above the full-width reply paper and uses current compact chat spacing while keeping source-public names and assets.
 
 **0.2.7 Native parity:** device-local ChatGPT account authorization and model catalog, same-provider thought-soil finalization, model reasoning capability controls, sent-image inline rendering, prompt-cache read/write receipts, output-limit/finalization locking, and revision-safe global-excerpt clear. PWA backend contracts and cache receipts were synchronized without adding private production configuration. See [release history](docs/SOURCE_RELEASE_HISTORY.md) for the distinction between versioned source, historical assets and temporary QA packages.
 
@@ -583,7 +585,7 @@ This section describes the **current source tree**, not the features of the firs
 | Web / PWA | Conversation UI, streaming/SSE paths, visible context and tool records, owner/visitor separation, memory and world-book workspaces, attachment handling | Model responses and tool integrations need independently configured services; no private production data is distributed |
 | Owner calendar | Entries, notes, edits/deletion and recurrence, with owner-authenticated backend routes | Requires self-hosted backend and storage; tested temporary demos use synthetic data |
 | Tidal Library | TXT/EPUB imports, shelf/cover, chapter and page navigation, saved progress, highlights, annotations, reader options | The PWA and Native clients use the same backend contracts when connected to the same host |
-| Android Native | Jetpack Compose chat and Daily surfaces, calendar, book room, themes, local background selection, reading style/weight and user-supplied local fonts | `0.2.7-source`, `versionCode=9`; proprietary preset fonts are **not** bundled. Missing fonts use visibly different system fallbacks |
+| Android Native | Jetpack Compose chat and Daily surfaces, calendar, book room, themes, local background selection, reading style/weight and user-supplied local fonts | `0.2.8-source`, `versionCode=10`; proprietary preset fonts are **not** bundled. Missing fonts use visibly different system fallbacks |
 | Voice clips | Message-linked speech clip controls, playback and authorized generation endpoints | Actual speech generation requires self-hosted server-side `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`; no voice credentials or preset voice shipped |
 | Exports / tools | Source JSON/HTML snapshot and authorized calendar/reading/voice tool routes | Do not mistake unconfigured integrations or experimental interfaces for production services |
 
@@ -593,7 +595,7 @@ This section describes the **current source tree**, not the features of the firs
 
 ## Source PWA + Android APK
 
-**Current Android source:** `0.2.7-source` (`versionCode=9`, `com.elementeracoast.source`). After Source check passes on `main`, the visitor QA workflow publishes the matching APK and SHA-256 directly to GitHub Releases and marks the newest source visitor build as Latest. Historical 0.2.2 temporary-tunnel packages remain documented below for provenance.
+**Current Android source:** `0.2.8-source` (`versionCode=10`, `com.elementeracoast.source`). After Source check passes on `main`, the visitor QA workflow publishes the matching APK and SHA-256 directly to GitHub Releases and marks the newest source visitor build as Latest. Historical 0.2.2 temporary-tunnel packages remain documented below for provenance.
 
 **Important:** That 0.2.2 test APK was compiled against a short-lived Cloudflare Quick Tunnel, which is **not a permanent backend**. You can inspect the APK after the tunnel expires, but cannot log in through it. To test a live matching PWA and APK, manually run [Source Native V1 V2 Diagnostic QA](.github/workflows/source-native-v1v2-diagnostic.yml). It launches isolated empty test storage, verifies real login with password `123456`, publishes a fresh signed APK and ZIP to [Releases](../../releases), and keeps the one-time test backend online for approximately 30 minutes after publishing. Do not enter real user data.
 
