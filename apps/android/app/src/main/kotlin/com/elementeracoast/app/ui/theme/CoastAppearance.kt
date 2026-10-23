@@ -10,6 +10,7 @@ data class CoastAppearance(
     val userBubbleColor: Color? = null,
     val fontMode: CoastFontMode = CoastFontMode.CoastClassic,
     val paperMode: CoastPaperMode = CoastPaperMode.Wave,
+    val cloudOutlineEnabled: Boolean = true,
     val readingWeight: CoastReadingWeight = CoastReadingWeight.Normal,
     val messageSurfaceAlpha: Float = .94f,
     val chatBackgroundImagePath: String = "",
