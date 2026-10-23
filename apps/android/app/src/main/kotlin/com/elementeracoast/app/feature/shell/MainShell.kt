@@ -67,6 +67,7 @@ fun MainShell(
     onStop: () -> Unit,
     onMessageAction: (MessageAction) -> Unit,
     onOpenActionLog: (Set<String>) -> Unit,
+    onSetThoughtSoilEnabled: (Boolean) -> Unit,
     onImportMessages: (List<ChatMessage>) -> Unit,
     onLocalActionLogged: (String, String, String) -> Unit,
     onOpenModels: () -> Unit,
@@ -162,6 +163,7 @@ fun MainShell(
                             onStop = onStop,
                             onMessageAction = onMessageAction,
                             onOpenActionLog = onOpenActionLog,
+                            onSetThoughtSoilEnabled = onSetThoughtSoilEnabled,
                             onOpenPendingMemory = {
                                 openPendingMemoryOnLanding = true
                                 onOpenFeature(FeatureDestination.Memory)
