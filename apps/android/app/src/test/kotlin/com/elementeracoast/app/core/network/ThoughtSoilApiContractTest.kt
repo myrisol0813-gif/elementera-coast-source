@@ -56,13 +56,28 @@ class ThoughtSoilApiContractTest {
             "organized_by_model":"openai/gpt-5.6"
           }
         }"""))
+        server.enqueue(jsonResponse("""{
+          "ok":true,
+          "soil":{
+            "conversation_id":"c1",
+            "current_text":"新壤",
+            "hand_seeds":[],
+            "do_not_repeat":"",
+            "pocket_candidates":[],
+            "manual_locked":false,
+            "auto_refresh_enabled":false,
+            "revision":4
+          }
+        }"""))
 
         val loaded = api.getThoughtSoil("c1")
         val organized = api.organizeThoughtSoil("c1", "openai/gpt-5.6")
+        val disabled = api.setThoughtSoilEnabled("c1", false)
 
         assertEquals("旧壤", loaded.currentText)
         assertEquals("新壤", organized.soil.currentText)
         assertEquals("新芽", organized.soil.handSeeds.single().name)
+        assertEquals(false, disabled.autoRefreshEnabled)
 
         val getRequest = server.takeRequest()
         assertTrue(getRequest.path!!.startsWith("/api/memory/soil?conversation_id=c1"))
@@ -77,6 +92,12 @@ class ThoughtSoilApiContractTest {
         assertTrue(body.contains("\"conversation_id\":\"c1\""))
         assertTrue(body.contains("\"model\":\"openai/gpt-5.6\""))
         assertTrue(body.contains("\"trigger\":\"reply\""))
+
+        val toggleRequest = server.takeRequest()
+        assertTrue(toggleRequest.path!!.startsWith("/api/memory/soil?conversation_id=c1"))
+        assertEquals("PUT", toggleRequest.method)
+        assertEquals(config.origin, toggleRequest.getHeader("Origin"))
+        assertTrue(toggleRequest.body.readUtf8().contains("\"auto_refresh_enabled\":false"))
     }
 
     private fun jsonResponse(body: String): MockResponse = MockResponse()
