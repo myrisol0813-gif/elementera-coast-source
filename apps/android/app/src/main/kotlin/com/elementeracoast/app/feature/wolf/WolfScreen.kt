@@ -36,6 +36,7 @@ import com.elementeracoast.app.BuildConfig
 import com.elementeracoast.app.core.model.ChatMessage
 import com.elementeracoast.app.core.model.CoastShellState
 import com.elementeracoast.app.core.remote.RemoteDevUpdate
+import com.elementeracoast.app.feature.chatgpt.ChatGptConnectState
 import com.elementeracoast.app.feature.serpentdesk.DevHandsRepository
 import com.elementeracoast.app.feature.shell.FeatureLocalBackBar
 import com.elementeracoast.app.ui.theme.SnowLetterSurface
@@ -46,11 +47,16 @@ import kotlinx.coroutines.launch
 fun WolfScreen(
     store: WolfStore,
     shellState: CoastShellState,
+    chatGpt: ChatGptConnectState,
     messages: List<ChatMessage>,
     devHands: DevHandsRepository,
     archive: GlobalArchiveRepository,
     onSelectModel: (String) -> Unit,
     onRefreshModels: () -> Unit,
+    onChatGptConnect: () -> Unit,
+    onChatGptDisconnect: () -> Unit,
+    onChatGptRefresh: () -> Unit,
+    onChatGptProbe: (String) -> Unit,
     onLogout: () -> Unit,
     onImportMessages: (List<ChatMessage>) -> Unit,
     onActionLogged: (String, String, String) -> Unit,
@@ -88,7 +94,12 @@ fun WolfScreen(
                     models = shellState.models,
                     current = shellState.currentModel,
                     onSelect = onSelectModel,
-                    onRefresh = onRefreshModels
+                    onRefresh = onRefreshModels,
+                    chatGpt = chatGpt,
+                    onChatGptConnect = onChatGptConnect,
+                    onChatGptDisconnect = onChatGptDisconnect,
+                    onChatGptRefresh = onChatGptRefresh,
+                    onChatGptProbe = onChatGptProbe
                 )
                 WolfDestination.BasicSettings -> BasicSettingsScreen(state.basic, store, onSnackbar)
                 WolfDestination.Diagnostics -> DiagnosticsScreen(shellState, state)
