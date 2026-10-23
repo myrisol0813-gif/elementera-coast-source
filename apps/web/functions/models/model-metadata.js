@@ -127,14 +127,23 @@ export function usageMetadata(value) {
       ?? usage.prompt_tokens_details?.cached_tokens
       ?? usage.input_tokens_details?.cached_tokens,
   );
+  const cacheWrite = safeNumber(
+    usage.cache_write_tokens
+      ?? usage.prompt_tokens_details?.cache_write_tokens
+      ?? usage.input_tokens_details?.cache_write_tokens
+      ?? usage.prompt_tokens_details?.cache_creation_tokens,
+  );
   const total = safeNumber(usage.total_tokens);
   const cost = safeNumber(usage.cost ?? usage.total_cost);
-  if ([prompt, completion, reasoning, cached, total, cost].every((item) => item == null)) return null;
+  const discount = safeNumber(usage.cache_discount);
+  if ([prompt, completion, reasoning, cached, cacheWrite, total, cost, discount].every((item) => item == null)) return null;
   return {
     prompt_tokens: prompt,
     completion_tokens: completion,
     reasoning_tokens: reasoning,
     cached_tokens: cached,
+    cache_write_tokens: cacheWrite,
+    cache_discount: discount,
     total_tokens: total,
     cost,
   };
@@ -153,6 +162,8 @@ export function addUsageMetadata(left, right) {
     completion_tokens: addNullableNumber(left.completion_tokens, right.completion_tokens),
     reasoning_tokens: addNullableNumber(left.reasoning_tokens, right.reasoning_tokens),
     cached_tokens: addNullableNumber(left.cached_tokens, right.cached_tokens),
+    cache_write_tokens: addNullableNumber(left.cache_write_tokens, right.cache_write_tokens),
+    cache_discount: addNullableNumber(left.cache_discount, right.cache_discount),
     total_tokens: addNullableNumber(left.total_tokens, right.total_tokens),
     cost: addNullableNumber(left.cost, right.cost),
   };
@@ -230,7 +241,10 @@ export function createModelMetadataCollector({ requestedModel = '', requestPaylo
     state.resolvedModel = String(value.model || state.resolvedModel || '').slice(0, 180);
     state.provider = providerNameOf(value) || state.provider;
     state.providerRoute = providerRouteOf(value) ?? state.providerRoute;
-    state.usage = addUsageMetadata(state.usage, usageMetadata(value.usage));
+    state.usage = addUsageMetadata(state.usage, usageMetadata({
+      ...value.usage,
+      cache_discount: value.usage?.cache_discount ?? value.cache_discount,
+    }));
     const choice = choiceOf(value);
     if (choice.finish_reason != null) state.finishReason = String(choice.finish_reason).slice(0, 120);
     const calls = choice?.message?.tool_calls ?? choice?.delta?.tool_calls;
