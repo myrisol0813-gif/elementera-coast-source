@@ -50,12 +50,14 @@ The source build does not include private production credentials, production sig
 
 No WebView, React Native, TypeScript, or embedded PWA source is used by the Native client.
 
-## Public Native visitor QA prerelease
+## Public Native visitor QA · Latest GitHub Release
 
 The public Android app has its own install ID, `com.elementeracoast.source`, and is
 **not** the private production APK. When the main branch passes **Source check**,
 `.github/workflows/source-native-prerelease.yml` automatically builds and publishes
 a **0.2.6-source visitor QA APK** to GitHub Releases, with its SHA-256 file.
+GitHub marks each new version as **Latest** instead of a prerelease; publishing
+is skipped when that APK version already exists in Releases.
 
 It uses the existing `scripts/sign-disposable-qa.sh` signer to generate a new,
 temporary Source-only signing certificate in each CI runner, then deletes it.
