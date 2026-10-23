@@ -114,11 +114,22 @@ export function createMemoryActions({
       if (!await clearSoil()) return;
       return router.refresh();
     }
+    if (name === 'soil-toggle') {
+      const enabled = target.dataset.value === 'true';
+      const data = await saveSoilRequest(currentId(), { auto_refresh_enabled: enabled });
+      runtime.soils.set(currentId(), data.soil);
+      chat.renderMessages();
+      await router.refresh();
+      toast(enabled ? '当前对话纸条已开启，会继续整理并递入上下文。' : '当前对话纸条已关闭；旧内容保留，但不再整理，也不递入上下文。');
+      return;
+    }
     if (name === 'soil-auto') {
       const data = await saveSoilRequest(currentId(), { manual_locked: false, auto_refresh_enabled: true });
       runtime.soils.set(currentId(), data.soil);
       chat.renderMessages();
-      return router.refresh();
+      await router.refresh();
+      toast('已解除手动锁定，恢复自动整理。');
+      return;
     }
     if (name === 'pocket-resolve') {
       const tag = q('[data-memory-tag]', target.closest('[data-pocket-id]'))?.value || '';
