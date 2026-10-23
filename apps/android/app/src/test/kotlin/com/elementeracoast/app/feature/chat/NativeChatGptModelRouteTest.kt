@@ -16,7 +16,7 @@ class NativeChatGptModelRouteTest {
     }
 
     @Test fun officialModelsKeepReadableProviderLabel() {
-        assertEquals("官端 GPT · gpt-6-sol", modelDisplayName("chatgpt-plan:gpt-6-sol"))
+        assertEquals("ChatGPT · gpt-6-sol", modelDisplayName("chatgpt-plan:gpt-6-sol"))
         assertEquals("6", modelDisplayName("openai/gpt-6"))
     }
 }
