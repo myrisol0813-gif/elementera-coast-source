@@ -30,41 +30,6 @@ import com.elementeracoast.app.ui.theme.SnowLetterSurface
 import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
 import com.elementeracoast.app.ui.theme.snowLetterSheetContainerColor
 
-@Composable
-internal fun TurnDeskStatusStrip(
-    receipt: TurnDeskReceipt,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    SnowLetterSurface(
-        modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
-        role = SnowLetterSurfaceRole.StatusCard,
-        fallbackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .34f),
-        fallbackShape = MaterialTheme.shapes.medium
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 9.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    receipt.summary.ifBlank { "本轮递给模型" },
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                if (receipt.comfort.isNotBlank()) {
-                    Text(
-                        receipt.comfort,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TurnDeskBottomSheet(
