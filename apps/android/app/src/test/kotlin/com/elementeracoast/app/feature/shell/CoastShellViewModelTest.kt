@@ -215,6 +215,20 @@ class CoastShellViewModelTest {
     }
 
     @Test
+    fun thoughtSoilSwitchUpdatesCanonicalRepositoryAndShellState() {
+        val fixture = Fixture()
+        fixture.conversations.seed(RoomType.Main, "主聊天")
+        val vm = fixture.vm()
+
+        vm.setThoughtSoilEnabled(false)
+
+        assertEquals(1, fixture.thoughtSoil.setEnabledCalls)
+        assertFalse(fixture.thoughtSoil.lastEnabled)
+        assertFalse(vm.state.value.thoughtSoil!!.autoRefreshEnabled)
+        assertTrue(vm.state.value.snackbarMessage!!.contains("不再整理"))
+    }
+
+    @Test
     fun completedReplyExposesDeskReceiptAndOrganizesThoughtSoil() {
         val fixture = Fixture()
         fixture.conversations.seed(RoomType.Main, "主聊天")
@@ -463,8 +477,16 @@ class CoastShellViewModelTest {
 
     private class FakeThoughtSoilRepository : ThoughtSoilRepository {
         var organizeCalls = 0
+        var setEnabledCalls = 0
+        var lastEnabled = true
 
         override suspend fun load(conversationId: String): ThoughtSoilSnapshot = soil(conversationId, emptyList())
+
+        override suspend fun setEnabled(conversationId: String, enabled: Boolean): ThoughtSoilSnapshot {
+            setEnabledCalls += 1
+            lastEnabled = enabled
+            return soil(conversationId, emptyList()).copy(autoRefreshEnabled = enabled)
+        }
 
         override suspend fun organizeAfterReply(conversationId: String, modelId: String): ThoughtSoilSnapshot {
             organizeCalls += 1
