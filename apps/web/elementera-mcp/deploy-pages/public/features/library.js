@@ -161,7 +161,7 @@ export function createTidalLibrary({router,toast}) {
             if(current===total || current%40<8)toast(`正在收书：${current} / ${total} 个正文分段`,1600);
           },
         });
-        toast('整本书已核对完整，放上潮中书架了。');
+        toast('整本书已核对完整，放上书架了。');
         await openReader(book.id,0,0);
       }catch(e){toast(`导入失败：${e.message||'文件无法阅读。'}`,6000);}
     },{once:true});
