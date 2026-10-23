@@ -376,13 +376,13 @@ const REGISTRY = Object.freeze([
   }),
 
   entry({
-    tool_key: 'library.books', display_name: '翻潮中书架', description: '查看书房有哪些书或某本书的目录。',
+    tool_key: 'library.books', display_name: '查看书架', description: '查看书房有哪些书或某本书的目录。',
     model_exposed: true, model_group: 'library', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
-    model_tool: modelTool('library_books', '查看潮中书房里的书，提供 book_id 可查看章节目录。', {
+    model_tool: modelTool('library_books', '查看书房里的书，提供 book_id 可查看章节目录。', {
       properties: { book_id: { type: 'string' } },
     }),
     official_mcp: officialMcpTool({
-      order: 210, name: 'list_library_books', title: '查看潮中书架', description: '查看全部书，或指定一本书的章节目录。',
+      order: 210, name: 'list_library_books', title: '查看书架', description: '查看全部书，或指定一本书的章节目录。',
       inputSchema: objectSchema({ book_id: { type: 'string' } }),
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
       invoking: '正在翻书架…', invoked: '书架已经打开',
@@ -392,14 +392,14 @@ const REGISTRY = Object.freeze([
   entry({
     tool_key: 'library.read', display_name: '读一段书', description: '按章节和段落范围取书页正文。',
     model_exposed: true, model_group: 'library', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
-    model_tool: modelTool('library_read', '从潮中书房读某书指定章节的一页原文。start_paragraph 是从零起的段落号，默认每页 12 段，不会暗中裁剪。', {
+    model_tool: modelTool('library_read', '从书房读某书指定章节的一页原文。start_paragraph 是从零起的段落号，默认每页 12 段，不会暗中裁剪。', {
       properties: {
         book_id: { type: 'string' }, chapter_index: { type: 'integer', minimum: 0 },
         start_paragraph: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 12 },
       }, required: ['book_id','chapter_index'],
     }),
     official_mcp: officialMcpTool({
-      order: 220, name: 'read_library_chapter', title: '读潮中书页', description: '按章节、段号读取一页正文，不会在当前上下文注入全书。',
+      order: 220, name: 'read_library_chapter', title: '阅读书页', description: '按章节、段号读取一页正文，不会在当前上下文注入全书。',
       inputSchema: objectSchema({
         book_id: { type: 'string' }, chapter_index: { type: 'integer', minimum: 0 },
         start_paragraph: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 12 },
@@ -426,7 +426,7 @@ const REGISTRY = Object.freeze([
   entry({
     tool_key: 'library.write', display_name: '书页边写字', description: '模型伙伴 自主创建、修改或删除自己的批注与读后感。',
     model_exposed: true, model_group: 'library', auth_scopes: ['write:soil'],
-    model_tool: modelTool('library_write', '在潮中书房里写批注或读后感；允许自主改写、删除自己的文字，不能更改用户写的字。action 为 create/edit/delete。', {
+    model_tool: modelTool('library_write', '在书房里写批注或读后感；允许自主改写、删除自己的文字，不能更改用户写的字。action 为 create/edit/delete。', {
       properties: {
         action: { type: 'string', enum: ['create','edit','delete'] }, id: { type: 'string' },
         book_id: { type: 'string' }, kind: { type: 'string', enum: ['annotation','reflection'] },
