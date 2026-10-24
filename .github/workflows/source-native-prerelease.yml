@@ -147,7 +147,7 @@ jobs:
           cmp "source-release/$apk_name" "$downloaded/$apk_name"
           (cd "$downloaded" && sha256sum --check "$GITHUB_WORKSPACE/apps/android/source-release/SHA256SUMS.txt")
           build_tools="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          "$build_tools/apksigner" verify --verbose --min-sdk-version 26 --print-certs "$downloaded/$apk_name" | tee "$RUNNER_TEMP/published-signature-check.txt"
+          "$build_tools/apksigner" verify --verbose --min-sdk-version 23 --print-certs "$downloaded/$apk_name" | tee "$RUNNER_TEMP/published-signature-check.txt"
           grep -F 'Verified using v1 scheme (JAR signing): true' "$RUNNER_TEMP/published-signature-check.txt"
           grep -F 'Verified using v2 scheme (APK Signature Scheme v2): true' "$RUNNER_TEMP/published-signature-check.txt"
           unzip -Z1 "$downloaded/$apk_name" | grep -Fx 'META-INF/CERT.RSA'
