@@ -67,8 +67,8 @@ jobs:
         run: |
           set -euo pipefail
           grep -Fq 'applicationId = "com.elementeracoast.source"' app/build.gradle.kts
-          grep -Fq 'versionCode = 12' app/build.gradle.kts
-          grep -Fq 'versionName = "0.2.10-source"' app/build.gradle.kts
+          grep -Fq 'versionCode = 13' app/build.gradle.kts
+          grep -Fq 'versionName = "0.2.11-source"' app/build.gradle.kts
           test -f scripts/sign-disposable-qa.sh
           ! grep -Eiq 'app[.]elementeracoast[.]com' app/build.gradle.kts
 
@@ -90,20 +90,20 @@ jobs:
           set -euo pipefail
           unsigned_apk=app/build/outputs/apk/release/app-release-unsigned.apk
           mkdir -p source-release
-          apk=source-release/elementera-coast-source-v0.2.10-visitor-qa.apk
+          apk=source-release/elementera-coast-source-v0.2.11-visitor-qa.apk
           # Sign original unsigned Release exactly once, never double-sign Debug.
           bash scripts/sign-disposable-qa.sh "$unsigned_apk" "$apk"
           build_tools="$(find "${ANDROID_HOME}/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           badging="$("${build_tools}/aapt" dump badging "$apk")"
           line="$(printf '%s\n' "$badging" | sed -n '1p')"
           [[ "$line" == *"name='com.elementeracoast.source'"* ]]
-          [[ "$line" == *"versionCode='12'"* ]]
-          [[ "$line" == *"versionName='0.2.10-source'"* ]]
+          [[ "$line" == *"versionCode='13'"* ]]
+          [[ "$line" == *"versionName='0.2.11-source'"* ]]
           "${build_tools}/apksigner" verify --verbose --print-certs "$apk" > "${RUNNER_TEMP}/source-visitor-apk-certs.txt"
           fingerprint="$(grep -m1 'certificate SHA-256 digest:' "${RUNNER_TEMP}/source-visitor-apk-certs.txt" | awk '{print $NF}')"
           : "${fingerprint:?Missing source certificate fingerprint}"
           echo "fingerprint=$fingerprint" >> "${GITHUB_OUTPUT}"
-          (cd source-release && sha256sum elementera-coast-source-v0.2.10-visitor-qa.apk > SHA256SUMS.txt)
+          (cd source-release && sha256sum elementera-coast-source-v0.2.11-visitor-qa.apk > SHA256SUMS.txt)
           unzip -t "$apk" >/dev/null
 
       - name: Publish visitor APK directly to Releases
@@ -113,22 +113,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tag="source-visitor-v0.2.10-${{ github.event.workflow_run.head_sha || github.sha }}"
+          tag="source-visitor-v0.2.11-${{ github.event.workflow_run.head_sha || github.sha }}"
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release already exists: $tag" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           gh release create "$tag" \
-            source-release/elementera-coast-source-v0.2.10-visitor-qa.apk \
+            source-release/elementera-coast-source-v0.2.11-visitor-qa.apk \
             source-release/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" \
             --target "${{ github.event.workflow_run.head_sha || github.sha }}" \
-            --title "Elementera Coast Source Native 0.2.10 · Visitor QA" \
+            --title "Elementera Coast Source Native 0.2.11 · Visitor QA" \
             --latest \
             --notes "Public visitor-only Source Native APK, password 123456. Original Native pages and appearance are retained; remote operations are blocked while visiting. Built against a non-routable .invalid API host; no real account, production backend or model budget is included. QA uses a NEW disposable signing certificate for each build, so it cannot upgrade prior Source APKs with different signing keys. If necessary uninstall ONLY com.elementeracoast.source before installing. Source code and private production app are separate. This is the latest public visitor build, QA-signed with a disposable certificate, not a stable-signed production app."
           echo "### Source visitor APK published" >> "$GITHUB_STEP_SUMMARY"
           echo "Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"
-          echo "APK: https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/elementera-coast-source-v0.2.10-visitor-qa.apk" >> "$GITHUB_STEP_SUMMARY"
+          echo "APK: https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/elementera-coast-source-v0.2.11-visitor-qa.apk" >> "$GITHUB_STEP_SUMMARY"
           echo "SHA256: $(cut -d' ' -f1 source-release/SHA256SUMS.txt)" >> "$GITHUB_STEP_SUMMARY"
           echo "QA signing cert SHA256: ${{ steps.signing.outputs.fingerprint }}" >> "$GITHUB_STEP_SUMMARY"
 
@@ -139,8 +139,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tag="source-visitor-v0.2.10-${{ github.event.workflow_run.head_sha || github.sha }}"
-          apk_name=elementera-coast-source-v0.2.10-visitor-qa.apk
+          tag="source-visitor-v0.2.11-${{ github.event.workflow_run.head_sha || github.sha }}"
+          apk_name=elementera-coast-source-v0.2.11-visitor-qa.apk
           downloaded="$RUNNER_TEMP/verified-release"
           mkdir -p "$downloaded"
           gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "$apk_name" --dir "$downloaded"
