@@ -25,13 +25,15 @@ There are two different ways to try this repository. They are intentionally not 
 
 ### 1. Inspect the current public Android build
 
-Download the newest **Source Native Visitor QA** APK from [Latest Releases](../../releases/latest) and enter:
+Download the current **Source Native Visitor QA** APK and its SHA-256 from **[Latest APK release](../../releases/latest)**, then enter:
 
 ```text
 123456
 ```
 
 This opens the real Native page structure and local appearance for inspection. Visitor mode is deliberately **offline-only**: account login, ChatGPT authorization, model calls, and other cloud actions are blocked before network transmission.
+
+**Only use Latest for a new install.** Old QA APKs mentioned in release notes are historical builds and may have expired backends or missing fixes.
 
 The published visitor APK is compiled with the non-routable backend placeholder:
 
@@ -99,7 +101,7 @@ For a longer-lived setup, replace the Quick Tunnel with your own hosted source b
 - [Attachments, files, and search surfaces](#attachments-files-and-search-surfaces)
 - [MCP and external-interface experiments](#mcp-and-external-interface-experiments)
 - [Current feature status (0.2.9-source)](#current-feature-status-029-source)
-- [Historical preview APK](#historical-preview-apk)
+- [Android APK downloads and history](#android-apk-downloads-and-history)
 - [Running and testing](#running-and-testing)
 - [Configuration](#configuration)
 - [Privacy and sanitization](#privacy-and-sanitization)
@@ -591,34 +593,17 @@ This section describes the **current source tree**, not the features of the firs
 | Voice clips | Message-linked speech clip controls, playback and authorized generation endpoints | Actual speech generation requires self-hosted server-side `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`; no voice credentials or preset voice shipped |
 | Exports / tools | Source JSON/HTML snapshot and authorized calendar/reading/voice tool routes | Do not mistake unconfigured integrations or experimental interfaces for production services |
 
-**0.2.2 Native fixes:** preserve the paragraph + in-paragraph reading offset when notes/highlights trigger refreshes; make the named font choices visibly distinct even without licensed font files; show the actual fallback in appearance settings. The public ZIP-wrapped QA APK was signed and checked for ZIP integrity before publishing, and the Android installation was subsequently checked on a phone. This is not a promise of permanent backend availability.
+## Android APK downloads and history
 
-**Download status:** The published 0.2.2 QA APK is a real, inspectable build, but it embeds a **temporary** Cloudflare Quick Tunnel which expires after its GitHub Actions run. For a working login, rebuild against your own backend or launch a fresh isolated QA run. The original `v0.1-source` release remains a historical milestone, not the current feature build.
+**Download the current public APK:** [Latest Source Native Visitor QA release](../../releases/latest) — the release page contains the current APK and a `SHA256SUMS.txt` checksum file. This link automatically follows new public visitor releases; do **not** use an APK from an old walkthrough.
 
-## Source PWA + Android APK
+- **Visitor APK:** enter `123456` to inspect the Native interface offline. This published package has an intentionally non-routable backend and cannot connect to your ChatGPT account.
+- **Live ChatGPT test:** fork the repository, enable Actions and run [Live ChatGPT Test](.github/workflows/source-live-chatgpt-test.yml). It builds a fresh temporary APK and backend; fetch the package and random login password from that run's Draft Release during its test window.
+- **Persistent self-hosting:** configure your own Pages/D1 backend, Android API URL and signing setup. See [deployment instructions](docs/SOURCE_DEMO_PWA_APK.md) and [configuration](#configuration). Neither private production credentials nor signing keys are shipped.
 
-**Current Android source:** `0.2.9-source` (`versionCode=11`, `com.elementeracoast.source`). After Source check passes on `main`, the visitor QA workflow publishes the matching APK and SHA-256 directly to GitHub Releases and marks the newest source visitor build as Latest. Historical 0.2.2 temporary-tunnel packages remain documented below for provenance.
+**Version clarity:** the source tree is currently `0.2.9-source` (`versionCode=11`), whereas [Latest Releases](../../releases/latest) is the authoritative download target as newer builds are published. Each visitor QA build uses disposable signing material and normally cannot be installed as an in-place update over a separately signed QA APK. Uninstall only `com.elementeracoast.source` if Android reports a signing conflict; this does not affect any separately packaged private installation.
 
-**Important:** That 0.2.2 test APK was compiled against a short-lived Cloudflare Quick Tunnel, which is **not a permanent backend**. You can inspect the APK after the tunnel expires, but cannot log in through it. To test a live matching PWA and APK, manually run [Source Native V1 V2 Diagnostic QA](.github/workflows/source-native-v1v2-diagnostic.yml). It launches isolated empty test storage, verifies real login with password `123456`, publishes a fresh signed APK and ZIP to [Releases](../../releases), and keeps the one-time test backend online for approximately 30 minutes after publishing. Do not enter real user data.
-
-For a lasting installation instead, self-host an independent Pages/D1 backend and configure separate source-only signing for [the stable source prerelease workflow](.github/workflows/source-native-prerelease.yml). See [deployment instructions](docs/SOURCE_DEMO_PWA_APK.md). Neither private production backend nor private signing material is included.
-
-## Historical preview APK
-
-The original [v0.1-source release](../../releases/tag/v0.1-source) is kept for provenance only. It does **not** include the later calendar, reader or voice screens and is **not** the current download. Historical v0.1 preview details:
-
-```text
-file: elementera-coast-source-v0.1-debug.apk
-applicationId: com.elementeracoast.source
-versionCode: 1
-versionName: 0.1.0-source
-build type: debug
-official_production_apk: false
-preview password: 123456
-SHA-256: 04c21d8f88f9786ef6caa7c5adaf1838f748f817389cea87337a34444eba7702
-```
-
-This APK is only a source preview build. It is not an official production APK.
+**Older builds are not recommended downloads.** The `0.2.6`, `0.2.7`, and `0.2.8` visitor packages are superseded. Earlier `0.2.2` Quick Tunnel demos and the original `v0.1-source` preview are historical milestones, not current installation instructions; the `v0.1-source` release is no longer available on the Releases page. Keep their implementation notes in [source release history](docs/SOURCE_RELEASE_HISTORY.md), not in the current APK download instructions.
 
 ## Running and testing
 
