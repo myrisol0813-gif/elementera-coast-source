@@ -6,8 +6,8 @@ This directory contains the source-available Android client derived from the cur
 
 - App: Elementera Coast Source
 - `applicationId = com.elementeracoast.source`
-- `versionCode = 11`
-- `versionName = 0.2.9-source`
+- `versionCode = 12`
+- `versionName = 0.2.10-source`
 - Kotlin + Jetpack Compose
 - JDK 17 / Android SDK 34 / Gradle 8.9
 
@@ -61,12 +61,11 @@ No WebView, React Native, TypeScript, or embedded PWA source is used by the Nati
 The public Android app has its own install ID, `com.elementeracoast.source`, and is
 **not** the private production APK. When the main branch passes **Source check**,
 `.github/workflows/source-native-prerelease.yml` automatically builds and publishes
-a **0.2.9-source visitor QA APK** to GitHub Releases, with its SHA-256 file.
+a **0.2.10-source visitor QA APK** to GitHub Releases, with its SHA-256 file.
 GitHub marks each new version as **Latest** instead of a prerelease; publishing
 is skipped when that APK version already exists in Releases.
 
-It uses the existing `scripts/sign-disposable-qa.sh` signer to generate a new,
-temporary Source-only signing certificate in each CI runner, then deletes it.
+The QA publisher builds an **unsigned release** package, ZIP-aligns it and signs it **once** using `scripts/sign-disposable-qa.sh` with V1/V2/V3 and conventional `META-INF/CERT.RSA` / `META-INF/CERT.SF` entries. It re-downloads the published Release asset and checks its SHA-256, APK signature, ZIP entries and exact bytes before marking the workflow successful. Each run uses a temporary Source-only signing certificate, which is deleted afterward.
 **No signing Secrets, admin release switch, PWA deployment or Quick Tunnel are
 needed.** The published APK uses the non-routable `.invalid` API placeholder.
 Enter `123456` to tour the original Android UI and local appearance without
@@ -76,7 +75,7 @@ Important: because every QA release uses a **different** certificate, APK update
 from older QA/debug Source builds normally **cannot install over** the older app.
 Uninstall only `com.elementeracoast.source` before installing if Android reports a
 signing conflict; deleting the Source app may erase its local settings/data.
-The public visitor APK is a testing/inspection build, not stable application delivery.
+If a phone specifically reports **no signature file** even after re-downloading the actual .apk, compare its SHA-256 against the Release's `SHA256SUMS.txt` and report the exact device/installer error; CI signature verification cannot prove compatibility with every OEM installer. The public visitor APK is a testing/inspection build, not stable application delivery.
 Private production signing material must never be used here.
 
 ## Build
