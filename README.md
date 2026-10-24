@@ -35,6 +35,8 @@ This opens the real Native page structure and local appearance for inspection. V
 
 **Only use Latest for a new install.** Old QA APKs mentioned in release notes are historical builds and may have expired backends or missing fixes.
 
+If your phone says **“no signature file”** or **“cannot verify signature”**, do not rename or unpack the APK and do not install it from a ZIP preview. Download the actual `.apk` file using the system browser and compare its SHA-256 with the `SHA256SUMS.txt` linked in the release. A mismatching digest means the download is damaged; a matching digest with an installer error needs device-specific debugging. A disposable QA signature is not an additional file to install.
+
 The published visitor APK is compiled with the non-routable backend placeholder:
 
 ```text
@@ -100,7 +102,7 @@ For a longer-lived setup, replace the Quick Tunnel with your own hosted source b
 - [Model workspace and tool records](#model-workspace-and-tool-records)
 - [Attachments, files, and search surfaces](#attachments-files-and-search-surfaces)
 - [MCP and external-interface experiments](#mcp-and-external-interface-experiments)
-- [Current feature status (0.2.9-source)](#current-feature-status-029-source)
+- [Current feature status (0.2.10-source)](#current-feature-status-0210-source)
 - [Android APK downloads and history](#android-apk-downloads-and-history)
 - [Running and testing](#running-and-testing)
 - [Configuration](#configuration)
@@ -439,8 +441,8 @@ Source identity:
 ```text
 App: Elementera Coast Source
 applicationId = com.elementeracoast.source
-versionCode = 11
-versionName = 0.2.9-source
+versionCode = 12
+versionName = 0.2.10-source
 ```
 
 The Android client keeps the copied native application structure, including areas such as:
@@ -574,9 +576,11 @@ They should be treated as experimental.
 
 The source Native client now includes the original owner calendar, Tidal Library shelf and reader, EPUB/TXT import and audio-clip actions, using the same source backend contracts as the PWA. Only the interface and generic implementation are mirrored; private data, accounts, identities and signing are excluded. See [Native parity acceptance](docs/SOURCE_NATIVE_PARITY_2026-10-21.md).
 
-## Current feature status (0.2.9-source)
+## Current feature status (0.2.10-source)
 
 This section describes the **current source tree**, not the features of the first `v0.1-source` APK.
+
+**0.2.10 APK signing correction:** public visitor packaging now starts with an unsigned Android Release APK, aligns it, signs it once with V1/V2/V3 and explicit `META-INF/CERT.RSA` / `META-INF/CERT.SF`, and verifies the *downloaded GitHub Release asset* again against its SHA-256 and Android signature metadata. This supersedes the 0.2.9 visitor APK, which a phone installer rejected as having no signature file despite CI-side verification. The cause of the device-specific rejection is not proven; device installation must be retested. Source PWA remains `coast-source-app-09`.
 
 **0.2.9 Native trace + public copy:** the Native reasoning/model receipt now sits in the assistant's action row (short label on narrow screens), rather than in a detached metadata card. The public library uses “书房 / 书架 / 书页” in UI and tool descriptions, and the Native drawer uses “跨窗口选取 / 历史消息搜索”. Internal tool keys and stored data are unchanged. Source PWA cache: `coast-source-app-08` → `coast-source-app-09`.
 
@@ -589,7 +593,7 @@ This section describes the **current source tree**, not the features of the firs
 | Web / PWA | Conversation UI, streaming/SSE paths, visible context and tool records, owner/visitor separation, memory and world-book workspaces, attachment handling | Model responses and tool integrations need independently configured services; no private production data is distributed |
 | Owner calendar | Entries, notes, edits/deletion and recurrence, with owner-authenticated backend routes | Requires self-hosted backend and storage; tested temporary demos use synthetic data |
 | Tidal Library | TXT/EPUB imports, shelf/cover, chapter and page navigation, saved progress, highlights, annotations, reader options | The PWA and Native clients use the same backend contracts when connected to the same host |
-| Android Native | Jetpack Compose chat and Daily surfaces, calendar, book room, themes, local background selection, reading style/weight and user-supplied local fonts | `0.2.9-source`, `versionCode=11`; proprietary preset fonts are **not** bundled. Missing fonts use visibly different system fallbacks |
+| Android Native | Jetpack Compose chat and Daily surfaces, calendar, book room, themes, local background selection, reading style/weight and user-supplied local fonts | `0.2.10-source`, `versionCode=12`; proprietary preset fonts are **not** bundled. Missing fonts use visibly different system fallbacks |
 | Voice clips | Message-linked speech clip controls, playback and authorized generation endpoints | Actual speech generation requires self-hosted server-side `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`; no voice credentials or preset voice shipped |
 | Exports / tools | Source JSON/HTML snapshot and authorized calendar/reading/voice tool routes | Do not mistake unconfigured integrations or experimental interfaces for production services |
 
@@ -601,9 +605,9 @@ This section describes the **current source tree**, not the features of the firs
 - **Live ChatGPT test:** fork the repository, enable Actions and run [Live ChatGPT Test](.github/workflows/source-live-chatgpt-test.yml). It builds a fresh temporary APK and backend; fetch the package and random login password from that run's Draft Release during its test window.
 - **Persistent self-hosting:** configure your own Pages/D1 backend, Android API URL and signing setup. See [deployment instructions](docs/SOURCE_DEMO_PWA_APK.md) and [configuration](#configuration). Neither private production credentials nor signing keys are shipped.
 
-**Version clarity:** the source tree is currently `0.2.9-source` (`versionCode=11`), whereas [Latest Releases](../../releases/latest) is the authoritative download target as newer builds are published. Each visitor QA build uses disposable signing material and normally cannot be installed as an in-place update over a separately signed QA APK. Uninstall only `com.elementeracoast.source` if Android reports a signing conflict; this does not affect any separately packaged private installation.
+**Version clarity:** the source tree is currently `0.2.10-source` (`versionCode=12`), whereas [Latest Releases](../../releases/latest) is the authoritative download target as newer builds are published. Each visitor QA build uses disposable signing material and normally cannot be installed as an in-place update over a separately signed QA APK. Uninstall only `com.elementeracoast.source` if Android reports a signing conflict; this does not affect any separately packaged private installation.
 
-**Older builds are not recommended downloads.** The `0.2.6`, `0.2.7`, and `0.2.8` visitor packages are superseded. Earlier `0.2.2` Quick Tunnel demos and the original `v0.1-source` preview are historical milestones, not current installation instructions; the `v0.1-source` release is no longer available on the Releases page. Keep their implementation notes in [source release history](docs/SOURCE_RELEASE_HISTORY.md), not in the current APK download instructions.
+**Older builds are not recommended downloads.** The `0.2.6` through `0.2.9` visitor packages are superseded; `0.2.9` was reported rejected by a phone installer and withdrawn. Earlier `0.2.2` Quick Tunnel demos and the original `v0.1-source` preview are historical milestones, not current installation instructions; the `v0.1-source` release is no longer available on the Releases page. Keep their implementation notes in [source release history](docs/SOURCE_RELEASE_HISTORY.md), not in the current APK download instructions.
 
 ## Running and testing
 
