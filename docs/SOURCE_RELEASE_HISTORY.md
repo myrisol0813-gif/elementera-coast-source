@@ -25,6 +25,12 @@ Only the tagged source revision and the matching Release assets describe what wa
 - APK SHA-256: `4319dcca4bfe7424e5e27ff9181c0b87d8508795ba227ecab4cf58b7ab763abf`.
 - Live login depends on the original temporary test backend, which has expired. For self-hosting, supply an independent server and rebuild; for short phone QA, run the dedicated isolated test workflow.
 
+## Current source Native QA — 0.2.11-source (2026-10-24)
+
+- Copy-only Native QA refresh: the empty-chat placeholder changes from “潮水退到纸页外。” to “文字退到页边外。”; the second line remains unchanged.
+- Public application ID stays `com.elementeracoast.source`; versionCode 12 → 13 and versionName 0.2.10-source → 0.2.11-source so GitHub publishes a distinct test APK.
+- No chat behavior, backend contract, PWA code/cache, account flow, memory/tool logic or appearance behavior changes. Source PWA remains `coast-source-app-09`.
+
 ## Current source Native QA — 0.2.10-source (2026-10-24)
 
 - The prior 0.2.9 published QA APK was rejected by a phone installer as missing a signature file, despite v1/v2 signatures verified on the build runner; its published Release was subsequently deleted. The definitive device-specific cause is not established.

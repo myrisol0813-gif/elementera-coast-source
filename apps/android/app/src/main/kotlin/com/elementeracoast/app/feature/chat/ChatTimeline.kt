@@ -60,7 +60,7 @@ internal fun ChatTimeline(
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         if (messages.isEmpty()) {
             Column(modifier = Modifier.align(Alignment.Center).padding(horizontal = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("潮水退到纸页外。", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("文字退到页边外。", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text("写点什么，新的窗口会从这里长出来。", modifier = Modifier.padding(top = 7.dp), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .68f))
             }
             return@Box
