@@ -578,7 +578,7 @@ The source Native client now includes the original owner calendar, Tidal Library
 
 ## Current feature status (0.2.11-source)
 
-**0.2.11 copy-only Native QA:** the empty-chat placeholder is generalized from “潮水退到纸页外。” to “文字退到页边外。”. The second line remains “写点什么，新的窗口会从这里长出来。”. This release changes no chat behavior, backend contract, PWA code, account flow, memory/tool logic or appearance behavior; the Android version advances only so the text-only APK can be published and tested as a distinct build.
+**0.2.11 copy-only Native QA:** the empty-chat placeholder is generalized from “潮水退到纸页外。” to “文字退到页边外。” The second line remains “写点什么，新的窗口会从这里长出来。”. This release changes no chat behavior, backend contract, PWA code, account flow, memory/tool logic or appearance behavior; the Android version advances only so the text-only APK can be published and tested as a distinct build.
 
 This section describes the **current source tree**, not the features of the first `v0.1-source` APK.
 
