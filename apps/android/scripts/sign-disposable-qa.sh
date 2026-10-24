@@ -22,10 +22,10 @@ echo "QA signature stage 2: zipalign original unsigned Release APK"
 
 echo "QA signature stage 3: sign exactly once with V1/V2/V3 and conventional CERT basename"
 mkdir -p "$(dirname "$signed_apk")"
-"$tools_dir/apksigner" sign --ks "$work/qa.p12" --ks-key-alias CERT --ks-pass env:QA_SIGN_PASSWORD --key-pass env:QA_SIGN_PASSWORD --min-sdk-version 26 --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true --v4-signing-enabled false --v1-signer-name CERT --out "$signed_apk" "$work/aligned-unsigned.apk"
+"$tools_dir/apksigner" sign --ks "$work/qa.p12" --ks-key-alias CERT --ks-pass env:QA_SIGN_PASSWORD --key-pass env:QA_SIGN_PASSWORD --min-sdk-version 23 --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true --v4-signing-enabled false --v1-signer-name CERT --out "$signed_apk" "$work/aligned-unsigned.apk"
 
 echo "QA signature stage 4: verify the exact final distributable APK"
-"$tools_dir/apksigner" verify --verbose --min-sdk-version 26 --print-certs "$signed_apk" | tee "$work/verify.txt"
+"$tools_dir/apksigner" verify --verbose --min-sdk-version 23 --print-certs "$signed_apk" | tee "$work/verify.txt"
 grep -F 'Verified using v1 scheme (JAR signing): true' "$work/verify.txt"
 grep -F 'Verified using v2 scheme (APK Signature Scheme v2): true' "$work/verify.txt"
 unzip -t "$signed_apk" >/dev/null
