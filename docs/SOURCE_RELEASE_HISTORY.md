@@ -25,6 +25,13 @@ Only the tagged source revision and the matching Release assets describe what wa
 - APK SHA-256: `4319dcca4bfe7424e5e27ff9181c0b87d8508795ba227ecab4cf58b7ab763abf`.
 - Live login depends on the original temporary test backend, which has expired. For self-hosting, supply an independent server and rebuild; for short phone QA, run the dedicated isolated test workflow.
 
+## Current source Native QA — 0.2.10-source (2026-10-24)
+
+- The prior 0.2.9 published QA APK was rejected by a phone installer as missing a signature file, despite v1/v2 signatures verified on the build runner; its published Release was subsequently deleted. The definitive device-specific cause is not established.
+- This revision produces an **unsigned Release APK** before ZIP alignment and a **single** v1/v2/v3 signing pass with conventional CERT names. It checks the final package and downloads the GitHub Release APK back for a SHA-256 and signature recheck, failing publication checks on a mismatch.
+- Public application ID stays `com.elementeracoast.source`; versionCode 11 → 12 and versionName 0.2.9-source → 0.2.10-source. PWA code/cache remains unchanged (`coast-source-app-09`).
+- Installation on the affected handset is still a required acceptance check; CI cannot confirm success for that OEM package installer.
+
 ## Current source Native QA — 0.2.9-source (2026-10-24)
 
 - Moved the Native model metadata trace button into each assistant message action row, with an abbreviated label on narrower phones. Full reasoning, provider, request, cache, and tool trace details remain available directly beneath the relevant reply.
@@ -55,5 +62,5 @@ Only the tagged source revision and the matching Release assets describe what wa
 
 - These releases are inspectable open-source evidence, not promises of an enduring hosted service.
 - Public source excludes private conversations, production credentials, signing keys, proprietary fonts and production backend details.
-- The first release and later test assets are retained for reproducible history; do not delete or replace old binaries with newer ones.
+- Historical feature scope and commit records are retained for reproducibility; older QA Release binaries may be deleted after they are superseded or proven unusable.
 - Future updates should revise the current README feature matrix and current release description, without overwriting historical release capabilities.
