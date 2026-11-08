@@ -6,8 +6,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CoastThemePresetTest {
-    @Test fun wardrobeContainsThirteenNamedPresetsWithDefaultFirst() {
-        assertEquals(13, CoastThemePreset.entries.size)
+    @Test fun wardrobeContainsNamedPresetsWithDefaultFirst() {
+        assertEquals(14, CoastThemePreset.entries.size)
         assertEquals(CoastThemePreset.CoastDefault, CoastThemePreset.entries.first())
         assertEquals(
             listOf(
@@ -23,7 +23,8 @@ class CoastThemePresetTest {
                 "极简海雾",
                 "美式卡通",
                 "草地绿洲",
-                "紫色梦潮"
+                "紫色梦潮",
+                "奶油纸牌"
             ),
             CoastThemePreset.entries.map { it.label }
         )

@@ -6,8 +6,8 @@ This directory contains the source-available Android client derived from the cur
 
 - App: Elementera Coast Source
 - `applicationId = com.elementeracoast.source`
-- `versionCode = 13`
-- `versionName = 0.2.11-source`
+- `versionCode = 14`
+- `versionName = 0.2.12-source`
 - Kotlin + Jetpack Compose
 - JDK 17 / Android SDK 34 / Gradle 8.9
 
@@ -58,12 +58,12 @@ No WebView, React Native, TypeScript, or embedded PWA source is used by the Nati
 
 ## Public Native visitor QA · Latest GitHub Release
 
-**0.2.11-source is a copy-only QA refresh:** the empty-chat placeholder now reads “文字退到页边外。”; no chat behavior, backend contract, PWA code, account flow, memory logic, tool logic or appearance behavior changes in this release.
+**0.2.12-source adds the optional 奶油纸牌 theme:** cream and blush cards, cocoa outlines, hard offset shadows and composer press feedback. Select it in the existing wardrobe or appearance screen. See [theme details and device checks](docs/CREAM_PAPER_THEME.md). Chat behavior, account/visitor boundaries, backend contracts and the source PWA are unchanged.
 
 The public Android app has its own install ID, `com.elementeracoast.source`, and is
 **not** the private production APK. When the main branch passes **Source check**,
 `.github/workflows/source-native-prerelease.yml` automatically builds and publishes
-a **0.2.11-source visitor QA APK** to GitHub Releases, with its SHA-256 file.
+a **0.2.12-source visitor QA APK** to GitHub Releases, with its SHA-256 file.
 GitHub marks each new version as **Latest** instead of a prerelease; publishing
 is skipped when that APK version already exists in Releases.
 
