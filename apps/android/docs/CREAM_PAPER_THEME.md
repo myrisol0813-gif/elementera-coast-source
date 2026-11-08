@@ -1,6 +1,6 @@
 # 奶油纸牌 · Native theme
 
-Select **奶油纸牌** in the existing theme wardrobe or **小狼窝 → 外观 → 主题衣柜**.
+Select **奶油纸牌** in the existing theme wardrobe or **屋主设置 → 外观 → 主题衣柜**.
 The preset is opt-in and uses the existing device-local theme name storage.
 
 Cream paper (#FFF7EC), off-white cards (#FFFDF6), blush selection/user bubbles
