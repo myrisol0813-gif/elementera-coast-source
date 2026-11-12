@@ -895,6 +895,7 @@ class CoastShellViewModel(
     }
 
     fun setContextSettings(value: ConversationContextSettings) {
+        if (tourBlocksCloudAction()) return
         if (_state.value.isStreaming || generationJob?.isActive == true) {
             showPlaceholder("当前回复仍在生成，完成后再修改窗口上下文。")
             return
