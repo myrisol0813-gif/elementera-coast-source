@@ -9,6 +9,16 @@ import {
   renderModelMetadataTrace,
 } from './chat-model-metadata.js';
 
+function messageStamp(value) {
+  const date = new Date(String(value || ''));
+  if (!Number.isFinite(date.getTime())) return null;
+  return {
+    key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+    date: new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(date),
+    time: new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(date),
+  };
+}
+
 export function generationDetail(variant = {}) {
   const usage = variant.usage || {};
   return [
@@ -57,6 +67,8 @@ export function actionButton(action, title, { active = false, reaction = '' } = 
 function conversationRow(conversation, runtime, roomTypeLabels) {
   const active = conversation.id === runtime.currentId;
   const isRikka = conversation.source === 'rikkahub';
+  const history = runtime.histories.get(conversation.id);
+  const shortMode = history?.context_settings?.short_reply_mode === true;
   const title = isRikka
     ? conversation.title || '【Rikka】未命名窗口'
     : `${roomTypeLabels[conversation.room_type] || roomTypeLabels.main}｜${conversation.title || '新聊天'}`;
@@ -64,6 +76,8 @@ function conversationRow(conversation, runtime, roomTypeLabels) {
     <button class="history-item conversation-title ${active ? 'is-active' : ''}" type="button" data-action="chat:open" data-id="${escapeAttribute(conversation.id)}">${escapeHtml(title)}</button>
     <button class="conversation-more" type="button" data-action="chat:menu" data-id="${escapeAttribute(conversation.id)}" aria-label="窗口操作" aria-expanded="false">${icon('more')}</button>
     <div class="conversation-menu" data-conversation-menu hidden>
+      ${isRikka ? '' : `<button type="button" data-action="chat:toggle-short-mode" data-id="${escapeAttribute(conversation.id)}">短句模式${shortMode ? ' · 开' : ' · 关'}</button>
+      <button type="button" data-action="memory:soil-open" data-conversation-id="${escapeAttribute(conversation.id)}">整理当前对话的纸条</button>`}
       <button type="button" data-action="chat:rename" data-id="${escapeAttribute(conversation.id)}">改名</button>
       <button class="danger" type="button" data-action="chat:delete-conversation" data-id="${escapeAttribute(conversation.id)}">删除</button>
     </div>
@@ -86,7 +100,7 @@ function renderRikkaAttachments(runtime, conversationId, messageId) {
   return body ? `<div class="rikka-attachments">${body}</div>` : '';
 }
 
-function officialMcpLetter(user, turnId, attachmentHtml = '') {
+function officialMcpLetter(user, turnId, attachmentHtml = '', time = '') {
   const author = user?.display_author || user?.source_model_label || '官端 ChatGPT';
   const modelLabel = String(user?.source_model_label || '').trim();
   const provenance = ['official_mcp', author, modelLabel && modelLabel !== author ? modelLabel : '']
@@ -98,6 +112,7 @@ function officialMcpLetter(user, turnId, attachmentHtml = '') {
         <div class="mcp-letter-heading"><span>官端来信 · MCP</span><span class="message-dogtalk-mark">${escapeHtml(provenance)}</span></div>
         <div class="mcp-letter-body">${formatRichText(user?.content || '')}</div>
         <div class="mcp-letter-signature">— ${escapeHtml(author)}</div>
+        ${time ? `<div class="message-time is-user">${escapeHtml(time)}</div>` : ''}
       </div>
       ${attachmentHtml}
     </div>
@@ -167,6 +182,7 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
     if (!ui.messages || conversationId !== runtime.currentId) return;
     const state = runtime.histories.get(conversationId) || createState();
     const latestAssistantTurnId = [...state.turns].reverse().find((turn) => activeBranch(turn).assistant)?.id || '';
+    let lastDateKey = '';
     const html = state.turns.map((turn) => {
       const branch = activeBranch(turn);
       const loading = runtime.generation
@@ -181,14 +197,24 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
       const assistantAttachment = branch.assistant?.id ? renderRikkaAttachments(runtime, conversationId, branch.assistant.id) : '';
       const userImported = branch.user?.message_source === 'rikkahub';
       const assistantImported = branch.assistant?.message_source === 'rikkahub';
+      const userStamp = messageStamp(branch.user?.created_at);
+      const assistantStamp = messageStamp(branch.assistant?.created_at);
+      const userDivider = branch.user && !branch.user.hidden && userStamp?.key && userStamp.key !== lastDateKey
+        ? `<div class="message-date-divider">${escapeHtml(userStamp.date)}</div>`
+        : '';
+      if (branch.user && !branch.user.hidden && userStamp?.key) lastDateKey = userStamp.key;
       const user = branch.user && !branch.user.hidden
         ? branch.user.message_source === 'official_mcp'
-          ? officialMcpLetter(branch.user, turn.id, userAttachment)
-          : `<article class="message user ${userImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}"><div class="content">${branch.user.content ? `<div class="user-bubble">${escapeHtml(branch.user.content)}</div>` : ''}${userAttachment}${userImported ? '<span class="message-dogtalk-mark">RikkaHub 旧档案</span>' : ''}${branch.user.dogtalk_snapshot_id ? '<span class="message-dogtalk-mark">私人草稿 · 随本轮</span>' : ''}<div class="message-actions">${actionButton('edit-user', '编辑')}${actionButton('delete-user', '删除')}${variantControl('user', turn.id, branch.userIndex, turn.user.variants.length)}</div></div></article>`
+          ? officialMcpLetter(branch.user, turn.id, userAttachment, userStamp?.time || '')
+          : `<article class="message user ${userImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}"><div class="content">${branch.user.content ? `<div class="user-bubble">${escapeHtml(branch.user.content)}</div>` : ''}${userAttachment}${userImported ? '<span class="message-dogtalk-mark">RikkaHub 旧档案</span>' : ''}${branch.user.dogtalk_snapshot_id ? '<span class="message-dogtalk-mark">私人草稿 · 随本轮</span>' : ''}${userStamp?.time ? `<span class="message-time is-user">${escapeHtml(userStamp.time)}</span>` : ''}<div class="message-actions">${actionButton('edit-user', '编辑')}${actionButton('delete-user', '删除')}${variantControl('user', turn.id, branch.userIndex, turn.user.variants.length)}</div></div></article>`
         : '';
-      const assistant = branch.assistant ? `<article class="message assistant ${assistantImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}" data-message-id="${escapeAttribute(branch.assistant.id || '')}"><button class="avatar" type="button" data-action="settings:avatar" aria-label="更换助手头像"></button><div class="content">${renderFurnitureBubble(branch.assistant.furniture_runs, { conversationId })}<div class="assistant-text">${formatRichText(branch.assistant.content)}${branch.assistant.errorDetail ? `<span class="message-error">${escapeHtml(branch.assistant.errorDetail)}</span>` : ''}${loading ? '<span class="typing-cursor"></span>' : ''}</div>${assistantAttachment}${voiceAudioCards(conversationId, turn.id, branch.assistant.id)}${assistantImported ? `<span class="message-dogtalk-mark">RikkaHub 旧档案${branch.assistant.model_id ? ` · ${escapeHtml(shortModelName(branch.assistant.model_id))}` : ''}</span>` : ''}<div class="message-actions">${actionButton('copy', '复制')}${actionButton('voice', '生成语音')}${actionButton('like', '点赞', { active: branch.assistant.liked, reaction: 'liked' })}${actionButton('regenerate', '重新生成')}${actionButton('favorite', '收藏', { active: branch.assistant.favorite, reaction: 'favorite' })}${actionButton('delete-assistant', '删除')}${variantControl('assistant', turn.id, branch.assistantIndex, branch.assistants.length)}${generationFootprint(branch.assistant, turn.id)}</div>${loading ? '' : renderModelMetadataTrace(branch.assistant, conversationId)}</div></article>` : '';
+      const assistantDivider = branch.assistant && assistantStamp?.key && assistantStamp.key !== lastDateKey
+        ? `<div class="message-date-divider">${escapeHtml(assistantStamp.date)}</div>`
+        : '';
+      if (branch.assistant && assistantStamp?.key) lastDateKey = assistantStamp.key;
+      const assistant = branch.assistant ? `<article class="message assistant ${assistantImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}" data-message-id="${escapeAttribute(branch.assistant.id || '')}"><button class="avatar" type="button" data-action="settings:avatar" aria-label="更换助手头像"></button><div class="content">${renderFurnitureBubble(branch.assistant.furniture_runs, { conversationId })}<div class="assistant-text">${formatRichText(branch.assistant.content)}${branch.assistant.errorDetail ? `<span class="message-error">${escapeHtml(branch.assistant.errorDetail)}</span>` : ''}${loading ? '<span class="typing-cursor"></span>' : ''}</div>${assistantAttachment}${voiceAudioCards(conversationId, turn.id, branch.assistant.id)}${assistantImported ? `<span class="message-dogtalk-mark">RikkaHub 旧档案${branch.assistant.model_id ? ` · ${escapeHtml(shortModelName(branch.assistant.model_id))}` : ''}</span>` : ''}${assistantStamp?.time ? `<span class="message-time is-assistant">${escapeHtml(assistantStamp.time)}</span>` : ''}<div class="message-actions">${actionButton('copy', '复制')}${actionButton('voice', '生成语音')}${actionButton('like', '点赞', { active: branch.assistant.liked, reaction: 'liked' })}${actionButton('regenerate', '重新生成')}${actionButton('favorite', '收藏', { active: branch.assistant.favorite, reaction: 'favorite' })}${actionButton('delete-assistant', '删除')}${variantControl('assistant', turn.id, branch.assistantIndex, branch.assistants.length)}${generationFootprint(branch.assistant, turn.id)}</div>${loading ? '' : renderModelMetadataTrace(branch.assistant, conversationId)}</div></article>` : '';
       const soil = branch.assistant && turn.id === latestAssistantTurnId ? runtime.memory?.renderSoilEntry(conversationId) || '' : '';
-      return user + soil + assistant;
+      return userDivider + user + soil + assistantDivider + assistant;
     }).join('');
     ui.messages.innerHTML = html || '<div class="empty-state">这里还没有消息。</div>';
     hydrateModelMetadataTraces(ui.messages);
