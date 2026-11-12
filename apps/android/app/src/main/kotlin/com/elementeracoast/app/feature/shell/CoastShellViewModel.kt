@@ -872,6 +872,7 @@ class CoastShellViewModel(
     }
 
     fun setThoughtSoilEnabled(enabled: Boolean) {
+        if (tourBlocksCloudAction()) return
         val conversationId = _state.value.activeConversationId
         if (conversationId.isBlank()) return
         viewModelScope.launch(workDispatcher) {
