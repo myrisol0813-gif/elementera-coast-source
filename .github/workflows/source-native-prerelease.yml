@@ -67,8 +67,8 @@ jobs:
         run: |
           set -euo pipefail
           grep -Fq 'applicationId = "com.elementeracoast.source"' app/build.gradle.kts
-          grep -Fq 'versionCode = 13' app/build.gradle.kts
-          grep -Fq 'versionName = "0.2.11-source"' app/build.gradle.kts
+          grep -Fq 'versionCode = 14' app/build.gradle.kts
+          grep -Fq 'versionName = "0.2.12-source"' app/build.gradle.kts
           test -f scripts/sign-disposable-qa.sh
           ! grep -Eiq 'app[.]elementeracoast[.]com' app/build.gradle.kts
 
@@ -97,8 +97,8 @@ jobs:
           badging="$("${build_tools}/aapt" dump badging "$apk")"
           line="$(printf '%s\n' "$badging" | sed -n '1p')"
           [[ "$line" == *"name='com.elementeracoast.source'"* ]]
-          [[ "$line" == *"versionCode='13'"* ]]
-          [[ "$line" == *"versionName='0.2.11-source'"* ]]
+          [[ "$line" == *"versionCode='14'"* ]]
+          [[ "$line" == *"versionName='0.2.12-source'"* ]]
           "${build_tools}/apksigner" verify --verbose --print-certs "$apk" > "${RUNNER_TEMP}/source-visitor-apk-certs.txt"
           fingerprint="$(grep -m1 'certificate SHA-256 digest:' "${RUNNER_TEMP}/source-visitor-apk-certs.txt" | awk '{print $NF}')"
           : "${fingerprint:?Missing source certificate fingerprint}"
