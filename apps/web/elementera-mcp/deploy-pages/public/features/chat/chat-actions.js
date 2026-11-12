@@ -15,6 +15,7 @@ export function createChatActions({
   setHistory,
   composerState,
   renderMessages,
+  renderConversationList,
   saveHistory,
   generationDetail,
   generate,
@@ -74,6 +75,25 @@ export function createChatActions({
     }
     if (name === 'menu') return toggleMenu(conversationId);
     if (name === 'open') return loadConversation(conversationId);
+    if (name === 'toggle-short-mode') {
+      if (!runtime.histories.has(conversationId)) await loadConversation(conversationId);
+      const state = runtime.histories.get(conversationId);
+      if (!state) return;
+      const settings = state.context_settings || {};
+      const next = {
+        ...state,
+        context_settings: {
+          ...settings,
+          short_reply_mode: settings.short_reply_mode !== true,
+        },
+      };
+      setHistory(conversationId, next);
+      renderConversationList();
+      if (conversationId === runtime.currentId) renderMessages(conversationId);
+      await saveHistory(conversationId, next);
+      toast(next.context_settings.short_reply_mode ? '短句模式已开启。' : '短句模式已关闭。');
+      return;
+    }
     if (name === 'rename') return renameConversation(conversationId).catch((error) => toast(`改名失败：${error.message}`));
     if (name === 'delete-conversation') return deleteConversation(conversationId).catch((error) => toast(`删除失败：${error.message}`));
     if (name === 'mic') return toast('语音输入还没接入。');
