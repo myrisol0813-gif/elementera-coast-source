@@ -33,6 +33,8 @@ const DESCRIPTIONS = Object.freeze({
   related_memory: '这是与当前任务相关、且已确认可使用的长期记录。',
   worldbook: '这是被当前主题触发的设定资料，用于补足世界观、角色、项目或专有名词背景。',
   dogtalk: '这是用户可选提供的私有草稿；只有本轮实际递入时才作为补充上下文。',
+  reality_context: '这是当前窗口明确允许模型看到的现场现实；只展示本轮实际递入与缺失的字段。',
+  response_mode: '这是当前窗口选择的回应节奏；它不改变事实、工具权限或记忆。',
   cross_window: '这是本轮从其他对话窗口读取的近期聊天记录；是否引用应由当前任务相关性决定。',
   workbench: '这是代码、文件、接口、真机、GitHub 等技术领域的话题与事实结果。',
   external_tide: '这是从应用外部临时读入、且尚未归档成内部对话窗口的材料；本轮没有接入外部入口消息。',
@@ -111,7 +113,8 @@ export function createDeskSlip({
   globalExcerpt = '', globalExcerptStatus = 'empty', globalExcerptTokens = 0,
   soil = false, soilEnabled = true, soilContext = '', soilCurrentText = '', soilHandSeeds = [], soilPocketCandidatesCount = 0,
   memoryItems = [], memoryDeliveredTexts = [], worldbookItems = [], worldbookDeliveredCount = 0, worldbookDeliveredTexts = [],
-  dogtalk = false, dogtalkContext = '', crossWindow = null, workbenchPrompt = false, workbenchPromptText = '', modelVisibleTools = [], backendTools = [],
+  dogtalk = false, dogtalkContext = '', crossWindow = null, workbenchPrompt = false, workbenchPromptText = '',
+  reality = null, responseMode = null, modelVisibleTools = [], backendTools = [],
   toolGroups = {}, furniture = [], toolResults = [], trimmedCount = 0,
   estimatedTokens = 0, comfortCeiling = 0, exceedsComfortCeiling = false,
 } = {}) {
@@ -128,6 +131,13 @@ export function createDeskSlip({
   const soilText = String(soilContext || ''); const soilCurrent = String(soilCurrentText || ''); const handSeeds = (Array.isArray(soilHandSeeds) ? soilHandSeeds : []).map((item) => String(item || '')).filter(Boolean);
   const soilVisible = Boolean(soilText.trim() || soilCurrent.trim() || handSeeds.length); const dogtalkText = String(dogtalkContext || ''); const workbenchText = String(workbenchPromptText || '');
   const cross = safeCrossWindow(crossWindow, privateDetails);
+  const realityValue = reality && typeof reality === 'object' ? reality : {};
+  const selectedReality = uniqueStrings(realityValue.selected);
+  const deliveredReality = (Array.isArray(realityValue.delivered) ? realityValue.delivered : []).map((item) => ({
+    key: String(item?.key || ''), label: String(item?.label || item?.key || ''), text: String(item?.text || ''),
+  })).filter((item) => item.key && item.text);
+  const missingReality = uniqueStrings(realityValue.missing);
+  const responseValue = responseMode && typeof responseMode === 'object' ? responseMode : {};
   const comfort = trimmedCount > 0
     ? `已裁去 ${Number(trimmedCount)} 条低相关旧纸条`
     : cross.loaded_turns > 0 && cross.trimmed === false
@@ -150,6 +160,31 @@ export function createDeskSlip({
     related_memory: { label: '相关记忆', description: DESCRIPTIONS.related_memory, status: memories.length ? '已递给' : '未命中', confirmation_status: memories.length ? '已确认' : '', count: memories.length, items: privateDetails ? memories : [] },
     worldbook: { label: '世界书', description: DESCRIPTIONS.worldbook, status: deliveredWorldbookCount > 0 ? '已递给' : words.length ? '未递给' : '未命中', matched_count: words.length, delivered_count: deliveredWorldbookCount, entries: privateDetails ? words : [], matched_titles: words.map((item) => item.title), delivered_titles: words.filter((item) => item.delivered).map((item) => item.title) },
     dogtalk: { label: '私人草稿', description: DESCRIPTIONS.dogtalk, status: dogtalk ? '已递给' : '未递给', delivered: Boolean(dogtalk), context: privateDetails && dogtalk ? dogtalkText : '' },
+    reality_context: {
+      label: '现实上下文', description: DESCRIPTIONS.reality_context,
+      status: realityValue.enabled !== true
+        ? '未开启'
+        : !selectedReality.length
+          ? '已开启 · 未选择字段'
+          : realityValue.delivered_to_model === true
+            ? `已递给 · ${deliveredReality.length}/${selectedReality.length} 项`
+            : '已开启 · 本轮无数据',
+      enabled: realityValue.enabled === true,
+      delivered: realityValue.delivered_to_model === true,
+      selected: privateDetails ? selectedReality : [],
+      delivered_items: privateDetails && realityValue.delivered_to_model === true ? deliveredReality : [],
+      missing: privateDetails ? missingReality : [],
+      context: privateDetails && realityValue.delivered_to_model === true ? String(realityValue.context || '') : '',
+    },
+    response_mode: {
+      label: '回应节奏', description: DESCRIPTIONS.response_mode,
+      status: responseValue.short_reply_mode === true
+        ? (responseValue.delivered_to_model === true ? '短句模式 · 已递给' : '短句模式 · 未递给')
+        : '普通',
+      short_reply_mode: responseValue.short_reply_mode === true,
+      delivered: responseValue.delivered_to_model === true,
+      context: privateDetails && responseValue.delivered_to_model === true ? String(responseValue.context || '') : '',
+    },
     cross_window: cross,
     workbench: {
       label: '工作台 / 工具回执', description: DESCRIPTIONS.workbench, status: workbenchStatus, prompt_delivered: Boolean(workbenchPrompt), prompt: privateDetails && workbenchPrompt ? workbenchText : '',
@@ -174,6 +209,8 @@ export function createDeskSlip({
         ...(memories.length ? ['记忆'] : []),
         ...(deliveredWorldbookCount ? ['世界书'] : []),
         ...(dogtalk ? ['私人草稿'] : []),
+        ...(realityValue.delivered_to_model === true ? ['现实上下文'] : []),
+        ...(responseValue.delivered_to_model === true ? ['短句模式'] : []),
         ...(cross.delivered ? ['跨窗口'] : []),
         ...(workbenchStatus !== '未递给' ? ['本轮上下文预览 / 工具'] : []),
       ],
