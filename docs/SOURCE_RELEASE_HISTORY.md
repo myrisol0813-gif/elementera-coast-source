@@ -25,6 +25,17 @@ Only the tagged source revision and the matching Release assets describe what wa
 - APK SHA-256: `4319dcca4bfe7424e5e27ff9181c0b87d8508795ba227ecab4cf58b7ab763abf`.
 - Live login depends on the original temporary test backend, which has expired. For self-hosting, supply an independent server and rebuild; for short phone QA, run the dedicated isolated test workflow.
 
+## Current source Native QA — 0.2.12-source (2026-11-13)
+
+- Adds generalized per-conversation Reality Context parity across the source backend/PWA and Native Android app.
+- Supported opt-in fields: date, time, battery, manually configured weather city, optional coarse location, most-recent non-app foreground app, today's Top 5 app-usage durations, next-seven-days calendar events, and lightweight step-counter data.
+- Short reply mode is stored independently from the Reality master switch; turning Reality off does not disable short reply mode.
+- Android device data is collected locally at send time and only for selected fields. The backend rereads canonical conversation settings before assembling context, so unselected client fields are not injected.
+- Current-turn receipts show delivered and selected-but-unavailable Reality fields plus the response mode. PWA and Native add message HH:mm/cross-day markers; diaries expose creation time.
+- Thought-soil organization reduces mechanical copying of the just-delivered turn while preserving missed-turn cursor recovery. The existing do-not-repeat/avoid fields remain in this source revision; schema simplification is not part of 0.2.12.
+- Source PWA cache advances `coast-source-app-09 → coast-source-app-10`.
+- Public Native identity remains `com.elementeracoast.source`; versionCode 13 → 14 and versionName 0.2.11-source → 0.2.12-source. Visitor QA remains disposable-signed and separate from the private production updater/signing chain.
+
 ## Current source Native QA — 0.2.11-source (2026-10-24)
 
 - Copy-only Native QA refresh: the empty-chat placeholder changes from “潮水退到纸页外。” to “文字退到页边外。”; the second line remains unchanged.
