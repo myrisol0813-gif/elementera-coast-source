@@ -181,6 +181,8 @@ export function createDesk({ router, toast }) {
     const memory = slip.related_memory || { label: '相关记忆', status: '未命中', items: [] };
     const worldbook = slip.worldbook || { label: '世界书', status: '未命中', entries: [] };
     const dogtalk = slip.dogtalk || { label: '私人草稿', status: '未递给', context: '' };
+    const reality = slip.reality_context || { label: '现实上下文', status: '未开启', selected: [], delivered_items: [], missing: [], context: '' };
+    const responseMode = slip.response_mode || { label: '回应节奏', status: '普通', short_reply_mode: false, context: '' };
     const crossWindow = slip.cross_window || { label: '跨窗口读取', status: '未递给', mode: 'off', sources: [], messages: [] };
     const workbench = slip.workbench || { label: '工作台 / 工具回执', status: '未递给', model_visible_tools: [], backend_tools: [], core_tools: [], side_tools: [], furniture: [], prompt_delivered: false, prompt: '', tool_results: [], labels: {} };
     const attachments = slip.attachments || null;
@@ -239,6 +241,13 @@ export function createDesk({ router, toast }) {
         ${deskRow(memory.label || '相关记忆', memoryStatus, [sourceNote(memory.description), memoryDeskDetails(memory.items)].join(''))}
         ${deskRow(worldbook.label || '世界书', worldbookStatus, [sourceNote(worldbook.description), worldbookDeskDetails(worldbook.entries)].join(''))}
         ${deskRow(dogtalk.label || '私人草稿', dogtalk.status, [sourceNote(dogtalk.description), dogtalk.delivered ? deskText(dogtalk.context) : emptyNote()].join(''))}
+        ${deskRow(reality.label || '现实上下文', reality.status, [
+          sourceNote(reality.description),
+          reality.delivered_items?.length ? `<div class="desk-record-list">${reality.delivered_items.map((item) => `<section class="desk-record"><header><strong>${escapeHtml(item.label || item.key)}</strong><small>已递给模型</small></header>${deskText(item.text)}</section>`).join('')}</div>` : '',
+          reality.missing?.length ? paragraph('已开启但本轮无数据：', reality.missing.join('、')) : '',
+          reality.context ? deskText(reality.context, '实际递给模型') : (!reality.enabled ? emptyNote() : ''),
+        ].join(''))}
+        ${deskRow(responseMode.label || '回应节奏', responseMode.status, [sourceNote(responseMode.description), responseMode.context ? deskText(responseMode.context, '实际递给模型') : emptyNote()].join(''))}
         ${deskRow(crossWindow.label || '跨窗口读取', crossWindowStatus, crossWindowDeskDetails(crossWindow))}
         ${attachments ? deskRow('本轮附件', `上传 ${Number(attachments.uploaded || 0)} · 递给 ${Number(attachments.delivered_to_model || 0)}`, attachmentDeskDetails(attachments)) : ''}
         ${webSearch ? deskRow('本轮搜索', webSearch.available === false
