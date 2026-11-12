@@ -6,8 +6,8 @@ This directory contains the source-available Android client derived from the cur
 
 - App: Elementera Coast Source
 - `applicationId = com.elementeracoast.source`
-- `versionCode = 14`
-- `versionName = 0.2.12-source`
+- `versionCode = 15`
+- `versionName = 0.2.13-source`
 - Kotlin + Jetpack Compose
 - JDK 17 / Android SDK 34 / Gradle 8.9
 
@@ -58,12 +58,12 @@ No WebView, React Native, TypeScript, or embedded PWA source is used by the Nati
 
 ## Public Native visitor QA · Latest GitHub Release
 
-**0.2.12-source adds generalized Reality Context parity:** each conversation can independently opt into selected device/context fields and short reply mode. Android captures selected device-local fields at send time, the backend rechecks canonical window settings before injection, and the current-turn desk shows what was actually delivered or unavailable. The public visitor build remains offline-only and does not import private production identity, data, signing, or updater behavior.
+**0.2.13-source restores the optional Cream Paper Native theme on top of the 0.2.12 Reality Context work:** the theme wardrobe and appearance screen again expose 奶油纸牌, with cream/blush cards, cocoa outlines and hard offset shadows across chat chrome and common settings surfaces. Conversation Reality Context, short reply mode, thought-soil behavior and the public visitor/offline boundary remain unchanged.
 
 The public Android app has its own install ID, `com.elementeracoast.source`, and is
 **not** the private production APK. When the main branch passes **Source check**,
 `.github/workflows/source-native-prerelease.yml` automatically builds and publishes
-a **0.2.12-source visitor QA APK** to GitHub Releases, with its SHA-256 file.
+a **0.2.13-source visitor QA APK** to GitHub Releases, with its SHA-256 file.
 GitHub marks each new version as **Latest** instead of a prerelease; publishing
 is skipped when that APK version already exists in Releases.
 
