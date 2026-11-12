@@ -6,6 +6,7 @@ import com.elementeracoast.app.core.network.CoastApiErrorKind
 import com.elementeracoast.app.core.network.CoastApiException
 import com.elementeracoast.app.core.remote.RemoteChatRequest
 import com.elementeracoast.app.core.remote.RemoteHistory
+import com.elementeracoast.app.core.remote.RemoteRealityContext
 import com.elementeracoast.app.feature.chatgpt.ChatGptNativeInference
 import com.elementeracoast.app.feature.chatgpt.ChatGptPlanRepository
 import com.elementeracoast.app.feature.chatgpt.NativeChatEvent
@@ -42,7 +43,8 @@ internal class NativeChatGptTurnRepository(
         contextBudget: Int,
         outputLength: String,
         maxOutputTokens: Int,
-        crossWindow: CrossWindowRequest
+        crossWindow: CrossWindowRequest,
+        realityContext: RemoteRealityContext
     ): Flow<ChatProgress> = flow {
         require(isChatGptPlanModel(selectedModel))
         val model = selectedModel.removePrefix(CHATGPT_PLAN_PREFIX)
@@ -56,6 +58,7 @@ internal class NativeChatGptTurnRepository(
             attachmentIds = ChatSyncMapper.activeAttachmentIds(historyWithUser, turnId),
             localDate = LocalDate.now().toString(),
             localDateTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
+            realityContext = realityContext,
             settings = mapOf(
                 "recentTurns" to recentTurns.coerceAtLeast(1).toString(),
                 "contextBudget" to contextBudget.coerceAtLeast(1800).toString(),
