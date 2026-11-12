@@ -25,6 +25,15 @@ Only the tagged source revision and the matching Release assets describe what wa
 - APK SHA-256: `4319dcca4bfe7424e5e27ff9181c0b87d8508795ba227ecab4cf58b7ab763abf`.
 - Live login depends on the original temporary test backend, which has expired. For self-hosting, supply an independent server and rebuild; for short phone QA, run the dedicated isolated test workflow.
 
+## Current source Native QA — 0.2.13-source (2026-11-13)
+
+- Restores the previously unmerged public Native **奶油纸牌 / Cream Paper** theme on top of the current 0.2.12 source tree.
+- Adds the theme back to the Native wardrobe and appearance screen, with cream/blush surfaces, cocoa outlines and hard offset shadows across chat chrome, drawer/navigation, feature headers, common settings controls and Snow Letter surfaces.
+- Restores the reusable `CreamPaperStyle` visual primitives plus regression tests and theme contract coverage.
+- Does not revert or replace 0.2.12 Reality Context, independent short reply mode, thought-soil behavior, current-turn receipts, timestamps, visitor/offline boundaries or any PWA behavior.
+- Source PWA remains `coast-source-app-10`; this revision is Native-only.
+- Public Native identity remains `com.elementeracoast.source`; versionCode 14 → 15 and versionName 0.2.12-source → 0.2.13-source.
+
 ## Current source Native QA — 0.2.12-source (2026-11-13)
 
 - Adds generalized per-conversation Reality Context parity across the source backend/PWA and Native Android app.
