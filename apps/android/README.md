@@ -58,7 +58,7 @@ No WebView, React Native, TypeScript, or embedded PWA source is used by the Nati
 
 ## Public Native visitor QA · Latest GitHub Release
 
-**0.2.12-source is a copy-only QA refresh:** the empty-chat placeholder now reads “文字退到页边外。”; no chat behavior, backend contract, PWA code, account flow, memory logic, tool logic or appearance behavior changes in this release.
+**0.2.12-source adds generalized Reality Context parity:** each conversation can independently opt into selected device/context fields and short reply mode. Android captures selected device-local fields at send time, the backend rechecks canonical window settings before injection, and the current-turn desk shows what was actually delivered or unavailable. The public visitor build remains offline-only and does not import private production identity, data, signing, or updater behavior.
 
 The public Android app has its own install ID, `com.elementeracoast.source`, and is
 **not** the private production APK. When the main branch passes **Source check**,
