@@ -26,10 +26,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.elementeracoast.app.ui.theme.CoastThemePreset
+import com.elementeracoast.app.ui.theme.CreamPaperStyle
+import com.elementeracoast.app.ui.theme.LocalCoastAppearance
 import com.elementeracoast.app.ui.theme.SnowLetterVisualSettings
+import com.elementeracoast.app.ui.theme.creamPaperFrame
 import com.elementeracoast.app.ui.theme.palette
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,12 +86,21 @@ private fun ThemePresetBubble(
     onClick: () -> Unit
 ) {
     val palette = preset.palette()
+    val paper = preset == CoastThemePreset.CreamPaper ||
+        LocalCoastAppearance.current.preset == CoastThemePreset.CreamPaper
+    val shape = if (paper) CreamPaperStyle.CardShape else RoundedCornerShape(20.dp)
+    val secondaryText = if (paper) CreamPaperStyle.Muted else MaterialTheme.colorScheme.onSurfaceVariant
     Surface(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (selected) .92f else .56f),
-        tonalElevation = if (selected) 2.dp else 0.dp,
-        border = if (selected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+        modifier = Modifier.fillMaxWidth()
+            .then(if (paper) Modifier.creamPaperFrame(
+                if (selected) CreamPaperStyle.Pink else CreamPaperStyle.Surface, shape
+            ) else Modifier)
+            .clickable(onClick = onClick),
+        shape = shape,
+        color = if (paper) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (selected) .92f else .56f),
+        contentColor = if (paper) CreamPaperStyle.Ink else MaterialTheme.colorScheme.onSurface,
+        tonalElevation = if (selected && !paper) 2.dp else 0.dp,
+        border = if (paper) null else if (selected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
         else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
@@ -102,11 +115,11 @@ private fun ThemePresetBubble(
             Spacer(Modifier.size(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(preset.label, fontWeight = FontWeight.SemiBold)
-                Text(preset.tag, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                Text(preset.tag, color = secondaryText, style = MaterialTheme.typography.bodySmall)
             }
             Text(
                 if (selected) "已穿上" else "换上",
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (paper) CreamPaperStyle.Outline else if (selected) MaterialTheme.colorScheme.primary else secondaryText,
                 style = MaterialTheme.typography.labelMedium
             )
         }

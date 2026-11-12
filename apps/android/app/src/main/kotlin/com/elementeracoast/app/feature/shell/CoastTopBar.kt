@@ -33,6 +33,9 @@ import com.elementeracoast.app.core.model.RoomType
 import com.elementeracoast.app.core.model.modelDisplayName
 import com.elementeracoast.app.ui.icons.CoastChatIcons
 import com.elementeracoast.app.ui.theme.CoastChatTokens
+import com.elementeracoast.app.ui.theme.CoastThemePreset
+import com.elementeracoast.app.ui.theme.LocalCoastAppearance
+import com.elementeracoast.app.ui.theme.coastPaperHeader
 
 @Composable
 internal fun CoastTopBar(
@@ -48,6 +51,7 @@ internal fun CoastTopBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .coastPaperHeader()
                 .height(CoastChatTokens.TopBarHeight)
                 .padding(horizontal = CoastChatTokens.TopBarHorizontalPadding),
             verticalAlignment = Alignment.CenterVertically
@@ -144,9 +148,11 @@ internal fun CoastTopBar(
                 }
             }
         }
-        HorizontalDivider(
-            thickness = CoastChatTokens.TopBarDividerThickness,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = CoastChatTokens.TopBarDividerAlpha)
-        )
+        if (LocalCoastAppearance.current.preset != CoastThemePreset.CreamPaper) {
+            HorizontalDivider(
+                thickness = CoastChatTokens.TopBarDividerThickness,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = CoastChatTokens.TopBarDividerAlpha)
+            )
+        }
     }
 }

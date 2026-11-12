@@ -53,6 +53,7 @@ import com.elementeracoast.app.core.model.FeatureDestination
 import com.elementeracoast.app.core.model.RoomType
 import com.elementeracoast.app.core.model.filterConversations
 import com.elementeracoast.app.ui.theme.CoastChatTokens
+import com.elementeracoast.app.ui.theme.coastSurfaceBackground
 
 @Composable
 internal fun CoastDrawer(
@@ -94,7 +95,7 @@ internal fun CoastDrawer(
                 Row(
                     modifier = Modifier
                         .weight(1f)
-                        .background(
+                        .coastSurfaceBackground(
                             MaterialTheme.colorScheme.surfaceVariant,
                             RoundedCornerShape(CoastChatTokens.DrawerSearchRadius)
                         )
@@ -339,7 +340,7 @@ private fun StatusCard(label: String, value: String, unit: String, modifier: Mod
     Column(
         modifier = modifier
             .heightIn(min = CoastChatTokens.DrawerStatusHeight)
-            .background(
+            .coastSurfaceBackground(
                 MaterialTheme.colorScheme.surfaceVariant,
                 RoundedCornerShape(CoastChatTokens.DrawerStatusRadius)
             )
@@ -372,7 +373,7 @@ private fun DrawerEntry(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
+            .coastSurfaceBackground(
                 if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
                 RoundedCornerShape(CoastChatTokens.DrawerEntryRadius)
             )
@@ -424,7 +425,7 @@ private fun DrawerUtilityEntry(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
+            .coastSurfaceBackground(
                 if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
                 RoundedCornerShape(CoastChatTokens.DrawerEntryRadius)
             )
@@ -477,7 +478,7 @@ private fun ConversationRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
+            .coastSurfaceBackground(
                 if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
                 RoundedCornerShape(CoastChatTokens.DrawerEntryRadius)
             ),

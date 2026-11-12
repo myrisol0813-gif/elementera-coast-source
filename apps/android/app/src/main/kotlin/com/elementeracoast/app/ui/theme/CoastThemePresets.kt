@@ -19,7 +19,8 @@ enum class CoastThemePreset(val label: String, val tag: String) {
     MinimalSeaMist("极简海雾", "浅灰低饱和"),
     AmericanCartoon("美式卡通", "明亮粗线"),
     GrassOasis("草地绿洲", "绿色清爽"),
-    PurpleDreamTide("紫色梦潮", "紫蓝梦感");
+    PurpleDreamTide("紫色梦潮", "紫蓝梦感"),
+    CreamPaper("奶油纸牌", "奶油粉棕 · 厚描边");
 
     companion object {
         fun fromStored(value: String): CoastThemePreset = when (value) {
@@ -45,6 +46,18 @@ data class CoastThemePalette(
 )
 
 fun CoastThemePreset.palette(): CoastThemePalette = when (this) {
+    CoastThemePreset.CreamPaper -> CoastThemePalette(
+        background = CreamPaperStyle.Background,
+        surface = CreamPaperStyle.Surface,
+        card = CreamPaperStyle.Pink,
+        primary = CreamPaperStyle.Outline,
+        secondary = CreamPaperStyle.Muted,
+        textPrimary = CreamPaperStyle.Ink,
+        textSecondary = CreamPaperStyle.Muted,
+        border = CreamPaperStyle.Outline,
+        accent = CreamPaperStyle.Gold,
+        isLight = true
+    )
     CoastThemePreset.CoastDefault -> CoastThemePalette(
         background = Color.White,
         surface = Color.White,

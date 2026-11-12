@@ -20,9 +20,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -39,16 +39,17 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.semantics.Role
-import com.elementeracoast.app.ui.theme.CoastThemePreset
 import com.elementeracoast.app.ui.theme.CoastFontMode
 import com.elementeracoast.app.ui.theme.CoastPaperMode
 import com.elementeracoast.app.ui.theme.CoastReadingWeight
+import com.elementeracoast.app.ui.theme.CoastThemePreset
 import com.elementeracoast.app.ui.theme.SnowLetterSurface
 import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
+import com.elementeracoast.app.ui.theme.coastSurfaceBackground
 import java.io.File
 
 @Composable
@@ -251,31 +252,39 @@ internal fun AppearanceScreen(state: WolfState, store: WolfStore, onSnackbar: (S
         }
         item {
             SettingGroup("纸页形态") {
-                CoastPaperMode.entries.forEach { mode ->
-                    ChoiceRow(mode.label, state.appearance.paperMode == mode) {
-                        store.setPaperMode(mode)
-                    }
-                }
-                if (state.appearance.paperMode == CoastPaperMode.Cloud) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth()
-                            .toggleable(
-                                value = state.appearance.cloudOutlineEnabled,
-                                role = Role.Switch,
-                                onValueChange = store::setCloudOutlineEnabled
-                            )
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("云朵浅描边")
-                            Text(
-                                "跟随主题颜色；关闭描边后仍保留柔和阴影",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                if (state.appearance.theme == CoastThemePreset.CreamPaper) {
+                    Text(
+                        "奶油纸牌使用圆角纸卡。原来的纸形选择已保留，换回其他主题后恢复。",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                } else {
+                    CoastPaperMode.entries.forEach { mode ->
+                        ChoiceRow(mode.label, state.appearance.paperMode == mode) {
+                            store.setPaperMode(mode)
                         }
-                        Switch(checked = state.appearance.cloudOutlineEnabled, onCheckedChange = null)
+                    }
+                    if (state.appearance.paperMode == CoastPaperMode.Cloud) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .toggleable(
+                                    value = state.appearance.cloudOutlineEnabled,
+                                    role = Role.Switch,
+                                    onValueChange = store::setCloudOutlineEnabled
+                                )
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("云朵浅描边")
+                                Text(
+                                    "跟随主题颜色；关闭描边后仍保留柔和阴影",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            Switch(checked = state.appearance.cloudOutlineEnabled, onCheckedChange = null)
+                        }
                     }
                 }
             }
@@ -317,7 +326,7 @@ internal fun WolfTextField(
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp)).padding(13.dp),
+            modifier = Modifier.fillMaxWidth().coastSurfaceBackground(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp)).padding(13.dp),
             textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             minLines = minLines,
@@ -360,7 +369,7 @@ internal fun ChoiceRow(label: String, selected: Boolean, subtitle: String? = nul
 internal fun PrimaryLocalButton(label: String, onClick: () -> Unit) {
     Text(
         label,
-        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.primary, RoundedCornerShape(18.dp)).clickable(onClick = onClick).padding(14.dp),
+        modifier = Modifier.fillMaxWidth().coastSurfaceBackground(MaterialTheme.colorScheme.primary, RoundedCornerShape(18.dp)).clickable(onClick = onClick).padding(14.dp),
         color = MaterialTheme.colorScheme.onPrimary,
         fontWeight = FontWeight.SemiBold
     )
