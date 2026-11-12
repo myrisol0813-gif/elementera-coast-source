@@ -1,11 +1,12 @@
 import { escapeAttribute, escapeHtml } from '../../core/dom.js';
-import { authorName, dateKey } from './daily-format.js';
+import { authorName, dateKey, timeLabel } from './daily-format.js';
 
 export function createDailyDiariesView({ state, ensureLoad, syncNotice }) {
   function diaryCard(entry) {
     const tags = entry.tags?.length ? `<p class="daily-context">${entry.tags.map((tag) => `#${escapeHtml(tag)}`).join(' ')}</p>` : '';
+    const writtenAt = entry.createdAt ? ` · ${timeLabel(entry.createdAt)}` : '';
     return `<article class="diary-paper">
-      <header><strong>${escapeHtml(entry.date || dateKey())}</strong><small>${escapeHtml(authorName(entry))} · ${escapeHtml(entry.weather || '未标注')} · ${escapeHtml(entry.mood || '未标注')}</small></header>
+      <header><strong>${escapeHtml(entry.date || dateKey())}${escapeHtml(writtenAt)}</strong><small>${escapeHtml(authorName(entry))} · ${escapeHtml(entry.weather || '未标注')} · ${escapeHtml(entry.mood || '未标注')}</small></header>
       <p>${escapeHtml(entry.text || '（空白）')}</p>
       ${tags}
       <footer class="diary-card-actions"><button type="button" data-action="daily:edit-diary" data-id="${escapeAttribute(entry.id)}">编辑</button><button class="is-delete" type="button" data-action="daily:delete-diary" data-id="${escapeAttribute(entry.id)}">删除</button></footer>
