@@ -10,6 +10,7 @@ import com.elementeracoast.app.core.network.CoastApiException
 import com.elementeracoast.app.core.remote.RemoteAttachment
 import com.elementeracoast.app.core.remote.RemoteCacheStore
 import com.elementeracoast.app.core.remote.RemoteChatRequest
+import com.elementeracoast.app.core.remote.RemoteRealityContext
 import com.elementeracoast.app.core.remote.RemoteCrossWindowRequest
 import com.elementeracoast.app.core.remote.RemoteCrossWindowMessageSelection
 import com.elementeracoast.app.core.remote.RemoteDeskSlip
@@ -65,7 +66,8 @@ interface ChatRepository {
         contextBudget: Int,
         outputLength: String,
         maxOutputTokens: Int,
-        crossWindow: CrossWindowRequest = CrossWindowRequest()
+        crossWindow: CrossWindowRequest = CrossWindowRequest(),
+        realityContext: RemoteRealityContext = RemoteRealityContext()
     ): Flow<ChatProgress>
     fun failedHistory(historyWithUser: RemoteHistory, turnId: String, modelId: String, error: CoastApiException, partialContent: String = ""): RemoteHistory
     fun cancelledHistory(historyWithUser: RemoteHistory, turnId: String, modelId: String, partialContent: String): RemoteHistory
@@ -111,7 +113,8 @@ class DefaultChatRepository(
         contextBudget: Int,
         outputLength: String,
         maxOutputTokens: Int,
-        crossWindow: CrossWindowRequest
+        crossWindow: CrossWindowRequest,
+        realityContext: RemoteRealityContext
     ): Flow<ChatProgress> = flow {
         var content = ""
         var actualModel = modelId
@@ -133,6 +136,7 @@ class DefaultChatRepository(
             attachmentIds = ChatSyncMapper.activeAttachmentIds(historyWithUser, turnId),
             localDate = LocalDate.now().toString(),
             localDateTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
+            realityContext = realityContext,
             settings = mapOf(
                 "recentTurns" to normalizedRecentTurns.toString(),
                 "contextBudget" to contextBudget.coerceAtLeast(1800).toString(),

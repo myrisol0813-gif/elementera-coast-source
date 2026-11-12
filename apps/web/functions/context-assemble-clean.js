@@ -6,6 +6,8 @@ import {
 } from './cross-window-service.js';
 import { createDeskSlip } from './desk-slip.js';
 import { dogtalkContext } from './dogtalk-store.js';
+import { readConversationState } from './chat-store.js';
+import { buildRealityContext, responseModeContext } from './reality-context.js';
 import { buildMemoryContext, recallMemoryItems } from './memory-recall.js';
 import { MEMORY_OWNER_ID, readCustomInstructions, readGlobalExcerpt } from './memory-store.js';
 import { currentMailboxVisitor, mailboxMessages } from './mailbox-service.js';
@@ -20,6 +22,7 @@ const OWNER_TECHNICAL_PROMPT = '遵循本轮提供的上下文与屋主保存的
 const OWNER_CUSTOM_INSTRUCTION_SURFACES = new Set(['main_chat', 'landing', 'radio', 'lighthouse']);
 const CROSS_WINDOW_SURFACES = new Set(['main_chat', 'radio']);
 const WEB_SEARCH_SURFACES = new Set(['main_chat', 'radio']);
+const REALITY_CONTEXT_SURFACES = new Set(['main_chat', 'radio']);
 const WEB_SEARCH_SERVER_TOOL = Object.freeze({
   type: 'openrouter:web_search',
   parameters: Object.freeze({
@@ -147,16 +150,18 @@ function mergeModelReads(previous, next) {
 
 export async function assembleCleanContext(env, {
   surface, conversationId, roomId, visitorId, sourceTurnId = null, messages = [], lastUser, settings = {}, localDate = new Date().toISOString().slice(0, 10),
-  recentEntryIds = [], authScope = null, model = '', permission: requestedPermission, preview = false, baseSystemPrompt = '', exposeTools = true, initialFurniture = [], crossWindow = null,
+  localDateTime = '', realityContext = null, recentEntryIds = [], authScope = null, model = '', permission: requestedPermission, preview = false, baseSystemPrompt = '', exposeTools = true, initialFurniture = [], crossWindow = null,
 } = {}) {
   const permission = requestedPermission || (surface === 'mailbox_visitor' ? 'visitor' : 'owner');
   const access = roomAccess(surface, { permission, visitorId }); const request = requestSettings(settings);
   const recentTurns = effectiveRecentTurns(request, access);
   const ownerLongContext = permission === 'owner' && OWNER_CUSTOM_INSTRUCTION_SURFACES.has(surface);
-  const [ownerCustomInstructions, globalExcerpt] = await Promise.all([
+  const [ownerCustomInstructions, globalExcerpt, conversationState] = await Promise.all([
     ownerLongContext ? readCustomInstructions(env.COAST_CHAT_DB) : Promise.resolve(null),
     ownerLongContext ? readGlobalExcerpt(env.COAST_CHAT_DB) : Promise.resolve(null),
+    permission === 'owner' && conversationId ? readConversationState(env.COAST_CHAT_DB, conversationId) : Promise.resolve(null),
   ]);
+  const contextSettings = REALITY_CONTEXT_SURFACES.has(surface) ? (conversationState?.context_settings || {}) : {};
   const customInstructionsText = String(ownerCustomInstructions?.content ?? ''); const hasCustomInstructions = Boolean(customInstructionsText.trim());
   const globalExcerptText = String(globalExcerpt?.body ?? '');
   let recent = cleanHistory(messages, recentTurns);
@@ -177,13 +182,17 @@ export async function assembleCleanContext(env, {
   const modelVisibleTools = webSearchEnabled
     ? [...selection.modelVisibleTools, WEB_SEARCH_SERVER_TOOL]
     : selection.modelVisibleTools;
-  const [worldbook, directDogtalk, manualCrossWindow] = await Promise.all([
+  const [worldbook, directDogtalk, manualCrossWindow, reality] = await Promise.all([
     request.worldbookEnabled && request.worldbookLimit ? matchWorldbook(env.COAST_CHAT_DB, { input: query, messages: recent.slice(0, -1), surface, allowedScopes: access.worldbook, limit: request.worldbookLimit }) : Promise.resolve([]),
     OWNER_CUSTOM_INSTRUCTION_SURFACES.has(surface) ? dogtalkContext(env.COAST_CHAT_DB, { room_scope: 'conversation', conversation_id: conversationId }, query, { consume_direct: !preview }) : Promise.resolve(null),
     crossWindowRequest.mode === 'manual'
       ? readCrossWindow(env.COAST_CHAT_DB, { ...crossWindowRequest, current_conversation_id: conversationId })
       : Promise.resolve(null),
+    permission === 'owner' && conversationId
+      ? buildRealityContext(env, { settings: contextSettings, snapshot: realityContext, localDate, localDateTime })
+      : Promise.resolve({ enabled: false, selected: [], delivered: [], missing: [], text: '' }),
   ]);
+  const responseMode = responseModeContext(contextSettings);
   const soilEnabled = isThinkingSoilEnabled(papers.soil);
   const soilText = formatThinkingSoil(papers.soil, { maxCharacters: request.soilCharacters, maxHandSeeds: 7 });
   const memoryRecords = papers.memory?.visitor_memories ? [] : (Array.isArray(papers.memory?.items) ? papers.memory.items.slice(0, request.memoryLimit) : []);
@@ -192,7 +201,8 @@ export async function assembleCleanContext(env, {
   const comfort = trimContextToComfortRange({
     basePrompt: surface === 'mailbox_visitor' ? String(baseSystemPrompt || '').trim() || VISITOR_PROMPT : OWNER_CUSTOM_INSTRUCTION_SURFACES.has(surface) ? OWNER_TECHNICAL_PROMPT : String(baseSystemPrompt || '').trim() || OWNER_TECHNICAL_PROMPT,
     customInstructionsText: hasCustomInstructions ? customInstructionsText : '', globalExcerptText, soilText, memoryItems, worldbookItems, dogtalkText: dogtalk?.context || '',
-    crossWindowItems: manualCrossWindowItems(manualCrossWindow), workbenchText, messages: recent,
+    crossWindowItems: manualCrossWindowItems(manualCrossWindow), workbenchText,
+    realityText: reality.text, responseModeText: responseMode.text, messages: recent,
     recentTurns, maxTokens: request.comfortTokens,
   });
   const deliveredMessages = comfort.keptMessages || comfort.modelMessages.filter((message) => message.role !== 'system');
@@ -222,6 +232,8 @@ export async function assembleCleanContext(env, {
     soilCurrentText: soilDesk.current_text, soilHandSeeds: soilDesk.hand_seeds, soilPocketCandidatesCount: soilDesk.pocket_candidates_count, memoryItems: deliveredMemoryRecords,
     memoryDeliveredTexts: comfort.keptMemoryItems, worldbookItems: worldbook, worldbookDeliveredCount: comfort.kept.worldbook, worldbookDeliveredTexts: comfort.keptWorldbookItems,
     dogtalk: comfort.kept.dogtalk, dogtalkContext: comfort.keptDogtalkText, crossWindow: currentCrossWindowDesk(), workbenchPrompt: comfort.kept.workbench, workbenchPromptText: comfort.keptWorkbenchText,
+    reality: { ...reality, delivered_to_model: Boolean(comfort.kept.reality), context: comfort.keptRealityText },
+    responseMode: { ...responseMode, delivered_to_model: Boolean(comfort.kept.response_mode), context: comfort.keptResponseModeText },
     modelVisibleTools: modelVisibleToolRecords, backendTools, toolGroups, furniture: usedFurniture, toolResults, trimmedCount: comfort.trimmedCount,
   });
   const executeTool = async (toolCall) => {

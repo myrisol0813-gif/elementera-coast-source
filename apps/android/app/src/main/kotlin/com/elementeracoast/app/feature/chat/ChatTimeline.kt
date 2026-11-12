@@ -25,6 +25,33 @@ import com.elementeracoast.app.core.model.MessageAction
 import com.elementeracoast.app.core.model.MessageRole
 import com.elementeracoast.app.core.model.ThoughtSoilSnapshot
 import com.elementeracoast.app.ui.theme.CoastChatTokens
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+private val CHAT_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy年M月d日 · EEEE", Locale.SIMPLIFIED_CHINESE)
+private val CHAT_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT)
+
+private fun localMessageDateTime(value: String?): java.time.ZonedDateTime? {
+    val raw = value?.trim().orEmpty()
+    if (raw.isBlank()) return null
+    val zone = ZoneId.systemDefault()
+    return runCatching { Instant.parse(raw).atZone(zone) }.getOrNull()
+        ?: runCatching { OffsetDateTime.parse(raw).atZoneSameInstant(zone) }.getOrNull()
+        ?: runCatching { LocalDateTime.parse(raw).atZone(zone) }.getOrNull()
+}
+
+private fun messageDateKey(value: String?): String =
+    localMessageDateTime(value)?.toLocalDate()?.toString().orEmpty()
+
+private fun messageDateLabel(value: String?): String =
+    localMessageDateTime(value)?.format(CHAT_DATE_FORMATTER).orEmpty()
+
+private fun messageTimeLabel(value: String?): String =
+    localMessageDateTime(value)?.format(CHAT_TIME_FORMATTER).orEmpty()
 
 @Composable
 internal fun ChatTimeline(
@@ -78,6 +105,18 @@ internal fun ChatTimeline(
         ) {
             itemsIndexed(messages, key = { _, message -> message.id }) { index, message ->
                 Column {
+                    val dateKey = messageDateKey(message.createdAtLabel)
+                    val previousDateKey = messages.getOrNull(index - 1)?.let { messageDateKey(it.createdAtLabel) }.orEmpty()
+                    if (dateKey.isNotBlank() && dateKey != previousDateKey) {
+                        Text(
+                            text = messageDateLabel(message.createdAtLabel),
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .62f),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
                     val streamingTail = isStreaming && message.id == streamingMessageId
                     if (message.role == MessageRole.Assistant && !streamingTail && message.furnitureRuns.isNotEmpty()) {
                         FurnitureBubble(
@@ -116,6 +155,17 @@ internal fun ChatTimeline(
                         onAction = onAction,
                         onFootprint = onFootprint
                     )
+                    val timeLabel = messageTimeLabel(message.createdAtLabel)
+                    if (timeLabel.isNotBlank() && !streamingTail) {
+                        Text(
+                            text = timeLabel,
+                            modifier = Modifier
+                                .align(if (message.role == MessageRole.User) Alignment.End else Alignment.Start)
+                                .padding(top = 2.dp, start = if (message.role == MessageRole.Assistant) 46.dp else 0.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .48f),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
                     if (metadataMessageId != null) {
                         ModelUsageFooter(
                             conversationId = conversationId,

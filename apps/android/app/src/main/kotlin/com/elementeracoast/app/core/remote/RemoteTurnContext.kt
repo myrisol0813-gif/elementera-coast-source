@@ -15,6 +15,8 @@ data class RemoteDeskSlip(
     @SerialName("related_memory") val relatedMemory: RemoteDeskMemory = RemoteDeskMemory(),
     val worldbook: RemoteDeskWorldbook = RemoteDeskWorldbook(),
     val dogtalk: RemoteDeskDogtalk = RemoteDeskDogtalk(),
+    @SerialName("reality_context") val realityContext: RemoteDeskRealityContext = RemoteDeskRealityContext(),
+    @SerialName("response_mode") val responseMode: RemoteDeskResponseMode = RemoteDeskResponseMode(),
     @SerialName("cross_window") val crossWindow: RemoteDeskCrossWindow = RemoteDeskCrossWindow(),
     val workbench: RemoteDeskWorkbench = RemoteDeskWorkbench(),
     val attachments: RemoteDeskAttachments? = null,
@@ -142,6 +144,36 @@ data class RemoteDeskDogtalk(
     val label: String = "私人草稿",
     val description: String = "",
     val status: String = "未递给",
+    val delivered: Boolean = false,
+    val context: String = ""
+)
+
+@Serializable
+data class RemoteDeskRealityItem(
+    val key: String = "",
+    val label: String = "",
+    val text: String = ""
+)
+
+@Serializable
+data class RemoteDeskRealityContext(
+    val label: String = "现实上下文",
+    val description: String = "",
+    val status: String = "未开启",
+    val enabled: Boolean = false,
+    val delivered: Boolean = false,
+    val selected: List<String> = emptyList(),
+    @SerialName("delivered_items") val deliveredItems: List<RemoteDeskRealityItem> = emptyList(),
+    val missing: List<String> = emptyList(),
+    val context: String = ""
+)
+
+@Serializable
+data class RemoteDeskResponseMode(
+    val label: String = "回应节奏",
+    val description: String = "",
+    val status: String = "普通",
+    @SerialName("short_reply_mode") val shortReplyMode: Boolean = false,
     val delivered: Boolean = false,
     val context: String = ""
 )

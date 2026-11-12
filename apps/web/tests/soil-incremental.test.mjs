@@ -185,7 +185,7 @@ const degradedData = await organize(conversation.id, 'reply');
 assert.equal(degradedData.degraded, true);
 const degradedSoil = await readSoil(db, conversation.id);
 assert.equal(degradedSoil.organized_through_turn_id, successCursor, 'degraded fallback must not advance the successful cursor');
-assert.match(degradedSoil.current_text, /degraded-missed-user-marker/);
+assert.equal(degradedSoil.current_text, '当前没有需要脱离最近上下文再次复述的承接便签。');
 
 turns.push(turn('visible-101', 'latest-after-degraded-user-marker', 'latest-after-degraded-assistant-marker', '2026-07-15T03:41:00.000Z'));
 await writeConversationState(db, conversation.id, { version: 4, turns });

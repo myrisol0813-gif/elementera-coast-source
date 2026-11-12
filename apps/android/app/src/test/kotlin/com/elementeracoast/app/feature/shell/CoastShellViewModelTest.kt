@@ -4,6 +4,7 @@ import com.elementeracoast.app.core.auth.AuthRepository
 import com.elementeracoast.app.core.auth.AuthSession
 import com.elementeracoast.app.core.auth.SessionRestoreResult
 import com.elementeracoast.app.core.local.MemoryLocalPersistence
+import com.elementeracoast.app.core.model.ConversationContextSettings
 import com.elementeracoast.app.core.model.CrossWindowLimits
 import com.elementeracoast.app.core.model.CrossWindowMode
 import com.elementeracoast.app.core.model.CrossWindowRequest
@@ -21,12 +22,14 @@ import com.elementeracoast.app.core.network.CoastApiErrorKind
 import com.elementeracoast.app.core.network.CoastApiException
 import com.elementeracoast.app.core.remote.RemoteAttachment
 import com.elementeracoast.app.core.remote.RemoteHistory
+import com.elementeracoast.app.core.remote.RemoteRealityContext
 import com.elementeracoast.app.core.remote.RemoteModelCatalogItem
 import com.elementeracoast.app.core.remote.RemoteModelCatalogResponse
 import com.elementeracoast.app.core.remote.RemoteModelGroups
 import com.elementeracoast.app.core.remote.RemoteProfile
 import com.elementeracoast.app.feature.chat.ChatProgress
 import com.elementeracoast.app.feature.chat.ChatRepository
+import com.elementeracoast.app.feature.chat.RealityContextSource
 import com.elementeracoast.app.feature.chat.ChatSyncMapper
 import com.elementeracoast.app.feature.daily.DailyDiary
 import com.elementeracoast.app.feature.daily.DailyMoment
@@ -231,6 +234,25 @@ class CoastShellViewModelTest {
     }
 
     @Test
+    fun shortReplyModePersistsEvenWhenRealityContextIsOff() {
+        val fixture = Fixture()
+        val conversation = fixture.conversations.seed(RoomType.Main, "主聊天")
+        fixture.chat.histories[conversation.id] = RemoteHistory(conversationId = conversation.id)
+        val vm = fixture.vm()
+
+        vm.setContextSettings(
+            ConversationContextSettings(
+                realityEnabled = false,
+                shortReplyMode = true
+            )
+        )
+
+        assertFalse(vm.state.value.contextSettings.realityEnabled)
+        assertTrue(vm.state.value.contextSettings.shortReplyMode)
+        assertEquals(true, fixture.chat.histories[conversation.id]?.contextSettings?.shortReplyMode)
+    }
+
+    @Test
     fun completedReplyExposesDeskReceiptAndOrganizesThoughtSoil() {
         val fixture = Fixture()
         fixture.conversations.seed(RoomType.Main, "主聊天")
@@ -296,6 +318,9 @@ class CoastShellViewModelTest {
         val conversations = FakeConversationRepository()
         val profile = FakeProfileRepository()
         val chat = FakeChatRepository()
+        val reality = object : RealityContextSource {
+            override suspend fun capture(settings: ConversationContextSettings): RemoteRealityContext = RemoteRealityContext()
+        }
         val thoughtSoil = FakeThoughtSoilRepository()
         val daily = FakeDailyRepository()
         val memory = FakeMemoryRepository()
@@ -311,6 +336,7 @@ class CoastShellViewModelTest {
                 conversations = conversations,
                 profile = profile,
                 chat = chat,
+                reality = reality,
                 thoughtSoil = thoughtSoil,
                 daily = daily,
                 memory = memory,
@@ -561,7 +587,8 @@ class CoastShellViewModelTest {
             contextBudget: Int,
             outputLength: String,
             maxOutputTokens: Int,
-            crossWindow: CrossWindowRequest
+            crossWindow: CrossWindowRequest,
+            realityContext: RemoteRealityContext
         ): Flow<ChatProgress> = flow {
             streamCalls += 1
             lastRecentTurns = recentTurns

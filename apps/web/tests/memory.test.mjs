@@ -739,7 +739,7 @@ const degradedSoilData = await degradedSoilResponse.json();
 assert.equal(degradedSoilResponse.status, 200);
 assert.equal(degradedSoilData.degraded, true);
 assert.equal(degradedSoilData.reason, 'soil_organize_invalid');
-assert.match(degradedSoilData.soil.current_text, /第三轮需要兜底/, 'degraded organize should write a soft fallback current note');
+assert.equal(degradedSoilData.soil.current_text, '当前没有需要脱离最近上下文再次复述的承接便签。', 'degraded organize should avoid copying the latest turn back into soil');
 assert.equal(degradedSoilData.soil.hand_seeds.length, soilBeforeDegradedOrganize.hand_seeds.length, 'degraded organize must keep old hand seeds');
 assert.ok((await readSoil(db, conversationC.id)).revision > soilBeforeDegradedOrganize.revision, 'a degraded organize should save the soft fallback state');
 assert.equal((await listPockets(db, { conversation_id: conversationC.id, status: 'pending' })).length, pendingBeforeDegradedOrganize, 'a degraded organize must not mutate pending pockets');
@@ -762,7 +762,7 @@ const truncatedSoilResponse = await routeMemoryApi(new Request('https://coast.te
 const truncatedSoilData = await truncatedSoilResponse.json();
 assert.equal(truncatedSoilData.degraded, true);
 assert.equal(truncatedSoilData.reason, 'soil_organize_truncated');
-assert.match(truncatedSoilData.soil.current_text, /第三轮需要兜底/);
+assert.equal(truncatedSoilData.soil.current_text, '当前没有需要脱离最近上下文再次复述的承接便签。');
 providerFinishReason = 'stop';
 
 providerStatus = 503;
@@ -775,7 +775,7 @@ const providerErrorData = await providerErrorResponse.json();
 assert.equal(providerErrorResponse.status, 200);
 assert.equal(providerErrorData.degraded, true);
 assert.equal(providerErrorData.reason, 'provider_unavailable');
-assert.match(providerErrorData.soil.current_text, /第三轮需要兜底/);
+assert.equal(providerErrorData.soil.current_text, '当前没有需要脱离最近上下文再次复述的承接便签。');
 providerStatus = 200;
 
 await writeSoil(db, conversationB.id, {

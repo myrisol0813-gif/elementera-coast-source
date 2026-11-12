@@ -181,11 +181,7 @@ export function fallbackCurrentText(turns, landing) {
   if (landing || latest?.user?.hidden || latest?.user?.input_type === 'landing_letter') {
     return '登岛信开场已经完成，正在承接这封信与刚刚的读信回复。';
   }
-  const source = String(latest?.user?.content || '').replace(/\s+/g, ' ').trim();
-  const preview = Array.from(source).slice(0, 72).join('');
-  return preview
-    ? `刚刚完成了一轮对话，当前正在承接：${preview}${Array.from(source).length > 72 ? '…' : ''}`
-    : '刚刚完成了一轮对话，正在承接当前主题与下一步。';
+  return '当前没有需要脱离最近上下文再次复述的承接便签。';
 }
 
 export function clipSoilContent(value, max = SOIL_REPLY_FIELD_CHARS) {
@@ -299,7 +295,7 @@ mode 含义：
 - clear：你明确判断这一栏已经过时、重复、已经落袋或不再适合当前窗口，因此清空这一栏。
 不要把空数组或空字符串当作失败占位。如果你确实要清空，请使用 clear mode；如果你没有要改这一栏，请使用 keep mode。
 
-current_text 是“滚动承接便签”，不是最近十二轮聊天摘要。普通回复整理时，约 60–70% 注意力放在 latest_turn，约 20–30% 保留 old_current_text 中仍直接连接当前话题的未完成线索，极少量使用 previous_turn_excerpt 与 missed_since_success 防止断层。允许改写、压缩、删除已经结束的话题，用最新一轮重新解释上一段。不要累加“先聊 A、再聊 B、然后 C”的流水账；不要每轮继续背着登岛信；不要把远古精华长期塞在 current_text。
+current_text 是“滚动承接便签”，不是最近十二轮聊天摘要。latest_turn 与 previous_turn_excerpt 本来就会通过最近上下文直接递给模型，因此不要把它们换一种说法再抄进 current_text。只有某条信息会在最近上下文滑出后仍必须继续承接，例如尚未解决的问题、已经决定但下一步未完成的事项、跨多轮形成的结构变化，才值得写入。普通寒暄、刚表达完的感受、刚回答完的问题可以不留下额外摘要。允许 current_text 很短；没有额外承接内容时就写“当前没有需要脱离最近上下文再次复述的承接便签。”。允许改写、压缩、删除已经结束的话题，不要累加“先聊 A、再聊 B、然后 C”的流水账；不要每轮继续背着登岛信；不要把远古精华长期塞在 current_text。
 
 hand_seeds 不是永久收藏夹，而是“此刻最值得手持”的最多 ${maxHandSeeds} 粒。每轮都可以保留仍有用的旧种、删除过时旧种、替换旧种、合并重复旧种、改写旧种或加入新种。满 ${maxHandSeeds} 粒时主动做取舍。不要因为旧整理当前对话的纸条里已经有旧种就机械保留，也不要害怕让旧纸条退出手持。
 do_not_repeat 也只是当前窗口的工作提醒。已经不再需要防复读的提醒可以改写、合并或 clear。

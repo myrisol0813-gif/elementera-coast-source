@@ -75,6 +75,7 @@ async function contextFromRequest(env, value, { preview = false } = {}) {
     conversationId, sourceTurnId:turnId, messages,
     lastUser: messages.at(-1), settings: chatSettings(value.settings),
     localDate: value.local_date, localDateTime: value.local_datetime,
+    realityContext: value.reality_context,
     surface:room.room_type==='radio'?'radio':'main_chat', model,
     permission:'owner', crossWindow:value.cross_window,
     preview, exposeOpenRouterSearch:false,

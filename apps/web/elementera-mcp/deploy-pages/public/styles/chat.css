@@ -844,3 +844,27 @@
 
 .furniture-run-link{border:0;padding:0;margin:0;background:transparent;color:inherit;font:inherit;text-align:left;text-decoration:underline;text-underline-offset:3px;cursor:pointer;}
 .furniture-run-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px;}
+
+.message-date-divider {
+  align-self: center;
+  margin: 12px auto 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: var(--text-muted, #787b82);
+  background: color-mix(in srgb, var(--surface-soft, #f5f1e9) 72%, transparent);
+  font-size: 11px;
+  line-height: 1.35;
+  letter-spacing: .01em;
+}
+
+.message-time {
+  display: block;
+  margin-top: 4px;
+  color: color-mix(in srgb, var(--text-muted, #787b82) 72%, transparent);
+  font-size: 10.5px;
+  line-height: 1.2;
+  user-select: none;
+}
+
+.message-time.is-user { text-align: right; }
+.message-time.is-assistant { text-align: left; }

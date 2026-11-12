@@ -106,6 +106,28 @@ internal object TurnDeskMapper {
                 details = if (value.dogtalk.delivered) detail("实际递给模型", value.dogtalk.context) else emptyList()
             ),
             section(
+                title = value.realityContext.label.ifBlank { "现实上下文" },
+                status = value.realityContext.status,
+                description = value.realityContext.description,
+                details = buildList {
+                    value.realityContext.deliveredItems.forEach { item ->
+                        add(TurnDeskDetail(item.label.ifBlank { item.key }, item.text))
+                    }
+                    if (value.realityContext.missing.isNotEmpty()) {
+                        add(TurnDeskDetail("已开启但本轮无数据", value.realityContext.missing.joinToString("、")))
+                    }
+                    if (value.realityContext.context.isNotBlank()) {
+                        add(TurnDeskDetail("实际递给模型", value.realityContext.context))
+                    }
+                }
+            ),
+            section(
+                title = value.responseMode.label.ifBlank { "回应节奏" },
+                status = value.responseMode.status,
+                description = value.responseMode.description,
+                details = detail("实际递给模型", value.responseMode.context)
+            ),
+            section(
                 title = value.crossWindow.label.ifBlank { "跨窗口读取" },
                 status = crossWindowStatus(value.crossWindow),
                 description = value.crossWindow.description,

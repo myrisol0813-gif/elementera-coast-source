@@ -10,6 +10,10 @@ const DEFAULT_TITLES = new Set(['', '新聊天', '未命名对话', '主聊天']
 const ROOM_TYPES = new Set(['main', 'radio', 'lighthouse']);
 const MESSAGE_SOURCES = new Set(['owner_web', 'official_mcp', 'rikkahub']);
 const GENERATION_SOURCES = new Set(['chat', 'landing', 'relay', 'radio', 'lighthouse', 'other']);
+export const REALITY_CONTEXT_FIELDS = Object.freeze([
+  'date', 'time', 'battery', 'weather', 'location', 'recent_app', 'app_usage', 'calendar', 'steps',
+]);
+const REALITY_CONTEXT_FIELD_SET = new Set(REALITY_CONTEXT_FIELDS);
 
 export class ChatStoreError extends Error {
   constructor(type, message, status = 400) {
@@ -87,6 +91,20 @@ function normalizeUsage(value) {
   const values = fields.map((field) => Number(value[field]));
   if (!values.every((number) => Number.isFinite(number) && number >= 0)) return null;
   return Object.fromEntries(fields.map((field, index) => [field, Math.trunc(values[index])]));
+}
+
+export function normalizeContextSettings(value = {}) {
+  const raw = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const fields = [...new Set((Array.isArray(raw.reality_fields) ? raw.reality_fields : [])
+    .map((item) => String(item || '').trim())
+    .filter((item) => REALITY_CONTEXT_FIELD_SET.has(item)))];
+  const weatherCity = clip(raw.weather_city, 80).replace(/[\r\n\t]+/g, ' ').trim();
+  return {
+    reality_enabled: raw.reality_enabled === true,
+    reality_fields: fields,
+    short_reply_mode: raw.short_reply_mode === true,
+    weather_city: weatherCity,
+  };
 }
 
 function normalizeDeskSlip(value) {
@@ -246,6 +264,7 @@ export function normalizeState(value = {}) {
   return {
     version: 4,
     updated_at: typeof raw.updated_at === 'string' ? raw.updated_at : new Date().toISOString(),
+    context_settings: normalizeContextSettings(raw.context_settings),
     turns,
   };
 }

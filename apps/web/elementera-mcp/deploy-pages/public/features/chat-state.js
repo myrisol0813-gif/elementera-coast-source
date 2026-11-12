@@ -6,6 +6,9 @@ const MAX_VARIANTS = 20;
 const MAX_DESK_SLIP_JSON = 256000;
 const GENERATION_SOURCES = new Set(['chat', 'landing', 'relay', 'radio', 'lighthouse', 'other']);
 const MESSAGE_SOURCES = new Set(['owner_web', 'official_mcp', 'rikkahub']);
+const REALITY_CONTEXT_FIELDS = new Set([
+  'date', 'time', 'battery', 'weather', 'location', 'recent_app', 'app_usage', 'calendar', 'steps',
+]);
 
 const now = () => new Date().toISOString();
 
@@ -15,6 +18,18 @@ function normalizeUsage(value) {
   const values = fields.map((field) => Number(value[field]));
   if (!values.every((number) => Number.isFinite(number) && number >= 0)) return null;
   return Object.fromEntries(fields.map((field, index) => [field, Math.trunc(values[index])]));
+}
+
+export function normalizeContextSettings(value = {}) {
+  const raw = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return {
+    reality_enabled: raw.reality_enabled === true,
+    reality_fields: [...new Set((Array.isArray(raw.reality_fields) ? raw.reality_fields : [])
+      .map((item) => String(item || '').trim())
+      .filter((item) => REALITY_CONTEXT_FIELDS.has(item)))],
+    short_reply_mode: raw.short_reply_mode === true,
+    weather_city: String(raw.weather_city || '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80),
+  };
 }
 
 function normalizeDeskSlip(value) {
@@ -165,6 +180,7 @@ export function normalizeState(value = {}) {
   return {
     version: 4,
     updated_at: typeof raw.updated_at === 'string' ? raw.updated_at : now(),
+    context_settings: normalizeContextSettings(raw.context_settings),
     turns,
   };
 }
