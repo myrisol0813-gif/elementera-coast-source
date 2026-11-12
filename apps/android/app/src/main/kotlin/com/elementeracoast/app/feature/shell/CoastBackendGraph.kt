@@ -10,6 +10,8 @@ import com.elementeracoast.app.core.network.CoastApiConfig
 import com.elementeracoast.app.core.network.CoastHttpClient
 import com.elementeracoast.app.core.remote.RemoteCacheStore
 import com.elementeracoast.app.feature.chat.ChatRepository
+import com.elementeracoast.app.feature.chat.AndroidRealityContextSource
+import com.elementeracoast.app.feature.chat.RealityContextSource
 import com.elementeracoast.app.feature.chat.DefaultChatRepository
 import com.elementeracoast.app.feature.chat.ReasoningEffortStore
 import com.elementeracoast.app.feature.chat.NativeChatGptTurnRepository
@@ -34,6 +36,7 @@ data class CoastBackendGraph(
     val conversations: ConversationRepository,
     val profile: ProfileRepository,
     val chat: ChatRepository,
+    val reality: RealityContextSource,
     val thoughtSoil: ThoughtSoilRepository,
     val daily: DailyRepository,
     val memory: MemoryRepository,
@@ -62,6 +65,7 @@ data class CoastBackendGraph(
                 conversations = DefaultConversationRepository(api, cache, titleRemote),
                 profile = DefaultProfileRepository(api, cache),
                 chat = chatRepository,
+                reality = AndroidRealityContextSource(context.applicationContext, persistence),
                 thoughtSoil = DefaultThoughtSoilRepository(api, chatGptPlan),
                 daily = DefaultDailyRepository(api, cache),
                 memory = DefaultMemoryRepository(memoryRemote, cache),
