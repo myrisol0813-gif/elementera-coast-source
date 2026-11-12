@@ -48,6 +48,15 @@ jobs:
           grep -Fq 'versionCode = 15' app/build.gradle.kts
           grep -Fq 'versionName = "0.2.13-source"' app/build.gradle.kts
           ! grep -Eiq 'app[.]elementeracoast[.]com' app/build.gradle.kts
+      - name: Verify Source visitor release version plumbing
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow="../../.github/workflows/source-native-prerelease.yml"
+          grep -Fq 'steps.version_gate.outputs.base_version' "$workflow"
+          grep -Fq 'steps.version_gate.outputs.version_code' "$workflow"
+          ! grep -Eq 'source-visitor-v0\.[0-9]' "$workflow"
+          ! grep -Eq 'elementera-coast-source-v0\.[0-9].*-visitor-qa[.]apk' "$workflow"
       - run: gradle :app:testDebugUnitTest --no-daemon --stacktrace
       - run: gradle :app:assembleDebug --no-daemon --stacktrace
       - name: Show build-only result
