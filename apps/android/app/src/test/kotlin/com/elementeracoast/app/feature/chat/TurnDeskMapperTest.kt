@@ -10,6 +10,9 @@ import com.elementeracoast.app.core.remote.RemoteDeskGlobalExcerpt
 import com.elementeracoast.app.core.remote.RemoteDeskExternalTide
 import com.elementeracoast.app.core.remote.RemoteDeskMemory
 import com.elementeracoast.app.core.remote.RemoteDeskRecentContext
+import com.elementeracoast.app.core.remote.RemoteDeskRealityContext
+import com.elementeracoast.app.core.remote.RemoteDeskRealityItem
+import com.elementeracoast.app.core.remote.RemoteDeskResponseMode
 import com.elementeracoast.app.core.remote.RemoteDeskSlip
 import com.elementeracoast.app.core.remote.RemoteDeskThinkingSoil
 import com.elementeracoast.app.core.remote.RemoteDeskWebSearch
@@ -63,6 +66,23 @@ class TurnDeskMapperTest {
                     description = "记忆说明",
                     status = "未命中"
                 ),
+                realityContext = RemoteDeskRealityContext(
+                    description = "现实说明",
+                    status = "已递给 · 1/2 项",
+                    enabled = true,
+                    delivered = true,
+                    selected = listOf("date", "steps"),
+                    deliveredItems = listOf(RemoteDeskRealityItem("date", "日期", "2026-11-13")),
+                    missing = listOf("步数"),
+                    context = "日期：2026-11-13"
+                ),
+                responseMode = RemoteDeskResponseMode(
+                    description = "回应节奏说明",
+                    status = "短句模式 · 已递给",
+                    shortReplyMode = true,
+                    delivered = true,
+                    context = "当前对话开启了短句模式。"
+                ),
                 externalTide = RemoteDeskExternalTide(
                     description = "外来说明",
                     status = "未递给",
@@ -72,7 +92,7 @@ class TurnDeskMapperTest {
         )
 
         assertEquals(
-            listOf("当前消息", "最近上下文", "核心自定义", "全局摘录", "整理当前对话的纸条", "相关记忆", "世界书", "私人草稿", "跨窗口读取", "工作台 / 工具回执", "上下文预算", "外部入口消息"),
+            listOf("当前消息", "最近上下文", "核心自定义", "全局摘录", "整理当前对话的纸条", "相关记忆", "世界书", "私人草稿", "现实上下文", "回应节奏", "跨窗口读取", "工作台 / 工具回执", "上下文预算", "外部入口消息"),
             receipt.sections.map { it.title }
         )
         assertEquals("已递给 · 1 轮", receipt.sections[1].status)
@@ -80,14 +100,21 @@ class TurnDeskMapperTest {
         assertTrue(receipt.sections[3].details.any { it.label == "实际递给模型" && it.text.contains("我在文字里认出自己") })
         assertTrue(receipt.sections[4].details.any { it.label == "待确认候选" && it.text.contains("待确认 · 2 条 · 未递给正文") })
         assertEquals("未命中", receipt.sections[5].status)
-        assertTrue(receipt.sections[8].details.any { it.text == "本轮未递入" })
+        val reality = receipt.sections.first { it.title == "现实上下文" }
+        assertTrue(reality.status.contains("1/2"))
+        assertTrue(reality.details.any { it.label == "日期" && it.text == "2026-11-13" })
+        assertTrue(reality.details.any { it.label == "已开启但本轮无数据" && it.text.contains("步数") })
+        val response = receipt.sections.first { it.title == "回应节奏" }
+        assertTrue(response.status.contains("短句模式"))
+        assertTrue(response.details.any { it.label == "实际递给模型" && it.text.contains("短句模式") })
+        assertTrue(receipt.sections.first { it.title == "跨窗口读取" }.details.any { it.text == "本轮未递入" })
         val budget = receipt.sections.first { it.title == "上下文预算" }
         assertTrue(budget.status.contains("4321 / 6000"))
         assertTrue(budget.details.any { it.label == "保留来源" && it.text.contains("全局摘录") })
         assertTrue(receipt.sections.last().details.any { it.text == "本轮没有递入外部材料。" })
         val sourceSections = setOf(
             "当前消息", "最近上下文", "核心自定义", "全局摘录", "整理当前对话的纸条",
-            "相关记忆", "世界书", "私人草稿", "跨窗口读取", "工作台 / 工具回执", "外部入口消息"
+            "相关记忆", "世界书", "私人草稿", "现实上下文", "回应节奏", "跨窗口读取", "工作台 / 工具回执", "外部入口消息"
         )
         assertTrue(
             receipt.sections
