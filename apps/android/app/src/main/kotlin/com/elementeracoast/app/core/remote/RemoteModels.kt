@@ -1,5 +1,6 @@
 package com.elementeracoast.app.core.remote
 
+import com.elementeracoast.app.core.model.ConversationContextSettings
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -100,6 +101,7 @@ data class RemoteHistoryResponse(
 data class RemoteHistory(
     val version: Int = 4,
     @SerialName("updated_at") val updatedAt: String = "",
+    @SerialName("context_settings") val contextSettings: ConversationContextSettings = ConversationContextSettings(),
     val turns: List<RemoteTurn> = emptyList(),
     @SerialName("conversation_id") val conversationId: String? = null
 )
@@ -179,6 +181,44 @@ data class RemoteFurnitureItem(val title: String = "", val kind: String = "")
 @Serializable
 data class RemoteChatMessage(val role: String, val content: String)
 
+@Serializable
+data class RemoteRealityBattery(
+    val percent: Int,
+    val charging: Boolean? = null
+)
+
+@Serializable
+data class RemoteRealityLocation(
+    val label: String = ""
+)
+
+@Serializable
+data class RemoteRealityApp(
+    val name: String = ""
+)
+
+@Serializable
+data class RemoteRealityAppUsage(
+    val name: String = "",
+    val minutes: Int = 0
+)
+
+@Serializable
+data class RemoteRealitySteps(
+    val count: Int,
+    val basis: String = ""
+)
+
+@Serializable
+data class RemoteRealityContext(
+    val timezone: String = "",
+    val battery: RemoteRealityBattery? = null,
+    val location: RemoteRealityLocation? = null,
+    @SerialName("recent_app") val recentApp: RemoteRealityApp? = null,
+    @SerialName("app_usage") val appUsage: List<RemoteRealityAppUsage> = emptyList(),
+    val steps: RemoteRealitySteps? = null
+)
+
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 data class RemoteChatRequest(
@@ -190,6 +230,7 @@ data class RemoteChatRequest(
     @SerialName("attachment_ids") val attachmentIds: List<String> = emptyList(),
     @SerialName("local_date") val localDate: String,
     @SerialName("local_datetime") val localDateTime: String,
+    @SerialName("reality_context") val realityContext: RemoteRealityContext? = null,
     val settings: Map<String, String> = emptyMap(),
     @SerialName("cross_window") val crossWindow: RemoteCrossWindowRequest? = null,
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.ALWAYS)
