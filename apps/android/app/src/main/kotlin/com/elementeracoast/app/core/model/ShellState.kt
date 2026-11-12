@@ -19,6 +19,7 @@ data class CoastShellState(
     val actionLogFocusIds: Set<String> = emptySet(),
     val conversations: List<ConversationSummary> = emptyList(),
     val activeConversationId: String = "",
+    val contextSettings: ConversationContextSettings = ConversationContextSettings(),
     val messages: List<ChatMessage> = emptyList(),
     val pendingAttachments: List<ChatAttachment> = emptyList(),
     val attachmentUploading: Boolean = false,
