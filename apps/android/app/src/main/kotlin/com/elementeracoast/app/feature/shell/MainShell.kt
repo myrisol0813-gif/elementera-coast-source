@@ -25,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.elementeracoast.app.core.model.ChatMessage
+import com.elementeracoast.app.core.model.ConversationContextSettings
 import com.elementeracoast.app.core.tour.SourceVisitGate
 import androidx.compose.ui.unit.dp
 import com.elementeracoast.app.core.model.CoastShellState
@@ -76,6 +77,7 @@ fun MainShell(
     onMessageAction: (MessageAction) -> Unit,
     onOpenActionLog: (Set<String>) -> Unit,
     onSetThoughtSoilEnabled: (Boolean) -> Unit,
+    onSetContextSettings: (ConversationContextSettings) -> Unit,
     onImportMessages: (List<ChatMessage>) -> Unit,
     onLocalActionLogged: (String, String, String) -> Unit,
     onOpenModels: () -> Unit,
@@ -95,6 +97,7 @@ fun MainShell(
     val coroutineScope = rememberCoroutineScope()
     var openPendingMemoryOnLanding by remember { mutableStateOf(false) }
     var showThemeWardrobe by remember { mutableStateOf(false) }
+    var showWindowContext by rememberSaveable { mutableStateOf(false) }
     val defaultSnowLetterVisuals = remember { SnowLetterVisualSettings() }
     var snowLetterBackgroundAlpha by rememberSaveable { mutableStateOf(defaultSnowLetterVisuals.chatBackgroundAlpha) }
     var snowLetterDecorationAlpha by rememberSaveable { mutableStateOf(defaultSnowLetterVisuals.decorationAlpha) }
@@ -156,7 +159,7 @@ fun MainShell(
                                 onOpenModels = onOpenModels,
                                 onRefresh = onRefresh,
                                 onNewConversation = onNewConversation,
-                                onMore = { onOpenFeature(FeatureDestination.IslandLetter) }
+                                onMore = { showWindowContext = true }
                             )
                         }
                         if (SourceVisitGate.isActive) {
@@ -226,6 +229,20 @@ fun MainShell(
             }
         }
 
+        if (showWindowContext && state.activeFeature == null) {
+            WindowContextSheet(
+                conversationId = state.activeConversationId,
+                settings = state.contextSettings,
+                thoughtSoilEnabled = state.thoughtSoil?.autoRefreshEnabled ?: true,
+                onSettingsChange = onSetContextSettings,
+                onSetThoughtSoilEnabled = onSetThoughtSoilEnabled,
+                onOpenIslandLetter = {
+                    showWindowContext = false
+                    onOpenFeature(FeatureDestination.IslandLetter)
+                },
+                onDismiss = { showWindowContext = false }
+            )
+        }
         if (state.showModelPicker && state.activeFeature == null) {
             ModelQuickPicker(
                 models = state.models,
