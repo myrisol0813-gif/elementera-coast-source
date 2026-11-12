@@ -25,6 +25,8 @@ Only the tagged source revision and the matching Release assets describe what wa
 - APK SHA-256: `4319dcca4bfe7424e5e27ff9181c0b87d8508795ba227ecab4cf58b7ab763abf`.
 - Live login depends on the original temporary test backend, which has expired. For self-hosting, supply an independent server and rebuild; for short phone QA, run the dedicated isolated test workflow.
 
+> Release-publisher correction, 2026-11-13: the Source visitor workflow still carried old 0.2.11 filenames/tags/titles even though the APK identity checks already validated newer Gradle versions. The publisher now derives versionName/versionCode once from `app/build.gradle.kts` and reuses those outputs for gate, filename, tag, title, package verification and redownload verification. Source check rejects hard-coded visitor version labels. Two automated Releases created earlier on 2026-11-13 were therefore mislabeled as 0.2.11 and should not be used as version-history evidence.
+
 ## Current source Native QA — 0.2.13-source (2026-11-13)
 
 - Restores the previously unmerged public Native **奶油纸牌 / Cream Paper** theme on top of the current 0.2.12 source tree.
