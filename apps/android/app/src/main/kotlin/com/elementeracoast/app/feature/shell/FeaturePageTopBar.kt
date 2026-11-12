@@ -26,6 +26,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elementeracoast.app.ui.theme.CoastChatTokens
+import com.elementeracoast.app.ui.theme.CoastThemePreset
+import com.elementeracoast.app.ui.theme.LocalCoastAppearance
+import com.elementeracoast.app.ui.theme.coastPaperHeader
+import com.elementeracoast.app.ui.theme.coastSurfaceBackground
 
 @Composable
 fun FeaturePageTopBar(
@@ -44,7 +48,7 @@ fun FeaturePageTopBar(
     val backSize = if (compact) 38.dp else 40.dp
     Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
         Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = minHeight).padding(horizontal = horizontalPadding, vertical = verticalPadding),
+            modifier = Modifier.fillMaxWidth().coastPaperHeader().heightIn(min = minHeight).padding(horizontal = horizontalPadding, vertical = verticalPadding),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack, modifier = Modifier.size(backSize)) {
@@ -74,7 +78,9 @@ fun FeaturePageTopBar(
                 PageAction(secondaryActionLabel, onSecondaryAction)
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .82f))
+        if (LocalCoastAppearance.current.preset != CoastThemePreset.CreamPaper) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .82f))
+        }
     }
 }
 
@@ -84,7 +90,7 @@ private fun PageAction(label: String?, onClick: (() -> Unit)?) {
     Text(
         label,
         modifier = Modifier
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
+            .coastSurfaceBackground(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 7.dp),
         style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
