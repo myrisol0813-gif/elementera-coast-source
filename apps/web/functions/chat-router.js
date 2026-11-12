@@ -502,6 +502,7 @@ async function formalChat(request, env) {
     settings: requestSettings,
     localDate: localDate(value.local_date),
     localDateTime: value.local_datetime,
+    realityContext: value.reality_context,
     surface: conversationSurface(conversation.room_type),
     recentEntryIds: value.recent_entry_ids,
     model: value.model,
