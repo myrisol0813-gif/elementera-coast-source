@@ -32,7 +32,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.elementeracoast.app.core.network.CoastApiException
 import com.elementeracoast.app.feature.wolf.WolfTextField
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
 
 @Composable
@@ -67,7 +70,16 @@ internal fun DiaryScreen(
         } else {
             items(snapshot.diaries, key = { it.id }) { entry ->
                 DailySurfaceCard {
-                    Text(entry.date.replace('-', '/'), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
+                    val clock = runCatching {
+                        DateTimeFormatter.ofPattern("HH:mm")
+                            .withZone(ZoneId.systemDefault())
+                            .format(Instant.parse(entry.createdAt))
+                    }.getOrDefault("")
+                    Text(
+                        listOf(entry.date.replace('-', '/'), clock).filter(String::isNotBlank).joinToString(" · "),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelLarge
+                    )
                     Spacer(Modifier.height(7.dp))
                     Text(entry.text, style = MaterialTheme.typography.bodyLarge)
                     Spacer(Modifier.height(8.dp))
