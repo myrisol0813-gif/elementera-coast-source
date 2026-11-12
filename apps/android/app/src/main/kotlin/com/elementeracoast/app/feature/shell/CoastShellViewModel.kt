@@ -12,6 +12,7 @@ import com.elementeracoast.app.core.model.ChatAttachment
 import com.elementeracoast.app.core.model.ChatMessage
 import com.elementeracoast.app.core.model.CoastShellState
 import com.elementeracoast.app.core.model.ConversationSummary
+import com.elementeracoast.app.core.model.ConversationContextSettings
 import com.elementeracoast.app.core.model.CrossWindowRequest
 import com.elementeracoast.app.core.model.FeatureDestination
 import com.elementeracoast.app.core.model.MessageAction
@@ -893,6 +894,35 @@ class CoastShellViewModel(
         }
     }
 
+    fun setContextSettings(value: ConversationContextSettings) {
+        if (_state.value.isStreaming || generationJob?.isActive == true) {
+            showPlaceholder("当前回复仍在生成，完成后再修改窗口上下文。")
+            return
+        }
+        val conversationId = _state.value.activeConversationId
+        if (conversationId.isBlank()) return
+        val previous = backend.chat.cachedHistory(conversationId) ?: run {
+            showPlaceholder("聊天记录尚未载入完成，请重新打开窗口后再修改上下文。")
+            return
+        }
+        val clean = value.normalized()
+        val next = previous.copy(contextSettings = clean)
+        if (next == previous) return
+        backend.chat.cacheHistory(conversationId, next)
+        showHistory(conversationId, next)
+        viewModelScope.launch(workDispatcher) {
+            try {
+                val persisted = backend.chat.persistHistory(conversationId, next)
+                showHistory(conversationId, persisted)
+                _state.update { it.copy(backendOffline = false) }
+            } catch (error: CoastApiException) {
+                backend.chat.cacheHistory(conversationId, previous)
+                showHistory(conversationId, previous)
+                handleBackendError(error, "窗口上下文设置保存失败", keepAuthenticatedOnNetworkError = true)
+            }
+        }
+    }
+
     private suspend fun organizeThoughtSoilAfterReply(conversationId: String, modelId: String) {
         try {
             val soil = backend.thoughtSoil.organizeAfterReply(conversationId, modelId)
@@ -926,6 +956,7 @@ class CoastShellViewModel(
                 conversations = listOf(created) + it.conversations.filterNot { row -> row.id == created.id },
                 activeConversationId = created.id,
                 activeRoomType = created.roomType,
+                contextSettings = empty.contextSettings.normalized(),
                 messages = emptyList(),
                 thoughtSoil = null,
                 turnDeskReceipt = null,
@@ -966,6 +997,7 @@ class CoastShellViewModel(
             )
         }
         try {
+            val realityContext = backend.reality.capture(cleared.contextSettings)
             (if (isChatGptPlanModel(modelId)) backend.officialChat
                 ?: throw CoastApiException(
                     CoastApiErrorKind.Model, "chatgpt_plan_unavailable",
@@ -979,7 +1011,8 @@ class CoastShellViewModel(
                 local.wolf.state.value.basic.contextBudget,
                 local.wolf.state.value.basic.outputLength,
                 local.wolf.state.value.basic.maxOutputTokens,
-                crossWindowRequest
+                crossWindowRequest,
+                realityContext
             ).collect { progress ->
                 when (progress) {
                     is ChatProgress.Delta -> {
@@ -1221,7 +1254,12 @@ class CoastShellViewModel(
 
     private fun showHistory(conversationId: String, history: RemoteHistory) {
         if (_state.value.activeConversationId != conversationId) return
-        _state.update { it.copy(messages = ChatSyncMapper.toUi(history)) }
+        _state.update {
+            it.copy(
+                messages = ChatSyncMapper.toUi(history),
+                contextSettings = history.contextSettings.normalized()
+            )
+        }
     }
 
     private fun activateCachedConversation(conversation: ConversationSummary) {
@@ -1234,6 +1272,7 @@ class CoastShellViewModel(
                 activeFeature = null,
                 actionLogFocusIds = emptySet(),
                 activeConversationId = conversation.id,
+                contextSettings = history?.contextSettings?.normalized() ?: ConversationContextSettings(),
                 messages = history?.let(ChatSyncMapper::toUi).orEmpty(),
                 thoughtSoil = null,
                 turnDeskReceipt = null,
@@ -1256,6 +1295,7 @@ class CoastShellViewModel(
                 activeFeature = null,
                 actionLogFocusIds = emptySet(),
                 activeConversationId = "",
+                contextSettings = ConversationContextSettings(),
                 messages = emptyList(),
                 thoughtSoil = null,
                 turnDeskReceipt = null,
