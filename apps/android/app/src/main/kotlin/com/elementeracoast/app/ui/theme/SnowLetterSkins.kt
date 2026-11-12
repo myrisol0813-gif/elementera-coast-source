@@ -59,6 +59,7 @@ fun SnowLetterSurface(
     fallbackBorder: BorderStroke? = null,
     fallbackElevation: Dp = 0.dp,
     contentAlignment: Alignment = Alignment.TopStart,
+    pressed: Boolean = false,
     content: @Composable BoxScope.() -> Unit
 ) {
     val appearance = LocalCoastAppearance.current
@@ -80,6 +81,20 @@ fun SnowLetterSurface(
     }
 
     val surfaceModifier = when {
+        appearance.preset == CoastThemePreset.CreamPaper -> {
+            val shape = when (role) {
+                SnowLetterSurfaceRole.AssistantBubble,
+                SnowLetterSurfaceRole.UserBubble,
+                SnowLetterSurfaceRole.StatusCard,
+                SnowLetterSurfaceRole.DogtalkCard -> CreamPaperStyle.CardShape
+                else -> fallbackShape
+            }
+            Modifier.creamPaperFrame(
+                color = creamPaperFill(role, appearance, fallbackColor),
+                shape = shape,
+                pressed = pressed
+            )
+        }
         cloud -> {
             val shape = CoastCloudShape
             val cloudFill = if (role == SnowLetterSurfaceRole.UserBubble && appearance.userBubbleColor == null) {
@@ -157,7 +172,11 @@ fun SnowLetterSurface(
 @Composable
 fun snowLetterInnerPadding(role: SnowLetterSurfaceRole): PaddingValues =
     if (role == SnowLetterSurfaceRole.AssistantBubble) {
-        PaddingValues(horizontal = 13.dp, vertical = 10.dp)
+        if (LocalCoastAppearance.current.preset == CoastThemePreset.CreamPaper) {
+            PaddingValues(horizontal = 16.dp, vertical = 14.dp)
+        } else {
+            PaddingValues(horizontal = 13.dp, vertical = 10.dp)
+        }
     } else {
         PaddingValues(0.dp)
     }
