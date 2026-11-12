@@ -315,6 +315,7 @@ export function createChat({ storage, toast, dogtalk }) {
     setHistory,
     composerState,
     renderMessages,
+    renderConversationList,
     saveHistory,
     generationDetail,
     generate,
