@@ -127,14 +127,13 @@ See [../README.md](../README.md), [ENVIRONMENT.md](ENVIRONMENT.md), and [KNOWN_L
 
 When testing a live Native build, Reality Context is configured per conversation.
 
-Shared PWA/Native fields:
+PWA Reality fields:
 
 - date;
-- time;
-- manually configured weather city;
+- local time;
 - next seven days of Coast calendar entries.
 
-Native-only device fields:
+Native keeps the fuller Reality set, including the manually configured weather city and these device fields:
 
 - battery;
 - optional coarse location;
@@ -150,13 +149,13 @@ Short reply mode is independent of Reality Context. A valid acceptance check is 
 
 ## 5. PWA acceptance
 
-The current Source PWA uses cache `coast-source-app-14`.
+The current Source PWA uses cache `coast-source-app-15`.
 
 On mobile, verify:
 
 - the top-right menu opens **「这个窗口」**;
 - Reality, short reply mode, thought soil and the landing letter are reachable there;
-- Native-only Reality fields are visible but locked;
+- PWA Reality shows only date, local time, and the next-seven-days calendar; weather and Native-only device fields are absent;
 - chat reading text uses the compact mobile reading size;
 - the conversation drawer scrolls internally instead of freezing against the viewport;
 - current-turn receipts show which context was delivered or unavailable.
