@@ -5,6 +5,7 @@ import { activeMessages, createState, flatMessagesToState, normalizeState } from
 import { createChatActions } from './chat/chat-actions.js';
 import { createChatAttachments } from './chat/chat-attachments.js';
 import { createChatVoice } from './chat/chat-voice.js';
+import { createChatWindowSettings } from './chat/chat-window-settings.js';
 import { createChatConversations } from './chat/chat-conversations.js';
 import { createChatGeneration } from './chat/chat-generation.js';
 import {
@@ -45,6 +46,7 @@ export function createChat({ storage, toast, dogtalk }) {
     generation: null,
     memory: null,
     desk: null,
+    letters: null,
     profileListeners: new Set(),
     runSettings: () => storage.read().runControl,
   };
@@ -225,6 +227,16 @@ export function createChat({ storage, toast, dogtalk }) {
     voice,
   });
 
+  const windowSettings = createChatWindowSettings({
+    runtime,
+    currentHistory,
+    setHistory,
+    saveHistory,
+    renderConversationList,
+    renderMessages,
+    toast,
+  });
+
   function toggleRikkaHub() {
     runtime.rikkahubExpanded = !runtime.rikkahubExpanded;
     renderConversationList();
@@ -331,6 +343,7 @@ export function createChat({ storage, toast, dogtalk }) {
     importRikkaHub,
     attachments: chatAttachments,
     voice,
+    windowSettings,
   });
 
   async function bootstrap() {
@@ -389,12 +402,14 @@ export function createChat({ storage, toast, dogtalk }) {
 
   function refresh() {
     closeMenu();
+    windowSettings.close();
     chatAttachments.refresh();
     composerState();
   }
 
   function destroy() {
     closeMenu();
+    windowSettings.close();
   }
 
   return Object.freeze({
@@ -443,6 +458,9 @@ export function createChat({ storage, toast, dogtalk }) {
     },
     setDeskController(controller) {
       runtime.desk = controller;
+    },
+    setLettersController(controller) {
+      runtime.letters = controller;
     },
   });
 }
