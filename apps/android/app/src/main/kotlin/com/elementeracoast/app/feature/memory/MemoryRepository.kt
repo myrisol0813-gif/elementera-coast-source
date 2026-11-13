@@ -266,6 +266,7 @@ class DefaultMemoryRepository(
             usageHint = value.usageHint,
             avoidHint = value.avoidHint,
             sourceExcerpt = value.sourceExcerpt,
+            suggestedDestination = value.suggestedDestination,
             status = value.status
         )
 
