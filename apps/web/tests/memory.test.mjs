@@ -167,7 +167,7 @@ await assert.rejects(
 const autoCandidate = {
   candidate_id: 'sleeping-tide-drawer',
   title: '潮汐钥匙',
-  content: '潮汐钥匙来自思维壤种子候选，只能先进入待确认区。',
+  content: '潮汐钥匙来自整理当前对话的纸条种子候选，只能先进入待确认区。',
   source_refs: [{ turn_id: 'auto-turn-1', role: 'turn' }],
   source_excerpt: '这部分先放下，之后也许还会发芽。',
 };
@@ -346,7 +346,7 @@ const chatResponse = await routeChatApi(new Request('https://coast.test/api/chat
 const chatData = await chatResponse.json();
 assert.equal(chatResponse.status, 200);
 assert.equal(providerPayload.messages[0].role, 'system');
-assert.match(providerPayload.messages[0].content, /思维壤/);
+assert.match(providerPayload.messages[0].content, /整理当前对话的纸条/);
 assert.match(providerPayload.messages[0].content, /【相关记忆】/);
 assert.match(providerPayload.messages[0].content, /潮汐钥匙/);
 assert.doesNotMatch(providerPayload.messages[0].content, /上下文目录|海岸环境|记忆球｜当前情境面/);
@@ -475,7 +475,7 @@ assert.ok(providerPayload.messages[0].content.length < 90000, 'soil prompt shoul
 
 await writeConversationState(db, conversationD.id, {
   version: 4,
-  turns: [turn('soil-guard-turn', '守住旧壤', '新版思维壤按此刻重写桌面', '2026-07-14T07:59:00.000Z')],
+  turns: [turn('soil-guard-turn', '守住旧壤', '新版整理纸条按此刻重写桌面', '2026-07-14T07:59:00.000Z')],
 });
 await writeSoil(db, conversationD.id, {
   current_text: '上一版仍需承接的内容',
@@ -542,7 +542,7 @@ const routedSoilData = await organizeConversationD({
     title: '仍可生长的问题',
     content: '这个问题暂时没有答案，但值得以后重新拿起来。',
     source_refs: [{ turn_id: 'soil-guard-turn', role: 'assistant' }],
-    source_excerpt: '新版思维壤按此刻重写桌面',
+    source_excerpt: '新版整理纸条按此刻重写桌面',
   }],
 });
 assert.equal(routedSoilData.soil.afterthoughts.length, 1);
