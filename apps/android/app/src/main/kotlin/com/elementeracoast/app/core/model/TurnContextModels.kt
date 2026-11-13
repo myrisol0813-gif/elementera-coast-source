@@ -20,9 +20,9 @@ data class TurnDeskDetail(
 data class ThoughtSoilSnapshot(
     val conversationId: String,
     val currentText: String,
-    val handSeeds: List<ThoughtSeedSnapshot>,
-    val doNotRepeat: String,
-    val pocketCandidates: List<ThoughtPocketSnapshot>,
+    val afterthoughts: List<String>,
+    val memoryCandidates: List<ThoughtCandidateSnapshot>,
+    val seedCandidates: List<ThoughtCandidateSnapshot>,
     val manualLocked: Boolean,
     val autoRefreshEnabled: Boolean = true,
     val revision: Int,
@@ -30,18 +30,8 @@ data class ThoughtSoilSnapshot(
     val updatedAt: String
 )
 
-data class ThoughtSeedSnapshot(
-    val name: String,
-    val lifeCore: String,
-    val usageHint: String,
-    val avoidHint: String
-)
-
-data class ThoughtPocketSnapshot(
+data class ThoughtCandidateSnapshot(
     val title: String,
-    val lifeCore: String,
     val content: String,
-    val usageHint: String,
-    val avoidHint: String,
     val sourceExcerpt: String
 )

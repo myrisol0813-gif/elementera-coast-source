@@ -30,27 +30,14 @@ export const MAX_SOURCE_WINDOW = 180;
 export const MAX_CUSTOM_INSTRUCTIONS = 32000;
 export const ENTRY_SEARCH_SCAN_LIMIT = 500;
 
-function normalizeHandSeed(value = {}) {
-  if (typeof value === 'string') {
-    const lifeCore = clip(value, MAX_LIFE_CORE);
-    return lifeCore ? { name: clip(lifeCore, MAX_TITLE), life_core: lifeCore, usage_hint: '', avoid_hint: '' } : null;
-  }
-  const lifeCore = clip(value.life_core ?? value.lifeCore, MAX_LIFE_CORE);
-  const name = clip(value.name ?? value.title, MAX_TITLE);
-  if (!lifeCore && !name) return null;
-  return {
-    name: name || clip(lifeCore, MAX_TITLE),
-    life_core: lifeCore || name,
-    usage_hint: clip(value.usage_hint ?? value.usageHint, MAX_HINT),
-    avoid_hint: clip(value.avoid_hint ?? value.avoidHint, MAX_HINT),
-  };
-}
+export const MAX_AFTERTHOUGHTS = MEMORY_CONFIG.soil.maxHandSeeds;
+export const MAX_SOIL_CANDIDATES = MEMORY_CONFIG.soil.maxHandSeeds;
 
-export function normalizeHandSeeds(value) {
+export function normalizeAfterthoughts(value) {
   return (Array.isArray(value) ? value : [])
-    .map(normalizeHandSeed)
+    .map((item) => clip(typeof item === 'string' ? item : item?.text, MAX_LIFE_CORE))
     .filter(Boolean)
-    .slice(0, MAX_HAND_SEEDS);
+    .slice(0, MAX_AFTERTHOUGHTS);
 }
 
 export function stableCandidateKey(value) {
@@ -75,25 +62,22 @@ export function normalizeCandidateId(value, lifeCore) {
   return supplied || `candidate_${stableCandidateKey(lifeCore)}`;
 }
 
-export function normalizePocketCandidate(value, options = {}) {
+export function normalizeSoilCandidate(value, options = {}) {
   if (typeof value === 'string') {
-    const text = clip(value, MAX_LIFE_CORE);
-    if (!text) return null;
+    const content = clip(value, MAX_ENTRY_CONTENT);
+    if (!content) return null;
     return {
-      candidate_id: normalizeCandidateId('', text),
-      title: clip(text, MAX_TITLE),
-      life_core: text,
-      content: clip(text, MAX_ENTRY_CONTENT),
-      usage_hint: '',
-      avoid_hint: '',
+      candidate_id: normalizeCandidateId('', content),
+      title: clip(content.replace(/\s+/g, ' '), MAX_TITLE),
+      content,
       source_refs: [],
       source_excerpt: '',
     };
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const title = clip(value.title ?? value.name, MAX_TITLE);
-  const lifeCore = clip(value.life_core ?? value.lifeCore ?? value.text ?? value.content ?? title, MAX_LIFE_CORE);
-  if (!title && !lifeCore) return null;
+  const content = clip(value.content ?? value.text ?? value.title, MAX_ENTRY_CONTENT);
+  const title = clip(value.title ?? value.name ?? content.replace(/\s+/g, ' '), MAX_TITLE);
+  if (!title && !content) return null;
   const allowedTurnIds = options.allowedTurnIds instanceof Set ? options.allowedTurnIds : null;
   let sourceRefs = (Array.isArray(value.source_refs) ? value.source_refs : [])
     .map(normalizeCandidateSourceRef)
@@ -103,23 +87,21 @@ export function normalizePocketCandidate(value, options = {}) {
     const fallback = normalizeCandidateSourceRef(options.fallbackSourceRef);
     if (fallback && (!allowedTurnIds || allowedTurnIds.has(fallback.turn_id))) sourceRefs = [fallback];
   }
+  const body = content || title;
   return {
-    candidate_id: normalizeCandidateId(value.candidate_id ?? value.candidateId, lifeCore || title),
-    title: title || clip(lifeCore, MAX_TITLE),
-    life_core: lifeCore || title,
-    content: clip(value.content ?? value.text ?? lifeCore ?? title, MAX_ENTRY_CONTENT),
-    usage_hint: clip(value.usage_hint ?? value.usageHint, MAX_HINT),
-    avoid_hint: clip(value.avoid_hint ?? value.avoidHint, MAX_HINT),
+    candidate_id: normalizeCandidateId(value.candidate_id ?? value.candidateId, body),
+    title: title || clip(body.replace(/\s+/g, ' '), MAX_TITLE),
+    content: body,
     source_refs: sourceRefs,
     source_excerpt: clip(value.source_excerpt ?? value.sourceExcerpt ?? options.fallbackExcerpt, MAX_SOURCE_EXCERPT),
   };
 }
 
-export function normalizePocketCandidates(value, options = {}) {
+export function normalizeSoilCandidates(value, options = {}) {
   return (Array.isArray(value) ? value : [])
-    .map((item) => normalizePocketCandidate(item, options))
+    .map((item) => normalizeSoilCandidate(item, options))
     .filter(Boolean)
-    .slice(0, MAX_HAND_SEEDS);
+    .slice(0, MAX_SOIL_CANDIDATES);
 }
 
 export function sourceRef(value) {

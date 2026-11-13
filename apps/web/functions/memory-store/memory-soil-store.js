@@ -4,8 +4,8 @@ import { MemoryStoreError, bool, clip, first, iso, parseJson, run } from './memo
 import {
   MAX_SOIL_TEXT,
   MAX_SOURCE_TEXT,
-  normalizeHandSeeds,
-  normalizePocketCandidates,
+  normalizeAfterthoughts,
+  normalizeSoilCandidates,
 } from './memory-normalize.js';
 import { ensureMemorySchema } from './memory-schema.js';
 
@@ -13,9 +13,9 @@ export function soilFromRow(row) {
   return {
     conversation_id: row.conversation_id,
     current_text: row.current_text || '',
-    hand_seeds: normalizeHandSeeds(parseJson(row.hand_seeds_json, [])),
-    do_not_repeat: row.do_not_repeat || '',
-    pocket_candidates: normalizePocketCandidates(parseJson(row.pocket_candidates_json, [])),
+    afterthoughts: normalizeAfterthoughts(parseJson(row.afterthoughts_json, [])),
+    memory_candidates: normalizeSoilCandidates(parseJson(row.memory_candidates_json, [])),
+    seed_candidates: normalizeSoilCandidates(parseJson(row.seed_candidates_json, [])),
     manual_locked: Number(row.manual_locked || 0) === 1,
     auto_refresh_enabled: Number(row.auto_refresh_enabled ?? 1) === 1,
     organized_through_turn_id: row.organized_through_turn_id || '',
@@ -38,9 +38,10 @@ async function ensureSoilRow(db, conversationId) {
   await getConversation(db, conversationId);
   const timestamp = Date.now();
   await run(db, `INSERT OR IGNORE INTO conversation_soils (
-    conversation_id, current_text, hand_seeds_json, do_not_repeat,
-    pocket_candidates_json, manual_locked, auto_refresh_enabled, revision, created_at, updated_at
-  ) VALUES (?, '', '[]', '', '[]', 0, 1, 1, ?, ?)`, [conversationId, timestamp, timestamp]);
+    conversation_id, current_text,
+    afterthoughts_json, memory_candidates_json, seed_candidates_json,
+    manual_locked, auto_refresh_enabled, revision, created_at, updated_at
+  ) VALUES (?, '', '[]', '[]', '[]', 0, 1, 1, ?, ?)`, [conversationId, timestamp, timestamp]);
 }
 
 export async function readSoil(db, id) {
@@ -58,12 +59,12 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
     throw new MemoryStoreError('soil_locked', '整理当前对话的纸条已由屋主手动锁定。', 409);
   }
   const has = (name) => Object.prototype.hasOwnProperty.call(value, name);
-  const changesContent = ['current_text', 'hand_seeds', 'do_not_repeat', 'pocket_candidates', 'organized_through_turn_id'].some(has);
+  const changesContent = ['current_text', 'afterthoughts', 'memory_candidates', 'seed_candidates', 'organized_through_turn_id'].some(has);
   const next = {
     current_text: has('current_text') ? clip(value.current_text, MAX_SOIL_TEXT) : current.current_text,
-    hand_seeds: has('hand_seeds') ? normalizeHandSeeds(value.hand_seeds) : current.hand_seeds,
-    do_not_repeat: has('do_not_repeat') ? clip(value.do_not_repeat, MAX_SOIL_TEXT) : current.do_not_repeat,
-    pocket_candidates: has('pocket_candidates') ? normalizePocketCandidates(value.pocket_candidates) : current.pocket_candidates,
+    afterthoughts: has('afterthoughts') ? normalizeAfterthoughts(value.afterthoughts) : current.afterthoughts,
+    memory_candidates: has('memory_candidates') ? normalizeSoilCandidates(value.memory_candidates) : current.memory_candidates,
+    seed_candidates: has('seed_candidates') ? normalizeSoilCandidates(value.seed_candidates) : current.seed_candidates,
     organized_through_turn_id: has('organized_through_turn_id') ? clip(value.organized_through_turn_id, 180) : current.organized_through_turn_id,
     manual_locked: has('manual_locked') ? bool(value.manual_locked) : (!automatic && changesContent ? true : current.manual_locked),
     auto_refresh_enabled: has('auto_refresh_enabled') ? bool(value.auto_refresh_enabled) : current.auto_refresh_enabled,
@@ -77,16 +78,16 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
     : ownerIdentity();
   const timestamp = Date.now();
   await run(db, `UPDATE conversation_soils SET
-    current_text = ?, hand_seeds_json = ?, do_not_repeat = ?, pocket_candidates_json = ?,
+    current_text = ?, afterthoughts_json = ?, memory_candidates_json = ?, seed_candidates_json = ?,
     manual_locked = ?, auto_refresh_enabled = ?, organized_through_turn_id = ?,
     actor = ?, surface = ?, model_label = ?, model_nickname = ?, symbol = ?, display_author = ?,
     source_conversation_id = ?, source_turn_id = ?, tool_call_id = ?,
     revision = revision + 1, updated_at = ?
     WHERE conversation_id = ?`, [
     next.current_text,
-    JSON.stringify(next.hand_seeds),
-    next.do_not_repeat,
-    JSON.stringify(next.pocket_candidates),
+    JSON.stringify(next.afterthoughts),
+    JSON.stringify(next.memory_candidates),
+    JSON.stringify(next.seed_candidates),
     next.manual_locked ? 1 : 0,
     next.auto_refresh_enabled ? 1 : 0,
     next.organized_through_turn_id,

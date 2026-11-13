@@ -77,17 +77,12 @@ function requestWithToken(path, token, options = {}) {
   });
 }
 
-function nextSoil(label, candidates = []) {
+function nextSoil(label, memoryCandidates = [], seedCandidates = []) {
   return {
     current_text: `${label}的当前承接。`,
-    hand_seeds: [{
-      name: `${label}当前活跃线索`,
-      life_core: `${label}仍想继续谈创作。`,
-      usage_hint: '下一封自然接续。',
-      avoid_hint: '不要当成固定人格标签。',
-    }],
-    do_not_repeat: `${label}已经知道这里不是实时聊天。`,
-    pocket_candidates: candidates,
+    afterthoughts: [`${label}仍想继续谈创作。`],
+    memory_candidates: memoryCandidates,
+    seed_candidates: seedCandidates,
   };
 }
 
@@ -123,6 +118,7 @@ for (const table of [
 assert.deepEqual(mailboxMigrationIds, [
   'mailbox-friend-chat-v1',
   'mailbox-room-memory-v2',
+  'mailbox-thought-soil-v2',
   'mailbox-test-data-reset-20260920',
 ]);
 for (const migrationId of mailboxMigrationIds) {
@@ -342,17 +338,19 @@ const aliceReply = await replyToMailboxVisitor(db, {
   thought_soil: nextSoil('星星', [
     {
       title: '星星意象',
-      life_core: '喜欢在创作里使用星星意象。',
       content: '小星在这轮谈到了自己反复使用的星星意象。',
-      usage_hint: '讨论创作时可以自然记得。',
       source_excerpt: '创作中的星光',
     },
     {
       title: '轻量称呼',
-      life_core: '更喜欢被叫作小星。',
       content: '登记称呼与聊天称呼一致。',
+      source_excerpt: '',
     },
-  ]),
+  ], [{
+    title: '星光创作方向',
+    content: '以后也许可以继续展开星光在创作里的不同形态。',
+    source_excerpt: '创作中的星光',
+  }]),
   model_label: 'GPT-5.6 Thinking',
   model_nickname: '雾灯',
   source_conversation_id: 'official-conversation-a',
@@ -366,7 +364,10 @@ assert.deepEqual(
   [alice.id, alice.id],
 );
 assert.equal(aliceReply.thought_soil.current_text, '星星的当前承接。');
-assert.equal(aliceReply.thought_soil.hand_seeds.length, 1);
+assert.equal(aliceReply.thought_soil.afterthoughts.length, 1);
+assert.equal(aliceReply.thought_soil.memory_candidates.length, 2);
+assert.equal(aliceReply.thought_soil.seed_candidates.length, 1);
+assert.equal(aliceReply.pending_pocket_count, 2, 'visitor seed candidates stay in visitor soil instead of entering notebook pending');
 assert.equal(aliceReply.thought_soil.model_label, 'GPT-5.6 Thinking');
 assert.equal(aliceReply.memory_candidates_skipped, 0);
 
@@ -377,8 +378,8 @@ const bobReply = await replyToMailboxVisitor(db, {
   content: '这是只写回苔藓房间的 模型伙伴回信。',
   thought_soil: nextSoil('苔藓', [{
     title: '不应落袋',
-    life_core: '访客没有允许长期记忆。',
-    content: '这条只能留在滚动整理当前对话的纸条展示层。',
+    content: '访客没有允许长期记忆；这条只能留在滚动整理当前对话的纸条展示层。',
+    source_excerpt: '苔藓房间',
   }]),
   model_label: 'GPT-5.6 Thinking',
   tool_call_id: 'mailbox-reply-b-1',
@@ -544,6 +545,10 @@ assert.deepEqual(mailboxTools.mcp_mailbox_reply.securitySchemes[0].scopes, ['wri
 assert.deepEqual(mailboxTools.mcp_mailbox_resolve_pocket.securitySchemes[0].scopes, ['write:lighthouse']);
 assert.deepEqual(mailboxTools.mcp_mailbox_patrol_report.securitySchemes[0].scopes, ['read:coast']);
 assert.ok(mailboxTools.mcp_mailbox_reply.inputSchema.required.includes('thought_soil'));
+assert.deepEqual(
+  mailboxTools.mcp_mailbox_reply.inputSchema.properties.thought_soil.required,
+  ['current_text', 'afterthoughts', 'memory_candidates', 'seed_candidates'],
+);
 assert.equal('optional_thinking_notes' in mailboxTools.mcp_mailbox_reply.inputSchema.properties, false);
 assert.equal('optional_notebook_entries' in mailboxTools.mcp_mailbox_reply.inputSchema.properties, false);
 assert.match(VISITOR_MODEL_PARTNER_PROMPT_V1, /public Elementera Coast visitor mailbox demo/);

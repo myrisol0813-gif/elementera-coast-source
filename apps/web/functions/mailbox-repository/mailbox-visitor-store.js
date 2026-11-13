@@ -22,11 +22,11 @@ export async function createMailboxVisitor(db, value) {
       value.allow_memory ? 1 : 0,
     ),
     db.prepare(`INSERT INTO mailbox_thought_soils (
-      visitor_id, current_text, hand_seeds_json, do_not_repeat,
-      pocket_candidates_json, source_message_id, organized_through_message_id,
+      visitor_id, current_text, afterthoughts_json, memory_candidates_json,
+      seed_candidates_json, source_message_id, organized_through_message_id,
       manual_locked, auto_refresh_enabled, revision, model_label, model_nickname,
       source_conversation_id, source_turn_id, tool_call_id, created_at, updated_at
-    ) VALUES (?, '', '[]', '', '[]', NULL, NULL, 0, 1, 1,
+    ) VALUES (?, '', '[]', '[]', '[]', NULL, NULL, 0, 1, 1,
       NULL, NULL, NULL, NULL, NULL, ?, ?)`).bind(id, timestamp, timestamp),
   ]);
   return visitorFromRow(await first(db, 'SELECT * FROM mailbox_visitors WHERE id = ?', [id]));

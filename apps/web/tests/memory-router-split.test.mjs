@@ -32,7 +32,7 @@ assert.match(organizer, /SOIL_RESPONSE_FORMAT/);
 assert.match(organizer, /function soilPrompt\(/);
 assert.match(organizer, /organizeConversationSoil/);
 assert.match(organizer, /整理当前对话的纸条/);
-assert.match(organizer, /upsertSoilPocketCandidates/);
+assert.match(organizer, /upsertSoilCandidates/);
 assert.match(organizer, /saveGenerationProvenance/);
 assert.equal(organizer.includes('return json('), false, 'soil organizer returns domain objects, not HTTP responses');
 

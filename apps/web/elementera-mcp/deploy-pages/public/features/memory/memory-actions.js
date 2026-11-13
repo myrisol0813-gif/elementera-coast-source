@@ -16,7 +16,7 @@ import {
   filterValues,
   resetDimensionFilters,
 } from './memory-library-view.js';
-import { parsePocketCandidateLines, parseSeedLines } from './memory-soil-view.js';
+import { parseAfterthoughtLines, parseSoilCandidateLines } from './memory-soil-view.js';
 
 export function createMemoryActions({
   runtime,
@@ -24,7 +24,7 @@ export function createMemoryActions({
   toast,
   chat,
   currentId,
-  maxHandSeeds,
+  maxAfterthoughts,
   currentSoil,
   currentPockets,
   fetchSoil,
@@ -63,7 +63,7 @@ export function createMemoryActions({
 
   async function clearSoil() {
     const data = await saveSoilRequest(currentId(), {
-      current_text: '', hand_seeds: [], do_not_repeat: '', pocket_candidates: [], manual_locked: true,
+      current_text: '', afterthoughts: [], memory_candidates: [], seed_candidates: [], manual_locked: true,
     });
     runtime.soils.set(currentId(), data.soil);
     chat.renderMessages();
@@ -254,11 +254,12 @@ export function createMemoryActions({
       return;
     }
     if (name !== 'soil-save') return;
+    const soil = currentSoil();
     const data = await saveSoilRequest(currentId(), {
       current_text: field('current_text'),
-      hand_seeds: parseSeedLines(field('hand_seeds'), maxHandSeeds()),
-      do_not_repeat: field('do_not_repeat'),
-      pocket_candidates: parsePocketCandidateLines(field('pocket_candidates'), currentSoil().pocket_candidates),
+      afterthoughts: parseAfterthoughtLines(field('afterthoughts'), maxAfterthoughts()),
+      memory_candidates: parseSoilCandidateLines(field('memory_candidates'), soil.memory_candidates, maxAfterthoughts()),
+      seed_candidates: parseSoilCandidateLines(field('seed_candidates'), soil.seed_candidates, maxAfterthoughts()),
       manual_locked: true,
     });
     runtime.soils.set(currentId(), data.soil);

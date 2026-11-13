@@ -2,8 +2,8 @@ export { MemoryStoreError, hasMemoryDatabase } from './memory-store/memory-db.js
 export {
   MEMORY_OWNER_ID,
   MEMORY_TAGS,
-  normalizeHandSeeds,
-  normalizePocketCandidates,
+  normalizeAfterthoughts,
+  normalizeSoilCandidates,
 } from './memory-store/memory-normalize.js';
 export { ensureMemorySchema } from './memory-store/memory-schema.js';
 export {
@@ -18,7 +18,7 @@ export {
   patchPocket,
   deletePocket,
   pocketFingerprint,
-  upsertSoilPocketCandidates,
+  upsertSoilCandidates,
   resolvePocket,
 } from './memory-store/memory-pocket-store.js';
 export {

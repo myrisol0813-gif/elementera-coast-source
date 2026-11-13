@@ -150,9 +150,9 @@ function soilFor(conversationId) {
   if (!soils.has(conversationId)) soils.set(conversationId, {
     conversation_id: conversationId,
     current_text: '',
-    hand_seeds: [],
-    do_not_repeat: '',
-    pocket_candidates: [],
+    afterthoughts: [],
+    memory_candidates: [],
+    seed_candidates: [],
     manual_locked: false,
     auto_refresh_enabled: true,
     revision: 1,
@@ -434,10 +434,7 @@ globalThis.fetch = async (input, options = {}) => {
     const structuredCandidate = {
       candidate_id: 'mock-unfinished-tide',
       title: '暂放的潮汐岔路',
-      life_core: '这条岔路现在不用，但以后仍可能长出新的理解。',
       content: '把当前两轮里关于潮汐岔路的上下文一起保留下来。',
-      usage_hint: '再次谈到这条岔路时重新触碰。',
-      avoid_hint: '不要把它说成已经确认的长期记忆。',
       source_refs: [{ turn_id: 'mock-active-turn', role: 'turn' }],
       source_excerpt: '这条岔路先放下，以后也许还会长。',
     };
@@ -445,22 +442,32 @@ globalThis.fetch = async (input, options = {}) => {
     const soil = {
       ...current,
       current_text: '继续测试当前窗口',
-      hand_seeds: [{ name: '测试种', life_core: '只在需要时轻轻递入', usage_hint: '', avoid_hint: '不要复读' }],
-      pocket_candidates: discoversPocket ? [structuredCandidate] : current.pocket_candidates,
+      afterthoughts: ['这条潮汐岔路还没有说尽，以后也许值得再回来。'],
+      memory_candidates: [],
+      seed_candidates: discoversPocket ? [structuredCandidate] : [],
       revision: current.revision + 1,
     };
     soils.set(body.conversation_id, soil);
-    if (discoversPocket && !memoryPockets.some((pocket) => pocket.fingerprint === 'mock:conv-1:unfinished-tide')) {
+    if (discoversPocket && !memoryPockets.some((pocket) => pocket.fingerprint === 'mock:conv-1:seed:unfinished-tide')) {
       memoryPockets.unshift({
         id: 'soil-pocket-conv-1',
         conversation_id: body.conversation_id,
         source_type: 'soil',
-        source_ref: { conversation_id: body.conversation_id, candidate_id: structuredCandidate.candidate_id },
+        source_ref: {
+          conversation_id: body.conversation_id,
+          candidate_id: structuredCandidate.candidate_id,
+          suggested_destination: 'seed',
+        },
+        suggested_destination: 'seed',
         source_text: structuredCandidate.content,
+        title: structuredCandidate.title,
+        life_core: structuredCandidate.content,
+        content: structuredCandidate.content,
+        source_refs: structuredCandidate.source_refs,
+        source_excerpt: structuredCandidate.source_excerpt,
         generated_by_model: '5.5',
-        fingerprint: 'mock:conv-1:unfinished-tide',
+        fingerprint: 'mock:conv-1:seed:unfinished-tide',
         status: 'pending',
-        ...structuredCandidate,
       });
     }
     return response({ ok: true, soil });

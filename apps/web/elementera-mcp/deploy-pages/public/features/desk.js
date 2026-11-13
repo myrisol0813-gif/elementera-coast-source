@@ -177,7 +177,10 @@ export function createDesk({ router, toast }) {
     const custom = slip.custom_instructions || { label: '核心自定义', status: '未递给', length: 0, content: '' };
     const globalExcerpt = slip.global_excerpt || { label: '全局摘录', status: '未设置', injection: 'empty', estimated_tokens: 0, length: 0, content: '' };
     const contextBudget = slip.context_budget || { label: '上下文预算', estimated_tokens: 0, comfort_ceiling: 0, trimmed: false, trimmed_count: 0, sources_preserved: [], global_excerpt: 'empty' };
-    const soil = slip.thinking_soil || { label: '整理当前对话的纸条', status: '未递给', context: '', current_text: '', hand_seeds: [], pocket_candidates_count: 0 };
+    const soil = slip.thinking_soil || {
+      label: '整理当前对话的纸条', status: '未递给', context: '', current_text: '', afterthoughts: [],
+      memory_candidates_count: 0, seed_candidates_count: 0, candidates_delivered: false,
+    };
     const memory = slip.related_memory || { label: '相关记忆', status: '未命中', items: [] };
     const worldbook = slip.worldbook || { label: '世界书', status: '未命中', entries: [] };
     const dogtalk = slip.dogtalk || { label: '私人草稿', status: '未递给', context: '' };
@@ -204,11 +207,13 @@ export function createDesk({ router, toast }) {
       : `${crossWindow.status} · 请求 ${crossWindowRequested}轮 · 读取 ${crossWindowLoaded}轮 · ${crossWindow.status === '递送失败' ? `尝试 ${crossWindowAttempted}轮` : `递给 ${crossWindowDelivered}轮`}`;
     const soilDetail = [
       sourceNote(soil.description),
-      deskText(soil.current_text, '当前整理'),
-      soil.hand_seeds?.length ? `<div class="desk-mini-list"><b>当前活跃线索</b>${soil.hand_seeds.map((item) => `<p>${escapeHtml(item)}</p>`).join('')}</div>` : '',
-      `<p><b>待确认候选：</b>${escapeHtml(soil.pocket_candidates_status || (Number(soil.pocket_candidates_count || 0) ? '待确认' : '未递入'))} · ${Number(soil.pocket_candidates_count || 0)} 条 · 未递给正文</p>`,
+      deskText(soil.current_text, '当前'),
+      soil.afterthoughts?.length
+        ? `<div class="desk-mini-list"><b>余思</b>${soil.afterthoughts.map((item) => `<p>${escapeHtml(item)}</p>`).join('')}</div>`
+        : '',
+      `<p><b>去处候选：</b>记忆 ${Number(soil.memory_candidates_count || 0)} 条 · 种子 ${Number(soil.seed_candidates_count || 0)} 条 · 未递给正文</p>`,
       deskText(soil.context, '实际递给模型'),
-      !soil.context && !soil.current_text && !soil.hand_seeds?.length ? emptyNote() : '',
+      !soil.context && !soil.current_text && !soil.afterthoughts?.length ? emptyNote() : '',
     ].join('');
     const workbenchDetail = [
       sourceNote(workbench.description),

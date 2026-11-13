@@ -83,7 +83,7 @@ const storage = { read: () => ({ runControl: { maxHandSeeds: 7, autoRefreshEvery
 const requestJson = async (input) => {
   const url = new URL(String(input), 'http://coast.test/');
   if (url.pathname === '/api/memory/soil') return { ok: true, soil: {
-    conversation_id: 'conv-1', current_text: '潮线', hand_seeds: [], do_not_repeat: '', pocket_candidates: [],
+    conversation_id: 'conv-1', current_text: '潮线', afterthoughts: [], memory_candidates: [], seed_candidates: [],
     manual_locked: false, auto_refresh_enabled: true, revision: 2,
     organized_by_model: 'openai/gpt-5.5',
     organize_usage: { prompt_tokens: 1000, completion_tokens: 286, total_tokens: 1286 },

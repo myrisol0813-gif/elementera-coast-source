@@ -23,7 +23,7 @@ const index = await read(resolve(pages, 'index.html'));
 const scripts = [...index.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)].map((match) => match[1]);
 assert.deepEqual(scripts, [`/public/app.js?v=${APP_CACHE_VERSION}`]);
 assert.match(APP_CACHE_VERSION, /^coast-source-app-[0-9]+$/);
-assert.equal(MAILBOX_CACHE_VERSION, 'coast-source-mailbox-01');
+assert.equal(MAILBOX_CACHE_VERSION, 'coast-source-mailbox-02');
 for (const duplicate of ['app.html', 'gptlike.html', 'index-next.html']) assert.equal(await exists(resolve(pages, duplicate)), false);
 
 const applicationContract = await read(resolve(root, 'ARCHITECTURE.md'));
@@ -92,7 +92,7 @@ assert.match(devRegistry, /resolveDevHandToolSelection/);
 assert.match(devRegistry, /permission === 'owner'/);
 assert.match(devRegistry, /DEV_HAND_CHAT_SURFACES\.has\(surface\)/);
 assert.match(mcp, /listRegisteredMcpTools/);
-assert.match(mcp, /const VERSION = '2\.1\.0'/);
+assert.match(mcp, /const VERSION = '2\.2\.0'/);
 assert.doesNotMatch(mcp, /RETIRED_MCP_TOOLS|retiredTool\(|retiredToolResult\(|retired_tool/);
 assert.doesNotMatch(mcp, /calendar\.|executeCalendarMcpTool|CALENDAR_MCP_DEFINITIONS/);
 

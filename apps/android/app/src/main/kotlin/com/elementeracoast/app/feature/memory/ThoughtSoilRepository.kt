@@ -1,7 +1,6 @@
 package com.elementeracoast.app.feature.memory
 
-import com.elementeracoast.app.core.model.ThoughtPocketSnapshot
-import com.elementeracoast.app.core.model.ThoughtSeedSnapshot
+import com.elementeracoast.app.core.model.ThoughtCandidateSnapshot
 import com.elementeracoast.app.core.model.ThoughtSoilSnapshot
 import com.elementeracoast.app.core.network.CoastApiClient
 import com.elementeracoast.app.core.network.CoastApiException
@@ -55,22 +54,18 @@ class DefaultThoughtSoilRepository(
 internal fun RemoteThoughtSoil.toSnapshot(fallbackConversationId: String = ""): ThoughtSoilSnapshot = ThoughtSoilSnapshot(
     conversationId = conversationId.ifBlank { fallbackConversationId },
     currentText = currentText,
-    handSeeds = handSeeds.map { seed ->
-        ThoughtSeedSnapshot(
-            name = seed.name.ifBlank { seed.lifeCore },
-            lifeCore = seed.lifeCore,
-            usageHint = seed.usageHint,
-            avoidHint = seed.avoidHint
+    afterthoughts = afterthoughts,
+    memoryCandidates = memoryCandidates.map { candidate ->
+        ThoughtCandidateSnapshot(
+            title = candidate.title.ifBlank { candidate.content },
+            content = candidate.content,
+            sourceExcerpt = candidate.sourceExcerpt
         )
     },
-    doNotRepeat = doNotRepeat,
-    pocketCandidates = pocketCandidates.map { candidate ->
-        ThoughtPocketSnapshot(
-            title = candidate.title.ifBlank { candidate.lifeCore },
-            lifeCore = candidate.lifeCore,
+    seedCandidates = seedCandidates.map { candidate ->
+        ThoughtCandidateSnapshot(
+            title = candidate.title.ifBlank { candidate.content },
             content = candidate.content,
-            usageHint = candidate.usageHint,
-            avoidHint = candidate.avoidHint,
             sourceExcerpt = candidate.sourceExcerpt
         )
     },

@@ -31,14 +31,14 @@ const DANGER_ACTIONS = Object.freeze({
   }),
   'memory:soil-clear': Object.freeze({
     title: '清空当前窗口的整理当前对话的纸条？',
-    message: '当前、当前活跃线索、勿复读和可落袋候选会被清空。聊天记录、落袋、种子和记忆不会被删除。',
+    message: '当前、余思、记忆候选和种子候选会被清空。聊天记录、待确认区、种子库和记忆库不会被删除。',
     confirmText: '清空整理当前对话的纸条',
     cancelText: '取消',
     dangerLevel: 'danger',
   }),
   'tools:clear-soil': Object.freeze({
     title: '清空当前窗口的整理当前对话的纸条？',
-    message: '当前、当前活跃线索、勿复读和可落袋候选会被清空。聊天记录、落袋、种子和记忆不会被删除。',
+    message: '当前、余思、记忆候选和种子候选会被清空。聊天记录、待确认区、种子库和记忆库不会被删除。',
     confirmText: '清空整理当前对话的纸条',
     cancelText: '取消',
     dangerLevel: 'danger',

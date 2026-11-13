@@ -25,8 +25,10 @@ await writeCustomInstructions(db, { content: OWNER_CUSTOM });
 const sourceExcerptCandidate = await createGlobalExcerptCandidate(db, { proposed_body: SOURCE_GLOBAL_EXCERPT, reason: 'source contract fixture' });
 await confirmGlobalExcerptCandidate(db, sourceExcerptCandidate.id, { operator: 'test' });
 await writeSoil(db, conversation.id, {
-  current_text: '当前整理当前对话的纸条只承接透明上下文。', hand_seeds: [{ name: '透明纸条', life_core: '只看本轮真正递给模型的内容。' }],
-  pocket_candidates: [{ candidate_id: 'candidate_context_contract', title: '不该直递的候选', life_core: SOIL_CANDIDATE_SECRET, content: SOIL_CANDIDATE_SECRET }],
+  current_text: '当前整理当前对话的纸条只承接透明上下文。',
+  afterthoughts: ['只看本轮真正递给模型的内容。'],
+  memory_candidates: [{ candidate_id: 'candidate_context_contract', title: '不该直递的候选', content: SOIL_CANDIDATE_SECRET }],
+  seed_candidates: [],
 });
 await createEntry(db, { entry_type: 'memory', scope: 'conversation', conversation_id: conversation.id, title: '透明记忆', life_core: '只有召回命中时才递进本轮。', tag: '工程技术', source_window: 'Context Contract v1', status: 'active' });
 await createPocket(db, { conversation_id: conversation.id, source_type: 'soil', source_ref: { conversation_id: conversation.id, candidate_id: 'pending_context_contract' }, source_text: PENDING_SECRET, title: '待确认秘密', life_core: PENDING_SECRET });
@@ -92,9 +94,10 @@ assert.equal(slip.global_excerpt.content, SOURCE_GLOBAL_EXCERPT);
 assert.equal(slip.context_budget.global_excerpt, 'complete');
 assert.ok(slip.context_budget.sources_preserved.includes('全局摘录'));
 assert.equal(slip.thinking_soil.current_text, '当前整理当前对话的纸条只承接透明上下文。');
-assert.equal(slip.thinking_soil.hand_seeds_count, 1);
-assert.equal(slip.thinking_soil.pocket_candidates_count, 1);
-assert.equal(slip.thinking_soil.pocket_candidates_status, '待确认');
+assert.equal(slip.thinking_soil.afterthoughts_count, 1);
+assert.equal(slip.thinking_soil.memory_candidates_count, 1);
+assert.equal(slip.thinking_soil.seed_candidates_count, 0);
+assert.equal(slip.thinking_soil.candidates_delivered, false);
 assert.ok(slip.related_memory.items.some((item) => item.title === '透明记忆'));
 assert.equal(slip.related_memory.status, '已递给');
 assert.equal(slip.related_memory.confirmation_status, '已确认');

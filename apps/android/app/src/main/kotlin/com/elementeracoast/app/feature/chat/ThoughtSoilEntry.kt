@@ -32,7 +32,7 @@ internal fun ThoughtSoilEntry(
             else -> ""
         }
         Text(
-            "整理当前对话的纸条 · ${soil.handSeeds.size.coerceAtMost(7)} 粒当前活跃线索$state",
+            "整理当前对话的纸条 · ${soil.afterthoughts.size} 条余思$state",
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Medium,

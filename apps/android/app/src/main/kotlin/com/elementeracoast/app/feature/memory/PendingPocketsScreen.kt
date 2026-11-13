@@ -64,6 +64,16 @@ internal fun PendingPocketsScreen(
                         Spacer(Modifier.height(8.dp))
                         Text("来源：${pocket.sourceExcerpt}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     }
+                    when (pocket.suggestedDestination) {
+                        "memory" -> {
+                            Spacer(Modifier.height(8.dp))
+                            Text("模型建议：记忆库", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                        }
+                        "seed" -> {
+                            Spacer(Modifier.height(8.dp))
+                            Text("模型建议：种子库", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Text("确认到记忆", modifier = Modifier.clickable { resolving = pocket to "memory" }, color = MaterialTheme.colorScheme.primary)

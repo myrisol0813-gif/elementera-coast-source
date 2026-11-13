@@ -48,10 +48,11 @@ export async function runMemoryFlow() {
   await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'memory-pockets', 'pending pocket route');
   let autoPocketCard = document.querySelector('[data-pocket-id="soil-pocket-conv-1"]');
   assert.ok(autoPocketCard.textContent.includes('暂放的潮汐岔路'));
-  assert.ok(autoPocketCard.textContent.includes('核心：这条岔路现在不用，但以后仍可能长出新的理解。'));
+  assert.ok(autoPocketCard.textContent.includes('核心：把当前两轮里关于潮汐岔路的上下文一起保留下来。'));
   assert.ok(autoPocketCard.textContent.includes('来源：这条岔路先放下，以后也许还会长。'));
-  assert.ok(autoPocketCard.textContent.includes('使用时机：再次谈到这条岔路时重新触碰。'));
-  assert.ok(autoPocketCard.textContent.includes('勿误用：不要把它说成已经确认的长期记忆。'));
+  assert.ok(autoPocketCard.textContent.includes('模型建议：种子库'));
+  assert.equal(autoPocketCard.textContent.includes('使用时机：'), false, 'thought-soil v2 does not invent a usage hint before confirmation');
+  assert.equal(autoPocketCard.textContent.includes('勿误用：'), false, 'thought-soil v2 does not invent an avoid hint before confirmation');
   assert.ok(autoPocketCard.textContent.includes('只有确认后才会进入记忆库或种子库'));
   assert.equal(autoPocketCard.querySelectorAll('.button-row button').length, 3);
   assert.equal(autoPocketCard.textContent.includes('石头'), false);

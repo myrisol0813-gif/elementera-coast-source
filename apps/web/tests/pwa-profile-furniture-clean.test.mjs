@@ -92,7 +92,7 @@ assert.match(toolroom, /status/);
 assert.match(toolroom, /tool_key/);
 assert.match(toolroom, /runIds/);
 
-assert.equal(MAILBOX_CACHE_VERSION, 'coast-source-mailbox-01');
+assert.equal(MAILBOX_CACHE_VERSION, 'coast-source-mailbox-02');
 const worker = await read(resolve(pages, 'service-worker.js'));
 assert.match(worker, new RegExp(`const CACHE_NAME = '${escaped(APP_CACHE_NAME)}'`));
 assert.match(worker, new RegExp(`/public/app\\.js\\?v=${escaped(APP_CACHE_VERSION)}`));
@@ -102,7 +102,7 @@ assert.match(index, new RegExp(`/public/app\\.js\\?v=${escaped(APP_CACHE_VERSION
 assert.match(index, /模型工作台/);
 assert.match(index, /模型工作台/);
 const mailboxPage = await read(resolve(root, 'functions/mailbox-page.js'));
-assert.ok(mailboxPage.includes('coast-source-mailbox-01'));
+assert.ok(mailboxPage.includes('coast-source-mailbox-02'));
 assert.equal(mailboxPage.includes('coast-mailbox-04'), false);
 
 console.log('pwa-profile-furniture-clean: ok');

@@ -12,13 +12,15 @@ function clip(value, max = 1200) {
 }
 
 function currentSoilRecord(soil) {
+  const afterthoughts = (Array.isArray(soil.afterthoughts) ? soil.afterthoughts : []).slice(0, 7);
   return {
     id: `conversation-soil:${soil.conversation_id}`,
     type: 'soil',
     title: soil.conversation_title || '窗口整理当前对话的纸条',
-    content: clip(soil.current_text, 4000),
-    hand_seeds: (soil.hand_seeds || []).slice(0, 7),
-    do_not_repeat: clip(soil.do_not_repeat, 1200),
+    content: clip([soil.current_text, ...afterthoughts].filter(Boolean).join('\n'), 4000),
+    afterthoughts,
+    memory_candidates_count: Array.isArray(soil.memory_candidates) ? soil.memory_candidates.length : 0,
+    seed_candidates_count: Array.isArray(soil.seed_candidates) ? soil.seed_candidates.length : 0,
     actor: soil.actor || null,
     surface: soil.surface || null,
     model_label: soil.model_label || null,

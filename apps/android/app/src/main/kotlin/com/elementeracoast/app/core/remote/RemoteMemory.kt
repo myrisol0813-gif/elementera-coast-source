@@ -72,6 +72,7 @@ data class RemoteMemoryPocket(
     @SerialName("usage_hint") val usageHint: String = "",
     @SerialName("avoid_hint") val avoidHint: String = "",
     @SerialName("source_excerpt") val sourceExcerpt: String = "",
+    @SerialName("suggested_destination") val suggestedDestination: String = "",
     val status: String = "pending",
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null

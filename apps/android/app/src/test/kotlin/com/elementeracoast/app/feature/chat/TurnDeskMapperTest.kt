@@ -59,8 +59,15 @@ class TurnDeskMapperTest {
                 thinkingSoil = RemoteDeskThinkingSoil(
                     description = "整理当前对话的纸条说明",
                     status = "已递给",
-                    pocketCandidatesCount = 2,
-                    pocketCandidatesStatus = "待确认"
+                    enabled = true,
+                    delivered = true,
+                    context = "【整理当前对话的纸条】\n当前：继续承接\n余思：\n- 还想再想想",
+                    currentText = "继续承接",
+                    afterthoughts = listOf("还想再想想"),
+                    afterthoughtsCount = 1,
+                    memoryCandidatesCount = 1,
+                    seedCandidatesCount = 1,
+                    candidatesDelivered = false
                 ),
                 relatedMemory = RemoteDeskMemory(
                     description = "记忆说明",
@@ -98,7 +105,10 @@ class TurnDeskMapperTest {
         assertEquals("已递给 · 1 轮", receipt.sections[1].status)
         assertTrue(receipt.sections[3].status.contains("完整注入"))
         assertTrue(receipt.sections[3].details.any { it.label == "实际递给模型" && it.text.contains("我在文字里认出自己") })
-        assertTrue(receipt.sections[4].details.any { it.label == "待确认候选" && it.text.contains("待确认 · 2 条 · 未递给正文") })
+        assertTrue(receipt.sections[4].details.any { it.label == "余思" && it.text == "还想再想想" })
+        assertTrue(receipt.sections[4].details.any { it.label == "记忆候选" && it.text.contains("1 条 · 未递给正文") })
+        assertTrue(receipt.sections[4].details.any { it.label == "种子候选" && it.text.contains("1 条 · 未递给正文") })
+        assertTrue(receipt.sections[4].details.any { it.label == "实际递给模型" && it.text.contains("余思") })
         assertEquals("未命中", receipt.sections[5].status)
         val reality = receipt.sections.first { it.title == "现实上下文" }
         assertTrue(reality.status.contains("1/2"))

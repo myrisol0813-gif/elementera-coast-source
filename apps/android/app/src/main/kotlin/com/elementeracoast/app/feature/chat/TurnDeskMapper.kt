@@ -56,11 +56,9 @@ internal object TurnDeskMapper {
                 description = value.thinkingSoil.description,
                 details = buildList {
                     if (value.thinkingSoil.currentText.isNotBlank()) add(TurnDeskDetail("当前整理", value.thinkingSoil.currentText))
-                    value.thinkingSoil.handSeeds.forEach { seed -> add(TurnDeskDetail("当前活跃线索", seed)) }
-                    add(TurnDeskDetail(
-                        "待确认候选",
-                        "${value.thinkingSoil.pocketCandidatesStatus.ifBlank { if (value.thinkingSoil.pocketCandidatesCount > 0) "待确认" else "未递入" }} · ${value.thinkingSoil.pocketCandidatesCount} 条 · 未递给正文"
-                    ))
+                    value.thinkingSoil.afterthoughts.forEach { item -> add(TurnDeskDetail("余思", item)) }
+                    add(TurnDeskDetail("记忆候选", "${value.thinkingSoil.memoryCandidatesCount} 条 · 未递给正文"))
+                    add(TurnDeskDetail("种子候选", "${value.thinkingSoil.seedCandidatesCount} 条 · 未递给正文"))
                     if (value.thinkingSoil.context.isNotBlank()) add(TurnDeskDetail("实际递给模型", value.thinkingSoil.context))
                 }
             ),

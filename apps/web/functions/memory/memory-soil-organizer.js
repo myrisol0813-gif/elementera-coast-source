@@ -3,10 +3,10 @@ import { safeLogError } from '../http.js';
 import { soilSettings } from '../memory-config.js';
 import {
   MemoryStoreError,
-  normalizeHandSeeds,
-  normalizePocketCandidates,
+  normalizeAfterthoughts,
+  normalizeSoilCandidates,
   readSoil,
-  upsertSoilPocketCandidates,
+  upsertSoilCandidates,
   writeSoil,
 } from '../memory-store.js';
 import { ModelRequestError, performFormalChat } from '../models.js';
@@ -27,43 +27,25 @@ export const PLAN_SOIL_MAX_RESULT_CHARS = 10000;
 export const SOIL_RESPONSE_FORMAT = Object.freeze({
   type: 'json_schema',
   json_schema: Object.freeze({
-    name: 'thought_soil',
+    name: 'thought_soil_v2',
     strict: true,
     schema: Object.freeze({
       type: 'object',
       additionalProperties: false,
       properties: Object.freeze({
         current_text: Object.freeze({ type: 'string' }),
-        hand_seeds_mode: Object.freeze({ type: 'string', enum: ['replace', 'keep', 'clear'] }),
-        hand_seeds: Object.freeze({
+        afterthoughts: Object.freeze({
           type: 'array',
-          items: Object.freeze({
-            type: 'object',
-            additionalProperties: false,
-            properties: Object.freeze({
-              name: Object.freeze({ type: 'string' }),
-              life_core: Object.freeze({ type: 'string' }),
-              usage_hint: Object.freeze({ type: 'string' }),
-              avoid_hint: Object.freeze({ type: 'string' }),
-            }),
-            required: ['name', 'life_core', 'usage_hint', 'avoid_hint'],
-          }),
+          items: Object.freeze({ type: 'string' }),
         }),
-        do_not_repeat_mode: Object.freeze({ type: 'string', enum: ['replace', 'keep', 'clear'] }),
-        do_not_repeat: Object.freeze({ type: 'string' }),
-        pocket_candidates_mode: Object.freeze({ type: 'string', enum: ['replace', 'keep', 'clear'] }),
-        pocket_candidates: Object.freeze({
+        memory_candidates: Object.freeze({
           type: 'array',
           items: Object.freeze({
             type: 'object',
             additionalProperties: false,
             properties: Object.freeze({
-              candidate_id: Object.freeze({ type: 'string' }),
               title: Object.freeze({ type: 'string' }),
-              life_core: Object.freeze({ type: 'string' }),
               content: Object.freeze({ type: 'string' }),
-              usage_hint: Object.freeze({ type: 'string' }),
-              avoid_hint: Object.freeze({ type: 'string' }),
               source_refs: Object.freeze({
                 type: 'array',
                 items: Object.freeze({
@@ -78,19 +60,36 @@ export const SOIL_RESPONSE_FORMAT = Object.freeze({
               }),
               source_excerpt: Object.freeze({ type: 'string' }),
             }),
-            required: ['candidate_id', 'title', 'life_core', 'content', 'usage_hint', 'avoid_hint', 'source_refs', 'source_excerpt'],
+            required: ['title', 'content', 'source_refs', 'source_excerpt'],
+          }),
+        }),
+        seed_candidates: Object.freeze({
+          type: 'array',
+          items: Object.freeze({
+            type: 'object',
+            additionalProperties: false,
+            properties: Object.freeze({
+              title: Object.freeze({ type: 'string' }),
+              content: Object.freeze({ type: 'string' }),
+              source_refs: Object.freeze({
+                type: 'array',
+                items: Object.freeze({
+                  type: 'object',
+                  additionalProperties: false,
+                  properties: Object.freeze({
+                    turn_id: Object.freeze({ type: 'string' }),
+                    role: Object.freeze({ type: 'string', enum: ['user', 'assistant', 'turn'] }),
+                  }),
+                  required: ['turn_id', 'role'],
+                }),
+              }),
+              source_excerpt: Object.freeze({ type: 'string' }),
+            }),
+            required: ['title', 'content', 'source_refs', 'source_excerpt'],
           }),
         }),
       }),
-      required: [
-        'current_text',
-        'hand_seeds_mode',
-        'hand_seeds',
-        'do_not_repeat_mode',
-        'do_not_repeat',
-        'pocket_candidates_mode',
-        'pocket_candidates',
-      ],
+      required: ['current_text', 'afterthoughts', 'memory_candidates', 'seed_candidates'],
     }),
   }),
 });
@@ -171,19 +170,6 @@ export function parseStrictJson(value) {
   throw new MemoryStoreError('soil_organize_invalid', '整理当前对话的纸条整理结果格式无效。', 502);
 }
 
-export function normalizeSoilMode(value) {
-  const mode = String(value || '').trim().toLowerCase();
-  return ['replace', 'keep', 'clear'].includes(mode) ? mode : '';
-}
-
-export function fallbackCurrentText(turns, landing) {
-  const latest = turns.at(-1);
-  if (landing || latest?.user?.hidden || latest?.user?.input_type === 'landing_letter') {
-    return '登岛信开场已经完成，正在承接这封信与刚刚的读信回复。';
-  }
-  return '当前没有需要脱离最近上下文再次复述的承接便签。';
-}
-
 export function clipSoilContent(value, max = SOIL_REPLY_FIELD_CHARS) {
   return Array.from(String(value || '')).slice(0, Math.max(0, max)).join('');
 }
@@ -233,13 +219,11 @@ export function replySoilContext(turns, oldSoil) {
   return {
     mode: 'reply_incremental',
     old_current_text: oldSoil.current_text || '',
+    old_afterthoughts: oldSoil.afterthoughts || [],
     organized_through_turn_id: cursor,
     latest_turn: soilTurnDigest(latest, SOIL_REPLY_FIELD_CHARS),
     previous_turn_excerpt: previous ? soilTurnDigest(previous, SOIL_PREVIOUS_FIELD_CHARS) : null,
     missed_since_success: missed,
-    old_hand_seeds: oldSoil.hand_seeds,
-    old_do_not_repeat: oldSoil.do_not_repeat,
-    old_pocket_candidates: oldSoil.pocket_candidates,
   };
 }
 
@@ -258,50 +242,60 @@ export function boundedSoilContext(context) {
   if (JSON.stringify(value).length <= SOIL_PROMPT_TOTAL_CHARS) return value;
   return {
     ...value,
-    old_hand_seeds: (value.old_hand_seeds || []).slice(0, 3),
-    old_do_not_repeat: clipSoilContent(value.old_do_not_repeat, 1200),
-    old_pocket_candidates: (value.old_pocket_candidates || []).slice(0, 3),
+    old_afterthoughts: (value.old_afterthoughts || []).slice(0, 5),
   };
 }
 
-export function soilPrompt(turns, oldSoil, maxHandSeeds, options = {}) {
+export function soilPrompt(turns, oldSoil, options = {}) {
   const context = options.landing
     ? landingSoilContext(turns)
     : boundedSoilContext(replySoilContext(turns, oldSoil));
-  return `你只负责整理当前对话的一小捧“整理当前对话的纸条”。它是当前窗口的工作台小纸条，不是永久档案馆，不是长期记忆，也不是思考过程。
-请只返回一个 JSON 对象，不要 Markdown，不要解释：
+  return `整理当前对话的纸条
+
+① 当前｜current_text
+现在仍需承接的东西。
+整理当前对话中，在最近上下文逐渐滑出后仍值得继续带着的情境、事项、变化与未完成内容。
+
+② 余思｜afterthoughts
+整理这一刻，你觉得想要、需要留下的好奇、兴趣、联想与未尽方向。
+非强制填写，没有想留下的余思时可以为空。
+
+③ 去处｜memory_candidates / seed_candidates
+对话中，你觉得值得安放到更远处的内容。是否提出候选，由你自行判断。
+
+memory_candidates —— 记忆候选
+值得以后仍然能够认出、取回和承接的内容。可以是事实、已经发生的事件、形成的认识、决定、关系变化、项目状态，也可以是某个对双方而言有持续意义的细节。
+它更偏向“以后再遇见时，我希望自己还知道这件事”。
+
+seed_candidates —— 种子候选
+值得留下继续生长的内容。可以是有趣的想法、问题、意象、猜想、创作方向、尚未展开的可能性，或你想在未来重新拿起来思考的东西。
+它更偏向“我不知道它以后会长成什么，但我想留下这颗种子”。
+
+候选只代表你希望把它递往相应区域，系统会把它送入待确认流程；是否成为正式记忆或种子，仍由后续确认决定。
+
+请只返回一个 JSON 对象：
 {
-  "current_text": "当前窗口此刻的滚动承接便签，通常 600–1800 中文字符，不要流水账",
-  "hand_seeds_mode": "replace|keep|clear 三选一",
-  "hand_seeds": [{"name":"名称","life_core":"生命核","usage_hint":"何时可用","avoid_hint":"如何避免复读"}],
-  "do_not_repeat_mode": "replace|keep|clear 三选一",
-  "do_not_repeat": "已经确认、不应重复铺陈的内容",
-  "pocket_candidates_mode": "replace|keep|clear 三选一",
-  "pocket_candidates": [{
-    "candidate_id": "简短稳定标识",
-    "title": "不是原句截取的简短名称",
-    "life_core": "真正有再生力的核心",
-    "content": "保留足够上下文后的压缩内容",
-    "usage_hint": "什么情况下值得重新碰到",
-    "avoid_hint": "如何避免机械复读或误用",
-    "source_refs": [{"turn_id":"从本轮上下文中原样选择","role":"user|assistant|turn"}],
+  "current_text": "字符串，可以为空",
+  "afterthoughts": ["字符串；非强制，可以为空数组"],
+  "memory_candidates": [{
+    "title": "简短名称",
+    "content": "希望以后仍能认出和承接的内容",
+    "source_refs": [{"turn_id":"从整理输入中的真实 turn_id 选择","role":"user|assistant|turn"}],
+    "source_excerpt": "帮助辨认来源的短摘录"
+  }],
+  "seed_candidates": [{
+    "title": "简短名称",
+    "content": "值得留下继续生长的内容",
+    "source_refs": [{"turn_id":"从整理输入中的真实 turn_id 选择","role":"user|assistant|turn"}],
     "source_excerpt": "帮助辨认来源的短摘录"
   }]
 }
 
-mode 含义：
-- replace：使用你本轮返回的新纸条。旧纸条可以退出、被改写、合并或替换；新内容比旧内容少也没关系。
-- keep：这一栏原样保留旧整理当前对话的纸条。
-- clear：你明确判断这一栏已经过时、重复、已经落袋或不再适合当前窗口，因此清空这一栏。
-不要把空数组或空字符串当作失败占位。如果你确实要清空，请使用 clear mode；如果你没有要改这一栏，请使用 keep mode。
-
-current_text 是“滚动承接便签”，不是最近十二轮聊天摘要。latest_turn 与 previous_turn_excerpt 本来就会通过最近上下文直接递给模型，因此不要把它们换一种说法再抄进 current_text。只有某条信息会在最近上下文滑出后仍必须继续承接，例如尚未解决的问题、已经决定但下一步未完成的事项、跨多轮形成的结构变化，才值得写入。普通寒暄、刚表达完的感受、刚回答完的问题可以不留下额外摘要。允许 current_text 很短；没有额外承接内容时就写“当前没有需要脱离最近上下文再次复述的承接便签。”。允许改写、压缩、删除已经结束的话题，不要累加“先聊 A、再聊 B、然后 C”的流水账；不要每轮继续背着登岛信；不要把远古精华长期塞在 current_text。
-
-hand_seeds 不是永久收藏夹，而是“此刻最值得手持”的最多 ${maxHandSeeds} 粒。每轮都可以保留仍有用的旧种、删除过时旧种、替换旧种、合并重复旧种、改写旧种或加入新种。满 ${maxHandSeeds} 粒时主动做取舍。不要因为旧整理当前对话的纸条里已经有旧种就机械保留，也不要害怕让旧纸条退出手持。
-do_not_repeat 也只是当前窗口的工作提醒。已经不再需要防复读的提醒可以改写、合并或 clear。
-pocket_candidates 只放“现在不用、但仍有再生力”的内容，并使用上方真实 turn_id。旧候选会由系统先 upsert 到 pending；已经进入 pending、已经落袋或已经不适合当前窗口的候选可以从整理当前对话的纸条展示层退出，不要为了保留展示而反复挂在手上。当前确实没有候选时使用 pocket_candidates_mode=clear。
-
-你只能整理 current_text、hand_seeds、do_not_repeat、pocket_candidates 这四块临时工作台内容。不要创建或删除长期记忆，不要删除聊天记录、pending pocket、confirmed pocket、seed、memory 或向量索引中的已确认内容；不要判断 core，不要把候选升级为 seed 或 memory，不要替用户做决定，不要复述整段聊天。
+四个内容字段都允许为空。不要为了填满结构而制造内容。
+最近上下文本身会继续递给聊天模型；current_text 只保留在这些最近消息逐渐滑出后仍需要承接的内容。
+old_current_text 与 old_afterthoughts 是上一版桌面，可自由保留、压缩、改写或让其退出。
+source_refs 可以只选择真正相关的 turn_id；如果不需要精确指向，可返回空数组，系统会补上本轮来源。
+整理结果只提出候选，不直接修改正式记忆库或种子库。
 
 整理输入结构：
 ${JSON.stringify(context)}`;
@@ -312,9 +306,9 @@ export async function organizeConversationSoil(env, conversationId, value) {
   const reply = value.trigger === 'reply';
   const force = value.force === true || reply;
   const requestedModel = String(value.model || '').trim().slice(0, 180);
-  const planPhase = String(value.plan_phase || '').trim();
+  const planPhase = value.plan_phase || '';
   if (planPhase && !['prepare', 'commit'].includes(planPhase)) {
-    throw new MemoryStoreError('invalid_plan_phase', '无效的本机 GPT 对话纸条操作。', 400);
+    throw new MemoryStoreError('invalid_plan_phase', '无效的本机 GPT 整理当前对话的纸条操作。', 400);
   }
   if (planPhase && !/^chatgpt-plan:gpt-[a-z0-9._-]+$/.test(requestedModel)) {
     throw new MemoryStoreError('invalid_plan_model', '整理当前对话的纸条只能使用已选择的本机 GPT 模型。', 400);
@@ -339,15 +333,13 @@ export async function organizeConversationSoil(env, conversationId, value) {
   if (!turns.length) return { ok: true, skipped: true, reason: 'no_completed_turns', soil: oldSoil };
   const latestTurn = turns.at(-1);
   const activeModel = String(latestTurn?.assistant?.model_id || '').trim();
+  // An older Native app must not silently fall through to a billed Coast
+  // provider when a ChatGPT-plan assistant has just completed.
   if (!planPhase && activeModel.startsWith('chatgpt-plan:')) {
-    throw new MemoryStoreError(
-      'plan_soil_requires_native',
-      'ChatGPT 套餐轮次的当前对话纸条必须由本机套餐模型整理；未调用其他模型供应商。',
-      409,
-    );
+    throw new MemoryStoreError('plan_soil_requires_native', '官端 GPT 整理当前对话的纸条必须由本机套餐模型整理；未调用其他 API。请更新 Native。', 409);
   }
   if (planPhase && activeModel !== requestedModel) {
-    throw new MemoryStoreError('plan_soil_model_mismatch', '本轮模型与当前对话纸条整理模型不一致。', 409);
+    throw new MemoryStoreError('plan_soil_model_mismatch', '本轮模型与整理当前对话的纸条整理模型不一致。', 409);
   }
   const scheduledTurn = landing
     || reply
@@ -359,13 +351,12 @@ export async function organizeConversationSoil(env, conversationId, value) {
     return { ok: true, skipped: true, reason: 'not_due', soil: oldSoil };
   }
 
-  const fallback = fallbackCurrentText(turns, landing);
   if (planPhase === 'prepare') {
     return {
       ok: true,
       skipped: false,
       model: requestedModel,
-      prompt: soilPrompt(turns, oldSoil, settings.maxHandSeeds, { landing }),
+      prompt: soilPrompt(turns, oldSoil, { landing }),
       expected_turn_id: latestTurn.turn_id,
       expected_assistant_id: String(latestTurn.assistant?.id || ''),
       expected_soil_revision: oldSoil.revision,
@@ -378,11 +369,7 @@ export async function organizeConversationSoil(env, conversationId, value) {
       && Number.isSafeInteger(value.expected_soil_revision)
       && value.expected_soil_revision === oldSoil.revision;
     if (!matches) {
-      throw new MemoryStoreError(
-        'plan_soil_stale',
-        '整理期间当前对话纸条或聊天记录已经改变；未覆盖较新的资料。',
-        409,
-      );
+      throw new MemoryStoreError('plan_soil_stale', '整理期间整理当前对话的纸条或聊天记录已经改变；未覆盖较新的资料。', 409);
     }
     if (typeof value.result_text !== 'string' || value.result_text.length > PLAN_SOIL_MAX_RESULT_CHARS) {
       throw new MemoryStoreError('plan_soil_result_invalid', '本轮整理内容长度无效。', 400);
@@ -394,19 +381,11 @@ export async function organizeConversationSoil(env, conversationId, value) {
   try {
     if (planPhase === 'commit') {
       organized = parseStrictJson(value.result_text);
-      const modes = ['replace', 'keep', 'clear'];
       if (typeof organized.current_text !== 'string'
-        || !modes.includes(organized.hand_seeds_mode)
-        || !Array.isArray(organized.hand_seeds)
-        || !modes.includes(organized.do_not_repeat_mode)
-        || typeof organized.do_not_repeat !== 'string'
-        || !modes.includes(organized.pocket_candidates_mode)
-        || !Array.isArray(organized.pocket_candidates)) {
-        throw new MemoryStoreError(
-          'soil_organize_invalid',
-          'GPT 整理结果不符合当前对话纸条格式；旧资料保持不变。',
-          422,
-        );
+        || !Array.isArray(organized.afterthoughts)
+        || !Array.isArray(organized.memory_candidates)
+        || !Array.isArray(organized.seed_candidates)) {
+        throw new MemoryStoreError('soil_organize_invalid', 'GPT 整理结果不符合整理当前对话的纸条格式；旧资料保持不变。', 422);
       }
       const safeUsage = (key) => {
         const n = value.usage?.[key];
@@ -425,7 +404,7 @@ export async function organizeConversationSoil(env, conversationId, value) {
     } else {
     const profile = await readProfile(env.COAST_CHAT_DB);
     const modelId = requestedModel || profile.current_chat_model || 'openai/gpt-4.1-nano';
-    const basePrompt = soilPrompt(turns, oldSoil, settings.maxHandSeeds, { landing });
+    const basePrompt = soilPrompt(turns, oldSoil, { landing });
     let lastJsonError = null;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
@@ -467,20 +446,11 @@ export async function organizeConversationSoil(env, conversationId, value) {
       && !(error instanceof MemoryStoreError && String(error.type || '').startsWith('soil_organize_'))) throw error;
     safeLogError('memory:soil-organize', error);
     degradedReason = error.type || 'soil_organize_failed';
-    const degradedSoil = await writeSoil(env.COAST_CHAT_DB, conversationId, {
-      current_text: fallback,
-      hand_seeds: oldSoil.hand_seeds,
-      do_not_repeat: oldSoil.do_not_repeat,
-      pocket_candidates: oldSoil.pocket_candidates,
-      organized_through_turn_id: oldSoil.organized_through_turn_id,
-      manual_locked: oldSoil.manual_locked,
-      auto_refresh_enabled: oldSoil.auto_refresh_enabled,
-    }, { automatic: true });
     return {
       ok: true,
       degraded: true,
       reason: degradedReason,
-      soil: await decorateSoilProvenance(env.COAST_CHAT_DB, degradedSoil),
+      soil: oldSoil,
       pocket_sync: null,
     };
   }
@@ -489,47 +459,20 @@ export async function organizeConversationSoil(env, conversationId, value) {
   const fallbackExcerpt = [latestTurn?.user?.content, latestTurn?.assistant?.content]
     .map((part) => String(part || '').replace(/\s+/g, ' ').trim())
     .filter(Boolean).join(' / ').slice(0, 360);
-  const handSeedsMode = normalizeSoilMode(organized.hand_seeds_mode);
-  const doNotRepeatMode = normalizeSoilMode(organized.do_not_repeat_mode);
-  const pocketCandidatesMode = normalizeSoilMode(organized.pocket_candidates_mode);
-  const organizedHandSeeds = normalizeHandSeeds(organized.hand_seeds).slice(0, settings.maxHandSeeds);
-  const organizedDoNotRepeat = String(organized.do_not_repeat || '').trim();
-  const organizedPocketCandidates = normalizePocketCandidates(organized.pocket_candidates, {
+  const candidateOptions = {
     allowedTurnIds,
     fallbackSourceRef: latestTurn?.turn_id ? { turn_id: latestTurn.turn_id, role: 'turn' } : null,
     fallbackExcerpt,
-  });
+  };
   const soilValue = {
-    current_text: String(organized.current_text || '').trim()
-      || fallback,
-    hand_seeds: handSeedsMode === 'replace'
-      ? organizedHandSeeds
-      : handSeedsMode === 'keep'
-        ? oldSoil.hand_seeds
-        : handSeedsMode === 'clear'
-          ? []
-          : organizedHandSeeds.length ? organizedHandSeeds : oldSoil.hand_seeds,
-    do_not_repeat: doNotRepeatMode === 'replace'
-      ? organizedDoNotRepeat
-      : doNotRepeatMode === 'keep'
-        ? oldSoil.do_not_repeat
-        : doNotRepeatMode === 'clear'
-          ? ''
-          : organizedDoNotRepeat || oldSoil.do_not_repeat,
-    pocket_candidates: pocketCandidatesMode === 'replace'
-      ? organizedPocketCandidates
-      : pocketCandidatesMode === 'keep'
-        ? oldSoil.pocket_candidates
-        : pocketCandidatesMode === 'clear'
-          ? []
-          : organizedPocketCandidates.length ? organizedPocketCandidates : oldSoil.pocket_candidates,
+    current_text: String(organized.current_text || '').trim(),
+    afterthoughts: normalizeAfterthoughts(organized.afterthoughts),
+    memory_candidates: normalizeSoilCandidates(organized.memory_candidates, candidateOptions),
+    seed_candidates: normalizeSoilCandidates(organized.seed_candidates, candidateOptions),
     organized_through_turn_id: latestTurn?.turn_id || oldSoil.organized_through_turn_id,
     manual_locked: oldSoil.manual_locked,
     auto_refresh_enabled: oldSoil.auto_refresh_enabled,
   };
-  const previousPocketSync = degradedReason
-    ? null
-    : await upsertSoilPocketCandidates(env.COAST_CHAT_DB, conversationId, oldSoil.pocket_candidates);
   let writtenSoil = await writeSoil(env.COAST_CHAT_DB, conversationId, soilValue, {
     automatic: true,
     provenance: {
@@ -542,25 +485,16 @@ export async function organizeConversationSoil(env, conversationId, value) {
     await saveGenerationProvenance(env.COAST_CHAT_DB, 'soil', conversationId, organizedBy);
     writtenSoil = await decorateSoilProvenance(env.COAST_CHAT_DB, writtenSoil);
   }
-  const currentPocketSync = degradedReason
-    ? null
-    : await upsertSoilPocketCandidates(env.COAST_CHAT_DB, conversationId, writtenSoil.pocket_candidates);
-  if (organizedBy && currentPocketSync) {
-    await Promise.all((currentPocketSync.pockets || [])
+  const pocketSync = await upsertSoilCandidates(env.COAST_CHAT_DB, conversationId, {
+    memory_candidates: writtenSoil.memory_candidates,
+    seed_candidates: writtenSoil.seed_candidates,
+  });
+  if (organizedBy && pocketSync) {
+    await Promise.all((pocketSync.pockets || [])
       .filter((pocket) => pocket?.id && pocket?.source_type === 'soil' && pocket?.status === 'pending')
       .map((pocket) => saveGenerationProvenance(env.COAST_CHAT_DB, 'pocket', pocket.id, organizedBy)));
-    currentPocketSync.pockets = await decoratePocketsProvenance(env.COAST_CHAT_DB, currentPocketSync.pockets);
+    pocketSync.pockets = await decoratePocketsProvenance(env.COAST_CHAT_DB, pocketSync.pockets);
   }
-  const syncedPockets = new Map();
-  for (const pocket of [...(previousPocketSync?.pockets || []), ...(currentPocketSync?.pockets || [])]) {
-    if (pocket?.id) syncedPockets.set(pocket.id, pocket);
-  }
-  const pocketSync = previousPocketSync && currentPocketSync ? {
-    created: previousPocketSync.created + currentPocketSync.created,
-    updated: previousPocketSync.updated + currentPocketSync.updated,
-    suppressed: previousPocketSync.suppressed + currentPocketSync.suppressed,
-    pockets: [...syncedPockets.values()],
-  } : null;
   return {
     ok: true,
     degraded: Boolean(degradedReason),

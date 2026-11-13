@@ -47,12 +47,9 @@ const originalFetch = globalThis.fetch;
 let providerPayloads = [];
 let providerContent = JSON.stringify({
   current_text: '默认整理成功',
-  hand_seeds_mode: 'keep',
-  hand_seeds: [],
-  do_not_repeat_mode: 'keep',
-  do_not_repeat: '',
-  pocket_candidates_mode: 'keep',
-  pocket_candidates: [],
+  afterthoughts: [],
+  memory_candidates: [],
+  seed_candidates: [],
 });
 let providerFinishReason = 'stop';
 let providerStatus = 200;
@@ -106,12 +103,9 @@ await writeConversationState(db, landingConversation.id, {
 providerPayloads = [];
 providerContent = JSON.stringify({
   current_text: '登岛信开场已经完成',
-  hand_seeds_mode: 'clear',
-  hand_seeds: [],
-  do_not_repeat_mode: 'clear',
-  do_not_repeat: '',
-  pocket_candidates_mode: 'clear',
-  pocket_candidates: [],
+  afterthoughts: [],
+  memory_candidates: [],
+  seed_candidates: [],
 });
 const landingData = await organize(landingConversation.id, 'landing');
 assert.equal(landingData.soil.current_text, '登岛信开场已经完成');
@@ -137,30 +131,18 @@ for (let index = 0; index < 100; index += 1) {
 await writeConversationState(db, conversation.id, { version: 4, turns });
 await writeSoil(db, conversation.id, {
   current_text: '上一版 current_text 里仍悬着的线索：老英国人假胡子与保底纸条。',
-  hand_seeds: [{ name: '旧手持', life_core: '旧当前活跃线索应该进入增量整理输入', usage_hint: '', avoid_hint: '' }],
-  do_not_repeat: '旧勿复读应该进入增量整理输入',
-  pocket_candidates: [{
-    candidate_id: 'old-candidate',
-    title: '旧候选',
-    life_core: '旧候选只作为工作台纸条输入',
-    content: '候选内容',
-    usage_hint: '',
-    avoid_hint: '',
-    source_refs: [{ turn_id: 'visible-98', role: 'turn' }],
-    source_excerpt: 'previous-visible-marker',
-  }],
+  afterthoughts: ['上一版余思：旧当前活跃线索已经变成自由余思。'],
+  memory_candidates: [],
+  seed_candidates: [],
   manual_locked: false,
   auto_refresh_enabled: true,
 });
 providerPayloads = [];
 providerContent = JSON.stringify({
   current_text: '滚动承接最新一轮',
-  hand_seeds_mode: 'keep',
-  hand_seeds: [],
-  do_not_repeat_mode: 'keep',
-  do_not_repeat: '',
-  pocket_candidates_mode: 'clear',
-  pocket_candidates: [],
+  afterthoughts: [],
+  memory_candidates: [],
+  seed_candidates: [],
 });
 const replyData = await organize(conversation.id, 'reply');
 const replyPrompt = providerPayloads.at(-1).messages[0].content;
@@ -168,6 +150,7 @@ assert.equal(replyData.soil.current_text, '滚动承接最新一轮');
 assert.equal((await readSoil(db, conversation.id)).organized_through_turn_id, 'visible-99');
 assert.match(replyPrompt, /reply_incremental/);
 assert.match(replyPrompt, /上一版 current_text 里仍悬着的线索/);
+assert.match(replyPrompt, /上一版余思：旧当前活跃线索已经变成自由余思/);
 assert.match(replyPrompt, /latest-visible-user-marker/);
 assert.match(replyPrompt, /latest-visible-assistant-marker/);
 assert.match(replyPrompt, /previous-visible-marker/);
@@ -185,19 +168,16 @@ const degradedData = await organize(conversation.id, 'reply');
 assert.equal(degradedData.degraded, true);
 const degradedSoil = await readSoil(db, conversation.id);
 assert.equal(degradedSoil.organized_through_turn_id, successCursor, 'degraded fallback must not advance the successful cursor');
-assert.equal(degradedSoil.current_text, '当前没有需要脱离最近上下文再次复述的承接便签。');
+assert.equal(degradedSoil.current_text, '滚动承接最新一轮', 'degraded organize keeps the previous successful soil unchanged');
 
 turns.push(turn('visible-101', 'latest-after-degraded-user-marker', 'latest-after-degraded-assistant-marker', '2026-07-15T03:41:00.000Z'));
 await writeConversationState(db, conversation.id, { version: 4, turns });
 providerPayloads = [];
 providerContent = JSON.stringify({
   current_text: '补读失败轮后继续承接',
-  hand_seeds_mode: 'keep',
-  hand_seeds: [],
-  do_not_repeat_mode: 'keep',
-  do_not_repeat: '',
-  pocket_candidates_mode: 'clear',
-  pocket_candidates: [],
+  afterthoughts: [],
+  memory_candidates: [],
+  seed_candidates: [],
 });
 const afterDegradedData = await organize(conversation.id, 'reply');
 const afterDegradedPrompt = providerPayloads.at(-1).messages[0].content;
@@ -211,12 +191,9 @@ providerContent = [
   '第一次不是合法 JSON',
   JSON.stringify({
     current_text: '重试仍正常',
-    hand_seeds_mode: 'keep',
-    hand_seeds: [],
-    do_not_repeat_mode: 'keep',
-    do_not_repeat: '',
-    pocket_candidates_mode: 'clear',
-    pocket_candidates: [],
+    afterthoughts: [],
+    memory_candidates: [],
+    seed_candidates: [],
   }),
 ];
 const retryData = await organize(conversation.id, 'reply');

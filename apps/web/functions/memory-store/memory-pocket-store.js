@@ -14,7 +14,7 @@ import {
   normalizeCandidateId,
   normalizeCandidateSourceRef,
   normalizeMemoryTag,
-  normalizePocketCandidates,
+  normalizeSoilCandidates,
   normalizedFingerprintCore,
   sourceRef,
 } from './memory-normalize.js';
@@ -42,6 +42,9 @@ export function pocketFromRow(row) {
     conversation_id: row.conversation_id,
     source_type: row.source_type,
     source_ref: reference,
+    suggested_destination: ['memory', 'seed'].includes(reference.suggested_destination)
+      ? reference.suggested_destination
+      : '',
     source_text: row.source_text || '',
     candidate_id: row.candidate_id || normalizeCandidateId('', lifeCore),
     title,
@@ -189,30 +192,45 @@ export async function deletePocket(db, id) {
   return { ...pocketFromRow(row), deleted_at: iso(timestamp) };
 }
 
-export async function pocketFingerprint(conversationIdValue, lifeCore) {
+export async function pocketFingerprint(conversationIdValue, contentValue, destinationValue = '') {
   const conversationId = sanitizeId(conversationIdValue, 'conversation');
-  const normalized = normalizedFingerprintCore(lifeCore);
-  if (!normalized) throw new MemoryStoreError('pocket_life_core_required', '可落袋候选缺少生命核。');
-  const bytes = new TextEncoder().encode(`${conversationId}\u0000${normalized}`);
+  const normalized = normalizedFingerprintCore(contentValue);
+  if (!normalized) throw new MemoryStoreError('pocket_content_required', '待确认候选缺少内容。');
+  const destination = ['memory', 'seed'].includes(String(destinationValue || ''))
+    ? String(destinationValue)
+    : '';
+  const bytes = new TextEncoder().encode(`${conversationId}\u0000${destination}\u0000${normalized}`);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   const hexadecimal = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
   return `soil:${hexadecimal}`;
 }
 
-export async function upsertSoilPocketCandidates(db, conversationIdValue, value) {
+export async function upsertSoilCandidates(db, conversationIdValue, {
+  memory_candidates: memoryCandidates = [],
+  seed_candidates: seedCandidates = [],
+} = {}) {
   await ensureMemorySchema(db);
   const conversationId = sanitizeId(conversationIdValue, 'conversation');
   await getConversation(db, conversationId);
-  const candidates = normalizePocketCandidates(value);
+  const routed = [
+    ...normalizeSoilCandidates(memoryCandidates).map((candidate) => ({ destination: 'memory', candidate })),
+    ...normalizeSoilCandidates(seedCandidates).map((candidate) => ({ destination: 'seed', candidate })),
+  ];
   const result = { created: 0, updated: 0, suppressed: 0, pockets: [] };
-  for (const candidate of candidates) {
-    const fingerprint = await pocketFingerprint(conversationId, candidate.life_core);
+  for (const { destination, candidate } of routed) {
+    const fingerprint = await pocketFingerprint(conversationId, candidate.content, destination);
     let row = await first(db, `SELECT * FROM memory_pockets
       WHERE user_id = ? AND fingerprint = ?
       ORDER BY created_at ASC LIMIT 1`, [MEMORY_OWNER_ID, fingerprint]);
+    const pocketValue = {
+      ...candidate,
+      life_core: candidate.content,
+      usage_hint: '',
+      avoid_hint: '',
+    };
     if (row) {
       if (row.status === 'pending' && !row.deleted_at) {
-        const pocket = await patchPocket(db, row.id, candidate);
+        const pocket = await patchPocket(db, row.id, pocketValue);
         result.updated += 1;
         result.pockets.push(pocket);
       } else {
@@ -225,9 +243,13 @@ export async function upsertSoilPocketCandidates(db, conversationIdValue, value)
       const pocket = await createPocket(db, {
         conversation_id: conversationId,
         source_type: 'soil',
-        source_ref: { conversation_id: conversationId, candidate_id: candidate.candidate_id },
+        source_ref: {
+          conversation_id: conversationId,
+          candidate_id: candidate.candidate_id,
+          suggested_destination: destination,
+        },
         source_text: candidate.content,
-        ...candidate,
+        ...pocketValue,
         fingerprint,
       });
       result.created += 1;

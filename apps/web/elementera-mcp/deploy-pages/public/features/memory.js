@@ -51,7 +51,7 @@ export function createMemory({ chat, router, toast, storage }) {
     return storage.read().runControl;
   }
 
-  function maxHandSeeds() {
+  function maxAfterthoughts() {
     const value = Number(settings().maxHandSeeds);
     return Number.isFinite(value) ? Math.min(7, Math.max(1, Math.trunc(value))) : 7;
   }
@@ -126,7 +126,7 @@ export function createMemory({ chat, router, toast, storage }) {
     }
   }
 
-  const soilViews = createSoilViews({ runtime, currentId, maxHandSeeds, currentSoil });
+  const soilViews = createSoilViews({ runtime, currentId, maxAfterthoughts, currentSoil });
   const pocketViews = createPocketViews({ currentPockets });
   const libraryViews = createLibraryViews({ runtime, currentId, currentPockets, chat });
   const globalExcerptViews = createGlobalExcerptViews({ runtime });
@@ -146,7 +146,7 @@ export function createMemory({ chat, router, toast, storage }) {
     toast,
     chat,
     currentId,
-    maxHandSeeds,
+    maxAfterthoughts,
     currentSoil,
     currentPockets,
     fetchSoil,
