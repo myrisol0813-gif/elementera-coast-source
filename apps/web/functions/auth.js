@@ -683,7 +683,7 @@ function loginPage(message = '', previewPasswordHint = '') {
       </dialog>
     </section>
   </main>
-  <script type="module" src="/public/mailbox-entry.js?v=coast-source-mailbox-01"></script>
+  <script type="module" src="/public/mailbox-entry.js?v=coast-source-mailbox-02"></script>
 </body>
 </html>`;
 }
