@@ -457,6 +457,11 @@ class CoastShellViewModelTest {
         override suspend fun refreshPockets(conversationId: String) = Unit
         override suspend fun refreshWorldbook() = Unit
         override suspend fun refreshInstructions() = Unit
+        override suspend fun refreshUserPortrait() = Unit
+        override suspend fun setUserPortraitWriteEnabled(enabled: Boolean) = Unit
+        override suspend fun clearUserPortrait(expectedRevision: Int) = Unit
+        override suspend fun confirmUserPortraitCandidate(id: String, editedBody: String?) = Unit
+        override suspend fun discardUserPortraitCandidate(id: String) = Unit
         override suspend fun refreshGlobalExcerpt() = Unit
         override suspend fun setGlobalExcerptWriteEnabled(enabled: Boolean) = Unit
         override suspend fun clearGlobalExcerpt(expectedRevision: Int) = Unit
