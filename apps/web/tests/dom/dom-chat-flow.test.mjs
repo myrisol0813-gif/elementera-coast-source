@@ -239,6 +239,11 @@ export async function runChatTypedRooms() {
   assert.equal(conversations.find((item) => item.id === landingConversationId)?.title, '新聊天');
 
   document.querySelector('#moreButton').click();
+  await waitFor(() => document.querySelector('#windowContextOverlay')?.hidden === false, 'window settings sheet');
+  assert.ok(document.querySelector('#windowContextOverlay').textContent.includes('这个窗口'));
+  assert.ok(document.querySelector('#windowContextOverlay').textContent.includes('整理当前对话的纸条'));
+  document.querySelector('[data-action="chat:window-letter-open"]').click();
+  await waitFor(() => document.querySelector('#windowContextOverlay')?.hidden === true, 'window settings closes before letter');
   await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'island-letter', 'letter route');
   assert.ok(document.querySelector('#islandLetterText').value.includes('这是 source 版本的公开占位入住信'));
   assert.equal(document.querySelector('[data-action="letters:send-island"]').textContent, '递出登岛信');
@@ -286,6 +291,8 @@ export async function runChatTypedRooms() {
   assert.equal(document.querySelectorAll('.message.user').length, visibleUsersBeforeLetter, 'landing regenerate must keep the hidden input hidden');
 
   document.querySelector('#moreButton').click();
+  await waitFor(() => document.querySelector('#windowContextOverlay')?.hidden === false, 'reopen window settings');
+  document.querySelector('[data-action="chat:window-letter-open"]').click();
   await waitFor(() => document.querySelector('[data-action="letters:send-island"]'), 'reopen letter route');
   assert.equal(document.querySelector('[data-action="letters:send-island"]').textContent, '重新递出登岛信');
   const lockedSoil = { ...soilFor(landingConversationId), current_text: '屋主手动锁定的当前方向', hand_seeds: [], manual_locked: true };
@@ -300,6 +307,8 @@ export async function runChatTypedRooms() {
   assert.ok(document.querySelector('.thought-soil-entry')?.textContent.includes('已锁定'));
 
   document.querySelector('#moreButton').click();
+  await waitFor(() => document.querySelector('#windowContextOverlay')?.hidden === false, 'reopen settings for soil failure');
+  document.querySelector('[data-action="chat:window-letter-open"]').click();
   await waitFor(() => document.querySelector('[data-action="letters:send-island"]'), 'reopen letter for soil failure');
   setFailNextSoilOrganize(true);
   const landingCountBeforeFailure = landingBodies.length;
