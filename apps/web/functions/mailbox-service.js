@@ -217,49 +217,25 @@ function record(value, name) {
   return value;
 }
 
-function handSeeds(value) {
-  return array(value, 'thought_soil.hand_seeds', 7).map((raw, index) => {
-    const item = record(raw, `thought_soil.hand_seeds[${index}]`);
-    const lifeCore = text(
-      item.life_core ?? item.name,
-      `thought_soil.hand_seeds[${index}].life_core`,
-      1200,
-      { required: true },
-    );
-    return {
-      name: text(item.name, `thought_soil.hand_seeds[${index}].name`, 160) || lifeCore.slice(0, 160),
-      life_core: lifeCore,
-      usage_hint: text(item.usage_hint, `thought_soil.hand_seeds[${index}].usage_hint`, 1200),
-      avoid_hint: text(item.avoid_hint, `thought_soil.hand_seeds[${index}].avoid_hint`, 1200),
-    };
-  });
+function thoughtSoilAfterthoughts(value) {
+  return array(value, 'thought_soil.afterthoughts', 7)
+    .map((item, index) => text(item, `thought_soil.afterthoughts[${index}]`, 1600))
+    .filter(Boolean);
 }
 
-function pocketCandidates(value) {
-  return array(value, 'thought_soil.pocket_candidates', 7).map((raw, index) => {
-    const item = record(raw, `thought_soil.pocket_candidates[${index}]`);
-    const lifeCore = text(
-      item.life_core ?? item.title ?? item.content,
-      `thought_soil.pocket_candidates[${index}].life_core`,
-      2000,
+function thoughtSoilCandidates(value, key) {
+  return array(value, `thought_soil.${key}`, 7).map((raw, index) => {
+    const item = record(raw, `thought_soil.${key}[${index}]`);
+    const content = text(
+      item.content ?? item.title,
+      `thought_soil.${key}[${index}].content`,
+      8000,
       { required: true },
     );
-    const title = text(
-      item.title,
-      `thought_soil.pocket_candidates[${index}].title`,
-      160,
-    ) || lifeCore.slice(0, 160);
     return {
-      title,
-      life_core: lifeCore,
-      content: text(
-        item.content,
-        `thought_soil.pocket_candidates[${index}].content`,
-        8000,
-      ) || lifeCore,
-      usage_hint: text(item.usage_hint, `thought_soil.pocket_candidates[${index}].usage_hint`, 2000),
-      avoid_hint: text(item.avoid_hint, `thought_soil.pocket_candidates[${index}].avoid_hint`, 2000),
-      source_excerpt: text(item.source_excerpt, `thought_soil.pocket_candidates[${index}].source_excerpt`, 2000),
+      title: text(item.title, `thought_soil.${key}[${index}].title`, 160) || content.slice(0, 160),
+      content,
+      source_excerpt: text(item.source_excerpt, `thought_soil.${key}[${index}].source_excerpt`, 2000),
     };
   });
 }
@@ -268,9 +244,9 @@ function thoughtSoil(value) {
   const soil = record(value, 'thought_soil');
   return {
     current_text: text(soil.current_text, 'thought_soil.current_text', 4000),
-    hand_seeds: handSeeds(soil.hand_seeds),
-    do_not_repeat: text(soil.do_not_repeat, 'thought_soil.do_not_repeat', 4000),
-    pocket_candidates: pocketCandidates(soil.pocket_candidates),
+    afterthoughts: thoughtSoilAfterthoughts(soil.afterthoughts),
+    memory_candidates: thoughtSoilCandidates(soil.memory_candidates, 'memory_candidates'),
+    seed_candidates: thoughtSoilCandidates(soil.seed_candidates, 'seed_candidates'),
   };
 }
 
