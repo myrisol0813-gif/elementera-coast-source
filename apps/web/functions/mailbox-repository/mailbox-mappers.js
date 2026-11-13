@@ -57,9 +57,9 @@ export function emptyThoughtSoil(visitorId) {
   return {
     visitor_id: visitorId,
     current_text: '',
-    hand_seeds: [],
-    do_not_repeat: '',
-    pocket_candidates: [],
+    afterthoughts: [],
+    memory_candidates: [],
+    seed_candidates: [],
     source_message_id: null,
     organized_through_message_id: null,
     manual_locked: false,
@@ -79,12 +79,14 @@ export function thoughtSoilFromRow(row, visitorId = row?.visitor_id || '') {
   return {
     visitor_id: row.visitor_id,
     current_text: row.current_text || '',
-    hand_seeds: Array.isArray(parseJson(row.hand_seeds_json, []))
-      ? parseJson(row.hand_seeds_json, [])
+    afterthoughts: Array.isArray(parseJson(row.afterthoughts_json, []))
+      ? parseJson(row.afterthoughts_json, [])
       : [],
-    do_not_repeat: row.do_not_repeat || '',
-    pocket_candidates: Array.isArray(parseJson(row.pocket_candidates_json, []))
-      ? parseJson(row.pocket_candidates_json, [])
+    memory_candidates: Array.isArray(parseJson(row.memory_candidates_json, []))
+      ? parseJson(row.memory_candidates_json, [])
+      : [],
+    seed_candidates: Array.isArray(parseJson(row.seed_candidates_json, []))
+      ? parseJson(row.seed_candidates_json, [])
       : [],
     source_message_id: row.source_message_id || null,
     organized_through_message_id: row.organized_through_message_id || null,
