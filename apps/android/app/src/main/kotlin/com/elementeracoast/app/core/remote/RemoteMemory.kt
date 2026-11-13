@@ -236,6 +236,14 @@ data class RemoteGlobalExcerptResponse(
 )
 
 @Serializable
+data class RemoteUserPortraitResponse(
+    val ok: Boolean = false,
+    val portrait: RemoteGlobalExcerpt = RemoteGlobalExcerpt(),
+    val candidates: List<RemoteGlobalExcerptCandidate> = emptyList(),
+    val revisions: List<RemoteGlobalExcerptRevision> = emptyList()
+)
+
+@Serializable
 data class RemoteGlobalExcerptClearRequest(
     val action: String,
     @SerialName("expected_revision") val expectedRevision: Int
