@@ -167,20 +167,18 @@ await assert.rejects(
 const autoCandidate = {
   candidate_id: 'sleeping-tide-drawer',
   title: '潮汐钥匙',
-  life_core: '潮汐钥匙来自整理当前对话的纸条候选，只能先进入待确认区。',
-  content: 'Memory v2 只保留 soil/turn candidate，不保存长按 active variant 原文。',
-  usage_hint: '再次谈到潮汐钥匙时使用',
-  avoid_hint: '不要把 pending 当成已确认记忆',
+  content: '潮汐钥匙来自思维壤种子候选，只能先进入待确认区。',
   source_refs: [{ turn_id: 'auto-turn-1', role: 'turn' }],
   source_excerpt: '这部分先放下，之后也许还会发芽。',
 };
-const expectedFingerprint = await pocketFingerprint(conversationC.id, autoCandidate.life_core);
-const firstAutoUpsert = await upsertSoilPocketCandidates(db, conversationC.id, [autoCandidate]);
-assert.equal(firstAutoUpsert.created, 1, 'a soil candidate must automatically create one pending pocket');
+const expectedFingerprint = await pocketFingerprint(conversationC.id, autoCandidate.content, 'seed');
+const firstAutoUpsert = await upsertSoilCandidates(db, conversationC.id, { seed_candidates: [autoCandidate] });
+assert.equal(firstAutoUpsert.created, 1, 'a soil seed candidate must automatically create one pending pocket');
 let pendingC = await listPockets(db, { conversation_id: conversationC.id, status: 'pending' });
 assert.equal(pendingC.length, 1);
 assert.equal(pendingC[0].fingerprint, expectedFingerprint);
 assert.equal(pendingC[0].source_type, 'soil');
+assert.equal(pendingC[0].suggested_destination, 'seed');
 assert.equal(pendingC[0].source_refs[0].turn_id, 'auto-turn-1');
 const pendingRecall = await buildMemoryContext(noVectorEnv, 'owner', conversationC.id, '潮汐钥匙', { conversation_turns: 8 });
 assert.deepEqual(pendingRecall.items, [], 'pending pockets must never participate in recall');
@@ -348,7 +346,7 @@ const chatResponse = await routeChatApi(new Request('https://coast.test/api/chat
 const chatData = await chatResponse.json();
 assert.equal(chatResponse.status, 200);
 assert.equal(providerPayload.messages[0].role, 'system');
-assert.match(providerPayload.messages[0].content, /整理当前对话的纸条/);
+assert.match(providerPayload.messages[0].content, /思维壤/);
 assert.match(providerPayload.messages[0].content, /【相关记忆】/);
 assert.match(providerPayload.messages[0].content, /潮汐钥匙/);
 assert.doesNotMatch(providerPayload.messages[0].content, /上下文目录|海岸环境|记忆球｜当前情境面/);
@@ -477,27 +475,13 @@ assert.ok(providerPayload.messages[0].content.length < 90000, 'soil prompt shoul
 
 await writeConversationState(db, conversationD.id, {
   version: 4,
-  turns: [turn('soil-guard-turn', '守住旧壤', '自动整理不能把旧壤冲空', '2026-07-14T07:59:00.000Z')],
+  turns: [turn('soil-guard-turn', '守住旧壤', '新版思维壤按此刻重写桌面', '2026-07-14T07:59:00.000Z')],
 });
-const guardedCandidate = {
-  candidate_id: 'guarded-old-candidate',
-  title: '下一轮前先落袋的旧候选',
-  life_core: '旧候选必须先进入待确认区，再允许展示层换壤。',
-  content: '这条候选只存在于旧整理当前对话的纸条，尚未进入 pending。',
-  usage_hint: '验证下一轮自动整理前的 pending 路径。',
-  avoid_hint: '不要依赖模型再次返回它。',
-  source_refs: [{ turn_id: 'soil-guard-turn', role: 'assistant' }],
-  source_excerpt: '自动整理不能把旧壤冲空',
-};
-const oldHandSeeds = [
-  { name: '旧当前活跃线索甲', life_core: '第一粒旧种不能被事故空数组冲掉', usage_hint: '', avoid_hint: '' },
-  { name: '旧当前活跃线索乙', life_core: '第二粒旧种用于验证 replace 可以主动取舍', usage_hint: '', avoid_hint: '' },
-];
 await writeSoil(db, conversationD.id, {
-  current_text: '守护旧壤字段',
-  hand_seeds: oldHandSeeds,
-  do_not_repeat: '旧的勿复读不能被事故空字符串清除',
-  pocket_candidates: [guardedCandidate],
+  current_text: '上一版仍需承接的内容',
+  afterthoughts: ['上一版留下的余思'],
+  memory_candidates: [],
+  seed_candidates: [],
   manual_locked: false,
   auto_refresh_enabled: true,
 });
@@ -518,33 +502,24 @@ async function organizeConversationD(output, extra = {}) {
   return organizeConversationDRequest(extra);
 }
 
-assert.equal((await listPockets(db, { conversation_id: conversationD.id, status: 'pending' })).length, 0);
-const guardedSoilData = await organizeConversationD({
+const emptySnapshotData = await organizeConversationD({
   current_text: '',
-  hand_seeds: [],
-  do_not_repeat: '',
-  pocket_candidates: [],
+  afterthoughts: [],
+  memory_candidates: [],
+  seed_candidates: [],
 });
-assert.equal(guardedSoilData.soil.hand_seeds.length, 2);
-assert.equal(guardedSoilData.soil.hand_seeds[0].life_core, oldHandSeeds[0].life_core, 'missing mode plus an empty seed list must preserve old seeds');
-assert.equal(guardedSoilData.soil.do_not_repeat, '旧的勿复读不能被事故空字符串清除', 'missing mode plus empty do-not-repeat must preserve the old value');
-assert.equal(guardedSoilData.soil.pocket_candidates.length, 1, 'missing mode plus an empty candidate list must preserve old soil candidates');
-assert.equal(guardedSoilData.soil.pocket_candidates[0].life_core, guardedCandidate.life_core);
-assert.equal(guardedSoilData.pocket_sync.created, 1, 'old soil candidates must enter pending before the new soil is written');
-const guardedPending = await listPockets(db, { conversation_id: conversationD.id, status: 'pending' });
-assert.equal(guardedPending.length, 1);
-assert.equal(guardedPending[0].life_core, guardedCandidate.life_core);
+assert.equal(emptySnapshotData.soil.current_text, '', 'v2 allows the current note to become empty');
+assert.deepEqual(emptySnapshotData.soil.afterthoughts, [], 'v2 empty afterthoughts are a valid current snapshot');
+assert.deepEqual(emptySnapshotData.soil.memory_candidates, []);
+assert.deepEqual(emptySnapshotData.soil.seed_candidates, []);
 
 providerContent = [
   '上一次不是合法 JSON。',
   JSON.stringify({
     current_text: '重试成功整理',
-    hand_seeds_mode: 'replace',
-    hand_seeds: [{ name: '重试种', life_core: '第一次 JSON 失败后第二次成功', usage_hint: '', avoid_hint: '' }],
-    do_not_repeat_mode: 'replace',
-    do_not_repeat: '重试后写入的新勿复读',
-    pocket_candidates_mode: 'clear',
-    pocket_candidates: [],
+    afterthoughts: ['第二次成功后留下的余思'],
+    memory_candidates: [],
+    seed_candidates: [],
   }),
 ];
 const retryCallsBefore = providerChatCalls;
@@ -552,107 +527,60 @@ const retrySoilData = await organizeConversationDRequest();
 assert.equal(providerChatCalls - retryCallsBefore, 2, 'invalid JSON must retry exactly once');
 assert.equal(Boolean(retrySoilData.degraded), false);
 assert.equal(retrySoilData.soil.current_text, '重试成功整理');
-assert.equal(retrySoilData.soil.hand_seeds[0].life_core, '第一次 JSON 失败后第二次成功');
+assert.deepEqual(retrySoilData.soil.afterthoughts, ['第二次成功后留下的余思']);
 
-const replacedSoilData = await organizeConversationD({
-  current_text: '主动替换旧手持',
-  hand_seeds_mode: 'replace',
-  hand_seeds: [{ name: '新当前活跃线索', life_core: '只留下此刻真正值得手持的一粒', usage_hint: '', avoid_hint: '' }],
-  do_not_repeat_mode: 'replace',
-  do_not_repeat: '新的勿复读提醒',
-  pocket_candidates_mode: 'keep',
-  pocket_candidates: [],
+const routedSoilData = await organizeConversationD({
+  current_text: '现在承接去处分流',
+  afterthoughts: ['想继续看看这条线以后会长成什么'],
+  memory_candidates: [{
+    title: '应被记住的决定',
+    content: '以后再遇见时，希望仍然知道这个决定。',
+    source_refs: [{ turn_id: 'soil-guard-turn', role: 'turn' }],
+    source_excerpt: '守住旧壤',
+  }],
+  seed_candidates: [{
+    title: '仍可生长的问题',
+    content: '这个问题暂时没有答案，但值得以后重新拿起来。',
+    source_refs: [{ turn_id: 'soil-guard-turn', role: 'assistant' }],
+    source_excerpt: '新版思维壤按此刻重写桌面',
+  }],
 });
-assert.equal(replacedSoilData.soil.hand_seeds.length, 1, 'replace may return fewer seeds than the old soil');
-assert.equal(replacedSoilData.soil.hand_seeds[0].life_core, '只留下此刻真正值得手持的一粒');
-assert.equal(replacedSoilData.soil.hand_seeds.some((seed) => seed.life_core === oldHandSeeds[1].life_core), false, 'replace must let stale seeds leave');
-assert.equal(replacedSoilData.soil.do_not_repeat, '新的勿复读提醒');
+assert.equal(routedSoilData.soil.afterthoughts.length, 1);
+assert.equal(routedSoilData.soil.memory_candidates[0].title, '应被记住的决定');
+assert.equal(routedSoilData.soil.seed_candidates[0].title, '仍可生长的问题');
+assert.equal(routedSoilData.pocket_sync.created, 2, 'memory and seed suggestions both enter the pending pocket');
+const routedPending = await listPockets(db, { conversation_id: conversationD.id, status: 'pending' });
+assert.equal(routedPending.some((pocket) => pocket.suggested_destination === 'memory' && pocket.title === '应被记住的决定'), true);
+assert.equal(routedPending.some((pocket) => pocket.suggested_destination === 'seed' && pocket.title === '仍可生长的问题'), true);
 
-const keptSoilData = await organizeConversationD({
-  current_text: '明确保留工作台纸条',
-  hand_seeds_mode: 'keep',
-  hand_seeds: [{ name: '不应写入', life_core: 'keep mode 不应使用这粒返回值', usage_hint: '', avoid_hint: '' }],
-  do_not_repeat_mode: 'keep',
-  do_not_repeat: 'keep mode 不应使用这段返回值',
-  pocket_candidates_mode: 'keep',
-  pocket_candidates: [],
+const nextSnapshotData = await organizeConversationD({
+  current_text: '候选已经递往待确认区，当前桌面可以自然放下它们',
+  afterthoughts: [],
+  memory_candidates: [],
+  seed_candidates: [],
 });
-assert.equal(keptSoilData.soil.hand_seeds.length, 1);
-assert.equal(keptSoilData.soil.hand_seeds[0].life_core, '只留下此刻真正值得手持的一粒', 'keep must preserve old hand seeds');
-assert.equal(keptSoilData.soil.do_not_repeat, '新的勿复读提醒', 'keep must preserve old do-not-repeat');
-
-const clearedSoilData = await organizeConversationD({
-  current_text: '明确清理过时提醒',
-  hand_seeds_mode: 'clear',
-  hand_seeds: [{ name: 'clear 忽略值', life_core: '这粒不应写入', usage_hint: '', avoid_hint: '' }],
-  do_not_repeat_mode: 'clear',
-  do_not_repeat: '这段也不应写入',
-  pocket_candidates_mode: 'keep',
-  pocket_candidates: [],
-});
-assert.deepEqual(clearedSoilData.soil.hand_seeds, [], 'clear must empty hand seeds');
-assert.equal(clearedSoilData.soil.do_not_repeat, '', 'clear must empty do-not-repeat');
-
-const clearCandidate = {
-  candidate_id: 'clear-display-candidate',
-  title: '退出展示层的旧候选',
-  life_core: '候选退出整理当前对话的纸条展示前必须先进入 pending。',
-  content: '清理展示层不等于删除待确认区。',
-  usage_hint: '验证 clear mode 的展示层边界。',
-  avoid_hint: '不要把 clear 解释成删除 pocket。',
-  source_refs: [{ turn_id: 'soil-guard-turn', role: 'assistant' }],
-  source_excerpt: '自动整理不能把旧壤冲空',
-};
-const beforePocketClearSoil = await readSoil(db, conversationD.id);
-await writeSoil(db, conversationD.id, {
-  current_text: beforePocketClearSoil.current_text,
-  hand_seeds: [{ name: '候选清理时仍保留', life_core: '清候选不影响当前活跃线索', usage_hint: '', avoid_hint: '' }],
-  do_not_repeat: '清候选不影响勿复读',
-  pocket_candidates: [clearCandidate],
-  manual_locked: false,
-  auto_refresh_enabled: true,
-});
-const confirmedBeforeClear = await createPocket(db, {
-  conversation_id: conversationD.id,
-  source_type: 'soil',
-  source_ref: { conversation_id: conversationD.id, turn_id: 'soil-guard-turn', role: 'turn' },
-  source_text: '已经确认的落袋不受整理当前对话的纸条 clear 影响',
-});
-const confirmedBeforeClearResult = await resolvePocket(db, confirmedBeforeClear.id, { action: 'memory', tag: '工程技术' });
-const confirmedBeforeClearId = confirmedBeforeClearResult.pocket.id;
-const confirmedCountBeforeClear = (await listPockets(db, { conversation_id: conversationD.id, status: 'confirmed' })).length;
-const pendingCountBeforePocketClear = (await listPockets(db, { conversation_id: conversationD.id, status: 'pending' })).length;
-const pocketClearData = await organizeConversationD({
-  current_text: '让旧候选退出工作台展示',
-  hand_seeds_mode: 'keep',
-  hand_seeds: [],
-  do_not_repeat_mode: 'keep',
-  do_not_repeat: '',
-  pocket_candidates_mode: 'clear',
-  pocket_candidates: [{ ...clearCandidate, candidate_id: 'clear-mode-ignored-return', life_core: 'clear mode 不应把返回候选重新挂回展示层' }],
-});
-assert.deepEqual(pocketClearData.soil.pocket_candidates, [], 'pocket clear only empties the soil display layer');
-assert.equal(pocketClearData.soil.hand_seeds[0].life_core, '清候选不影响当前活跃线索');
-assert.equal(pocketClearData.soil.do_not_repeat, '清候选不影响勿复读');
-const pendingAfterPocketClear = await listPockets(db, { conversation_id: conversationD.id, status: 'pending' });
-assert.equal(pendingAfterPocketClear.length, pendingCountBeforePocketClear + 1, 'old soil candidate must upsert pending before clear writes the display layer');
-assert.equal(pendingAfterPocketClear.some((pocket) => pocket.life_core === clearCandidate.life_core), true);
-assert.equal(pendingAfterPocketClear.some((pocket) => pocket.life_core === 'clear mode 不应把返回候选重新挂回展示层'), false);
-const confirmedAfterPocketClear = await listPockets(db, { conversation_id: conversationD.id, status: 'confirmed' });
-assert.equal(confirmedAfterPocketClear.length, confirmedCountBeforeClear, 'soil clear mode must not delete confirmed pockets');
-assert.equal(confirmedAfterPocketClear.some((pocket) => pocket.id === confirmedBeforeClearId), true);
+assert.deepEqual(nextSnapshotData.soil.memory_candidates, [], 'successful v2 organize replaces the temporary candidate snapshot');
+assert.deepEqual(nextSnapshotData.soil.seed_candidates, []);
+const routedPendingAfterClear = await listPockets(db, { conversation_id: conversationD.id, status: 'pending' });
+assert.equal(routedPendingAfterClear.length, routedPending.length, 'clearing the temporary soil snapshot does not delete pending pockets');
 
 const manualClearResponse = await routeMemoryApi(new Request(`https://coast.test/api/memory/soil?conversation_id=${conversationD.id}`, {
   method: 'PUT',
   headers: { Origin: 'https://coast.test', 'Content-Type': 'application/json' },
-  body: JSON.stringify({ current_text: '', hand_seeds: [], do_not_repeat: '', pocket_candidates: [], manual_locked: true }),
+  body: JSON.stringify({
+    current_text: '',
+    afterthoughts: [],
+    memory_candidates: [],
+    seed_candidates: [],
+    manual_locked: true,
+  }),
 }), { COAST_CHAT_DB: db, OPENROUTER_API_KEY: 'test-key' });
 const manualClearData = await manualClearResponse.json();
 assert.equal(manualClearResponse.status, 200);
 assert.equal(manualClearData.soil.current_text, '');
-assert.deepEqual(manualClearData.soil.hand_seeds, []);
-assert.equal(manualClearData.soil.do_not_repeat, '');
-assert.deepEqual(manualClearData.soil.pocket_candidates, []);
+assert.deepEqual(manualClearData.soil.afterthoughts, []);
+assert.deepEqual(manualClearData.soil.memory_candidates, []);
+assert.deepEqual(manualClearData.soil.seed_candidates, []);
 assert.equal(manualClearData.soil.manual_locked, true, 'an explicit manual clear must still clear and lock the soil');
 
 const partialToggleResponse = await routeMemoryApi(new Request(`https://coast.test/api/memory/soil?conversation_id=${conversationD.id}`, {
@@ -765,12 +693,14 @@ const providerErrorData = await providerErrorResponse.json();
 assert.equal(providerErrorResponse.status, 200);
 assert.equal(providerErrorData.degraded, true);
 assert.equal(providerErrorData.reason, 'provider_unavailable');
-assert.equal(providerErrorData.soil.current_text, '当前没有需要脱离最近上下文再次复述的承接便签。');
+assert.equal(providerErrorData.soil.current_text, soilBeforeDegradedOrganize.current_text);
 providerStatus = 200;
 
 await writeSoil(db, conversationB.id, {
   current_text: '屋主手动锁定的当前方向',
-  hand_seeds: [],
+  afterthoughts: [],
+  memory_candidates: [],
+  seed_candidates: [],
   manual_locked: true,
 });
 const callsBeforeLockedLanding = providerChatCalls;
