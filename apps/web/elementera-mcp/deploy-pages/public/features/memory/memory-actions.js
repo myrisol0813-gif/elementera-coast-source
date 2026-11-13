@@ -3,13 +3,16 @@ import { MEMORY_FILTER_KINDS, MEMORY_TAGS } from './memory-constants.js';
 import {
   createEntryRequest,
   discardGlobalExcerptCandidateRequest,
+  discardUserPortraitCandidateRequest,
   deleteEntryRequest,
   patchEntryRequest,
   resolvePocketRequest,
   resolveGlobalExcerptCandidateRequest,
+  resolveUserPortraitCandidateRequest,
   saveCustomInstructionsRequest,
   saveSoilRequest,
   setGlobalExcerptWriteEnabledRequest,
+  setUserPortraitWriteEnabledRequest,
 } from './memory-client.js';
 import {
   availableFilterKinds,
@@ -31,6 +34,7 @@ export function createMemoryActions({
   fetchPockets,
   fetchEntries,
   fetchCustomInstructions,
+  fetchUserPortrait,
   fetchGlobalExcerpt,
   fetchVectorStatus,
 }) {
@@ -163,6 +167,32 @@ export function createMemoryActions({
       return router.refresh({ preserveScroll: false });
     }
     if (name === 'entry-new') return router.open('memory-entry-edit', { scope: runtime.libraryTab });
+    if (name === 'user-portrait') {
+      await fetchUserPortrait();
+      return router.open('user-portrait');
+    }
+    if (name === 'user-portrait-toggle') {
+      await setUserPortraitWriteEnabledRequest(target.dataset.value === 'true');
+      await fetchUserPortrait();
+      await router.refresh();
+      toast(target.dataset.value === 'true' ? '用户画像自动整理已开启。' : '用户画像自动整理已关闭；正式正文仍会照常进入上下文。');
+      return;
+    }
+    if (name === 'user-portrait-confirm') {
+      await resolveUserPortraitCandidateRequest(target.dataset.id, { action: 'confirm', operator: 'user' });
+      await fetchUserPortrait();
+      await router.refresh({ preserveScroll: true });
+      toast('用户画像已确认更新。');
+      return;
+    }
+    if (name === 'user-portrait-discard') {
+      await discardUserPortraitCandidateRequest(target.dataset.id);
+      await fetchUserPortrait();
+      await router.refresh({ preserveScroll: true });
+      toast('这条用户画像候选已经消失，正式正文没有改变。');
+      return;
+    }
+    if (name === 'user-portrait-edit') return router.open('user-portrait-edit', { id: target.dataset.id });
     if (name === 'global-excerpt') {
       await fetchGlobalExcerpt();
       return router.open('global-excerpt');
@@ -171,14 +201,14 @@ export function createMemoryActions({
       await setGlobalExcerptWriteEnabledRequest(target.dataset.value === 'true');
       await fetchGlobalExcerpt();
       await router.refresh();
-      toast(target.dataset.value === 'true' ? '全局摘录写入已开启。' : '全局摘录现在只读。');
+      toast(target.dataset.value === 'true' ? '自我画像自动整理已开启。' : '自我画像自动整理已关闭；正式正文仍会照常进入上下文。');
       return;
     }
     if (name === 'global-excerpt-confirm') {
       await resolveGlobalExcerptCandidateRequest(target.dataset.id, { action: 'confirm', operator: 'user' });
       await fetchGlobalExcerpt();
       await router.refresh({ preserveScroll: true });
-      toast('全局摘录已确认更新。');
+      toast('自我画像已确认更新。');
       return;
     }
     if (name === 'global-excerpt-discard') {
@@ -209,13 +239,22 @@ export function createMemoryActions({
       await fetchEntries(runtime.libraryTab);
       return router.refresh({ preserveScroll: false });
     }
+    if (name === 'user-portrait-edit-confirm') {
+      const id = form.dataset.id;
+      await resolveUserPortraitCandidateRequest(id, { action: 'confirm', edited_body: field('body'), operator: 'user' });
+      await fetchUserPortrait();
+      await router.back();
+      await router.refresh({ preserveScroll: true });
+      toast('编辑后的用户画像已确认。');
+      return;
+    }
     if (name === 'global-excerpt-edit-confirm') {
       const id = form.dataset.id;
       await resolveGlobalExcerptCandidateRequest(id, { action: 'confirm', edited_body: field('body'), operator: 'user' });
       await fetchGlobalExcerpt();
       await router.back();
       await router.refresh({ preserveScroll: true });
-      toast('编辑后的全局摘录已确认。');
+      toast('编辑后的自我画像已确认。')
       return;
     }
     if (name === 'entry-save') {
