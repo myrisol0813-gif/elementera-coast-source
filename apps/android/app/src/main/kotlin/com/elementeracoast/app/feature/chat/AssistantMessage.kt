@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,9 +31,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.elementeracoast.app.core.model.ChatMessage
 import com.elementeracoast.app.core.model.MessageAction
+import com.elementeracoast.app.core.model.ThoughtSoilSnapshot
 import com.elementeracoast.app.ui.theme.CoastChatTokens
 import com.elementeracoast.app.ui.theme.coastReadingMessageStyle
 import com.elementeracoast.app.ui.theme.SnowLetterSurface
@@ -43,11 +46,14 @@ import com.elementeracoast.app.ui.theme.snowLetterInnerPadding
 internal fun AssistantMessage(
     conversationId: String,
     message: ChatMessage,
+    timeLabel: String,
     metadataMessageId: String?,
     metadataSource: ModelMetadataRemoteDataSource,
     isStreamingTail: Boolean,
     avatarBitmap: ImageBitmap?,
+    thoughtSoil: ThoughtSoilSnapshot?,
     onAvatarClick: () -> Unit,
+    onOpenThoughtSoil: () -> Unit,
     onCopy: () -> Unit,
     voiceClips: List<VoiceClip>,
     onVoice: () -> Unit,
@@ -66,6 +72,18 @@ internal fun AssistantMessage(
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             AssistantAvatar(avatarBitmap, onAvatarClick)
+            if (timeLabel.isNotBlank()) {
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = timeLabel,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .52f),
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+            if (thoughtSoil != null) {
+                Spacer(Modifier.width(12.dp))
+                ThoughtSoilHeaderPill(soil = thoughtSoil, onClick = onOpenThoughtSoil)
+            }
         }
         Spacer(Modifier.height(8.dp))
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -129,6 +147,26 @@ internal fun AssistantMessage(
             }
             GenerationFootprint(message, onFootprint, Modifier.align(Alignment.End))
         }
+    }
+}
+
+@Composable
+private fun ThoughtSoilHeaderPill(soil: ThoughtSoilSnapshot, onClick: () -> Unit) {
+    val label = "整理纸条 · ${soil.afterthoughts.size} 条余思"
+    SnowLetterSurface(
+        modifier = Modifier.clickable(onClick = onClick),
+        role = SnowLetterSurfaceRole.StatusCard,
+        fallbackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .42f),
+        fallbackShape = RoundedCornerShape(999.dp)
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .88f),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
