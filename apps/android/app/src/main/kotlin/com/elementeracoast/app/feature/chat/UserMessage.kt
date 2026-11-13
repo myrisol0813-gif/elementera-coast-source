@@ -35,6 +35,7 @@ import com.elementeracoast.app.ui.theme.snowLetterInnerPadding
 internal fun UserMessage(
     conversationId: String,
     message: ChatMessage,
+    timeLabel: String,
     attachmentPreviewSource: AttachmentPreviewRemoteDataSource,
     onCopy: () -> Unit,
     onEdit: () -> Unit,
@@ -55,6 +56,14 @@ internal fun UserMessage(
         Row(modifier = Modifier.fillMaxWidth()) {
             Spacer(Modifier.weight(1f))
             Column(modifier = Modifier.widthIn(max = maxBubble), horizontalAlignment = Alignment.End) {
+                if (timeLabel.isNotBlank()) {
+                    Text(
+                        text = timeLabel,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .52f),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
                 val bubbleShape = RoundedCornerShape(CoastChatTokens.UserBubbleRadius)
                 if (message.text.isNotBlank()) {
                     SnowLetterSurface(
