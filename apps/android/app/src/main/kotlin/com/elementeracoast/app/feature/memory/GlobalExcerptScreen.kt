@@ -39,6 +39,8 @@ import com.elementeracoast.app.ui.theme.SnowLetterSurface
 import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
 import kotlinx.coroutines.launch
 
+enum class PortraitKind { User, Self }
+
 private data class ExcerptDiffPreview(
     val proposed: AnnotatedString,
     val removedText: String
@@ -47,10 +49,12 @@ private data class ExcerptDiffPreview(
 @Composable
 fun GlobalExcerptScreen(
     repository: MemoryRepository,
+    kind: PortraitKind,
     onSnackbar: (String) -> Unit
 ) {
     val snapshot by repository.snapshot.collectAsState()
-    val excerpt = snapshot.globalExcerpt
+    val portraitName = if (kind == PortraitKind.User) "用户画像" else "自我画像"
+    val excerpt = if (kind == PortraitKind.User) snapshot.userPortrait else snapshot.globalExcerpt
     val scope = rememberCoroutineScope()
     var guidanceOpen by remember { mutableStateOf(false) }
     var historyOpen by remember { mutableStateOf(false) }
@@ -60,9 +64,10 @@ fun GlobalExcerptScreen(
     var busyId by remember { mutableStateOf<String?>(null) }
     var clearConfirmation by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        runCatching { repository.refreshGlobalExcerpt() }
-            .onFailure { onSnackbar("全局摘录读取失败：${it.message ?: "未知错误"}") }
+    LaunchedEffect(kind) {
+        runCatching {
+            if (kind == PortraitKind.User) repository.refreshUserPortrait() else repository.refreshGlobalExcerpt()
+        }.onFailure { onSnackbar("${portraitName}读取失败：${it.message ?: "未知错误"}") }
     }
 
     fun runAction(id: String = "excerpt", success: String, block: suspend () -> Unit) {
@@ -71,7 +76,7 @@ fun GlobalExcerptScreen(
         scope.launch {
             runCatching { block() }
                 .onSuccess { onSnackbar(success) }
-                .onFailure { onSnackbar("全局摘录操作失败：${it.message ?: "未知错误"}") }
+                .onFailure { onSnackbar("${portraitName}操作失败：${it.message ?: "未知错误"}") }
             busyId = null
         }
     }
@@ -79,7 +84,7 @@ fun GlobalExcerptScreen(
     if (clearConfirmation) {
         AlertDialog(
             onDismissRequest = { if (busyId == null) clearConfirmation = false },
-            title = { Text("清空全局摘录正文？") },
+            title = { Text("清空${portraitName}正文？") },
             text = {
                 Text("正式正文会变为空白；已有修改历史仍保留，待确认候选不会删除。不会影响当前对话纸条、记忆、种子或聊天。")
             },
@@ -88,8 +93,8 @@ fun GlobalExcerptScreen(
                     enabled = busyId == null,
                     onClick = {
                         val version = excerpt.revision
-                        runAction("clear", "全局摘录正文已清空，历史仍可查看。") {
-                            repository.clearGlobalExcerpt(version)
+                        runAction("clear", "${portraitName}正文已清空，历史仍可查看。") {
+                            if (kind == PortraitKind.User) repository.clearUserPortrait(version) else repository.clearGlobalExcerpt(version)
                             clearConfirmation = false
                         }
                     }
@@ -123,9 +128,9 @@ fun GlobalExcerptScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text("写入说明 / 收录准则", fontWeight = FontWeight.SemiBold)
+                            Text("画像前置 / 书写目光", fontWeight = FontWeight.SemiBold)
                             Text(
-                                "给模型看的写入边界，与正式正文分开。",
+                                "这段目光陪着模型思考何时值得更新画像。",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall
                             )
@@ -135,7 +140,7 @@ fun GlobalExcerptScreen(
                     if (guidanceOpen) {
                         Spacer(Modifier.height(10.dp))
                         Text(
-                            excerpt.writeGuidance.ifBlank { "这里只沉积真正有重量的长期认知变化；候选必须经过确认后才进入正式正文。" },
+                            excerpt.writeGuidance.ifBlank { "怀着珍重而安稳的心情思考，在觉得应更改时更改。" },
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -155,9 +160,9 @@ fun GlobalExcerptScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("模型写入", fontWeight = FontWeight.SemiBold)
+                        Text("自动整理", fontWeight = FontWeight.SemiBold)
                         Text(
-                            if (excerpt.writeEnabled) "开启 · 模型可提出候选，仍需用户确认" else "关闭 · 正式正文只读，不生成候选",
+                            if (excerpt.writeEnabled) "开启 · 思维壤可在觉得应更改时提出候选" else "关闭 · 思维壤不自动生成画像候选",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -166,8 +171,9 @@ fun GlobalExcerptScreen(
                         checked = excerpt.writeEnabled,
                         enabled = busyId == null,
                         onCheckedChange = { enabled ->
-                            runAction(success = if (enabled) "全局摘录写入已开启。" else "全局摘录现在只读。") {
-                                repository.setGlobalExcerptWriteEnabled(enabled)
+                            runAction(success = if (enabled) "${portraitName}自动整理已开启。" else "${portraitName}自动整理已关闭；正式正文仍会照常进入上下文。") {
+                                if (kind == PortraitKind.User) repository.setUserPortraitWriteEnabled(enabled)
+                                else repository.setGlobalExcerptWriteEnabled(enabled)
                             }
                         }
                     )
@@ -197,7 +203,7 @@ fun GlobalExcerptScreen(
                 fallbackShape = RoundedCornerShape(20.dp)
             ) {
                 Text(
-                    excerpt.body.ifBlank { "这里还是空白的。今后确认的摘录会出现在这里。" },
+                    excerpt.body.ifBlank { "这里还是空白的。今后确认的画像正文会出现在这里。" },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 18.dp),
                     style = MaterialTheme.typography.bodyLarge
                 )
@@ -269,8 +275,9 @@ fun GlobalExcerptScreen(
                                 Button(
                                     enabled = busyId == null && editBody.isNotBlank(),
                                     onClick = {
-                                        runAction(candidate.id, "编辑后的全局摘录已确认。") {
-                                            repository.confirmGlobalExcerptCandidate(candidate.id, editBody)
+                                        runAction(candidate.id, "编辑后的${portraitName}已确认。") {
+                                            if (kind == PortraitKind.User) repository.confirmUserPortraitCandidate(candidate.id, editBody)
+                                            else repository.confirmGlobalExcerptCandidate(candidate.id, editBody)
                                             editingCandidateId = null
                                         }
                                     }
@@ -282,8 +289,9 @@ fun GlobalExcerptScreen(
                                 Button(
                                     enabled = busyId == null,
                                     onClick = {
-                                        runAction(candidate.id, "全局摘录已确认更新。") {
-                                            repository.confirmGlobalExcerptCandidate(candidate.id)
+                                        runAction(candidate.id, "${portraitName}已确认更新。") {
+                                            if (kind == PortraitKind.User) repository.confirmUserPortraitCandidate(candidate.id)
+                                            else repository.confirmGlobalExcerptCandidate(candidate.id)
                                         }
                                     }
                                 ) { Text("确认") }
@@ -295,7 +303,8 @@ fun GlobalExcerptScreen(
                                     enabled = busyId == null,
                                     onClick = {
                                         runAction(candidate.id, "这条候选已经消失，正式正文没有改变。") {
-                                            repository.discardGlobalExcerptCandidate(candidate.id)
+                                            if (kind == PortraitKind.User) repository.discardUserPortraitCandidate(candidate.id)
+                                            else repository.discardGlobalExcerptCandidate(candidate.id)
                                         }
                                     }
                                 ) { Text("驳回") }
