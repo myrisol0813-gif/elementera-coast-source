@@ -44,6 +44,7 @@ assert.deepEqual([...routes.keys()], ['island-letter']);
 
 const lettersSource = await readFile(new URL('../elementera-mcp/deploy-pages/public/features/letters.js', import.meta.url), 'utf8');
 const indexSource = await readFile(new URL('../elementera-mcp/deploy-pages/index.html', import.meta.url), 'utf8');
+const windowSettingsSource = await readFile(new URL('../elementera-mcp/deploy-pages/public/features/chat/chat-window-settings.js', import.meta.url), 'utf8');
 const workerSource = await readFile(new URL('../elementera-mcp/deploy-pages/service-worker.js', import.meta.url), 'utf8');
 for (const retired of [
   'lovebookView', 'penView', 'promote', 'save-love', 'copy-love-core', 'copy-love-full',
@@ -54,7 +55,9 @@ for (const retiredUi of ['予爱机书', '转为予爱机书', '屋主添笔', '
 }
 assert.match(lettersSource, /defaultIslandLetter/);
 assert.match(lettersSource, /chat\.sendLandingLetter/);
-assert.match(indexSource, /aria-label="登岛信"/);
+assert.match(indexSource, /aria-label="这个窗口"/);
+assert.match(windowSettingsSource, /window-letter-open/);
+assert.match(windowSettingsSource, />登岛信<\/button>/);
 assert.match(workerSource, /\/public\/content\/island-letter\.js/);
 assert.equal(workerSource.includes('/public/content/letters.js'), false);
 
