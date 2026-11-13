@@ -249,10 +249,16 @@
 .sidebar {
   position: fixed;
   z-index: 40;
-  inset: 0 auto 0 0;
+  top: 0;
+  left: 0;
+  bottom: auto;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   width: var(--sidebar-width);
+  height: var(--app-viewport-height, 100svh);
+  max-height: var(--app-viewport-height, 100svh);
+  min-height: 0;
+  overflow: hidden;
   padding: var(--safe-top) 0 var(--safe-bottom);
   border-right: 1px solid var(--line);
   background: var(--surface);
@@ -302,10 +308,12 @@
 
 .sidebar-content {
   min-height: 0;
+  height: 100%;
+  overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
   padding: 10px;
 }
 
