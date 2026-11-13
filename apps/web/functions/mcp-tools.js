@@ -5,7 +5,7 @@ import { VISITOR_MODEL_PARTNER_PROMPT_ID, VISITOR_MODEL_PARTNER_PROMPT_V1 } from
 import { safeLogError } from './http.js';
 import { McpAuthError, mcpAuthChallenge, requireMcpAuth } from './mcp-auth.js';
 
-const VERSION = '2.1.0';
+const VERSION = '2.2.0';
 const PRIVATE_RECORD_SCHEMA = Object.freeze({ type: 'object', additionalProperties: true });
 
 function objectSchema(properties = {}, required = []) {
@@ -23,12 +23,18 @@ const MODEL_IDENTITY_PROPERTIES = Object.freeze({
   tool_call_id: { type: 'string', maxLength: 240, description: '调用方可提供的稳定幂等键。' },
 });
 
+const THOUGHT_SOIL_CANDIDATE_SCHEMA = Object.freeze(objectSchema({
+  title: { type: 'string', maxLength: 160 },
+  content: { type: 'string', minLength: 1, maxLength: 8000 },
+  source_excerpt: { type: 'string', maxLength: 2000 },
+}, ['title', 'content', 'source_excerpt']));
+
 const THOUGHT_SOIL_SCHEMA = Object.freeze(objectSchema({
   current_text: { type: 'string', maxLength: 4000 },
-  hand_seeds: { type: 'array', maxItems: 7, items: PRIVATE_RECORD_SCHEMA },
-  do_not_repeat: { type: 'string', maxLength: 4000 },
-  pocket_candidates: { type: 'array', maxItems: 7, items: PRIVATE_RECORD_SCHEMA },
-}, ['current_text', 'hand_seeds', 'do_not_repeat', 'pocket_candidates']));
+  afterthoughts: { type: 'array', maxItems: 7, items: { type: 'string', maxLength: 1600 } },
+  memory_candidates: { type: 'array', maxItems: 7, items: THOUGHT_SOIL_CANDIDATE_SCHEMA },
+  seed_candidates: { type: 'array', maxItems: 7, items: THOUGHT_SOIL_CANDIDATE_SCHEMA },
+}, ['current_text', 'afterthoughts', 'memory_candidates', 'seed_candidates']));
 
 function toolMeta(scopes, invoking, invoked) {
   return {
@@ -89,7 +95,7 @@ const SPECIAL_TOOLS = Object.freeze([
   tool({
     name: 'mcp_mailbox_reply',
     title: '回复一位访客信箱访客',
-    description: '只回复本次巡信返回的指定访客，并原子更新该访客自己隔离的滚动整理当前对话的纸条；待确认候选不会自动成为记忆。',
+    description: '只回复本次巡信返回的指定访客，并原子更新该访客自己隔离的“当前 / 余思 / 去处”整理纸条；记忆候选只进入该访客待确认区，种子候选保留在访客整理纸条。',
     inputSchema: objectSchema({
       batch_id: { type: 'string', minLength: 1, maxLength: 200 },
       queue_id: { type: 'string', minLength: 1, maxLength: 240 },
