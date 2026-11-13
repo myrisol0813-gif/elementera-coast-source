@@ -169,7 +169,12 @@ class ChatGptPlanRepository(
         completeText(model, "请只回答：海岸已连接。")
 
     /** Also used for plan-funded thought-soil, never routed to OpenRouter. */
-    suspend fun completeText(model: String, prompt: String): ChatGptProbeResult = mutex.withLock {
+    suspend fun completeText(
+        model: String,
+        prompt: String,
+        reasoningEffort: String? = null,
+        maxOutputTokens: Int? = null
+    ): ChatGptProbeResult = mutex.withLock {
         require(model.isNotBlank() && prompt.isNotBlank())
         val access = withContext(Dispatchers.IO) { activeCredentials().accessToken }
         withContext(Dispatchers.IO) {
@@ -181,6 +186,12 @@ class ChatGptPlanRepository(
                 }) })
                 put("store", false)
                 put("stream", true)
+                if (reasoningEffort != null) put("reasoning", buildJsonObject {
+                    put("effort", reasoningEffort)
+                })
+                if (maxOutputTokens != null) {
+                    put("max_output_tokens", maxOutputTokens.coerceIn(256, 10000))
+                }
             }.toString()
             val request = Request.Builder()
                 .url("https://api.openai.com/v1/responses")

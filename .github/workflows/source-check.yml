@@ -45,8 +45,8 @@ jobs:
         run: |
           set -euo pipefail
           grep -Fq 'applicationId = "com.elementeracoast.source"' app/build.gradle.kts
-          grep -Fq 'versionCode = 16' app/build.gradle.kts
-          grep -Fq 'versionName = "0.2.14-source"' app/build.gradle.kts
+          grep -Fq 'versionCode = 17' app/build.gradle.kts
+          grep -Fq 'versionName = "0.2.15-source"' app/build.gradle.kts
           ! grep -Eiq 'app[.]elementeracoast[.]com' app/build.gradle.kts
       - name: Verify Source visitor release version plumbing
         shell: bash
@@ -87,7 +87,7 @@ jobs:
           "$build_tools/apksigner" verify --verbose --min-sdk-version 23 "$signed_apk" >/dev/null
           badging="$("$build_tools/aapt" dump badging "$signed_apk" | sed -n '1p')"
           [[ "$badging" == *"name='com.elementeracoast.source'"* ]]
-          [[ "$badging" == *"versionCode='16'"* ]]
-          [[ "$badging" == *"versionName='0.2.14-source'"* ]]
+          [[ "$badging" == *"versionCode='17'"* ]]
+          [[ "$badging" == *"versionName='0.2.15-source'"* ]]
       - name: Show build-only result
         run: echo "Android Source checks passed; Debug and disposable-signed Release packaging both verified."

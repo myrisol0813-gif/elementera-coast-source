@@ -113,7 +113,7 @@ For a longer-lived setup, replace the Quick Tunnel with your own hosted source b
 - [Model workspace and tool records](#model-workspace-and-tool-records)
 - [Attachments, files, and search surfaces](#attachments-files-and-search-surfaces)
 - [MCP and external-interface experiments](#mcp-and-external-interface-experiments)
-- [Current feature status (0.2.14-source)](#current-feature-status-0214-source)
+- [Current feature status (0.2.15-source)](#current-feature-status-0215-source)
 - [Android APK downloads and history](#android-apk-downloads-and-history)
 - [Running and testing](#running-and-testing)
 - [Configuration](#configuration)
@@ -469,8 +469,8 @@ Source identity:
 ```text
 App: Elementera Coast Source
 applicationId = com.elementeracoast.source
-versionCode = 16
-versionName = 0.2.14-source
+versionCode = 17
+versionName = 0.2.15-source
 ```
 
 The Android client keeps the copied native application structure, including areas such as:
@@ -608,13 +608,13 @@ They should be treated as experimental.
 
 The source Native client now includes the original owner calendar, Tidal Library shelf and reader, EPUB/TXT import and audio-clip actions, using the same source backend contracts as the PWA. Only the interface and generic implementation are mirrored; private data, accounts, identities and signing are excluded. See [Native parity acceptance](docs/SOURCE_NATIVE_PARITY_2026-10-21.md).
 
-## Current feature status (0.2.14-source)
+## Current feature status (0.2.15-source)
 
-The source tree currently identifies the Android app as `0.2.14-source` (`versionCode=16`). The PWA cache is currently `coast-source-app-14`.
+The source tree currently identifies the Android app as `0.2.15-source` (`versionCode=17`). The PWA cache is currently `coast-source-app-14`.
 
 ### Thought Soil v2
 
-The current Source build exposes the per-conversation work note as **Current / Afterthoughts / Destinations**. The PWA and Native client share the same v2 contract, while the public UI keeps the more generic “current conversation note” wording. Suggested memory and seed destinations remain reviewable: they can be confirmed, redirected, or discarded before becoming long-term state. Legacy D1 columns are retained only for historical schema compatibility; the v2 runtime no longer reads or writes the old hand-seed / do-not-repeat / pocket-candidate soil fields.
+The current Source build exposes the per-conversation work note as **Current / Afterthoughts / Destinations**. Native ChatGPT-plan Thought Soil organization also prefers the lightest reasoning effort explicitly advertised by the selected model (`none`, then `minimal`, then `low`) and applies the organizer output cap only when that light reasoning mode is known to be supported; ordinary chat reasoning remains unchanged. The PWA and Native client share the same v2 contract, while the public UI keeps the more generic “current conversation note” wording. Suggested memory and seed destinations remain reviewable: they can be confirmed, redirected, or discarded before becoming long-term state. Legacy D1 columns are retained only for historical schema compatibility; the v2 runtime no longer reads or writes the old hand-seed / do-not-repeat / pocket-candidate soil fields.
 
 ### Conversation Reality Context and response mode
 
@@ -630,7 +630,7 @@ The current Source PWA cache is `coast-source-app-14`.
 
 ### Native appearance
 
-`0.2.14-source` restores the optional **奶油纸牌 / Cream Paper** Native theme on top of the Reality Context work. The theme wardrobe and appearance screen expose cream/blush cards, cocoa outlines and hard offset shadows across chat chrome and common settings surfaces. This is Native-only visual styling; it does not replace the PWA's separate web theme system.
+`0.2.14-source` restored the optional **奶油纸牌 / Cream Paper** Native theme on top of the Reality Context work. `0.2.15-source` keeps that appearance work and adds the lightweight ChatGPT-plan Thought Soil organizer policy described above. The theme wardrobe and appearance screen expose cream/blush cards, cocoa outlines and hard offset shadows across chat chrome and common settings surfaces. This is Native-only visual styling; it does not replace the PWA's separate web theme system.
 
 ### Local ChatGPT plan connection
 
@@ -645,7 +645,7 @@ The public visitor publisher and temporary Live ChatGPT QA path build an **unsig
 | Surface | Available in the current open-source implementation | Configuration / limits |
 | --- | --- | --- |
 | Web / PWA | Conversation UI, streaming/SSE paths, per-window context settings, visible context/tool records, owner/visitor separation, memory/world-book workspaces, attachments | Browser-visible Reality is limited to fields the PWA can honestly provide; device-only fields stay locked |
-| Android Native | Jetpack Compose chat/Daily/calendar/library/memory surfaces, local ChatGPT connection, Reality device fields, themes including Cream Paper | `0.2.14-source`, `versionCode=16`; visitor builds are Source-only and disposable-signed |
+| Android Native | Jetpack Compose chat/Daily/calendar/library/memory surfaces, local ChatGPT connection, Reality device fields, themes including Cream Paper | `0.2.15-source`, `versionCode=17`; visitor builds are Source-only and disposable-signed |
 | Owner calendar | Entries, notes, edits/deletion and recurrence | Requires self-hosted backend/storage; calendar can feed the next seven days into Reality Context when selected |
 | Tidal Library | TXT/EPUB imports, shelf/cover, chapter/page navigation, progress, highlights, annotations, reader options | PWA and Native use the same backend contracts when pointed at the same host |
 | Voice clips | Message-linked speech clip controls, playback and authorized generation endpoints | Actual generation needs self-hosted `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` |
@@ -661,7 +661,7 @@ Historical implementation milestones belong in [source release history](docs/SOU
 - **Live ChatGPT test:** fork the repository, enable Actions and run [Live ChatGPT Test](.github/workflows/source-live-chatgpt-test.yml). It builds a fresh temporary APK and backend; fetch the package and random login password from that run's Draft Release during its test window.
 - **Persistent self-hosting:** configure your own Pages/D1 backend, Android API URL and signing setup. See [deployment instructions](docs/SOURCE_DEMO_PWA_APK.md) and [configuration](#configuration). Neither private production credentials nor signing keys are shipped.
 
-**Version clarity:** the source tree is currently `0.2.14-source` (`versionCode=16`), whereas [Latest Releases](../../releases/latest) is the authoritative download target as newer builds are published. Each visitor QA build uses disposable signing material and normally cannot be installed as an in-place update over a separately signed QA APK. Uninstall only `com.elementeracoast.source` if Android reports a signing conflict; this does not affect any separately packaged private installation.
+**Version clarity:** the source tree is currently `0.2.15-source` (`versionCode=17`), whereas [Latest Releases](../../releases/latest) is the authoritative download target as newer builds are published. Each visitor QA build uses disposable signing material and normally cannot be installed as an in-place update over a separately signed QA APK. Uninstall only `com.elementeracoast.source` if Android reports a signing conflict; this does not affect any separately packaged private installation.
 
 **Older builds are not recommended downloads.** The `0.2.6` through `0.2.9` visitor packages are superseded; `0.2.9` was reported rejected by a phone installer and withdrawn. Earlier `0.2.2` Quick Tunnel demos and the original `v0.1-source` preview are historical milestones, not current installation instructions; the `v0.1-source` release is no longer available on the Releases page. Keep their implementation notes in [source release history](docs/SOURCE_RELEASE_HISTORY.md), not in the current APK download instructions.
 
@@ -805,7 +805,7 @@ You should expect to fork, rename, configure, simplify, and replace parts of it 
 
 ## Project status
 
-The repository began with `v0.1-source`; the current Android source identity is `0.2.14-source` (`versionCode=16`), with the PWA and backend continuing to evolve independently under the same source tree.
+The repository began with `v0.1-source`; the current Android source identity is `0.2.15-source` (`versionCode=17`), with the PWA and backend continuing to evolve independently under the same source tree.
 
 It remains a reference implementation rather than a mature framework or hosted product. Current feature status is documented above; older milestones and superseded QA flows are kept in [docs/SOURCE_RELEASE_HISTORY.md](docs/SOURCE_RELEASE_HISTORY.md).
 
