@@ -167,7 +167,7 @@ export function parseStrictJson(value) {
       }
     }
   }
-  throw new MemoryStoreError('soil_organize_invalid', '思维壤整理结果格式无效。', 502);
+  throw new MemoryStoreError('soil_organize_invalid', '整理当前对话的纸条整理结果格式无效。', 502);
 }
 
 export function clipSoilContent(value, max = SOIL_REPLY_FIELD_CHARS) {
@@ -250,7 +250,7 @@ export function soilPrompt(turns, oldSoil, options = {}) {
   const context = options.landing
     ? landingSoilContext(turns)
     : boundedSoilContext(replySoilContext(turns, oldSoil));
-  return `思维壤
+  return `整理当前对话的纸条
 
 ① 当前｜current_text
 现在仍需承接的东西。
@@ -308,10 +308,10 @@ export async function organizeConversationSoil(env, conversationId, value) {
   const requestedModel = String(value.model || '').trim().slice(0, 180);
   const planPhase = value.plan_phase || '';
   if (planPhase && !['prepare', 'commit'].includes(planPhase)) {
-    throw new MemoryStoreError('invalid_plan_phase', '无效的本机 GPT 思维壤操作。', 400);
+    throw new MemoryStoreError('invalid_plan_phase', '无效的本机 GPT 整理当前对话的纸条操作。', 400);
   }
   if (planPhase && !/^chatgpt-plan:gpt-[a-z0-9._-]+$/.test(requestedModel)) {
-    throw new MemoryStoreError('invalid_plan_model', '思维壤只能使用已选择的本机 GPT 模型。', 400);
+    throw new MemoryStoreError('invalid_plan_model', '整理当前对话的纸条只能使用已选择的本机 GPT 模型。', 400);
   }
   const settings = soilSettings(value.settings || {});
   const oldSoil = await decorateSoilProvenance(
@@ -336,10 +336,10 @@ export async function organizeConversationSoil(env, conversationId, value) {
   // An older Native app must not silently fall through to a billed Coast
   // provider when a ChatGPT-plan assistant has just completed.
   if (!planPhase && activeModel.startsWith('chatgpt-plan:')) {
-    throw new MemoryStoreError('plan_soil_requires_native', '官端 GPT 思维壤必须由本机套餐模型整理；未调用其他 API。请更新 Native。', 409);
+    throw new MemoryStoreError('plan_soil_requires_native', '官端 GPT 整理当前对话的纸条必须由本机套餐模型整理；未调用其他 API。请更新 Native。', 409);
   }
   if (planPhase && activeModel !== requestedModel) {
-    throw new MemoryStoreError('plan_soil_model_mismatch', '本轮模型与思维壤整理模型不一致。', 409);
+    throw new MemoryStoreError('plan_soil_model_mismatch', '本轮模型与整理当前对话的纸条整理模型不一致。', 409);
   }
   const scheduledTurn = landing
     || reply
@@ -369,7 +369,7 @@ export async function organizeConversationSoil(env, conversationId, value) {
       && Number.isSafeInteger(value.expected_soil_revision)
       && value.expected_soil_revision === oldSoil.revision;
     if (!matches) {
-      throw new MemoryStoreError('plan_soil_stale', '整理期间思维壤或聊天记录已经改变；未覆盖较新的资料。', 409);
+      throw new MemoryStoreError('plan_soil_stale', '整理期间整理当前对话的纸条或聊天记录已经改变；未覆盖较新的资料。', 409);
     }
     if (typeof value.result_text !== 'string' || value.result_text.length > PLAN_SOIL_MAX_RESULT_CHARS) {
       throw new MemoryStoreError('plan_soil_result_invalid', '本轮整理内容长度无效。', 400);
@@ -385,7 +385,7 @@ export async function organizeConversationSoil(env, conversationId, value) {
         || !Array.isArray(organized.afterthoughts)
         || !Array.isArray(organized.memory_candidates)
         || !Array.isArray(organized.seed_candidates)) {
-        throw new MemoryStoreError('soil_organize_invalid', 'GPT 整理结果不符合思维壤格式；旧资料保持不变。', 422);
+        throw new MemoryStoreError('soil_organize_invalid', 'GPT 整理结果不符合整理当前对话的纸条格式；旧资料保持不变。', 422);
       }
       const safeUsage = (key) => {
         const n = value.usage?.[key];
@@ -421,7 +421,7 @@ export async function organizeConversationSoil(env, conversationId, value) {
           reasoning: { effort: 'minimal', exclude: true },
         });
         if (result?.finish_reason === 'length') {
-          throw new MemoryStoreError('soil_organize_truncated', '思维壤整理结果被模型长度上限截断。', 502);
+          throw new MemoryStoreError('soil_organize_truncated', '整理当前对话的纸条整理结果被模型长度上限截断。', 502);
         }
         organized = parseStrictJson(result?.message?.content);
         organizedBy = {
