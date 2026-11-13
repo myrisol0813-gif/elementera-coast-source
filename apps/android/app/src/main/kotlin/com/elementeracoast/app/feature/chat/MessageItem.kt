@@ -5,17 +5,21 @@ import androidx.compose.ui.graphics.ImageBitmap
 import com.elementeracoast.app.core.model.ChatMessage
 import com.elementeracoast.app.core.model.MessageAction
 import com.elementeracoast.app.core.model.MessageRole
+import com.elementeracoast.app.core.model.ThoughtSoilSnapshot
 
 @Composable
 internal fun MessageItem(
     conversationId: String,
     message: ChatMessage,
+    timeLabel: String,
     isStreamingTail: Boolean,
     avatarBitmap: ImageBitmap?,
+    thoughtSoil: ThoughtSoilSnapshot?,
     metadataMessageId: String?,
     metadataSource: ModelMetadataRemoteDataSource,
     attachmentPreviewSource: AttachmentPreviewRemoteDataSource,
     onAvatarClick: () -> Unit,
+    onOpenThoughtSoil: () -> Unit,
     onCopy: (ChatMessage) -> Unit,
     voiceClips: List<VoiceClip>,
     onVoice: (ChatMessage) -> Unit,
@@ -28,6 +32,7 @@ internal fun MessageItem(
         MessageRole.User -> UserMessage(
             conversationId = conversationId,
             message = message,
+            timeLabel = timeLabel,
             attachmentPreviewSource = attachmentPreviewSource,
             onCopy = { onCopy(message) },
             onEdit = { onEdit(message) },
@@ -36,11 +41,14 @@ internal fun MessageItem(
         MessageRole.Assistant -> AssistantMessage(
             conversationId = conversationId,
             message = message,
+            timeLabel = timeLabel,
             metadataMessageId = metadataMessageId,
             metadataSource = metadataSource,
             isStreamingTail = isStreamingTail,
             avatarBitmap = avatarBitmap,
+            thoughtSoil = thoughtSoil,
             onAvatarClick = onAvatarClick,
+            onOpenThoughtSoil = onOpenThoughtSoil,
             onCopy = { onCopy(message) },
             voiceClips = voiceClips,
             onVoice = { onVoice(message) },
