@@ -169,6 +169,10 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.memory-tabs.memory-tabs-six {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
 .memory-tabs button {
   min-height: 40px;
   border: 0;
@@ -1557,7 +1561,8 @@
 }
 
 @media (max-width: 620px) {
-  .memory-tabs.memory-tabs-five {
+  .memory-tabs.memory-tabs-five,
+  .memory-tabs.memory-tabs-six {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
