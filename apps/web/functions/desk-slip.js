@@ -111,7 +111,8 @@ function safeCrossWindow(value, ownerVisible) {
 export function createDeskSlip({
   ownerVisible = true, currentMessage = '', recentMessages = [], customInstructions = '', customInstructionsDelivered = false,
   globalExcerpt = '', globalExcerptStatus = 'empty', globalExcerptTokens = 0,
-  soil = false, soilEnabled = true, soilContext = '', soilCurrentText = '', soilHandSeeds = [], soilPocketCandidatesCount = 0,
+  soil = false, soilEnabled = true, soilContext = '', soilCurrentText = '', soilAfterthoughts = [],
+  soilMemoryCandidatesCount = 0, soilSeedCandidatesCount = 0,
   memoryItems = [], memoryDeliveredTexts = [], worldbookItems = [], worldbookDeliveredCount = 0, worldbookDeliveredTexts = [],
   dogtalk = false, dogtalkContext = '', crossWindow = null, workbenchPrompt = false, workbenchPromptText = '',
   reality = null, responseMode = null, modelVisibleTools = [], backendTools = [],
@@ -128,8 +129,8 @@ export function createDeskSlip({
   const words = matchedWorldbook.map((item, index) => worldbookItem(item, index < deliveredWorldbookCount, worldbookTexts[index]));
   const results = (Array.isArray(toolResults) ? toolResults : []).map(toolResultItem); const customText = String(customInstructions ?? ''); const customFilled = Boolean(customText.trim());
   const excerptText = String(globalExcerpt ?? ''); const excerptFilled = Boolean(excerptText.trim());
-  const soilText = String(soilContext || ''); const soilCurrent = String(soilCurrentText || ''); const handSeeds = (Array.isArray(soilHandSeeds) ? soilHandSeeds : []).map((item) => String(item || '')).filter(Boolean);
-  const soilVisible = Boolean(soilText.trim() || soilCurrent.trim() || handSeeds.length); const dogtalkText = String(dogtalkContext || ''); const workbenchText = String(workbenchPromptText || '');
+  const soilText = String(soilContext || ''); const soilCurrent = String(soilCurrentText || ''); const afterthoughts = (Array.isArray(soilAfterthoughts) ? soilAfterthoughts : []).map((item) => String(item || '')).filter(Boolean);
+  const soilVisible = Boolean(soilText.trim() || soilCurrent.trim() || afterthoughts.length); const dogtalkText = String(dogtalkContext || ''); const workbenchText = String(workbenchPromptText || '');
   const cross = safeCrossWindow(crossWindow, privateDetails);
   const realityValue = reality && typeof reality === 'object' ? reality : {};
   const selectedReality = uniqueStrings(realityValue.selected);
@@ -156,7 +157,18 @@ export function createDeskSlip({
       delivered: excerptFilled, injection: globalExcerptStatus, estimated_tokens: Math.max(0, Number(globalExcerptTokens) || 0),
       length: excerptText.length, content: privateDetails && excerptFilled ? excerptText : '',
     },
-    thinking_soil: { label: '整理当前对话的纸条', description: DESCRIPTIONS.thinking_soil, status: !soilEnabled ? '已关闭 · 本轮未递给' : soil ? '已递给' : '未递给', enabled: Boolean(soilEnabled), delivered: Boolean(soilEnabled && soil), empty: !soilVisible, context: privateDetails && soilEnabled && soil ? soilText : '', current_text: privateDetails && soilEnabled && soil ? soilCurrent : '', hand_seeds: privateDetails && soilEnabled && soil ? handSeeds : [], hand_seeds_count: soilEnabled ? handSeeds.length : 0, pocket_candidates_count: soilEnabled ? Math.max(0, Number(soilPocketCandidatesCount) || 0) : 0, pocket_candidates_status: soilEnabled && Number(soilPocketCandidatesCount) > 0 ? '待确认' : '未递入', pocket_candidates_delivered: false },
+    thinking_soil: {
+      label: '整理当前对话的纸条', description: DESCRIPTIONS.thinking_soil,
+      status: !soilEnabled ? '已关闭 · 本轮未递给' : soil ? '已递给' : '未递给',
+      enabled: Boolean(soilEnabled), delivered: Boolean(soilEnabled && soil), empty: !soilVisible,
+      context: privateDetails && soilEnabled && soil ? soilText : '',
+      current_text: privateDetails && soilEnabled && soil ? soilCurrent : '',
+      afterthoughts: privateDetails && soilEnabled && soil ? afterthoughts : [],
+      afterthoughts_count: soilEnabled ? afterthoughts.length : 0,
+      memory_candidates_count: soilEnabled ? Math.max(0, Number(soilMemoryCandidatesCount) || 0) : 0,
+      seed_candidates_count: soilEnabled ? Math.max(0, Number(soilSeedCandidatesCount) || 0) : 0,
+      candidates_delivered: false,
+    },
     related_memory: { label: '相关记忆', description: DESCRIPTIONS.related_memory, status: memories.length ? '已递给' : '未命中', confirmation_status: memories.length ? '已确认' : '', count: memories.length, items: privateDetails ? memories : [] },
     worldbook: { label: '世界书', description: DESCRIPTIONS.worldbook, status: deliveredWorldbookCount > 0 ? '已递给' : words.length ? '未递给' : '未命中', matched_count: words.length, delivered_count: deliveredWorldbookCount, entries: privateDetails ? words : [], matched_titles: words.map((item) => item.title), delivered_titles: words.filter((item) => item.delivered).map((item) => item.title) },
     dogtalk: { label: '私人草稿', description: DESCRIPTIONS.dogtalk, status: dogtalk ? '已递给' : '未递给', delivered: Boolean(dogtalk), context: privateDetails && dogtalk ? dogtalkText : '' },
