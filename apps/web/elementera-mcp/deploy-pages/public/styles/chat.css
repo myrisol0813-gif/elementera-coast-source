@@ -916,14 +916,14 @@
 
 .window-context-header h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: 15px;
   line-height: 1.25;
 }
 
 .window-context-header p {
   margin: 4px 0 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.45;
 }
 
@@ -934,7 +934,7 @@
   border-radius: 50%;
   background: var(--surface-soft);
   color: var(--text-soft);
-  font-size: 21px;
+  font-size: 18px;
   line-height: 1;
 }
 
@@ -955,7 +955,7 @@
 .window-context-row,
 .window-context-link {
   width: 100%;
-  min-height: 52px;
+  min-height: 48px;
   border: 0;
   background: transparent;
   color: var(--text);
@@ -984,7 +984,7 @@
 
 .window-context-copy strong,
 .window-context-link strong {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 650;
 }
 
@@ -992,7 +992,7 @@
 .window-context-link small {
   margin-top: 2px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 9.5px;
   line-height: 1.42;
 }
 
@@ -1089,21 +1089,21 @@
 }
 
 .window-context-note { padding: 11px 12px; }
-.window-context-note strong { font-size: 11px; }
+.window-context-note strong { font-size: 10.5px; }
 .window-context-note p {
   margin: 4px 0 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 9.5px;
   line-height: 1.5;
 }
 
 .window-context-letter {
-  min-height: 40px;
+  min-height: 38px;
   border: 0;
   border-radius: 14px;
   background: var(--surface-soft);
   color: var(--text-soft);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 @media (min-width: 700px) {

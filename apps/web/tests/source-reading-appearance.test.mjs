@@ -18,6 +18,7 @@ assert.match(shell, /document\.documentElement\.dataset\.fontMode/);
 assert.match(tokens, /--coast-font/);
 assert.match(tokens, /:root\[data-font-mode="note"\]/);
 assert.match(tokens, /:root\[data-font-mode="soft"\]/);
+assert.match(tokens, /--reading-size:\s*14px/);
 assert.match(chat, /\.message\.assistant\s*\{\s*display: block/);
 assert.match(chat, /\.message\.assistant \.content\s*\{/);
 assert.match(chat, /\.assistant-text\s*\{[^}]*font-family: var\(--coast-font\)/s);
@@ -28,7 +29,7 @@ assert.match(library, /这里是你的书房，可以保存阅读进度与笔记
 for (const privateCopy of ['我们共用一间书房', '挑一本一起读', '与潮水一起翻书', '双方笔记']) {
   assert.ok(!library.includes(privateCopy), 'Old shared-library wording remains');
 }
-assert.match(sw, /elementera-coast-source-app-11/);
+assert.match(sw, /elementera-coast-source-app-12/);
 const toolDescriptions = await readFile(new URL('../functions/tool-registry-core.js', import.meta.url), 'utf8');
 const libraryApi = await readFile(new URL('../functions/tidal-library-api.js', import.meta.url), 'utf8');
 const libraryImport = await readFile(new URL('../../android/app/src/main/kotlin/com/elementeracoast/app/feature/daily/LibraryImport.kt', import.meta.url), 'utf8');
