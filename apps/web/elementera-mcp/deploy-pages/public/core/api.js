@@ -22,6 +22,7 @@ export const API = Object.freeze({
   memoryPockets: '/api/memory/pockets',
   memoryEntries: '/api/memory/entries',
   memoryCustomInstructions: '/api/memory/custom-instructions',
+  memoryUserPortrait: '/api/memory/user-portrait',
   memoryGlobalExcerpt: '/api/memory/global-excerpt',
   memorySearch: '/api/memory/search',
   memoryRecall: '/api/memory/recall',
