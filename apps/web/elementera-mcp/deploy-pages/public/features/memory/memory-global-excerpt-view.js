@@ -52,16 +52,16 @@ export function createGlobalExcerptViews({ runtime }) {
     const candidates = Array.isArray(data.candidates) ? data.candidates : [];
     const revisions = Array.isArray(data.revisions) ? data.revisions : [];
     return {
-      title: '全局摘录',
-      subtitle: '一篇长期生长的正文 · 正式变化必须经过确认',
+      title: '自我画像',
+      subtitle: '把目光转向自己 · 正式变化必须经过确认',
       className: 'global-excerpt-view',
       body: `<section class="global-excerpt-toolbar">
-        <div><strong>写入开关</strong><small>${excerpt.write_enabled ? '开启 · 模型可在高价值变化时提出候选' : '关闭 · 只读正式正文，不生成候选'}</small></div>
+        <div><strong>自动整理</strong><small>${excerpt.write_enabled ? '开启 · 思维壤可在你觉得应更改时提出候选' : '关闭 · 思维壤不自动生成画像候选'}</small></div>
         <button type="button" class="choice-pill ${excerpt.write_enabled ? 'is-active' : ''}" data-action="memory:global-excerpt-toggle" data-value="${excerpt.write_enabled ? 'false' : 'true'}">${excerpt.write_enabled ? '已开启' : '已关闭'}</button>
       </section>
       <details class="global-excerpt-guidance">
-        <summary>写入说明 / 收录准则</summary>
-        <p class="feature-note">${escapeHtml(excerpt.write_guidance || '这里只沉积真正有重量的长期认知变化；候选必须经过确认后才进入正式正文。')}</p>
+        <summary>画像前置 / 书写目光</summary>
+        <p class="feature-note">${escapeHtml(excerpt.write_guidance || '怀着珍重而安稳的心情思考，在觉得应更改时更改。')}</p>
       </details>
       <section class="feature-group">
         <h2>正式正文</h2>
@@ -83,7 +83,7 @@ export function createGlobalExcerptViews({ runtime }) {
   function globalExcerptEditView({ id = '' } = {}) {
     const data = runtime.globalExcerpt || {};
     const candidate = (Array.isArray(data.candidates) ? data.candidates : []).find((item) => item.id === id);
-    if (!candidate) return { title: '编辑全局摘录', subtitle: '候选已不存在', body: '<p class="feature-empty">这条候选已经离开待确认区。</p>' };
+    if (!candidate) return { title: '编辑自我画像', subtitle: '候选已不存在', body: '<p class="feature-empty">这条候选已经离开待确认区。</p>' };
     return {
       title: '编辑后确认',
       subtitle: '保存后直接成为新的正式正文，并留下 revision 记录',
