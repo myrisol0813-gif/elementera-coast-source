@@ -2,15 +2,9 @@ import { escapeAttribute, escapeHtml, q } from '../../core/dom.js';
 import { normalizeContextSettings } from '../chat-state.js';
 
 const WEB_REALITY_FIELDS = Object.freeze([
-  ['date', '日期', '今天是哪一天', true],
-  ['time', '时间', '当前本地时间与时区', true],
-  ['weather', '天气', '按手动城市读取当前天气', true],
-  ['calendar', '未来 7 天日历', '读取未来 7 天的重要日期', true],
-  ['battery', '电量', '由 Native 读取设备电量', false],
-  ['location', '位置', '由 Native 读取粗粒度城市 / 区域', false],
-  ['recent_app', '最近使用 App', '由 Native 读取进入应用前的最近 App', false],
-  ['app_usage', '今日 App 使用时间', '由 Native 读取今日使用最多的前 5 个 App', false],
-  ['steps', '步数', '由 Native 读取轻量系统计步', false],
+  ['date', '日期', '今天是哪一天'],
+  ['time', '时间', '当前本地时间'],
+  ['calendar', '未来 7 天日历', '读取未来 7 天的重要日期'],
 ]);
 
 
@@ -59,20 +53,14 @@ export function createChatWindowSettings({
     const locked = isUnavailableConversation();
     const fields = new Set(settings.reality_fields);
 
-    const rows = WEB_REALITY_FIELDS.map(([field, title, note, webEnabled]) => {
-      const enabled = !locked && webEnabled;
-      const effectiveNote = webEnabled ? note : `${note} · 仅 Native 可用`;
-      const extra = webEnabled ? '' : '<span class="window-context-lock">Native</span>';
-      return switchRow({
-        field,
-        title,
-        note: effectiveNote,
-        checked: fields.has(field),
-        enabled,
-        action: enabled ? 'chat:window-reality-field' : '',
-        extra,
-      });
-    }).join('');
+    const rows = WEB_REALITY_FIELDS.map(([field, title, note]) => switchRow({
+      field,
+      title,
+      note,
+      checked: fields.has(field),
+      enabled: !locked,
+      action: !locked ? 'chat:window-reality-field' : '',
+    })).join('');
 
     root.innerHTML = `
       <button class="window-context-backdrop" type="button" data-action="chat:window-settings-close" aria-label="关闭窗口设置"></button>
@@ -95,14 +83,6 @@ export function createChatWindowSettings({
             })}
             <div class="window-context-fields ${settings.reality_enabled ? '' : 'is-muted'}">
               ${rows}
-              <div class="window-weather-city ${fields.has('weather') ? '' : 'is-hidden'}">
-                <label for="windowWeatherCity">天气城市</label>
-                <div>
-                  <input id="windowWeatherCity" type="text" maxlength="80" value="${escapeAttribute(settings.weather_city)}" placeholder="例如：太原">
-                  <button type="button" data-action="chat:window-weather-save" ${locked ? 'disabled' : ''}>保存</button>
-                </div>
-                <small>只按这里的城市取天气，不按 VPN / IP 猜位置。</small>
-              </div>
             </div>
           </section>
 
@@ -121,7 +101,7 @@ export function createChatWindowSettings({
 
           <section class="window-context-card window-context-note">
             <strong>PWA 与 Native 的边界</strong>
-            <p>日期、时间、天气和未来 7 天日历可在 PWA 直接设置。电量、位置、最近 App、App 使用时间与步数只由 Native 采集，所以这里固定显示但不能修改。</p>
+            <p>PWA 只递入日期、时间和未来 7 天日历，保持轻量，不在聊天前等待天气或设备信息。完整现实上下文仍由 Native 提供。</p>
           </section>
 
           <button class="window-context-letter" type="button" data-action="chat:window-letter-open">登岛信</button>
@@ -182,16 +162,11 @@ export function createChatWindowSettings({
     }
     if (name === 'window-reality-field') {
       const field = String(target.dataset.field || '');
-      const allowed = WEB_REALITY_FIELDS.find(([key]) => key === field)?.[3] === true;
+      const allowed = WEB_REALITY_FIELDS.some(([key]) => key === field);
       if (!allowed) return;
       const fields = new Set(settings.reality_fields);
       if (fields.has(field)) fields.delete(field); else fields.add(field);
       return writeSettings({ ...settings, reality_fields: [...fields] });
-    }
-    if (name === 'window-weather-save') {
-      const input = q('#windowWeatherCity');
-      const weatherCity = String(input?.value || '').trim().slice(0, 80);
-      return writeSettings({ ...settings, weather_city: weatherCity });
     }
   }
 
