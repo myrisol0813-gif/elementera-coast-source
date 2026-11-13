@@ -67,8 +67,6 @@ export function actionButton(action, title, { active = false, reaction = '' } = 
 function conversationRow(conversation, runtime, roomTypeLabels) {
   const active = conversation.id === runtime.currentId;
   const isRikka = conversation.source === 'rikkahub';
-  const history = runtime.histories.get(conversation.id);
-  const shortMode = history?.context_settings?.short_reply_mode === true;
   const title = isRikka
     ? conversation.title || '【Rikka】未命名窗口'
     : `${roomTypeLabels[conversation.room_type] || roomTypeLabels.main}｜${conversation.title || '新聊天'}`;
@@ -76,8 +74,6 @@ function conversationRow(conversation, runtime, roomTypeLabels) {
     <button class="history-item conversation-title ${active ? 'is-active' : ''}" type="button" data-action="chat:open" data-id="${escapeAttribute(conversation.id)}">${escapeHtml(title)}</button>
     <button class="conversation-more" type="button" data-action="chat:menu" data-id="${escapeAttribute(conversation.id)}" aria-label="窗口操作" aria-expanded="false">${icon('more')}</button>
     <div class="conversation-menu" data-conversation-menu hidden>
-      ${isRikka ? '' : `<button type="button" data-action="chat:toggle-short-mode" data-id="${escapeAttribute(conversation.id)}">短句模式${shortMode ? ' · 开' : ' · 关'}</button>
-      <button type="button" data-action="memory:soil-open" data-conversation-id="${escapeAttribute(conversation.id)}">整理当前对话的纸条</button>`}
       <button type="button" data-action="chat:rename" data-id="${escapeAttribute(conversation.id)}">改名</button>
       <button class="danger" type="button" data-action="chat:delete-conversation" data-id="${escapeAttribute(conversation.id)}">删除</button>
     </div>
