@@ -15,7 +15,6 @@ import com.elementeracoast.app.core.model.CrossWindowSourceSnapshot
 import com.elementeracoast.app.core.model.MessageAction
 import com.elementeracoast.app.core.model.MessageRole
 import com.elementeracoast.app.core.model.RoomType
-import com.elementeracoast.app.core.model.ThoughtSeedSnapshot
 import com.elementeracoast.app.core.model.ThoughtSoilSnapshot
 import com.elementeracoast.app.core.model.TurnDeskReceipt
 import com.elementeracoast.app.core.network.CoastApiErrorKind
@@ -262,7 +261,7 @@ class CoastShellViewModelTest {
 
         assertEquals("本轮递给模型", vm.state.value.turnDeskReceipt?.summary)
         assertEquals(1, fixture.thoughtSoil.organizeCalls)
-        assertEquals(listOf("新芽"), vm.state.value.thoughtSoil?.handSeeds?.map { it.name })
+        assertEquals(listOf("新芽"), vm.state.value.thoughtSoil?.afterthoughts)
     }
 
     @Test
@@ -521,16 +520,16 @@ class CoastShellViewModelTest {
             organizeCalls += 1
             return soil(
                 conversationId,
-                listOf(ThoughtSeedSnapshot("新芽", "本轮新承接", "下一轮继续", "不要机械复读"))
+                listOf("新芽")
             )
         }
 
-        private fun soil(conversationId: String, seeds: List<ThoughtSeedSnapshot>) = ThoughtSoilSnapshot(
+        private fun soil(conversationId: String, afterthoughts: List<String>) = ThoughtSoilSnapshot(
             conversationId = conversationId,
             currentText = "当前窗口继续承接本轮。",
-            handSeeds = seeds,
-            doNotRepeat = "",
-            pocketCandidates = emptyList(),
+            afterthoughts = afterthoughts,
+            memoryCandidates = emptyList(),
+            seedCandidates = emptyList(),
             manualLocked = false,
             revision = 1,
             organizer = "GPT-5.6",
