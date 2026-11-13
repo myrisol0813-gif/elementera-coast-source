@@ -5,6 +5,8 @@ export const MEMORY_ROUTES = new Set([
   'memory',
   'memory-entry-edit',
   'memory-vector-status',
+  'user-portrait',
+  'user-portrait-edit',
   'global-excerpt',
   'global-excerpt-edit',
 ]);
