@@ -37,9 +37,9 @@ class ThoughtSoilApiContractTest {
           "soil":{
             "conversation_id":"c1",
             "current_text":"旧壤",
-            "hand_seeds":[],
-            "do_not_repeat":"",
-            "pocket_candidates":[],
+            "afterthoughts":["旧余思"],
+            "memory_candidates":[],
+            "seed_candidates":[],
             "revision":2
           }
         }"""))
@@ -49,9 +49,17 @@ class ThoughtSoilApiContractTest {
           "soil":{
             "conversation_id":"c1",
             "current_text":"新壤",
-            "hand_seeds":[{"name":"新芽","life_core":"继续承接","usage_hint":"下一轮","avoid_hint":"勿复读"}],
-            "do_not_repeat":"",
-            "pocket_candidates":[],
+            "afterthoughts":["还想继续看看"],
+            "memory_candidates":[{
+              "title":"值得记住的决定",
+              "content":"以后再遇见时仍希望知道这个决定。",
+              "source_excerpt":"刚刚作出的决定"
+            }],
+            "seed_candidates":[{
+              "title":"未尽的问题",
+              "content":"不知道以后会长成什么，但想留下。",
+              "source_excerpt":"还没说完的问题"
+            }],
             "revision":3,
             "organized_by_model":"openai/gpt-5.6"
           }
@@ -61,9 +69,9 @@ class ThoughtSoilApiContractTest {
           "soil":{
             "conversation_id":"c1",
             "current_text":"新壤",
-            "hand_seeds":[],
-            "do_not_repeat":"",
-            "pocket_candidates":[],
+            "afterthoughts":["还想继续看看"],
+            "memory_candidates":[],
+            "seed_candidates":[],
             "manual_locked":false,
             "auto_refresh_enabled":false,
             "revision":4
@@ -75,8 +83,11 @@ class ThoughtSoilApiContractTest {
         val disabled = api.setThoughtSoilEnabled("c1", false)
 
         assertEquals("旧壤", loaded.currentText)
+        assertEquals(listOf("旧余思"), loaded.afterthoughts)
         assertEquals("新壤", organized.soil.currentText)
-        assertEquals("新芽", organized.soil.handSeeds.single().name)
+        assertEquals(listOf("还想继续看看"), organized.soil.afterthoughts)
+        assertEquals("值得记住的决定", organized.soil.memoryCandidates.single().title)
+        assertEquals("未尽的问题", organized.soil.seedCandidates.single().title)
         assertEquals(false, disabled.autoRefreshEnabled)
 
         val getRequest = server.takeRequest()
