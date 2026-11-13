@@ -5,6 +5,7 @@ import { ModelRequestError } from './models.js';
 import { OwnerAccessError } from './owner-access.js';
 import { routeCustomInstructions } from './memory/memory-custom-instructions-route.js';
 import { GLOBAL_EXCERPT_PATH, routeGlobalExcerpt } from './memory/memory-global-excerpt-route.js';
+import { USER_PORTRAIT_PATH, routeUserPortrait } from './memory/memory-user-portrait-route.js';
 import { routeMemoryEntries } from './memory/memory-entry-route.js';
 import { routeMemoryPockets } from './memory/memory-pocket-route.js';
 import {
@@ -29,7 +30,9 @@ export function isMemoryApiPath(pathname) {
     || pathname === `${MEMORY_PATH}/custom-instructions`
     || pathname === `${MEMORY_PATH}/vector-status`
     || pathname === GLOBAL_EXCERPT_PATH
-    || pathname.startsWith(`${GLOBAL_EXCERPT_PATH}/`);
+    || pathname.startsWith(`${GLOBAL_EXCERPT_PATH}/`)
+    || pathname === USER_PORTRAIT_PATH
+    || pathname.startsWith(`${USER_PORTRAIT_PATH}/`);
 }
 
 export async function routeMemoryApi(request, env, session = null) {
@@ -43,6 +46,7 @@ export async function routeMemoryApi(request, env, session = null) {
     if (url.pathname === `${MEMORY_PATH}/recall`) return await routeMemoryRecall(request, env);
     if (url.pathname === `${MEMORY_PATH}/custom-instructions`) return await routeCustomInstructions(request, env);
     if (url.pathname === GLOBAL_EXCERPT_PATH || url.pathname.startsWith(`${GLOBAL_EXCERPT_PATH}/`)) return await routeGlobalExcerpt(request, env, url);
+    if (url.pathname === USER_PORTRAIT_PATH || url.pathname.startsWith(`${USER_PORTRAIT_PATH}/`)) return await routeUserPortrait(request, env, url);
     if (url.pathname === `${MEMORY_PATH}/vector-status`) return await routeVectorStatus(request, env);
     if (url.pathname === `${MEMORY_PATH}/pockets` || url.pathname.startsWith(`${MEMORY_PATH}/pockets/`)) {
       return await routeMemoryPockets(request, env, url);
