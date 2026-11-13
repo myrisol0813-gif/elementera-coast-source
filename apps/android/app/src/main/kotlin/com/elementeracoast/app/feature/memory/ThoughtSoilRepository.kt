@@ -1,5 +1,6 @@
 package com.elementeracoast.app.feature.memory
 
+import com.elementeracoast.app.core.model.PortraitCandidateSnapshot
 import com.elementeracoast.app.core.model.ThoughtCandidateSnapshot
 import com.elementeracoast.app.core.model.ThoughtSoilSnapshot
 import com.elementeracoast.app.core.network.CoastApiClient
@@ -80,6 +81,12 @@ internal fun RemoteThoughtSoil.toSnapshot(fallbackConversationId: String = ""): 
             content = candidate.content,
             sourceExcerpt = candidate.sourceExcerpt
         )
+    },
+    userPortraitCandidate = userPortraitCandidate?.let {
+        PortraitCandidateSnapshot(it.candidateId, it.reason, it.sourceExcerpt)
+    },
+    selfPortraitCandidate = selfPortraitCandidate?.let {
+        PortraitCandidateSnapshot(it.candidateId, it.reason, it.sourceExcerpt)
     },
     manualLocked = manualLocked,
     autoRefreshEnabled = autoRefreshEnabled,
