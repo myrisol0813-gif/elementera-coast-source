@@ -86,6 +86,42 @@ class MemoryRemoteDataSource(
         RemoteCustomInstructionsResponse.serializer()
     ).instructions
 
+    suspend fun getUserPortrait(): RemoteGlobalExcerptResponse = request(
+        Request.Builder().url(config.url("/api/memory/user-portrait")).get().build(),
+        RemoteGlobalExcerptResponse.serializer()
+    )
+
+    suspend fun setUserPortraitWriteEnabled(enabled: Boolean): RemoteGlobalExcerptResponse = request(
+        Request.Builder().url(config.url("/api/memory/user-portrait")).patch(
+            body(json.encodeToString(RemoteGlobalExcerptPatchRequest(writeEnabled = enabled)))
+        ).build(),
+        RemoteGlobalExcerptResponse.serializer()
+    )
+
+    suspend fun clearUserPortrait(expectedRevision: Int): RemoteGlobalExcerptResponse = request(
+        Request.Builder().url(config.url("/api/memory/user-portrait")).patch(
+            body(json.encodeToString(RemoteGlobalExcerptClearRequest(action = "clear", expectedRevision = expectedRevision)))
+        ).build(),
+        RemoteGlobalExcerptResponse.serializer()
+    )
+
+    suspend fun confirmUserPortraitCandidate(id: String, editedBody: String? = null): RemoteGlobalExcerptResponse = request(
+        Request.Builder().url(config.url("/api/memory/user-portrait/candidates/${path(id)}")).patch(
+            body(json.encodeToString(RemoteGlobalExcerptConfirmRequest(
+                action = "confirm",
+                editedBody = editedBody,
+                operator = "user"
+            )))
+        ).build(),
+        RemoteGlobalExcerptResponse.serializer()
+    )
+
+    suspend fun discardUserPortraitCandidate(id: String) {
+        requestElement(
+            Request.Builder().url(config.url("/api/memory/user-portrait/candidates/${path(id)}")).delete().build()
+        )
+    }
+
     suspend fun getGlobalExcerpt(): RemoteGlobalExcerptResponse = request(
         Request.Builder().url(config.url("/api/memory/global-excerpt")).get().build(),
         RemoteGlobalExcerptResponse.serializer()
