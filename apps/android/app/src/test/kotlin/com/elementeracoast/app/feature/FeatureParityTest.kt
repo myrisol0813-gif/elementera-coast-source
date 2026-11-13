@@ -33,6 +33,6 @@ class FeatureParityTest {
     )
 
     @Test fun memoryLandingKeepsMemoryV2AndPairedPortraitEntrances() = assertEquals(
-        listOf("记忆库", "种子库", "世界书", "用户画像", "自我画像", "自定义指令"), memoryLandingItems().map { it.title }
+        listOf("记忆库", "种子库", "用户画像", "自我画像", "世界书", "自定义指令"), memoryLandingItems().map { it.title }
     )
 }
