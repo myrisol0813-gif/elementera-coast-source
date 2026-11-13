@@ -46,6 +46,7 @@ internal fun AssistantMessage(
     metadataMessageId: String?,
     metadataSource: ModelMetadataRemoteDataSource,
     isStreamingTail: Boolean,
+    timeLabel: String,
     avatarBitmap: ImageBitmap?,
     onAvatarClick: () -> Unit,
     onCopy: () -> Unit,
