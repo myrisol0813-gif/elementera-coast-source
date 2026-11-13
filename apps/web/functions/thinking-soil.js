@@ -4,29 +4,20 @@ function clip(value, max) {
 
 function hasSoil(soil) {
   return Boolean(clip(soil?.current_text, 1)
-    || (Array.isArray(soil?.hand_seeds) && soil.hand_seeds.length)
-    || clip(soil?.do_not_repeat, 1));
+    || (Array.isArray(soil?.afterthoughts) && soil.afterthoughts.some((item) => clip(item, 1))));
 }
 
-function seedText(seed) {
-  const name = clip(seed?.name || seed?.title, 90);
-  const core = clip(seed?.life_core || seed?.content, 360);
-  return [name, core].filter(Boolean).join('｜');
-}
-
-function soilLines(soil, { currentLimit, maxHandSeeds, includeLabel = false } = {}) {
+function soilLines(soil, { currentLimit, maxAfterthoughts, includeLabel = false } = {}) {
   if (!hasSoil(soil)) return [];
   const lines = [];
   if (includeLabel) lines.push(`${clip(soil.display_author || soil.source_label || '房间纸条', 80)}：`);
   const current = clip(soil.current_text, currentLimit);
   if (current) lines.push(`当前：${current}`);
-  const seeds = (Array.isArray(soil.hand_seeds) ? soil.hand_seeds : [])
-    .map(seedText)
+  const afterthoughts = (Array.isArray(soil.afterthoughts) ? soil.afterthoughts : [])
+    .map((item) => clip(item, 420))
     .filter(Boolean)
-    .slice(0, maxHandSeeds);
-  if (seeds.length) lines.push('当前活跃线索：', ...seeds.map((seed) => `- ${seed}`));
-  const doNotRepeat = clip(soil.do_not_repeat, 600);
-  if (doNotRepeat) lines.push(`勿复读：${doNotRepeat}`);
+    .slice(0, maxAfterthoughts);
+  if (afterthoughts.length) lines.push('余思：', ...afterthoughts.map((item) => `- ${item}`));
   return lines;
 }
 
