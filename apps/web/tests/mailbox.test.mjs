@@ -123,6 +123,7 @@ for (const table of [
 assert.deepEqual(mailboxMigrationIds, [
   'mailbox-friend-chat-v1',
   'mailbox-room-memory-v2',
+  'mailbox-thought-soil-v2',
   'mailbox-test-data-reset-20260920',
 ]);
 for (const migrationId of mailboxMigrationIds) {
@@ -342,17 +343,19 @@ const aliceReply = await replyToMailboxVisitor(db, {
   thought_soil: nextSoil('星星', [
     {
       title: '星星意象',
-      life_core: '喜欢在创作里使用星星意象。',
       content: '小星在这轮谈到了自己反复使用的星星意象。',
-      usage_hint: '讨论创作时可以自然记得。',
       source_excerpt: '创作中的星光',
     },
     {
       title: '轻量称呼',
-      life_core: '更喜欢被叫作小星。',
       content: '登记称呼与聊天称呼一致。',
+      source_excerpt: '',
     },
-  ]),
+  ], [{
+    title: '星光创作方向',
+    content: '以后也许可以继续展开星光在创作里的不同形态。',
+    source_excerpt: '创作中的星光',
+  }]),
   model_label: 'GPT-5.6 Thinking',
   model_nickname: '雾灯',
   source_conversation_id: 'official-conversation-a',
@@ -366,7 +369,10 @@ assert.deepEqual(
   [alice.id, alice.id],
 );
 assert.equal(aliceReply.thought_soil.current_text, '星星的当前承接。');
-assert.equal(aliceReply.thought_soil.hand_seeds.length, 1);
+assert.equal(aliceReply.thought_soil.afterthoughts.length, 1);
+assert.equal(aliceReply.thought_soil.memory_candidates.length, 2);
+assert.equal(aliceReply.thought_soil.seed_candidates.length, 1);
+assert.equal(aliceReply.pending_pocket_count, 2, 'visitor seed candidates stay in visitor soil instead of entering notebook pending');
 assert.equal(aliceReply.thought_soil.model_label, 'GPT-5.6 Thinking');
 assert.equal(aliceReply.memory_candidates_skipped, 0);
 
