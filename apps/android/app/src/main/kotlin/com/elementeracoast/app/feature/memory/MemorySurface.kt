@@ -39,8 +39,9 @@ import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
 enum class MemoryTab(val title: String) {
     Memory("记忆库"),
     Seed("种子库"),
+    UserPortrait("用户画像"),
+    SelfPortrait("自我画像"),
     Worldbook("世界书"),
-    GlobalExcerpt("全局摘录"),
     Instructions("自定义指令")
 }
 
@@ -72,10 +73,11 @@ fun MemoryTabs(active: MemoryTab, onSelect: (MemoryTab) -> Unit) {
                 MemoryTabCell(MemoryTab.Seed, active, Modifier.weight(1f), onSelect)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                MemoryTabCell(MemoryTab.Worldbook, active, Modifier.weight(1f), onSelect)
-                MemoryTabCell(MemoryTab.GlobalExcerpt, active, Modifier.weight(1f), onSelect)
+                MemoryTabCell(MemoryTab.UserPortrait, active, Modifier.weight(1f), onSelect)
+                MemoryTabCell(MemoryTab.SelfPortrait, active, Modifier.weight(1f), onSelect)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                MemoryTabCell(MemoryTab.Worldbook, active, Modifier.weight(1f), onSelect)
                 MemoryTabCell(MemoryTab.Instructions, active, Modifier.weight(1f), onSelect)
             }
         }
