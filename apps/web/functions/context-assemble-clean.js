@@ -96,15 +96,27 @@ async function roomPapers(env, access, { conversationId, visitorId, query, recen
 }
 function workbenchPrompt(query, toolCount) { if (!toolCount || !/(记忆|落袋|动态|日记|私人草稿|跨窗口|信箱|共通聊天室|MCP 对话区|工具|工作台)/u.test(String(query || ''))) return ''; return '【工作台】\n前端里有一些可使用的工具。需要时再用，不必为了使用而使用。'; }
 function soilDeskSnapshot(deliveredText, value) {
-  const text = String(deliveredText || ''); const lines = text.split('\n'); const current = []; const handSeeds = []; let readingSeeds = false;
+  const text = String(deliveredText || '');
+  const lines = text.split('\n');
+  const current = [];
+  const afterthoughts = [];
+  let readingAfterthoughts = false;
   for (const line of lines) {
-    if (line.startsWith('当前：')) { current.push(line.slice('当前：'.length)); readingSeeds = false; continue; }
-    if (line === '当前活跃线索：') { readingSeeds = true; continue; }
-    if (readingSeeds && line.startsWith('- ')) { handSeeds.push(line.slice(2)); continue; }
-    if (line && !/^【整理当前对话的纸条】$/.test(line)) readingSeeds = false;
+    if (line.startsWith('当前：')) { current.push(line.slice('当前：'.length)); readingAfterthoughts = false; continue; }
+    if (line === '余思：') { readingAfterthoughts = true; continue; }
+    if (readingAfterthoughts && line.startsWith('- ')) { afterthoughts.push(line.slice(2)); continue; }
+    if (line && !/^【整理当前对话的纸条】$/.test(line)) readingAfterthoughts = false;
   }
-  const roots = value?.sources && typeof value.sources === 'object' ? Object.values(value.sources) : [value?.soil || value].filter(Boolean);
-  return { context: text, current_text: current.join('\n'), hand_seeds: handSeeds, pocket_candidates_count: roots.reduce((sum, soil) => sum + (Array.isArray(soil?.pocket_candidates) ? soil.pocket_candidates.length : 0), 0) };
+  const roots = value?.sources && typeof value.sources === 'object'
+    ? Object.values(value.sources)
+    : [value?.soil || value].filter(Boolean);
+  return {
+    context: text,
+    current_text: current.join('\n'),
+    afterthoughts,
+    memory_candidates_count: roots.reduce((sum, soil) => sum + (Array.isArray(soil?.memory_candidates) ? soil.memory_candidates.length : 0), 0),
+    seed_candidates_count: roots.reduce((sum, soil) => sum + (Array.isArray(soil?.seed_candidates) ? soil.seed_candidates.length : 0), 0),
+  };
 }
 
 function crossWindowSourceText(item) {
