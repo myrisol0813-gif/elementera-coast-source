@@ -7,6 +7,11 @@ import com.elementeracoast.app.core.network.CoastApiException
 import com.elementeracoast.app.feature.chatgpt.ChatGptPlanRepository
 import com.elementeracoast.app.core.remote.RemoteThoughtSoil
 
+internal const val THOUGHT_SOIL_MAX_OUTPUT_TOKENS = 2400
+
+internal fun selectThoughtSoilReasoningEffort(supported: List<String>): String? =
+    listOf("none", "minimal", "low").firstOrNull(supported::contains)
+
 interface ThoughtSoilRepository {
     suspend fun load(conversationId: String): ThoughtSoilSnapshot
     suspend fun setEnabled(conversationId: String, enabled: Boolean): ThoughtSoilSnapshot
@@ -31,7 +36,14 @@ class DefaultThoughtSoilRepository(
             require(prepared.ok && prepared.prompt.isNotBlank() && prepared.model == modelId) {
                 "当前对话纸条准备失败；未调用其他模型额度。"
             }
-            val result = account.completeText(modelId.removePrefix("chatgpt-plan:"), prepared.prompt)
+            val modelSlug = modelId.removePrefix("chatgpt-plan:")
+            val reasoningEffort = selectThoughtSoilReasoningEffort(account.reasoningEffortsFor(modelSlug))
+            val result = account.completeText(
+                model = modelSlug,
+                prompt = prepared.prompt,
+                reasoningEffort = reasoningEffort,
+                maxOutputTokens = if (reasoningEffort != null) THOUGHT_SOIL_MAX_OUTPUT_TOKENS else null
+            )
             require(result.text.length <= prepared.maxResultChars) {
                 "GPT 当前对话纸条整理结果超出后端允许长度；未覆盖原资料。"
             }
