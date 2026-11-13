@@ -13,7 +13,7 @@ const PAGE = `<!doctype html>
   <link rel="stylesheet" href="/public/styles/shell.css?v=coast-app-85">
   <link rel="stylesheet" href="/public/styles/chat.css?v=coast-app-85">
   <link rel="stylesheet" href="/public/styles/features.css?v=coast-app-85">
-  <link rel="stylesheet" href="/public/styles/mailbox.css?v=coast-source-mailbox-01">
+  <link rel="stylesheet" href="/public/styles/mailbox.css?v=coast-source-mailbox-02">
 </head>
 <body class="mailbox-body">
   <div id="mailboxApp" class="app-shell mailbox-shell">
@@ -71,7 +71,7 @@ const PAGE = `<!doctype html>
 
     <div id="mailboxToast" class="toast" role="status" aria-live="polite" hidden></div>
   </div>
-  <script type="module" src="/public/mailbox.js?v=coast-source-mailbox-01"></script>
+  <script type="module" src="/public/mailbox.js?v=coast-source-mailbox-02"></script>
 </body>
 </html>`;
 
