@@ -1,6 +1,7 @@
 const MAILBOX_MIGRATION_IDS = Object.freeze([
   'mailbox-friend-chat-v1',
   'mailbox-room-memory-v2',
+  'mailbox-thought-soil-v2',
   'mailbox-test-data-reset-20260920',
 ]);
 const schemaPromises = new WeakMap();
@@ -161,6 +162,9 @@ async function initialize(db) {
     hand_seeds_json TEXT NOT NULL DEFAULT '[]',
     do_not_repeat TEXT NOT NULL DEFAULT '',
     pocket_candidates_json TEXT NOT NULL DEFAULT '[]',
+    afterthoughts_json TEXT NOT NULL DEFAULT '[]',
+    memory_candidates_json TEXT NOT NULL DEFAULT '[]',
+    seed_candidates_json TEXT NOT NULL DEFAULT '[]',
     source_message_id TEXT,
     organized_through_message_id TEXT,
     manual_locked INTEGER NOT NULL DEFAULT 0 CHECK (manual_locked IN (0, 1)),
@@ -176,6 +180,12 @@ async function initialize(db) {
     FOREIGN KEY(visitor_id) REFERENCES mailbox_visitors(id),
     FOREIGN KEY(source_message_id) REFERENCES mailbox_messages(id)
   )`);
+
+  await ensureColumns(db, 'mailbox_thought_soils', [
+    ['afterthoughts_json', "TEXT NOT NULL DEFAULT '[]'"],
+    ['memory_candidates_json', "TEXT NOT NULL DEFAULT '[]'"],
+    ['seed_candidates_json', "TEXT NOT NULL DEFAULT '[]'"],
+  ]);
 
   await run(db, `CREATE TABLE IF NOT EXISTS mailbox_memory_pockets (
     id TEXT PRIMARY KEY,
@@ -207,8 +217,8 @@ async function initialize(db) {
 
   const migrationTimestamp = new Date().toISOString();
   await run(db, `INSERT OR IGNORE INTO mailbox_thought_soils (
-    visitor_id, current_text, hand_seeds_json, do_not_repeat,
-    pocket_candidates_json, source_message_id, organized_through_message_id,
+    visitor_id, current_text, afterthoughts_json, memory_candidates_json,
+    seed_candidates_json, source_message_id, organized_through_message_id,
     manual_locked, auto_refresh_enabled, revision, model_label, model_nickname,
     source_conversation_id, source_turn_id, tool_call_id, created_at, updated_at
   ) SELECT
@@ -216,7 +226,7 @@ async function initialize(db) {
     COALESCE((SELECT n.content FROM mailbox_thinking_notes n
       WHERE n.visitor_id = v.id AND n.archived = 0
       ORDER BY n.updated_at DESC, n.id DESC LIMIT 1), ''),
-    '[]', '', '[]',
+    '[]', '[]', '[]',
     (SELECT n.source_message_id FROM mailbox_thinking_notes n
       WHERE n.visitor_id = v.id AND n.archived = 0
       ORDER BY n.updated_at DESC, n.id DESC LIMIT 1),
