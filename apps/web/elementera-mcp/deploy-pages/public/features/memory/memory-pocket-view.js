@@ -9,6 +9,11 @@ export function createPocketViews({ currentPockets }) {
     const usageHint = pocket.usage_hint || pocket.suggested_usage_hint || '';
     const avoidHint = pocket.avoid_hint || pocket.suggested_avoid_hint || '';
     const selectedTag = MEMORY_TAGS.find((tag) => tag === pocket.tag || pocket.memory_tags?.includes(tag)) || '';
+    const suggestedDestination = pocket.suggested_destination === 'memory'
+      ? '记忆库'
+      : pocket.suggested_destination === 'seed'
+        ? '种子库'
+        : '';
     const provenance = pocket.generated_by_model
       ? `<p class="feature-note generation-provenance">提炼 · ${escapeHtml(shortModelName(pocket.generated_by_model))}</p>`
       : '';
@@ -19,6 +24,7 @@ export function createPocketViews({ currentPockets }) {
       ${revision}
       <h2>${escapeHtml(title)}</h2>
       <p><strong>核心：</strong>${escapeHtml(lifeCore)}</p>
+      ${suggestedDestination ? `<p><strong>模型建议：</strong>${escapeHtml(suggestedDestination)}</p>` : ''}
       ${pocket.source_excerpt ? `<p><strong>来源：</strong>${escapeHtml(pocket.source_excerpt)}</p>` : ''}
       ${usageHint ? `<p><strong>使用时机：</strong>${escapeHtml(usageHint)}</p>` : ''}
       ${avoidHint ? `<p><strong>勿误用：</strong>${escapeHtml(avoidHint)}</p>` : ''}
@@ -26,8 +32,8 @@ export function createPocketViews({ currentPockets }) {
       <p class="feature-note">只有确认后才会进入记忆库或种子库。种子是可生长方向，不是已确认事实。</p>
       ${provenance}
       <div class="button-row">
-        <button class="primary-wide" type="button" data-action="memory:pocket-resolve" data-id="${escapeAttribute(pocket.id)}" data-destination="memory">写入记忆库</button>
-        <button type="button" data-action="memory:pocket-resolve" data-id="${escapeAttribute(pocket.id)}" data-destination="seed">写入种子库</button>
+        <button${pocket.suggested_destination !== 'seed' ? ' class="primary-wide"' : ''} type="button" data-action="memory:pocket-resolve" data-id="${escapeAttribute(pocket.id)}" data-destination="memory">写入记忆库</button>
+        <button${pocket.suggested_destination === 'seed' ? ' class="primary-wide"' : ''} type="button" data-action="memory:pocket-resolve" data-id="${escapeAttribute(pocket.id)}" data-destination="seed">写入种子库</button>
         <button type="button" data-action="memory:pocket-discard" data-id="${escapeAttribute(pocket.id)}">丢弃</button>
       </div>
     </article>`;
