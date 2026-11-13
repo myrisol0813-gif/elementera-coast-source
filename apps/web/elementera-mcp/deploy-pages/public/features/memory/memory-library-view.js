@@ -119,11 +119,12 @@ export function createLibraryViews({ runtime, currentId, currentPockets, chat })
         ${filterMenu('memoryFilterValueMenu', 'filter-value', valueChoices, selectedValue)}
       </section>`
       : '';
-    return `<div class="memory-tabs memory-tabs-five" role="tablist" aria-label="记忆入口">
+    return `<div class="memory-tabs memory-tabs-six" role="tablist" aria-label="记忆入口">
       <button class="${runtime.libraryTab === 'memory' ? 'is-active' : ''}" type="button" data-action="memory:tab" data-scope="memory">记忆库</button>
       <button class="${runtime.libraryTab === 'seed' ? 'is-active' : ''}" type="button" data-action="memory:tab" data-scope="seed">种子库</button>
+      <button type="button" data-action="memory:user-portrait">用户画像</button>
+      <button type="button" data-action="memory:global-excerpt">自我画像</button>
       <button type="button" data-action="desk:worldbook">世界书</button>
-      <button type="button" data-action="memory:global-excerpt">全局摘录</button>
       <button class="${runtime.libraryTab === 'custom' ? 'is-active' : ''}" type="button" data-action="memory:tab" data-scope="custom">自定义指令</button>
     </div>${filters}`;
   }
