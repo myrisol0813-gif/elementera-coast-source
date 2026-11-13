@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.elementeracoast.app.core.model.ThoughtCandidateSnapshot
 import com.elementeracoast.app.core.model.ThoughtSoilSnapshot
 import com.elementeracoast.app.ui.theme.SnowLetterSurface
 import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
@@ -47,8 +48,8 @@ internal fun SoilBottomSheet(
                 Text(
                     when {
                         !soil.autoRefreshEnabled -> "当前窗口 · 已关闭，不整理也不递入上下文"
-                        soil.manualLocked -> "当前窗口 · 手动内容已锁定，仍递入上下文"
-                        else -> "当前窗口 · 滚动工作上下文"
+                        soil.manualLocked -> "当前窗口 · 手动内容已锁定 · 当前与余思仍会递入上下文"
+                        else -> "当前 · 余思 · 去处"
                     },
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall
@@ -57,12 +58,18 @@ internal fun SoilBottomSheet(
 
             SoilCard(
                 title = if (soil.autoRefreshEnabled) "当前对话纸条已开启" else "当前对话纸条已关闭",
-                meta = if (soil.autoRefreshEnabled) "自动整理 · 注入上下文" else "停止整理 · 不注入上下文"
+                meta = if (soil.autoRefreshEnabled) "自动整理 · 当前 / 余思注入上下文" else "停止整理 · 不注入上下文"
             ) {
                 Text(
-                    if (soil.autoRefreshEnabled)
-                        if (soil.manualLocked) "当前内容由屋主手动锁定，不会自动覆盖；仍会递给模型。" else "每轮回复后会自动整理，并递入下一轮模型上下文。"
-                    else "旧内容会原样保留；关闭期间不会继续整理，也不会递给模型。",
+                    if (soil.autoRefreshEnabled) {
+                        if (soil.manualLocked) {
+                            "当前内容由屋主手动锁定，不会自动覆盖；只有“当前 / 余思”仍会递给模型。"
+                        } else {
+                            "每轮回复后自动整理。只有“当前 / 余思”进入下一轮；去处候选只进入待确认流程。"
+                        }
+                    } else {
+                        "旧内容会原样保留；关闭期间不会继续整理，也不会递给模型。"
+                    },
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -72,76 +79,53 @@ internal fun SoilBottomSheet(
             }
 
             SoilCard(
-                title = "当前整理当前对话的纸条",
-                meta = if (soil.manualLocked) "已锁定" else "随当前窗口整理"
+                title = "当前",
+                meta = if (soil.manualLocked) "已锁定" else "仍需承接"
             ) {
                 Text(
-                    soil.currentText.ifBlank { "还没有整理当前方向。" },
+                    soil.currentText.ifBlank { "现在没有需要越过最近上下文继续承接的内容。" },
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall
                 )
-                if (soil.doNotRepeat.isNotBlank()) {
-                    Spacer(Modifier.height(9.dp))
-                    Text("勿复读", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        soil.doNotRepeat,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
             }
 
             SoilCard(
-                title = "当前活跃线索",
-                meta = "${soil.handSeeds.size.coerceAtMost(7)}/7"
+                title = "余思",
+                meta = "${soil.afterthoughts.size} 条"
             ) {
-                if (soil.handSeeds.isEmpty()) {
-                    SoilEmpty("还没有当前活跃线索。")
+                if (soil.afterthoughts.isEmpty()) {
+                    SoilEmpty("这一刻没有想留下的余思。")
                 } else {
-                    soil.handSeeds.forEachIndexed { index, seed ->
-                        if (index > 0) Spacer(Modifier.height(10.dp))
+                    soil.afterthoughts.forEachIndexed { index, item ->
+                        if (index > 0) Spacer(Modifier.height(8.dp))
                         Text(
-                            seed.name.ifBlank { seed.lifeCore },
-                            fontWeight = FontWeight.Medium,
-                            style = MaterialTheme.typography.bodyMedium
+                            item,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall
                         )
-                        if (seed.lifeCore.isNotBlank()) {
-                            Text(seed.lifeCore, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        }
-                        if (seed.usageHint.isNotBlank()) {
-                            Text("使用 · ${seed.usageHint}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        }
-                        if (seed.avoidHint.isNotBlank()) {
-                            Text("避免 · ${seed.avoidHint}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        }
                     }
                 }
             }
 
             SoilCard(
-                title = "待确认区",
-                meta = "${soil.pocketCandidates.size} 条"
+                title = "去处",
+                meta = "模型建议 · 仍需确认"
             ) {
-                if (soil.pocketCandidates.isEmpty()) {
-                    SoilEmpty("现在没有待确认候选。")
-                } else {
-                    soil.pocketCandidates.forEachIndexed { index, candidate ->
-                        if (index > 0) Spacer(Modifier.height(10.dp))
-                        Text(
-                            candidate.title.ifBlank { candidate.lifeCore },
-                            fontWeight = FontWeight.Medium,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        if (candidate.lifeCore.isNotBlank()) {
-                            Text(candidate.lifeCore, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        }
-                        if (candidate.sourceExcerpt.isNotBlank()) {
-                            Text("来源 · ${candidate.sourceExcerpt}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
+                SoilCandidateGroup(
+                    title = "记忆候选 · ${soil.memoryCandidates.size}",
+                    emptyText = "没有想递往记忆库的内容。",
+                    candidates = soil.memoryCandidates
+                )
+                Spacer(Modifier.height(12.dp))
+                SoilCandidateGroup(
+                    title = "种子候选 · ${soil.seedCandidates.size}",
+                    emptyText = "没有想递往种子库的内容。",
+                    candidates = soil.seedCandidates
+                )
+                if (soil.memoryCandidates.isNotEmpty() || soil.seedCandidates.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
                     Text(
-                        "确认前只停在袋里，不参与长期召回。",
+                        "这些只是模型建议的去处。候选会进入待确认区；确认前不会成为正式记忆或种子，也不会递进聊天正文。",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall
                     )
@@ -174,6 +158,42 @@ internal fun SoilBottomSheet(
             }
 
             Spacer(Modifier.height(20.dp))
+        }
+    }
+}
+
+@Composable
+private fun SoilCandidateGroup(
+    title: String,
+    emptyText: String,
+    candidates: List<ThoughtCandidateSnapshot>
+) {
+    Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+    if (candidates.isEmpty()) {
+        Spacer(Modifier.height(4.dp))
+        SoilEmpty(emptyText)
+        return
+    }
+    candidates.forEachIndexed { index, candidate ->
+        if (index > 0) Spacer(Modifier.height(10.dp)) else Spacer(Modifier.height(5.dp))
+        Text(
+            candidate.title.ifBlank { candidate.content },
+            fontWeight = FontWeight.Medium,
+            style = MaterialTheme.typography.bodyMedium
+        )
+        if (candidate.content.isNotBlank() && candidate.content != candidate.title) {
+            Text(
+                candidate.content,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+        if (candidate.sourceExcerpt.isNotBlank()) {
+            Text(
+                "来源 · ${candidate.sourceExcerpt}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .78f),
+                style = MaterialTheme.typography.labelSmall
+            )
         }
     }
 }
