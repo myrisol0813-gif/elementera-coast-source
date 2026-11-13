@@ -77,17 +77,12 @@ function requestWithToken(path, token, options = {}) {
   });
 }
 
-function nextSoil(label, candidates = []) {
+function nextSoil(label, memoryCandidates = [], seedCandidates = []) {
   return {
     current_text: `${label}的当前承接。`,
-    hand_seeds: [{
-      name: `${label}当前活跃线索`,
-      life_core: `${label}仍想继续谈创作。`,
-      usage_hint: '下一封自然接续。',
-      avoid_hint: '不要当成固定人格标签。',
-    }],
-    do_not_repeat: `${label}已经知道这里不是实时聊天。`,
-    pocket_candidates: candidates,
+    afterthoughts: [`${label}仍想继续谈创作。`],
+    memory_candidates: memoryCandidates,
+    seed_candidates: seedCandidates,
   };
 }
 
@@ -383,8 +378,8 @@ const bobReply = await replyToMailboxVisitor(db, {
   content: '这是只写回苔藓房间的 模型伙伴回信。',
   thought_soil: nextSoil('苔藓', [{
     title: '不应落袋',
-    life_core: '访客没有允许长期记忆。',
-    content: '这条只能留在滚动整理当前对话的纸条展示层。',
+    content: '访客没有允许长期记忆；这条只能留在滚动整理当前对话的纸条展示层。',
+    source_excerpt: '苔藓房间',
   }]),
   model_label: 'GPT-5.6 Thinking',
   tool_call_id: 'mailbox-reply-b-1',
@@ -550,6 +545,10 @@ assert.deepEqual(mailboxTools.mcp_mailbox_reply.securitySchemes[0].scopes, ['wri
 assert.deepEqual(mailboxTools.mcp_mailbox_resolve_pocket.securitySchemes[0].scopes, ['write:lighthouse']);
 assert.deepEqual(mailboxTools.mcp_mailbox_patrol_report.securitySchemes[0].scopes, ['read:coast']);
 assert.ok(mailboxTools.mcp_mailbox_reply.inputSchema.required.includes('thought_soil'));
+assert.deepEqual(
+  mailboxTools.mcp_mailbox_reply.inputSchema.properties.thought_soil.required,
+  ['current_text', 'afterthoughts', 'memory_candidates', 'seed_candidates'],
+);
 assert.equal('optional_thinking_notes' in mailboxTools.mcp_mailbox_reply.inputSchema.properties, false);
 assert.equal('optional_notebook_entries' in mailboxTools.mcp_mailbox_reply.inputSchema.properties, false);
 assert.match(VISITOR_MODEL_PARTNER_PROMPT_V1, /public Elementera Coast visitor mailbox demo/);
