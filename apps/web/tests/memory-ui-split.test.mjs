@@ -41,7 +41,10 @@ assert.match(moduleSources.get('memory-constants.js'), /MEMORY_FILTER_KIND_ORDER
 assert.match(moduleSources.get('memory-client.js'), /API\.memorySoil/);
 assert.match(moduleSources.get('memory-client.js'), /API\.memoryPockets/);
 assert.match(moduleSources.get('memory-client.js'), /API\.memoryEntries/);
-assert.match(moduleSources.get('memory-soil-view.js'), /名称｜生命核｜使用提示｜避免提示/);
+assert.match(moduleSources.get('memory-soil-view.js'), /余思/);
+assert.match(moduleSources.get('memory-soil-view.js'), /记忆候选/);
+assert.match(moduleSources.get('memory-soil-view.js'), /种子候选/);
+assert.equal(moduleSources.get('memory-soil-view.js').includes('名称｜生命核｜使用提示｜避免提示'), false);
 assert.match(moduleSources.get('memory-pocket-view.js'), /只有确认后才会进入记忆库或种子库/);
 assert.match(moduleSources.get('memory-library-view.js'), /搜索与筛选放在同一处/);
 assert.match(moduleSources.get('memory-global-excerpt-view.js'), /写入说明 \/ 收录准则/);
