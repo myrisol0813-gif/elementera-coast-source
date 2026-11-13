@@ -40,7 +40,7 @@ export function isThinkingSoilEnabled(value) {
 
 export function formatThinkingSoil(value, {
   maxCharacters = 1800,
-  maxHandSeeds = 7,
+  maxAfterthoughts = 7,
 } = {}) {
   const limit = Math.max(300, Math.min(4000, Number(maxCharacters) || 1800));
   let lines = [];
@@ -49,14 +49,14 @@ export function formatThinkingSoil(value, {
       if (!isThinkingSoilEnabled(soil)) continue;
       lines.push(...soilLines(soil, {
         currentLimit: Math.max(240, Math.floor(limit / 2)),
-        maxHandSeeds: Math.max(1, Math.ceil(maxHandSeeds / 2)),
+        maxAfterthoughts: Math.max(1, Math.ceil(maxAfterthoughts / 2)),
         includeLabel: true,
       }));
     }
   } else {
     const soil = value?.soil || value;
     if (!isThinkingSoilEnabled(soil)) return '';
-    lines = soilLines(soil, { currentLimit: limit, maxHandSeeds });
+    lines = soilLines(soil, { currentLimit: limit, maxAfterthoughts });
   }
   if (!lines.length) return '';
   return `【整理当前对话的纸条】\n${lines.join('\n')}`.slice(0, limit);
