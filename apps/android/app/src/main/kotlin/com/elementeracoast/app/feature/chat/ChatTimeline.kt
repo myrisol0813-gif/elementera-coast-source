@@ -138,10 +138,12 @@ internal fun ChatTimeline(
                             message.generationSource in setOf("chat", "landing", "radio", "lighthouse") &&
                             it.isNotBlank()
                     }
+                    val timeLabel = if (streamingTail) "" else messageTimeLabel(message.createdAtLabel)
                     MessageItem(
                         conversationId = conversationId,
                         message = message,
                         isStreamingTail = streamingTail,
+                        timeLabel = timeLabel,
                         avatarBitmap = avatarBitmap,
                         metadataMessageId = metadataMessageId,
                         metadataSource = metadataSource,
