@@ -16,6 +16,8 @@ export function soilFromRow(row) {
     afterthoughts: normalizeAfterthoughts(parseJson(row.afterthoughts_json, [])),
     memory_candidates: normalizeSoilCandidates(parseJson(row.memory_candidates_json, [])),
     seed_candidates: normalizeSoilCandidates(parseJson(row.seed_candidates_json, [])),
+    user_portrait_candidate: parseJson(row.user_portrait_candidate_json, null),
+    self_portrait_candidate: parseJson(row.self_portrait_candidate_json, null),
     manual_locked: Number(row.manual_locked || 0) === 1,
     auto_refresh_enabled: Number(row.auto_refresh_enabled ?? 1) === 1,
     organized_through_turn_id: row.organized_through_turn_id || '',
@@ -40,8 +42,9 @@ async function ensureSoilRow(db, conversationId) {
   await run(db, `INSERT OR IGNORE INTO conversation_soils (
     conversation_id, current_text,
     afterthoughts_json, memory_candidates_json, seed_candidates_json,
+    user_portrait_candidate_json, self_portrait_candidate_json,
     manual_locked, auto_refresh_enabled, revision, created_at, updated_at
-  ) VALUES (?, '', '[]', '[]', '[]', 0, 1, 1, ?, ?)`, [conversationId, timestamp, timestamp]);
+  ) VALUES (?, '', '[]', '[]', '[]', 'null', 'null', 0, 1, 1, ?, ?)`, [conversationId, timestamp, timestamp]);
 }
 
 export async function readSoil(db, id) {
@@ -59,12 +62,14 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
     throw new MemoryStoreError('soil_locked', '整理当前对话的纸条已由屋主手动锁定。', 409);
   }
   const has = (name) => Object.prototype.hasOwnProperty.call(value, name);
-  const changesContent = ['current_text', 'afterthoughts', 'memory_candidates', 'seed_candidates', 'organized_through_turn_id'].some(has);
+  const changesContent = ['current_text', 'afterthoughts', 'memory_candidates', 'seed_candidates', 'user_portrait_candidate', 'self_portrait_candidate', 'organized_through_turn_id'].some(has);
   const next = {
     current_text: has('current_text') ? clip(value.current_text, MAX_SOIL_TEXT) : current.current_text,
     afterthoughts: has('afterthoughts') ? normalizeAfterthoughts(value.afterthoughts) : current.afterthoughts,
     memory_candidates: has('memory_candidates') ? normalizeSoilCandidates(value.memory_candidates) : current.memory_candidates,
     seed_candidates: has('seed_candidates') ? normalizeSoilCandidates(value.seed_candidates) : current.seed_candidates,
+    user_portrait_candidate: has('user_portrait_candidate') ? (value.user_portrait_candidate || null) : current.user_portrait_candidate,
+    self_portrait_candidate: has('self_portrait_candidate') ? (value.self_portrait_candidate || null) : current.self_portrait_candidate,
     organized_through_turn_id: has('organized_through_turn_id') ? clip(value.organized_through_turn_id, 180) : current.organized_through_turn_id,
     manual_locked: has('manual_locked') ? bool(value.manual_locked) : (!automatic && changesContent ? true : current.manual_locked),
     auto_refresh_enabled: has('auto_refresh_enabled') ? bool(value.auto_refresh_enabled) : current.auto_refresh_enabled,
@@ -79,6 +84,7 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
   const timestamp = Date.now();
   await run(db, `UPDATE conversation_soils SET
     current_text = ?, afterthoughts_json = ?, memory_candidates_json = ?, seed_candidates_json = ?,
+    user_portrait_candidate_json = ?, self_portrait_candidate_json = ?,
     manual_locked = ?, auto_refresh_enabled = ?, organized_through_turn_id = ?,
     actor = ?, surface = ?, model_label = ?, model_nickname = ?, symbol = ?, display_author = ?,
     source_conversation_id = ?, source_turn_id = ?, tool_call_id = ?,
@@ -88,6 +94,8 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
     JSON.stringify(next.afterthoughts),
     JSON.stringify(next.memory_candidates),
     JSON.stringify(next.seed_candidates),
+    JSON.stringify(next.user_portrait_candidate),
+    JSON.stringify(next.self_portrait_candidate),
     next.manual_locked ? 1 : 0,
     next.auto_refresh_enabled ? 1 : 0,
     next.organized_through_turn_id,
