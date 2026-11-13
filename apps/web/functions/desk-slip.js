@@ -28,7 +28,8 @@ const DESCRIPTIONS = Object.freeze({
   current_message: '这是用户本轮刚刚提交的消息，是当前任务最直接的输入。',
   recent_context: '这是当前会话最近几轮消息，用来保持主题、术语和任务连续性。',
   custom_instructions: '这是用户保存的自定义指令，用来补充响应偏好、格式要求、任务约束与工具行为。',
-  global_excerpt: '这是已经确认的全局摘录正文；它紧跟核心自定义整篇注入，不按关键词拆散召回。',
+  user_portrait: '这是已经确认的用户画像正文；它整篇参与本轮上下文，保存你长期形成的对用户的认识。',
+  global_excerpt: '这是已经确认的自我画像正文；它整篇参与本轮上下文，保存你长期形成的自我认识。',
   thinking_soil: '这是当前窗口的承上启下小纸条；待确认候选仍只是候选，不等于已确认记忆。',
   related_memory: '这是与当前任务相关、且已确认可使用的长期记录。',
   worldbook: '这是被当前主题触发的设定资料，用于补足世界观、角色、项目或专有名词背景。',
@@ -110,6 +111,7 @@ function safeCrossWindow(value, ownerVisible) {
 
 export function createDeskSlip({
   ownerVisible = true, currentMessage = '', recentMessages = [], customInstructions = '', customInstructionsDelivered = false,
+  userPortrait = '', userPortraitStatus = 'empty', userPortraitTokens = 0,
   globalExcerpt = '', globalExcerptStatus = 'empty', globalExcerptTokens = 0,
   soil = false, soilEnabled = true, soilContext = '', soilCurrentText = '', soilAfterthoughts = [],
   soilMemoryCandidatesCount = 0, soilSeedCandidatesCount = 0,
@@ -128,6 +130,7 @@ export function createDeskSlip({
   const deliveredWorldbookCount = Math.min(matchedWorldbook.length, Math.max(0, Number(worldbookDeliveredCount) || 0));
   const words = matchedWorldbook.map((item, index) => worldbookItem(item, index < deliveredWorldbookCount, worldbookTexts[index]));
   const results = (Array.isArray(toolResults) ? toolResults : []).map(toolResultItem); const customText = String(customInstructions ?? ''); const customFilled = Boolean(customText.trim());
+  const portraitText = String(userPortrait ?? ''); const portraitFilled = Boolean(portraitText.trim());
   const excerptText = String(globalExcerpt ?? ''); const excerptFilled = Boolean(excerptText.trim());
   const soilText = String(soilContext || ''); const soilCurrent = String(soilCurrentText || ''); const afterthoughts = (Array.isArray(soilAfterthoughts) ? soilAfterthoughts : []).map((item) => String(item || '')).filter(Boolean);
   const soilVisible = Boolean(soilText.trim() || soilCurrent.trim() || afterthoughts.length); const dogtalkText = String(dogtalkContext || ''); const workbenchText = String(workbenchPromptText || '');
@@ -151,8 +154,14 @@ export function createDeskSlip({
     current_message: { label: '当前消息', description: DESCRIPTIONS.current_message, status: '已递给', delivered: true, content: privateDetails ? String(currentMessage ?? '') : '' },
     recent_context: { label: '最近上下文', description: DESCRIPTIONS.recent_context, status: recent.length ? '已递给' : '未递给', status_detail: `${recent.filter((message) => message.role === 'user').length} 轮`, turns: recent.filter((message) => message.role === 'user').length, current_message_separate: true, messages: privateDetails ? recent : [] },
     custom_instructions: { label: '核心自定义', description: DESCRIPTIONS.custom_instructions, status: customInstructionsDelivered && customFilled ? '已递给' : '未递给', delivered: Boolean(customInstructionsDelivered && customFilled), empty: !customFilled, length: customFilled ? customText.length : 0, content: privateDetails && customInstructionsDelivered && customFilled ? customText : '' },
+    user_portrait: {
+      label: '用户画像', description: DESCRIPTIONS.user_portrait,
+      status: !portraitFilled ? '未设置' : userPortraitStatus === 'over_budget' ? '超出预算但未静默截断' : userPortraitStatus === 'truncated' ? '被截断' : '完整注入',
+      delivered: portraitFilled, injection: userPortraitStatus, estimated_tokens: Math.max(0, Number(userPortraitTokens) || 0),
+      length: portraitText.length, content: privateDetails && portraitFilled ? portraitText : '',
+    },
     global_excerpt: {
-      label: '全局摘录', description: DESCRIPTIONS.global_excerpt,
+      label: '自我画像', description: DESCRIPTIONS.global_excerpt,
       status: !excerptFilled ? '未设置' : globalExcerptStatus === 'over_budget' ? '超出预算但未静默截断' : globalExcerptStatus === 'truncated' ? '被截断' : '完整注入',
       delivered: excerptFilled, injection: globalExcerptStatus, estimated_tokens: Math.max(0, Number(globalExcerptTokens) || 0),
       length: excerptText.length, content: privateDetails && excerptFilled ? excerptText : '',
@@ -216,7 +225,8 @@ export function createDeskSlip({
         '当前消息',
         ...(recent.length ? ['最近上下文'] : []),
         ...(customInstructionsDelivered && customFilled ? ['自定义指令'] : []),
-        ...(excerptFilled ? ['全局摘录'] : []),
+        ...(portraitFilled ? ['用户画像'] : []),
+        ...(excerptFilled ? ['自我画像'] : []),
         ...(soilEnabled && soil ? ['整理当前对话的纸条'] : []),
         ...(memories.length ? ['记忆'] : []),
         ...(deliveredWorldbookCount ? ['世界书'] : []),
@@ -226,6 +236,7 @@ export function createDeskSlip({
         ...(cross.delivered ? ['跨窗口'] : []),
         ...(workbenchStatus !== '未递给' ? ['本轮上下文预览 / 工具'] : []),
       ],
+      user_portrait: userPortraitStatus,
       global_excerpt: globalExcerptStatus,
     },
   };
