@@ -50,6 +50,25 @@ The Native source includes an optional device-local ChatGPT account connection. 
 
 The source visitor doorway remains offline-only. In visitor mode, account connection and other cloud actions are blocked before network transmission. To use this feature, self-host the source backend, sign in normally, and authorize a ChatGPT account on that device.
 
+## Reality Context and current-window settings
+
+Reality Context is stored per conversation and is opt-in. Native can collect only the fields selected for that window and only when the relevant Android capability is available:
+
+- local date and time;
+- battery state;
+- manually configured weather city;
+- optional coarse location;
+- most-recent non-Coast foreground app;
+- today's Top 5 app-usage durations;
+- the next seven days of Coast calendar events;
+- lightweight step-counter data.
+
+The backend re-reads the canonical conversation settings and intersects them with the device snapshot before model assembly. Missing permission or unavailable sensor data does not block chat; it remains visibly missing in the current-turn receipt.
+
+Short reply mode is stored independently from Reality Context, so a conversation may keep Reality fully disabled while using the compact response mode. The current-window sheet also links to the existing thought-soil and landing-letter surfaces.
+
+The PWA shares the same conversation settings and backend semantics, but it does not pretend to collect Android-only fields. Date, time, weather and calendar are the browser-side configurable Reality fields; device-only rows are visible but locked.
+
 ## Source-build boundaries
 
 The source build does not include private production credentials, production signing keys, production API origin, or private data. Its QA APK delivery is a separate, ephemeral-signed GitHub Release workflow, not the production APK updater. The existing “版本与更新” surface remains part of the copied UI, but does not download or install private production APKs.
@@ -67,7 +86,9 @@ a **0.2.13-source visitor QA APK** to GitHub Releases, with its SHA-256 file.
 GitHub marks each new version as **Latest** instead of a prerelease; publishing
 is skipped when that APK version already exists in Releases.
 
-The QA publisher builds an **unsigned release** package, ZIP-aligns it and signs it **once** using `scripts/sign-disposable-qa.sh` with V1/V2/V3 and conventional `META-INF/CERT.RSA` / `META-INF/CERT.SF` entries. It re-downloads the published Release asset and checks its SHA-256, APK signature, ZIP entries and exact bytes before marking the workflow successful. Each run uses a temporary Source-only signing certificate, which is deleted afterward.
+The QA publisher builds an **unsigned release** package, ZIP-aligns it and signs it **once** using `scripts/sign-disposable-qa.sh <unsigned-apk> <signed-apk>` with V1/V2/V3 and conventional `META-INF/CERT.RSA` / `META-INF/CERT.SF` entries. It re-downloads the published Release asset and checks its SHA-256, APK signature, ZIP entries and exact bytes before marking the workflow successful. Each run uses a temporary Source-only signing certificate, which is deleted afterward.
+
+The same two-path signer contract is now used by **Live ChatGPT Test** and **Source Native V1 V2 Diagnostic QA**. Both build `app-release-unsigned.apk` and produce a separate final signed APK instead of attempting to re-sign `app-debug.apk`. `Source check` exercises the disposable Release signing path so a future signer-interface mismatch fails during CI.
 **No signing Secrets, admin release switch, PWA deployment or Quick Tunnel are
 needed.** The published APK uses the non-routable `.invalid` API placeholder.
 Enter `123456` to tour the original Android UI and local appearance without
@@ -90,6 +111,20 @@ gradle :app:assembleDebug --no-daemon --stacktrace
 ```
 
 A local debug APK produced this way is a source inspection/test build, not an official production APK.
+
+To mirror the repository's disposable QA packaging path:
+
+```bash
+gradle :app:assembleRelease --no-daemon --stacktrace \
+  -PSOURCE_TOUR_ENABLED=true \
+  -PCOAST_API_BASE_URL=https://elementera-coast-source.invalid
+
+bash scripts/sign-disposable-qa.sh \
+  app/build/outputs/apk/release/app-release-unsigned.apk \
+  /tmp/elementera-coast-source-qa.apk
+```
+
+The disposable signer is for Source QA only. Persistent self-hosted delivery should use the builder's own stable application signing setup.
 
 ## Data and secret hygiene
 
