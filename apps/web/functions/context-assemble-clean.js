@@ -194,7 +194,7 @@ export async function assembleCleanContext(env, {
   ]);
   const responseMode = responseModeContext(contextSettings);
   const soilEnabled = isThinkingSoilEnabled(papers.soil);
-  const soilText = formatThinkingSoil(papers.soil, { maxCharacters: request.soilCharacters, maxHandSeeds: 7 });
+  const soilText = formatThinkingSoil(papers.soil, { maxCharacters: request.soilCharacters, maxAfterthoughts: 7 });
   const memoryRecords = papers.memory?.visitor_memories ? [] : (Array.isArray(papers.memory?.items) ? papers.memory.items.slice(0, request.memoryLimit) : []);
   const memoryItems = papers.memory?.visitor_memories ? notebookItems(papers.memory.visitor_memories) : recallMemoryItems({ items: memoryRecords });
   const dogtalk = papers.dogtalk || directDogtalk; const worldbookItems = worldbook.map((entry) => `${entry.title}：${entry.content}`); const workbenchText = workbenchPrompt(query, modelVisibleTools.length);
@@ -229,7 +229,8 @@ export async function assembleCleanContext(env, {
     globalExcerpt: comfort.keptGlobalExcerptText, globalExcerptStatus: comfort.globalExcerptStatus, globalExcerptTokens: comfort.globalExcerptTokens,
     estimatedTokens: comfort.estimatedTokens, comfortCeiling: comfort.comfortCeiling, exceedsComfortCeiling: comfort.exceedsComfortCeiling,
     soil: comfort.kept.soil, soilEnabled, soilContext: soilDesk.context,
-    soilCurrentText: soilDesk.current_text, soilHandSeeds: soilDesk.hand_seeds, soilPocketCandidatesCount: soilDesk.pocket_candidates_count, memoryItems: deliveredMemoryRecords,
+    soilCurrentText: soilDesk.current_text, soilAfterthoughts: soilDesk.afterthoughts,
+    soilMemoryCandidatesCount: soilDesk.memory_candidates_count, soilSeedCandidatesCount: soilDesk.seed_candidates_count, memoryItems: deliveredMemoryRecords,
     memoryDeliveredTexts: comfort.keptMemoryItems, worldbookItems: worldbook, worldbookDeliveredCount: comfort.kept.worldbook, worldbookDeliveredTexts: comfort.keptWorldbookItems,
     dogtalk: comfort.kept.dogtalk, dogtalkContext: comfort.keptDogtalkText, crossWindow: currentCrossWindowDesk(), workbenchPrompt: comfort.kept.workbench, workbenchPromptText: comfort.keptWorkbenchText,
     reality: { ...reality, delivered_to_model: Boolean(comfort.kept.reality), context: comfort.keptRealityText },
