@@ -15,6 +15,8 @@ async function initializeMemorySchema(db) {
     afterthoughts_json TEXT NOT NULL DEFAULT '[]',
     memory_candidates_json TEXT NOT NULL DEFAULT '[]',
     seed_candidates_json TEXT NOT NULL DEFAULT '[]',
+    user_portrait_candidate_json TEXT NOT NULL DEFAULT 'null',
+    self_portrait_candidate_json TEXT NOT NULL DEFAULT 'null',
     manual_locked INTEGER NOT NULL DEFAULT 0,
     auto_refresh_enabled INTEGER NOT NULL DEFAULT 1,
     organized_through_turn_id TEXT NOT NULL DEFAULT '',

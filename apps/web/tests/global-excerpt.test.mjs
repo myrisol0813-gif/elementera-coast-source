@@ -94,8 +94,8 @@ const comfort = trimContextToComfortRange({
   maxTokens: 6000,
 });
 const system = comfort.modelMessages[0].content;
-assert.ok(system.indexOf('【核心自定义】') < system.indexOf('【全局摘录】'));
-assert.ok(system.indexOf('【全局摘录】') < system.indexOf('【相关记忆】'));
+assert.ok(system.indexOf('【核心自定义】') < system.indexOf('【自我画像】'));
+assert.ok(system.indexOf('【自我画像】') < system.indexOf('【相关记忆】'));
 assert.equal(comfort.keptGlobalExcerptText, excerpt);
 assert.equal(comfort.globalExcerptStatus, 'complete');
 

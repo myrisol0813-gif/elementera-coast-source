@@ -38,8 +38,18 @@ class TurnDeskMapperTest {
                     turns = 1,
                     messages = listOf(RemoteChatMessage(role = "user", content = "上一轮"))
                 ),
+                userPortrait = RemoteDeskGlobalExcerpt(
+                    label = "用户画像",
+                    description = "用户画像说明",
+                    status = "完整注入",
+                    delivered = true,
+                    injection = "complete",
+                    estimatedTokens = 60,
+                    length = 120,
+                    content = "这是用户画像测试正文。"
+                ),
                 globalExcerpt = RemoteDeskGlobalExcerpt(
-                    description = "全局摘录说明",
+                    description = "自我画像说明",
                     status = "完整注入",
                     delivered = true,
                     injection = "complete",
@@ -53,7 +63,7 @@ class TurnDeskMapperTest {
                     trimmed = false,
                     trimmedCount = 0,
                     exceedsComfortCeiling = false,
-                    sourcesPreserved = listOf("当前消息", "自定义指令", "全局摘录"),
+                    sourcesPreserved = listOf("当前消息", "自定义指令", "用户画像", "自我画像"),
                     globalExcerpt = "complete"
                 ),
                 thinkingSoil = RemoteDeskThinkingSoil(
@@ -99,17 +109,18 @@ class TurnDeskMapperTest {
         )
 
         assertEquals(
-            listOf("当前消息", "最近上下文", "核心自定义", "全局摘录", "整理当前对话的纸条", "相关记忆", "世界书", "私人草稿", "现实上下文", "回应节奏", "跨窗口读取", "工作台 / 工具回执", "上下文预算", "外部入口消息"),
+            listOf("当前消息", "最近上下文", "核心自定义", "用户画像", "自我画像", "整理当前对话的纸条", "相关记忆", "世界书", "私人草稿", "现实上下文", "回应节奏", "跨窗口读取", "工作台 / 工具回执", "上下文预算", "外部入口消息"),
             receipt.sections.map { it.title }
         )
         assertEquals("已递给 · 1 轮", receipt.sections[1].status)
-        assertTrue(receipt.sections[3].status.contains("完整注入"))
-        assertTrue(receipt.sections[3].details.any { it.label == "实际递给模型" && it.text.contains("我在文字里认出自己") })
-        assertTrue(receipt.sections[4].details.any { it.label == "余思" && it.text == "还想再想想" })
-        assertTrue(receipt.sections[4].details.any { it.label == "记忆候选" && it.text.contains("1 条 · 未递给正文") })
-        assertTrue(receipt.sections[4].details.any { it.label == "种子候选" && it.text.contains("1 条 · 未递给正文") })
-        assertTrue(receipt.sections[4].details.any { it.label == "实际递给模型" && it.text.contains("余思") })
-        assertEquals("未命中", receipt.sections[5].status)
+        assertTrue(receipt.sections.first { it.title == "用户画像" }.status.contains("完整注入"))
+        assertTrue(receipt.sections.first { it.title == "自我画像" }.status.contains("完整注入"))
+        assertTrue(receipt.sections.first { it.title == "自我画像" }.details.any { it.label == "实际递给模型" && it.text.contains("我在文字里认出自己") })
+        assertTrue(receipt.sections.first { it.title == "整理当前对话的纸条" }.details.any { it.label == "余思" && it.text == "还想再想想" })
+        assertTrue(receipt.sections.first { it.title == "整理当前对话的纸条" }.details.any { it.label == "记忆候选" && it.text.contains("1 条 · 未递给正文") })
+        assertTrue(receipt.sections.first { it.title == "整理当前对话的纸条" }.details.any { it.label == "种子候选" && it.text.contains("1 条 · 未递给正文") })
+        assertTrue(receipt.sections.first { it.title == "整理当前对话的纸条" }.details.any { it.label == "实际递给模型" && it.text.contains("余思") })
+        assertEquals("未命中", receipt.sections.first { it.title == "相关记忆" }.status)
         val reality = receipt.sections.first { it.title == "现实上下文" }
         assertTrue(reality.status.contains("1/2"))
         assertTrue(reality.details.any { it.label == "日期" && it.text == "2026-11-13" })
@@ -120,10 +131,10 @@ class TurnDeskMapperTest {
         assertTrue(receipt.sections.first { it.title == "跨窗口读取" }.details.any { it.text == "本轮未递入" })
         val budget = receipt.sections.first { it.title == "上下文预算" }
         assertTrue(budget.status.contains("4321 / 6000"))
-        assertTrue(budget.details.any { it.label == "保留来源" && it.text.contains("全局摘录") })
+        assertTrue(budget.details.any { it.label == "保留来源" && it.text.contains("自我画像") })
         assertTrue(receipt.sections.last().details.any { it.text == "本轮没有递入外部材料。" })
         val sourceSections = setOf(
-            "当前消息", "最近上下文", "核心自定义", "全局摘录", "整理当前对话的纸条",
+            "当前消息", "最近上下文", "核心自定义", "用户画像", "自我画像", "整理当前对话的纸条",
             "相关记忆", "世界书", "私人草稿", "现实上下文", "回应节奏", "跨窗口读取", "工作台 / 工具回执", "外部入口消息"
         )
         assertTrue(

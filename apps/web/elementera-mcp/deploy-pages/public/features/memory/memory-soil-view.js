@@ -8,6 +8,8 @@ export function emptySoil(conversationId) {
     afterthoughts: [],
     memory_candidates: [],
     seed_candidates: [],
+    user_portrait_candidate: null,
+    self_portrait_candidate: null,
     manual_locked: false,
     auto_refresh_enabled: true,
     revision: 1,
@@ -119,12 +121,22 @@ export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentS
       : '<p>这一刻没有想留下的余思。</p>';
     const memoryCandidates = Array.isArray(soil.memory_candidates) ? soil.memory_candidates : [];
     const seedCandidates = Array.isArray(soil.seed_candidates) ? soil.seed_candidates : [];
+    const userPortraitCandidate = soil.user_portrait_candidate || null;
+    const selfPortraitCandidate = soil.self_portrait_candidate || null;
+    const portraitCandidate = (label, candidate, action) => `
+      <div class="feature-kicker">${label}</div>
+      ${candidate
+        ? `<button class="feature-row" type="button" data-action="memory:${action}"><span><strong>本轮提出修改</strong><small>${escapeHtml(candidate.reason || candidate.source_excerpt || '已进入待确认修改。')}</small></span><span>›</span></button>`
+        : '<p>这一轮没有提出修改。</p>'}
+    `;
     const destinationBody = `
       <div class="feature-kicker">记忆候选 · ${memoryCandidates.length}</div>
       ${candidateBlock(memoryCandidates, '没有想递往记忆库的内容。')}
       <div class="feature-kicker">种子候选 · ${seedCandidates.length}</div>
       ${candidateBlock(seedCandidates, '没有想递往种子库的内容。')}
-      ${memoryCandidates.length || seedCandidates.length ? '<p class="feature-note">这些只是模型建议的去处，已送入待确认区；确认前不会参与召回。</p>' : ''}
+      ${portraitCandidate('用户画像', userPortraitCandidate, 'user-portrait')}
+      ${portraitCandidate('自我画像', selfPortraitCandidate, 'global-excerpt')}
+      ${memoryCandidates.length || seedCandidates.length || userPortraitCandidate || selfPortraitCandidate ? '<p class="feature-note">四个去处都只是模型建议；正式内容仍需经过各自的确认流程。</p>' : ''}
     `;
     const pocketEntry = pendingPockets.length || memoryCandidates.length || seedCandidates.length
       ? `<section class="feature-group"><div class="feature-card">

@@ -122,10 +122,19 @@ internal fun SoilBottomSheet(
                     emptyText = "没有想递往种子库的内容。",
                     candidates = soil.seedCandidates
                 )
-                if (soil.memoryCandidates.isNotEmpty() || soil.seedCandidates.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                SoilPortraitDestination("用户画像", soil.userPortraitCandidate)
+                Spacer(Modifier.height(8.dp))
+                SoilPortraitDestination("自我画像", soil.selfPortraitCandidate)
+                if (
+                    soil.memoryCandidates.isNotEmpty() ||
+                    soil.seedCandidates.isNotEmpty() ||
+                    soil.userPortraitCandidate != null ||
+                    soil.selfPortraitCandidate != null
+                ) {
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        "这些只是模型建议的去处。候选会进入待确认区；确认前不会成为正式记忆或种子，也不会递进聊天正文。",
+                        "这些只是模型建议的去处。记忆与种子进入待确认区；画像修改进入各自画像页，确认前都不会成为正式长期内容。",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall
                     )
@@ -137,7 +146,7 @@ internal fun SoilBottomSheet(
                         onOpenPendingBag()
                     }
                 ) {
-                    Text("打开待确认区")
+                    Text("打开记忆 / 种子待确认区")
                 }
             }
 
@@ -159,6 +168,30 @@ internal fun SoilBottomSheet(
 
             Spacer(Modifier.height(20.dp))
         }
+    }
+}
+
+@Composable
+private fun SoilPortraitDestination(
+    title: String,
+    candidate: com.elementeracoast.app.core.model.PortraitCandidateSnapshot?
+) {
+    Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+    Spacer(Modifier.height(4.dp))
+    if (candidate == null) {
+        SoilEmpty("这一轮没有提出修改。")
+        return
+    }
+    Text("待确认修改", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+    if (candidate.reason.isNotBlank()) {
+        Text(candidate.reason, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+    }
+    if (candidate.sourceExcerpt.isNotBlank()) {
+        Text(
+            "来源 · ${candidate.sourceExcerpt}",
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .78f),
+            style = MaterialTheme.typography.labelSmall
+        )
     }
 }
 

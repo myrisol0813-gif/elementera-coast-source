@@ -38,7 +38,20 @@ internal object TurnDeskMapper {
                 details = detail("全文", value.customInstructions.content)
             ),
             section(
-                title = value.globalExcerpt.label.ifBlank { "全局摘录" },
+                title = value.userPortrait.label.ifBlank { "用户画像" },
+                status = withDetail(
+                    value.userPortrait.status,
+                    if (value.userPortrait.estimatedTokens > 0) "约 ${value.userPortrait.estimatedTokens} tokens" else ""
+                ),
+                description = value.userPortrait.description,
+                details = buildList {
+                    if (value.userPortrait.injection.isNotBlank()) add(TurnDeskDetail("注入状态", value.userPortrait.injection))
+                    if (value.userPortrait.length > 0) add(TurnDeskDetail("正文长度", "${value.userPortrait.length} 字"))
+                    if (value.userPortrait.content.isNotBlank()) add(TurnDeskDetail("实际递给模型", value.userPortrait.content))
+                }
+            ),
+            section(
+                title = value.globalExcerpt.label.ifBlank { "自我画像" },
                 status = withDetail(
                     value.globalExcerpt.status,
                     if (value.globalExcerpt.estimatedTokens > 0) "约 ${value.globalExcerpt.estimatedTokens} tokens" else ""
@@ -59,6 +72,12 @@ internal object TurnDeskMapper {
                     value.thinkingSoil.afterthoughts.forEach { item -> add(TurnDeskDetail("余思", item)) }
                     add(TurnDeskDetail("记忆候选", "${value.thinkingSoil.memoryCandidatesCount} 条 · 未递给正文"))
                     add(TurnDeskDetail("种子候选", "${value.thinkingSoil.seedCandidatesCount} 条 · 未递给正文"))
+                    value.thinkingSoil.userPortraitCandidate?.let {
+                        add(TurnDeskDetail("用户画像候选", listOf(it.reason, it.sourceExcerpt).filter(String::isNotBlank).joinToString("\n").ifBlank { "1 条 · 未递给正文" }))
+                    }
+                    value.thinkingSoil.selfPortraitCandidate?.let {
+                        add(TurnDeskDetail("自我画像候选", listOf(it.reason, it.sourceExcerpt).filter(String::isNotBlank).joinToString("\n").ifBlank { "1 条 · 未递给正文" }))
+                    }
                     if (value.thinkingSoil.context.isNotBlank()) add(TurnDeskDetail("实际递给模型", value.thinkingSoil.context))
                 }
             ),
@@ -205,7 +224,8 @@ internal object TurnDeskMapper {
                 details = buildList {
                     add(TurnDeskDetail("裁剪", if (value.contextBudget.trimmed) "是 · ${value.contextBudget.trimmedCount} 项" else "否"))
                     if (value.contextBudget.sourcesPreserved.isNotEmpty()) add(TurnDeskDetail("保留来源", value.contextBudget.sourcesPreserved.joinToString("、")))
-                    if (value.contextBudget.globalExcerpt.isNotBlank()) add(TurnDeskDetail("全局摘录", value.contextBudget.globalExcerpt))
+                    if (value.contextBudget.userPortrait.isNotBlank()) add(TurnDeskDetail("用户画像", value.contextBudget.userPortrait))
+                    if (value.contextBudget.globalExcerpt.isNotBlank()) add(TurnDeskDetail("自我画像", value.contextBudget.globalExcerpt))
                 }
             ),
             section(

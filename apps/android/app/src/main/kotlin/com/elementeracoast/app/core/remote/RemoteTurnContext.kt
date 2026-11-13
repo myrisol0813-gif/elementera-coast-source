@@ -10,7 +10,8 @@ data class RemoteDeskSlip(
     @SerialName("current_message") val currentMessage: RemoteDeskCurrentMessage = RemoteDeskCurrentMessage(),
     @SerialName("recent_context") val recentContext: RemoteDeskRecentContext = RemoteDeskRecentContext(),
     @SerialName("custom_instructions") val customInstructions: RemoteDeskCustomInstructions = RemoteDeskCustomInstructions(),
-    @SerialName("global_excerpt") val globalExcerpt: RemoteDeskGlobalExcerpt = RemoteDeskGlobalExcerpt(),
+    @SerialName("user_portrait") val userPortrait: RemoteDeskGlobalExcerpt = RemoteDeskGlobalExcerpt(label = "用户画像"),
+    @SerialName("global_excerpt") val globalExcerpt: RemoteDeskGlobalExcerpt = RemoteDeskGlobalExcerpt(label = "自我画像"),
     @SerialName("thinking_soil") val thinkingSoil: RemoteDeskThinkingSoil = RemoteDeskThinkingSoil(),
     @SerialName("related_memory") val relatedMemory: RemoteDeskMemory = RemoteDeskMemory(),
     val worldbook: RemoteDeskWorldbook = RemoteDeskWorldbook(),
@@ -56,7 +57,7 @@ data class RemoteDeskCustomInstructions(
 
 @Serializable
 data class RemoteDeskGlobalExcerpt(
-    val label: String = "全局摘录",
+    val label: String = "自我画像",
     val description: String = "",
     val status: String = "未设置",
     val delivered: Boolean = false,
@@ -75,6 +76,7 @@ data class RemoteDeskContextBudget(
     @SerialName("trimmed_count") val trimmedCount: Int = 0,
     @SerialName("exceeds_comfort_ceiling") val exceedsComfortCeiling: Boolean = false,
     @SerialName("sources_preserved") val sourcesPreserved: List<String> = emptyList(),
+    @SerialName("user_portrait") val userPortrait: String = "",
     @SerialName("global_excerpt") val globalExcerpt: String = ""
 )
 
@@ -92,6 +94,8 @@ data class RemoteDeskThinkingSoil(
     @SerialName("afterthoughts_count") val afterthoughtsCount: Int = 0,
     @SerialName("memory_candidates_count") val memoryCandidatesCount: Int = 0,
     @SerialName("seed_candidates_count") val seedCandidatesCount: Int = 0,
+    @SerialName("user_portrait_candidate") val userPortraitCandidate: RemotePortraitCandidateSummary? = null,
+    @SerialName("self_portrait_candidate") val selfPortraitCandidate: RemotePortraitCandidateSummary? = null,
     @SerialName("candidates_delivered") val candidatesDelivered: Boolean = false
 )
 
@@ -358,12 +362,21 @@ data class RemotePlanSoilPrepareResponse(
 )
 
 @Serializable
+data class RemotePortraitCandidateSummary(
+    @SerialName("candidate_id") val candidateId: String = "",
+    val reason: String = "",
+    @SerialName("source_excerpt") val sourceExcerpt: String = ""
+)
+
+@Serializable
 data class RemoteThoughtSoil(
     @SerialName("conversation_id") val conversationId: String = "",
     @SerialName("current_text") val currentText: String = "",
     val afterthoughts: List<String> = emptyList(),
     @SerialName("memory_candidates") val memoryCandidates: List<RemoteThoughtCandidate> = emptyList(),
     @SerialName("seed_candidates") val seedCandidates: List<RemoteThoughtCandidate> = emptyList(),
+    @SerialName("user_portrait_candidate") val userPortraitCandidate: RemotePortraitCandidateSummary? = null,
+    @SerialName("self_portrait_candidate") val selfPortraitCandidate: RemotePortraitCandidateSummary? = null,
     @SerialName("manual_locked") val manualLocked: Boolean = false,
     @SerialName("auto_refresh_enabled") val autoRefreshEnabled: Boolean = true,
     val revision: Int = 1,

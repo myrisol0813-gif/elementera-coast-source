@@ -11,7 +11,7 @@ Open the repository's **Latest Release** and download the current Source Native 
 The visitor build:
 
 - uses `applicationId=com.elementeracoast.source`;
-- currently comes from the `0.2.15-source` source tree (`versionCode=17`);
+- currently comes from the `0.2.16-source` source tree (`versionCode=18`);
 - accepts the local visiting code `123456`;
 - keeps visitor mode **offline-only**;
 - blocks account authorization, model calls and other cloud actions before network transmission;
@@ -149,7 +149,7 @@ Short reply mode is independent of Reality Context. A valid acceptance check is 
 
 ## 5. PWA acceptance
 
-The current Source PWA uses cache `coast-source-app-15`.
+The current Source PWA uses cache `coast-source-app-16`.
 
 On mobile, verify:
 

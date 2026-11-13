@@ -1,6 +1,7 @@
 import { MEMORY_FILTER_KINDS, MEMORY_ROUTES } from './memory/memory-constants.js';
 import {
   fetchCustomInstructionsRequest,
+  fetchUserPortraitRequest,
   fetchGlobalExcerptRequest,
   fetchEntriesRequest,
   fetchPocketsRequest,
@@ -10,7 +11,7 @@ import {
 } from './memory/memory-client.js';
 import { createMemoryActions } from './memory/memory-actions.js';
 import { createLibraryViews, normalizeFilterState } from './memory/memory-library-view.js';
-import { createGlobalExcerptViews } from './memory/memory-global-excerpt-view.js';
+import { createGlobalExcerptViews, createUserPortraitViews } from './memory/memory-global-excerpt-view.js';
 import { createPocketViews } from './memory/memory-pocket-view.js';
 import { createSoilViews, emptySoil } from './memory/memory-soil-view.js';
 
@@ -26,6 +27,7 @@ export function createMemory({ chat, router, toast, storage }) {
       seed: { models: [], windows: [], tags: [], times: [] },
     },
     customInstructions: null,
+    userPortrait: null,
     globalExcerpt: null,
     vectorStatus: null,
     soilChains: new Map(),
@@ -106,6 +108,11 @@ export function createMemory({ chat, router, toast, storage }) {
     return runtime.customInstructions;
   }
 
+  async function fetchUserPortrait() {
+    runtime.userPortrait = await fetchUserPortraitRequest();
+    return runtime.userPortrait;
+  }
+
   async function fetchGlobalExcerpt() {
     runtime.globalExcerpt = await fetchGlobalExcerptRequest();
     return runtime.globalExcerpt;
@@ -129,6 +136,7 @@ export function createMemory({ chat, router, toast, storage }) {
   const soilViews = createSoilViews({ runtime, currentId, maxAfterthoughts, currentSoil });
   const pocketViews = createPocketViews({ currentPockets });
   const libraryViews = createLibraryViews({ runtime, currentId, currentPockets, chat });
+  const userPortraitViews = createUserPortraitViews({ runtime });
   const globalExcerptViews = createGlobalExcerptViews({ runtime });
 
   router.register('thought-soil', soilViews.soilView);
@@ -137,6 +145,8 @@ export function createMemory({ chat, router, toast, storage }) {
   router.register('memory', libraryViews.memoryView);
   router.register('memory-entry-edit', libraryViews.entryEditView);
   router.register('memory-vector-status', libraryViews.vectorStatusView);
+  router.register('user-portrait', userPortraitViews.userPortraitView);
+  router.register('user-portrait-edit', userPortraitViews.userPortraitEditView);
   router.register('global-excerpt', globalExcerptViews.globalExcerptView);
   router.register('global-excerpt-edit', globalExcerptViews.globalExcerptEditView);
 
@@ -153,6 +163,7 @@ export function createMemory({ chat, router, toast, storage }) {
     fetchPockets,
     fetchEntries,
     fetchCustomInstructions,
+    fetchUserPortrait,
     fetchGlobalExcerpt,
     fetchVectorStatus,
   });

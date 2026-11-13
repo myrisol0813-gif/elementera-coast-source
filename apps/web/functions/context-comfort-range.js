@@ -11,7 +11,8 @@ export function estimateContextTokens(value) {
 export const SOURCE_GUIDES = Object.freeze({
   current: ['【当前消息】', '这是用户本轮刚刚提交的消息。', '它是当前任务最直接的输入，应优先用于理解问题、目标和约束。'].join('\n'),
   recent: ['【最近上下文】', '这是当前会话最近几轮消息。', '它用于保持主题、术语和任务连续性，避免重复询问已经给出的信息。'].join('\n'),
-  global_excerpt: ['【全局摘录】', '这是应用内由用户确认的长期参考正文。', '它应整篇进入上下文，位置紧随核心自定义；不要把它当普通记忆按关键词拆散召回。'].join('\n'),
+  user_portrait: ['【用户画像】', '这是由用户确认的长期画像，记录模型逐渐形成的稳定用户理解。', '它整篇进入上下文，不按关键词拆散召回；自动整理关闭时仍照常读取正式正文。'].join('\n'),
+  global_excerpt: ['【自我画像】', '这是由用户确认的长期自我画像，记录模型对自身语言、判断、边界与连续性的稳定认识。', '它整篇进入上下文，不按关键词拆散召回；自动整理关闭时仍照常读取正式正文。'].join('\n'),
   custom: ['【核心自定义】', '这是用户为当前公开 demo assistant 保存的自定义指令。', '它用于补充响应偏好、格式要求、任务约束与允许的工具行为。'].join('\n'),
   soil: ['【整理当前对话的纸条】', '这是当前窗口的滚动摘要与待确认笔记。', '它用于压缩较早内容并保留仍然相关的任务线索；', '候选内容只有在用户确认后才可进入种子库或记忆库。', '它不是唯一上下文，也不应覆盖当前消息与最近上下文。'].join('\n'),
   memory: ['【相关记忆】', '这是与当前任务相关、且已确认可使用的长期记录。', '只在确实有帮助时引用，并以当前消息为最高优先级。'].join('\n'),
@@ -78,6 +79,7 @@ function assembleText(value, messages) {
   return [
     value.basePrompt,
     sourceBlock(SOURCE_GUIDES.custom, value.customInstructionsText),
+    sourceBlock(SOURCE_GUIDES.user_portrait, value.userPortraitText),
     sourceBlock(SOURCE_GUIDES.global_excerpt, value.globalExcerptText),
     sourceBlock(SOURCE_GUIDES.dogtalk, value.dogtalkText),
     crossWindowBlock(value.crossWindowItems),
@@ -96,6 +98,7 @@ function assembleText(value, messages) {
 export function trimContextToComfortRange({
   basePrompt = '',
   customInstructionsText = '',
+  userPortraitText = '',
   globalExcerptText = '',
   soilText = '',
   memoryItems = [],
@@ -113,6 +116,7 @@ export function trimContextToComfortRange({
   const value = {
     basePrompt: String(basePrompt || '').trim(),
     customInstructionsText: rawCustomInstructions.trim() ? rawCustomInstructions : '',
+    userPortraitText: String(userPortraitText ?? '').trim(),
     globalExcerptText: String(globalExcerptText ?? '').trim(),
     soilText: String(soilText || '').trim(),
     memoryItems: [...memoryItems].filter(Boolean),
@@ -158,6 +162,7 @@ export function trimContextToComfortRange({
     ],
     kept: {
       custom_instructions: Boolean(value.customInstructionsText),
+      user_portrait: Boolean(value.userPortraitText),
       global_excerpt: Boolean(value.globalExcerptText),
       soil: Boolean(value.soilText),
       memory: value.memoryItems.length,
@@ -170,6 +175,7 @@ export function trimContextToComfortRange({
     },
     keptMessages: keptMessages.map((message) => ({ ...message })),
     keptCustomInstructionsText: value.customInstructionsText,
+    keptUserPortraitText: value.userPortraitText,
     keptGlobalExcerptText: value.globalExcerptText,
     keptSoilText: sourceBody(value.soilText),
     keptMemoryItems: value.memoryItems,
@@ -184,6 +190,8 @@ export function trimContextToComfortRange({
     estimatedTokens,
     comfortCeiling: ceiling,
     exceedsComfortCeiling: estimatedTokens > ceiling,
+    userPortraitStatus: value.userPortraitText ? (estimatedTokens > ceiling ? 'over_budget' : 'complete') : 'empty',
+    userPortraitTokens: estimateContextTokens(value.userPortraitText),
     globalExcerptStatus: value.globalExcerptText ? (estimatedTokens > ceiling ? 'over_budget' : 'complete') : 'empty',
     globalExcerptTokens: estimateContextTokens(value.globalExcerptText),
     currentUserPreserved: Boolean(currentUser),

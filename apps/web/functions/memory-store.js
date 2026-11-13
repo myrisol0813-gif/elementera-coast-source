@@ -56,3 +56,17 @@ export {
   confirmGlobalExcerptCandidate,
   listGlobalExcerptRevisions,
 } from './memory-store/global-excerpt-store.js';
+
+export {
+  USER_PORTRAIT_ID,
+  USER_PORTRAIT_INITIAL_TEXT,
+  USER_PORTRAIT_WRITE_GUIDANCE,
+  readUserPortrait,
+  setUserPortraitWriteEnabled,
+  clearUserPortrait,
+  listUserPortraitCandidates,
+  createUserPortraitCandidate,
+  discardUserPortraitCandidate,
+  confirmUserPortraitCandidate,
+  listUserPortraitRevisions,
+} from './memory-store/user-portrait-store.js';

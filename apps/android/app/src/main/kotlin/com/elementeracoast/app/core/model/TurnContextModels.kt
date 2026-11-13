@@ -23,6 +23,8 @@ data class ThoughtSoilSnapshot(
     val afterthoughts: List<String>,
     val memoryCandidates: List<ThoughtCandidateSnapshot>,
     val seedCandidates: List<ThoughtCandidateSnapshot>,
+    val userPortraitCandidate: PortraitCandidateSnapshot? = null,
+    val selfPortraitCandidate: PortraitCandidateSnapshot? = null,
     val manualLocked: Boolean,
     val autoRefreshEnabled: Boolean = true,
     val revision: Int,
@@ -34,4 +36,11 @@ data class ThoughtCandidateSnapshot(
     val title: String,
     val content: String,
     val sourceExcerpt: String
+)
+
+
+data class PortraitCandidateSnapshot(
+    val candidateId: String = "",
+    val reason: String = "",
+    val sourceExcerpt: String = ""
 )

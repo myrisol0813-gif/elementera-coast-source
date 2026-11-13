@@ -6,8 +6,8 @@ This directory contains the source-available Android client derived from the cur
 
 - App: Elementera Coast Source
 - `applicationId = com.elementeracoast.source`
-- `versionCode = 15`
-- `versionName = 0.2.13-source`
+- `versionCode = 18`
+- `versionName = 0.2.16-source`
 - Kotlin + Jetpack Compose
 - JDK 17 / Android SDK 34 / Gradle 8.9
 
@@ -133,3 +133,7 @@ Do not commit provider/API/session secrets, local databases, build outputs, APK/
 ## License
 
 Elementera Coast Source is distributed under the MIT License. See `LICENSE`. Third-party components retain their upstream licenses as documented in `THIRD_PARTY_NOTICES.md` and `third_party/`.
+
+## Portraits and conversation timestamps (0.2.16)
+
+Source Native now exposes paired **用户画像 / 自我画像** review surfaces and their independent automatic-suggestion toggles. The toggles govern future organizer proposals; confirmed portrait text is still eligible for default context injection. The current-turn desk shows both portrait sections, and the Thought Soil destination area may show proposed portrait revisions before owner confirmation. In chat, each non-streaming message displays its local HH:mm above the content; assistant message time precedes the Thought Soil pill. Source retains its separate package identity and visitor-only, offline-safe acceptance boundaries.

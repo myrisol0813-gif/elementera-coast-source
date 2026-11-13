@@ -10,6 +10,7 @@ import com.elementeracoast.app.core.remote.RemoteGlobalExcerpt
 import com.elementeracoast.app.core.remote.RemoteGlobalExcerptCandidate
 import com.elementeracoast.app.core.remote.RemoteGlobalExcerptRevision
 import com.elementeracoast.app.core.remote.RemoteGlobalExcerptResponse
+import com.elementeracoast.app.core.remote.RemoteUserPortraitResponse
 import com.elementeracoast.app.core.remote.RemoteWorldbookEntry
 import com.elementeracoast.app.core.remote.RemoteWorldbookEntryWriteRequest
 import kotlinx.coroutines.async
@@ -26,6 +27,11 @@ interface MemoryRepository {
     suspend fun refreshPockets(conversationId: String)
     suspend fun refreshWorldbook()
     suspend fun refreshInstructions()
+    suspend fun refreshUserPortrait()
+    suspend fun setUserPortraitWriteEnabled(enabled: Boolean)
+    suspend fun clearUserPortrait(expectedRevision: Int)
+    suspend fun confirmUserPortraitCandidate(id: String, editedBody: String? = null)
+    suspend fun discardUserPortraitCandidate(id: String)
     suspend fun refreshGlobalExcerpt()
     suspend fun setGlobalExcerptWriteEnabled(enabled: Boolean)
     suspend fun clearGlobalExcerpt(expectedRevision: Int)
@@ -66,6 +72,7 @@ class DefaultMemoryRepository(
         }
         val worldbook = async { remote.listWorldbook() }
         val instructions = async { remote.getInstructions() }
+        val userPortrait = async { remote.getUserPortrait() }
         val globalExcerpt = async { remote.getGlobalExcerpt() }
 
         val remoteMemories = memories.await()
@@ -73,6 +80,7 @@ class DefaultMemoryRepository(
         val remotePockets = pockets?.await().orEmpty()
         val remoteWorldbook = worldbook.await()
         val remoteInstructions = instructions.await()
+        val remoteUserPortrait = userPortrait.await()
         val remoteGlobalExcerpt = globalExcerpt.await()
 
         cache.putMemoryEntries("memory", remoteMemories)
@@ -88,6 +96,7 @@ class DefaultMemoryRepository(
             pocketConversationId = cleanConversationId.ifBlank { null },
             worldbook = remoteWorldbook.map(::toWorldbook),
             customInstructions = remoteInstructions?.let(::toInstructions) ?: CustomInstructions(),
+            userPortrait = toUserPortrait(remoteUserPortrait),
             globalExcerpt = toGlobalExcerpt(remoteGlobalExcerpt)
         )
     }
@@ -130,6 +139,31 @@ class DefaultMemoryRepository(
         mutableSnapshot.value = mutableSnapshot.value.copy(
             customInstructions = instructions?.let(::toInstructions) ?: CustomInstructions()
         )
+    }
+
+    override suspend fun refreshUserPortrait() {
+        val response = remote.getUserPortrait()
+        mutableSnapshot.value = mutableSnapshot.value.copy(userPortrait = toUserPortrait(response))
+    }
+
+    override suspend fun setUserPortraitWriteEnabled(enabled: Boolean) {
+        remote.setUserPortraitWriteEnabled(enabled)
+        refreshUserPortrait()
+    }
+
+    override suspend fun clearUserPortrait(expectedRevision: Int) {
+        remote.clearUserPortrait(expectedRevision)
+        refreshUserPortrait()
+    }
+
+    override suspend fun confirmUserPortraitCandidate(id: String, editedBody: String?) {
+        remote.confirmUserPortraitCandidate(id, editedBody)
+        refreshUserPortrait()
+    }
+
+    override suspend fun discardUserPortraitCandidate(id: String) {
+        remote.discardUserPortraitCandidate(id)
+        refreshUserPortrait()
     }
 
     override suspend fun refreshGlobalExcerpt() {
@@ -283,6 +317,17 @@ class DefaultMemoryRepository(
             enabled = value.enabled,
             scope = value.scope,
             visitorSafe = value.visitorSafe
+        )
+
+        fun toUserPortrait(response: RemoteUserPortraitResponse) = GlobalExcerpt(
+            writeGuidance = response.portrait.writeGuidance,
+            body = response.portrait.body,
+            writeEnabled = response.portrait.writeEnabled,
+            revision = response.portrait.revision,
+            createdAt = response.portrait.createdAt,
+            updatedAt = response.portrait.updatedAt,
+            candidates = response.candidates.map(::toGlobalExcerptCandidate),
+            revisions = response.revisions.map(::toGlobalExcerptRevision)
         )
 
         fun toGlobalExcerpt(response: RemoteGlobalExcerptResponse) = GlobalExcerpt(

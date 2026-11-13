@@ -77,6 +77,28 @@ export async function fetchVectorStatusRequest() {
   return requestJson(API.memoryVectorStatus);
 }
 
+export async function fetchUserPortraitRequest() {
+  return requestJson(API.memoryUserPortrait);
+}
+
+export async function setUserPortraitWriteEnabledRequest(writeEnabled) {
+  return requestJson(API.memoryUserPortrait, {
+    method: 'PATCH',
+    body: JSON.stringify({ write_enabled: writeEnabled === true }),
+  });
+}
+
+export async function resolveUserPortraitCandidateRequest(id, payload = {}) {
+  return requestJson(`${API.memoryUserPortrait}/candidates/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function discardUserPortraitCandidateRequest(id) {
+  return requestJson(`${API.memoryUserPortrait}/candidates/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
 export async function fetchGlobalExcerptRequest() {
   return requestJson(API.memoryGlobalExcerpt);
 }

@@ -96,6 +96,7 @@ data class MemorySnapshot(
     val pocketConversationId: String? = null,
     val worldbook: List<WorldbookEntry> = emptyList(),
     val customInstructions: CustomInstructions = CustomInstructions(),
+    val userPortrait: GlobalExcerpt = GlobalExcerpt(),
     val globalExcerpt: GlobalExcerpt = GlobalExcerpt()
 )
 

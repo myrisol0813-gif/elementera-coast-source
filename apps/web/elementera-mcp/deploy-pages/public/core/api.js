@@ -23,6 +23,7 @@ export const API = Object.freeze({
   memoryEntries: '/api/memory/entries',
   memoryCustomInstructions: '/api/memory/custom-instructions',
   memoryGlobalExcerpt: '/api/memory/global-excerpt',
+  memoryUserPortrait: '/api/memory/user-portrait',
   memorySearch: '/api/memory/search',
   memoryRecall: '/api/memory/recall',
   memoryVectorStatus: '/api/memory/vector-status',

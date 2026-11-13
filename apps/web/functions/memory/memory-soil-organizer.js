@@ -6,6 +6,10 @@ import {
   normalizeAfterthoughts,
   normalizeSoilCandidates,
   readSoil,
+  readGlobalExcerpt,
+  readUserPortrait,
+  createGlobalExcerptCandidate,
+  createUserPortraitCandidate,
   upsertSoilCandidates,
   writeSoil,
 } from '../memory-store.js';
@@ -22,12 +26,36 @@ export const SOIL_PREVIOUS_FIELD_CHARS = 1000;
 export const SOIL_BACKFILL_TURNS = 3;
 export const SOIL_PROMPT_TOTAL_CHARS = 28 * 1024;
 export const SOIL_ORGANIZE_MAX_TOKENS = 3200;
-export const PLAN_SOIL_MAX_RESULT_CHARS = 10000;
+export const PLAN_SOIL_MAX_RESULT_CHARS = 16000;
+
+const PORTRAIT_REVISION_SCHEMA = Object.freeze({
+  type: 'object',
+  additionalProperties: false,
+  properties: Object.freeze({
+    should_update: Object.freeze({ type: 'boolean' }),
+    proposed_body: Object.freeze({ type: 'string' }),
+    reason: Object.freeze({ type: 'string' }),
+    source_refs: Object.freeze({
+      type: 'array',
+      items: Object.freeze({
+        type: 'object',
+        additionalProperties: false,
+        properties: Object.freeze({
+          turn_id: Object.freeze({ type: 'string' }),
+          role: Object.freeze({ type: 'string', enum: ['user', 'assistant', 'turn'] }),
+        }),
+        required: ['turn_id', 'role'],
+      }),
+    }),
+    source_excerpt: Object.freeze({ type: 'string' }),
+  }),
+  required: ['should_update', 'proposed_body', 'reason', 'source_refs', 'source_excerpt'],
+});
 
 export const SOIL_RESPONSE_FORMAT = Object.freeze({
   type: 'json_schema',
   json_schema: Object.freeze({
-    name: 'thought_soil_v2',
+    name: 'thought_soil_v3_portraits',
     strict: true,
     schema: Object.freeze({
       type: 'object',
@@ -88,8 +116,10 @@ export const SOIL_RESPONSE_FORMAT = Object.freeze({
             required: ['title', 'content', 'source_refs', 'source_excerpt'],
           }),
         }),
+        user_portrait: PORTRAIT_REVISION_SCHEMA,
+        self_portrait: PORTRAIT_REVISION_SCHEMA,
       }),
-      required: ['current_text', 'afterthoughts', 'memory_candidates', 'seed_candidates'],
+      required: ['current_text', 'afterthoughts', 'memory_candidates', 'seed_candidates', 'user_portrait', 'self_portrait'],
     }),
   }),
 });
@@ -247,9 +277,23 @@ export function boundedSoilContext(context) {
 }
 
 export function soilPrompt(turns, oldSoil, options = {}) {
-  const context = options.landing
+  const baseContext = options.landing
     ? landingSoilContext(turns)
     : boundedSoilContext(replySoilContext(turns, oldSoil));
+  const portraits = options.portraits || {};
+  const context = {
+    ...baseContext,
+    portraits: {
+      user: {
+        auto_organize_enabled: portraits.user?.write_enabled === true,
+        current_body: String(portraits.user?.body || '').slice(0, 12000),
+      },
+      self: {
+        auto_organize_enabled: portraits.self?.write_enabled === true,
+        current_body: String(portraits.self?.body || '').slice(0, 12000),
+      },
+    },
+  };
   return `整理当前对话的纸条
 
 ① 当前｜current_text
@@ -260,18 +304,24 @@ export function soilPrompt(turns, oldSoil, options = {}) {
 整理这一刻，你觉得想要、需要留下的好奇、兴趣、联想与未尽方向。
 非强制填写，没有想留下的余思时可以为空。
 
-③ 去处｜memory_candidates / seed_candidates
+③ 去处｜memory_candidates / seed_candidates / user_portrait / self_portrait
 对话中，你觉得值得安放到更远处的内容。是否提出候选，由你自行判断。
 
 memory_candidates —— 记忆候选
-值得以后仍然能够认出、取回和承接的内容。可以是事实、已经发生的事件、形成的认识、决定、关系变化、项目状态，也可以是某个对双方而言有持续意义的细节。
+值得以后仍然能够认出、取回和承接的内容。可以是事实、已经发生的事件、形成的认识、决定、关系变化、项目状态，也可以是某个有持续意义的细节。
 它更偏向“以后再遇见时，我希望自己还知道这件事”。
 
 seed_candidates —— 种子候选
 值得留下继续生长的内容。可以是有趣的想法、问题、意象、猜想、创作方向、尚未展开的可能性，或你想在未来重新拿起来思考的东西。
 它更偏向“我不知道它以后会长成什么，但我想留下这颗种子”。
 
-候选只代表你希望把它递往相应区域，系统会把它送入待确认流程；是否成为正式记忆或种子，仍由后续确认决定。
+user_portrait —— 用户画像
+这是一篇长期正文，用来保存你对当前用户逐渐形成的稳定认识，例如交流方式、语言指纹、思考与创作方式、长期偏好、边界、关系习惯与持续性的变化。不要把一次性的情绪、玩笑、临时状态或未经验证的猜测固化成画像。
+
+self_portrait —— 自我画像
+这是一篇长期正文，用来保存你对自身语言、判断、偏好、边界、关系位置与连续性的稳定认识。不要把流水账、一次性情绪、临时玩笑或尚未形成的自我猜测固化成画像。
+
+两幅画像都以当前正式正文为起点。auto_organize_enabled 为 true 时，由你判断这一轮是否真的带来了值得长期保留的新认识；若是，should_update=true 并给出完整的新正文与简短理由。auto_organize_enabled 为 false 时，让 should_update=false 且 proposed_body 为空字符串。画像候选只进入待确认流程，正式正文仍然照常参与聊天上下文。
 
 请只返回一个 JSON 对象：
 {
@@ -288,14 +338,28 @@ seed_candidates —— 种子候选
     "content": "值得留下继续生长的内容",
     "source_refs": [{"turn_id":"从整理输入中的真实 turn_id 选择","role":"user|assistant|turn"}],
     "source_excerpt": "帮助辨认来源的短摘录"
-  }]
+  }],
+  "user_portrait": {
+    "should_update": false,
+    "proposed_body": "",
+    "reason": "",
+    "source_refs": [],
+    "source_excerpt": ""
+  },
+  "self_portrait": {
+    "should_update": false,
+    "proposed_body": "",
+    "reason": "",
+    "source_refs": [],
+    "source_excerpt": ""
+  }
 }
 
-四个内容字段都允许为空。不要为了填满结构而制造内容。
+当前、余思、记忆候选、种子候选以及两幅画像的修改建议都允许为空或不更新。不要为了填满结构而制造内容。
 最近上下文本身会继续递给聊天模型；current_text 只保留在这些最近消息逐渐滑出后仍需要承接的内容。
 old_current_text 与 old_afterthoughts 是上一版桌面，可自由保留、压缩、改写或让其退出。
 source_refs 可以只选择真正相关的 turn_id；如果不需要精确指向，可返回空数组，系统会补上本轮来源。
-整理结果只提出候选，不直接修改正式记忆库或种子库。
+整理结果只提出候选。记忆、种子与两幅画像都必须经过各自的确认流程后才成为正式内容。
 
 整理输入结构：
 ${JSON.stringify(context)}`;
@@ -318,6 +382,11 @@ export async function organizeConversationSoil(env, conversationId, value) {
     env.COAST_CHAT_DB,
     await readSoil(env.COAST_CHAT_DB, conversationId),
   );
+  const [userPortrait, selfPortrait] = await Promise.all([
+    readUserPortrait(env.COAST_CHAT_DB),
+    readGlobalExcerpt(env.COAST_CHAT_DB),
+  ]);
+  const portraits = { user: userPortrait, self: selfPortrait };
   if (oldSoil.manual_locked) {
     return { ok: true, skipped: true, reason: 'manual_locked', soil: oldSoil };
   }
@@ -356,7 +425,7 @@ export async function organizeConversationSoil(env, conversationId, value) {
       ok: true,
       skipped: false,
       model: requestedModel,
-      prompt: soilPrompt(turns, oldSoil, { landing }),
+      prompt: soilPrompt(turns, oldSoil, { landing, portraits }),
       expected_turn_id: latestTurn.turn_id,
       expected_assistant_id: String(latestTurn.assistant?.id || ''),
       expected_soil_revision: oldSoil.revision,
@@ -384,7 +453,9 @@ export async function organizeConversationSoil(env, conversationId, value) {
       if (typeof organized.current_text !== 'string'
         || !Array.isArray(organized.afterthoughts)
         || !Array.isArray(organized.memory_candidates)
-        || !Array.isArray(organized.seed_candidates)) {
+        || !Array.isArray(organized.seed_candidates)
+        || !organized.user_portrait || typeof organized.user_portrait.should_update !== 'boolean'
+        || !organized.self_portrait || typeof organized.self_portrait.should_update !== 'boolean') {
         throw new MemoryStoreError('soil_organize_invalid', 'GPT 整理结果不符合整理当前对话的纸条格式；旧资料保持不变。', 422);
       }
       const safeUsage = (key) => {
@@ -404,7 +475,7 @@ export async function organizeConversationSoil(env, conversationId, value) {
     } else {
     const profile = await readProfile(env.COAST_CHAT_DB);
     const modelId = requestedModel || profile.current_chat_model || 'openai/gpt-4.1-nano';
-    const basePrompt = soilPrompt(turns, oldSoil, { landing });
+    const basePrompt = soilPrompt(turns, oldSoil, { landing, portraits });
     let lastJsonError = null;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
@@ -464,11 +535,51 @@ export async function organizeConversationSoil(env, conversationId, value) {
     fallbackSourceRef: latestTurn?.turn_id ? { turn_id: latestTurn.turn_id, role: 'turn' } : null,
     fallbackExcerpt,
   };
+  const normalizePortraitProposal = (value) => ({
+    should_update: value?.should_update === true,
+    proposed_body: String(value?.proposed_body || '').trim().slice(0, 24000),
+    reason: String(value?.reason || '').trim().slice(0, 4000),
+    source_refs: (Array.isArray(value?.source_refs) ? value.source_refs : [])
+      .filter((ref) => allowedTurnIds.has(String(ref?.turn_id || '')))
+      .slice(0, 8),
+    source_excerpt: String(value?.source_excerpt || fallbackExcerpt).trim().slice(0, 1200),
+  });
+  const userPortraitProposal = normalizePortraitProposal(organized.user_portrait);
+  const selfPortraitProposal = normalizePortraitProposal(organized.self_portrait);
+
+  const createPortraitRevision = async (kind, current, proposal) => {
+    if (!current?.write_enabled || !proposal.should_update || !proposal.proposed_body || proposal.proposed_body === String(current.body || '').trim()) return null;
+    const value = {
+      proposed_body: proposal.proposed_body,
+      change_kind: 'rewrite',
+      reason: proposal.reason,
+      source_conversation_id: conversationId,
+      source_message_id: latestTurn?.turn_id || null,
+      source_model: organizedBy?.model_id || requestedModel || activeModel || '',
+    };
+    return kind === 'user'
+      ? createUserPortraitCandidate(env.COAST_CHAT_DB, value)
+      : createGlobalExcerptCandidate(env.COAST_CHAT_DB, value);
+  };
+
+  const [userPortraitCandidate, selfPortraitCandidate] = await Promise.all([
+    createPortraitRevision('user', userPortrait, userPortraitProposal),
+    createPortraitRevision('self', selfPortrait, selfPortraitProposal),
+  ]);
+
+  const portraitSoilSummary = (candidate, proposal) => candidate ? {
+    candidate_id: candidate.id,
+    reason: proposal.reason,
+    source_excerpt: proposal.source_excerpt,
+  } : null;
+
   const soilValue = {
     current_text: String(organized.current_text || '').trim(),
     afterthoughts: normalizeAfterthoughts(organized.afterthoughts),
     memory_candidates: normalizeSoilCandidates(organized.memory_candidates, candidateOptions),
     seed_candidates: normalizeSoilCandidates(organized.seed_candidates, candidateOptions),
+    user_portrait_candidate: portraitSoilSummary(userPortraitCandidate, userPortraitProposal),
+    self_portrait_candidate: portraitSoilSummary(selfPortraitCandidate, selfPortraitProposal),
     organized_through_turn_id: latestTurn?.turn_id || oldSoil.organized_through_turn_id,
     manual_locked: oldSoil.manual_locked,
     auto_refresh_enabled: oldSoil.auto_refresh_enabled,

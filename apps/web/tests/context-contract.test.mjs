@@ -14,7 +14,7 @@ const SOIL_CANDIDATE_SECRET = 'SOIL_CANDIDATE_SECRET_713';
 const CONSTANT_SECRET = 'CONSTANT_WORLDBOOK_SECRET_713';
 const SOURCE_GLOBAL_EXCERPT = '这是 source 测试用的合成全局摘录正文。';
 const DELIVERED_SOURCE_LABELS = [
-  '【当前消息】', '【最近上下文】', '【核心自定义】', '【全局摘录】', '【整理当前对话的纸条】', '【相关记忆】',
+  '【当前消息】', '【最近上下文】', '【核心自定义】', '【自我画像】', '【整理当前对话的纸条】', '【相关记忆】',
   '【世界书】', '【工作台 / 工具回执】', '【外部入口消息】',
 ];
 
@@ -52,9 +52,9 @@ assert.equal(owner.modelMessages[0]?.role, 'system');
 assert.match(system, new RegExp(THIN_SHELL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 assert.ok(system.includes('【核心自定义】'));
 assert.ok(system.includes(OWNER_CUSTOM));
-assert.ok(system.includes('【全局摘录】'));
+assert.ok(system.includes('【自我画像】'));
 assert.ok(system.includes(SOURCE_GLOBAL_EXCERPT));
-assert.ok(system.indexOf('【核心自定义】') < system.indexOf('【全局摘录】'), 'global excerpt follows custom instructions');
+assert.ok(system.indexOf('【核心自定义】') < system.indexOf('【自我画像】'), 'global excerpt follows custom instructions');
 assert.equal(owner.paper_slips.includes(OWNER_CUSTOM), true);
 assert.equal(system.includes(OLD_OWNER_IDENTITY), false);
 assert.equal(system.includes('HIDDEN_OWNER_PERSONA_SHOULD_NOT_WIN'), false);
@@ -77,7 +77,7 @@ assert.equal(deliveredMessages.some((message) => message.content.includes('历�
 assert.equal(deliveredMessages.some((message) => message.content.includes('历史第三轮')), true);
 
 const slip = owner.deskSlip();
-for (const key of ['current_message', 'recent_context', 'custom_instructions', 'global_excerpt', 'thinking_soil', 'related_memory', 'worldbook', 'dogtalk', 'workbench', 'external_tide', 'context_budget']) assert.ok(Object.hasOwn(slip, key));
+for (const key of ['current_message', 'recent_context', 'custom_instructions', 'user_portrait', 'global_excerpt', 'thinking_soil', 'related_memory', 'worldbook', 'dogtalk', 'workbench', 'external_tide', 'context_budget']) assert.ok(Object.hasOwn(slip, key));
 assert.equal(Object.hasOwn(slip, 'touch'), false);
 assert.equal(Object.hasOwn(slip, 'cross_window_touch'), false);
 assert.equal(slip.summary, '本轮递给模型');
@@ -89,10 +89,12 @@ assert.equal(slip.recent_context.status_detail, '2 轮');
 assert.equal(slip.custom_instructions.label, '核心自定义');
 assert.equal(slip.custom_instructions.status, '已递给');
 assert.equal(slip.custom_instructions.content, OWNER_CUSTOM);
+assert.equal(slip.user_portrait.status, '未设置');
+assert.equal(slip.global_excerpt.label, '自我画像');
 assert.equal(slip.global_excerpt.status, '完整注入');
 assert.equal(slip.global_excerpt.content, SOURCE_GLOBAL_EXCERPT);
 assert.equal(slip.context_budget.global_excerpt, 'complete');
-assert.ok(slip.context_budget.sources_preserved.includes('全局摘录'));
+assert.ok(slip.context_budget.sources_preserved.includes('自我画像'));
 assert.equal(slip.thinking_soil.current_text, '当前整理当前对话的纸条只承接透明上下文。');
 assert.equal(slip.thinking_soil.afterthoughts_count, 1);
 assert.equal(slip.thinking_soil.memory_candidates_count, 1);
@@ -144,7 +146,7 @@ const emptySystem = empty.modelMessages[0]?.content || '';
 assert.ok(emptySystem.includes(THIN_SHELL));
 assert.equal(emptySystem.includes(OLD_OWNER_IDENTITY), false);
 assert.equal(emptySystem.includes('【核心自定义】'), false, 'empty custom instructions must not be injected into model context');
-assert.equal(emptySystem.includes('【全局摘录】'), false, 'empty source baseline excerpt must not inject an empty section');
+assert.equal(emptySystem.includes('【自我画像】'), false, 'empty source baseline excerpt must not inject an empty section');
 assert.ok(emptySystem.includes('【外部入口消息】'));
 assert.ok(emptySystem.includes('本轮没有递入外部材料。'));
 assert.ok(emptySystem.includes('【当前消息】'));
