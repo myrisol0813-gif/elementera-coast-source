@@ -117,7 +117,7 @@ export async function runChatPrelude() {
   assert.ok(document.querySelector('#overlayRoot').textContent.includes('余思 · 1'));
   assert.ok(document.querySelector('#overlayRoot').textContent.includes('暂放的潮汐岔路'));
   assert.ok(document.querySelector('#overlayRoot').textContent.includes('这条岔路先放下，以后也许还会长。'));
-  assert.ok(document.querySelector('#overlayRoot').textContent.includes('这些只是模型建议的去处，已送入待确认区；确认前不会参与召回。'));
+  assert.ok(document.querySelector('#overlayRoot').textContent.includes('四个去处都只是模型建议；正式内容仍需经过各自的确认流程。'));
   assert.ok(document.querySelector('#overlayRoot').textContent.includes('待确认区 · 1'));
   assert.ok(document.querySelector('#overlayRoot').textContent.includes('revision 2 · 整理来源'));
   assert.equal(document.querySelector('[data-action="memory:soil-organize"]'), null, 'manual soil organize entry must stay retired');
