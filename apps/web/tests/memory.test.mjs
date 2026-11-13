@@ -28,13 +28,13 @@ import {
   getPocket,
   listEntries,
   listPockets,
-  normalizePocketCandidates,
+  normalizeSoilCandidates,
   patchEntry,
   patchPocket,
   pocketFingerprint,
   readSoil,
   resolvePocket,
-  upsertSoilPocketCandidates,
+  upsertSoilCandidates,
   writeSoil,
 } from '../functions/memory-store.js';
 
@@ -105,58 +105,49 @@ assert.deepEqual(soilSettings({ autoRefreshEveryTurns: 99, maxHandSeeds: 0 }), {
   soilBudget: 1200,
 });
 
-const structuredCandidates = normalizePocketCandidates([{
+const structuredCandidates = normalizeSoilCandidates([{
   candidate_id: 'coast-return',
   title: '回潮后的未竟方向',
-  life_core: '暂时不沿这条路走，但它仍能长出新的理解。',
   content: '把相关的两段对话压缩保留在这里。',
-  usage_hint: '再次谈到回潮与选择时触碰。',
-  avoid_hint: '不要把它当作已经确认的长期记忆。',
   source_refs: [{ turn_id: 'turn-structured', role: 'turn' }],
   source_excerpt: '那条路暂时放下，但没有死去。',
 }]);
 assert.deepEqual(structuredCandidates[0], {
   candidate_id: 'coast-return',
   title: '回潮后的未竟方向',
-  life_core: '暂时不沿这条路走，但它仍能长出新的理解。',
   content: '把相关的两段对话压缩保留在这里。',
-  usage_hint: '再次谈到回潮与选择时触碰。',
-  avoid_hint: '不要把它当作已经确认的长期记忆。',
   source_refs: [{ turn_id: 'turn-structured', role: 'turn' }],
   source_excerpt: '那条路暂时放下，但没有死去。',
 });
-const legacyCandidates = normalizePocketCandidates(['旧壤里的一句话']);
-assert.equal(legacyCandidates[0].title, '旧壤里的一句话');
-assert.equal(legacyCandidates[0].life_core, '旧壤里的一句话');
-assert.equal(legacyCandidates[0].content, '旧壤里的一句话');
-assert.deepEqual(legacyCandidates[0].source_refs, []);
+const stringCandidates = normalizeSoilCandidates(['旧壤里的一句话']);
+assert.equal(stringCandidates[0].title, '旧壤里的一句话');
+assert.equal(stringCandidates[0].content, '旧壤里的一句话');
+assert.deepEqual(stringCandidates[0].source_refs, []);
 
 const originalA = await readSoil(db, conversationA.id);
 const originalB = await readSoil(db, conversationB.id);
 assert.equal(originalA.current_text, '');
 assert.equal(originalB.current_text, '');
 
-const seeds = Array.from({ length: 10 }, (_, index) => ({
-  name: `种子 ${index}`,
-  life_core: `生命核 ${index}`,
-  usage_hint: '需要时使用',
-  avoid_hint: '不要复读',
-}));
+const afterthoughts = Array.from({ length: 10 }, (_, index) => `余思 ${index}`);
 const writtenA = await writeSoil(db, conversationA.id, {
   current_text: '只属于窗口 A',
-  hand_seeds: seeds,
-  do_not_repeat: '已经确认',
-  pocket_candidates: ['候选一'],
+  afterthoughts,
+  memory_candidates: ['候选一'],
+  seed_candidates: ['种子候选一'],
 });
-assert.equal(writtenA.hand_seeds.length, 7, 'thought soil must cap hand seeds at seven');
-assert.equal(writtenA.pocket_candidates[0].life_core, '候选一');
+assert.equal(writtenA.afterthoughts.length, 7, 'thought soil must cap afterthoughts at seven');
+assert.equal(writtenA.memory_candidates[0].content, '候选一');
+assert.equal(writtenA.seed_candidates[0].content, '种子候选一');
 assert.equal(writtenA.manual_locked, true);
 assert.equal((await readSoil(db, conversationB.id)).current_text, '', 'conversation soils must not cross windows');
+
+// Legacy columns remain in D1 only for historical compatibility; V2 runtime must ignore them.
 db.database.prepare('UPDATE conversation_soils SET pocket_candidates_json = ? WHERE conversation_id = ?')
   .run(JSON.stringify(['来自旧 D1 的 string candidate']), conversationA.id);
 const legacySoil = await readSoil(db, conversationA.id);
-assert.equal(legacySoil.pocket_candidates[0].title, '来自旧 D1 的 string candidate');
-assert.equal(legacySoil.pocket_candidates[0].usage_hint, '');
+assert.equal(legacySoil.memory_candidates[0].content, '候选一');
+assert.equal(Object.hasOwn(legacySoil, 'pocket_candidates'), false);
 await assert.rejects(
   () => writeSoil(db, conversationA.id, { current_text: 'automatic overwrite' }, { automatic: true }),
   (error) => error.type === 'soil_locked' && error.status === 409,
@@ -206,16 +197,17 @@ assert.equal(seedResult.entry.entry_type, 'seed');
 assert.equal(seedResult.entry.scope, 'global');
 assert.equal(seedResult.entry.conversation_id, null);
 assert.equal(seedResult.entry.tag, '工程技术');
-const confirmedRepeat = await upsertSoilPocketCandidates(db, conversationC.id, [autoCandidate]);
+const confirmedRepeat = await upsertSoilCandidates(db, conversationC.id, { seed_candidates: [autoCandidate] });
 assert.equal(confirmedRepeat.suppressed, 1, 'resolved soil candidate must not bounce back into pending');
 
 const memoryCandidate = {
   ...autoCandidate,
   candidate_id: 'memory-candidate',
   title: '回潮记忆',
-  life_core: '回潮记忆被确认后进入统一记忆库。',
+  content: '回潮记忆被确认后进入统一记忆库。',
 };
-const memoryUpsert = await upsertSoilPocketCandidates(db, conversationC.id, [memoryCandidate]);
+const memoryUpsert = await upsertSoilCandidates(db, conversationC.id, { memory_candidates: [memoryCandidate] });
+assert.equal(memoryUpsert.pockets[0].suggested_destination, 'memory');
 await assert.rejects(
   () => resolvePocket(db, memoryUpsert.pockets[0].id, { action: 'memory' }),
   (error) => error.type === 'invalid_memory_tag' && error.status === 400,
@@ -231,10 +223,15 @@ assert.equal(memoryResult.entry.entry_type, 'memory');
 assert.equal(memoryResult.entry.scope, 'global');
 assert.equal(memoryResult.entry.tag, '历史锚点');
 
-const discardedCandidate = { ...autoCandidate, candidate_id: 'discard-once', life_core: '只出现一次后被明确丢弃', title: '不再弹回' };
-const discardedUpsert = await upsertSoilPocketCandidates(db, conversationC.id, [discardedCandidate]);
+const discardedCandidate = {
+  ...autoCandidate,
+  candidate_id: 'discard-once',
+  title: '不再弹回',
+  content: '只出现一次后被明确丢弃',
+};
+const discardedUpsert = await upsertSoilCandidates(db, conversationC.id, { memory_candidates: [discardedCandidate] });
 await resolvePocket(db, discardedUpsert.pockets[0].id, { action: 'discard' });
-const discardedRepeat = await upsertSoilPocketCandidates(db, conversationC.id, [discardedCandidate]);
+const discardedRepeat = await upsertSoilCandidates(db, conversationC.id, { memory_candidates: [discardedCandidate] });
 assert.equal(discardedRepeat.suppressed, 1);
 
 const firstRecall = await buildMemoryContext(noVectorEnv, 'owner', conversationA.id, '潮汐钥匙', { conversation_turns: 8 });
@@ -408,10 +405,10 @@ await writeProfile(db, {
   model_box: { chat: ['openai/gpt-5.1'], free: [], image: [] },
 });
 providerContent = JSON.stringify({
-  current_text: '',
-  hand_seeds: [],
-  do_not_repeat: '',
-  pocket_candidates: [],
+  current_text: '登岛信开场已经完成',
+  afterthoughts: [],
+  memory_candidates: [],
+  seed_candidates: [],
 });
 providerFinishReason = 'stop';
 const soilResponse = await routeMemoryApi(new Request('https://coast.test/api/memory/soil/organize', {
@@ -426,18 +423,21 @@ const soilResponse = await routeMemoryApi(new Request('https://coast.test/api/me
 }), { COAST_CHAT_DB: db, OPENROUTER_API_KEY: 'test-key' });
 const soilData = await soilResponse.json();
 assert.equal(soilResponse.status, 200);
-assert.equal(soilData.soil.hand_seeds.length, 0);
+assert.equal(soilData.soil.afterthoughts.length, 0);
 assert.match(soilData.soil.current_text, /登岛信开场已经完成/);
 assert.equal(providerPayload.model, 'openai/gpt-5.1', 'thought soil must follow the model currently selected for chat');
 assert.equal(providerPayload.max_completion_tokens, 3200, 'thought soil keeps a wider bounded JSON budget for reasoning-capable models');
 assert.equal(providerPayload.response_format?.type, 'json_schema', 'soil organize must request structured JSON when the selected model supports it');
 assert.equal(providerPayload.response_format?.json_schema?.strict, true);
-assert.ok(providerPayload.response_format?.json_schema?.schema?.required?.includes('hand_seeds_mode'));
+assert.ok(providerPayload.response_format?.json_schema?.schema?.required?.includes('afterthoughts'));
+assert.ok(providerPayload.response_format?.json_schema?.schema?.required?.includes('memory_candidates'));
+assert.ok(providerPayload.response_format?.json_schema?.schema?.required?.includes('seed_candidates'));
 assert.deepEqual(providerPayload.reasoning, { effort: 'minimal', exclude: true }, 'soil-only reasoning must leave completion room for the JSON payload');
-assert.match(providerPayload.messages[0].content, /工作台小纸条/, 'soil prompt must frame the soil as a temporary workbench');
-assert.match(providerPayload.messages[0].content, /hand_seeds_mode/, 'soil prompt must request explicit hand seed intent');
-assert.match(providerPayload.messages[0].content, /删除过时旧种/, 'soil prompt must permit old hand seeds to leave');
-assert.match(providerPayload.messages[0].content, /先 upsert 到 pending/, 'soil prompt must explain that old candidates may leave the display after pending sync');
+assert.match(providerPayload.messages[0].content, /① 当前｜current_text/, 'soil prompt must define current context');
+assert.match(providerPayload.messages[0].content, /② 余思｜afterthoughts/, 'soil prompt must leave room for optional afterthoughts');
+assert.match(providerPayload.messages[0].content, /memory_candidates/, 'soil prompt must expose memory destination');
+assert.match(providerPayload.messages[0].content, /seed_candidates/, 'soil prompt must expose seed destination');
+assert.equal(providerPayload.messages[0].content.includes('do_not_repeat'), false, 'legacy behavior-control fields must not remain in the organizer prompt');
 
 const turn = (id, user, assistant, createdAt) => ({
   id,
@@ -458,12 +458,9 @@ const longTurns = Array.from({ length: 12 }, (_, index) => turn(
 await writeConversationState(db, conversationLong.id, { version: 4, turns: longTurns });
 providerContent = JSON.stringify({
   current_text: '长回复后仍能整理',
-  hand_seeds_mode: 'clear',
-  hand_seeds: [],
-  do_not_repeat_mode: 'clear',
-  do_not_repeat: '',
-  pocket_candidates_mode: 'clear',
-  pocket_candidates: [],
+  afterthoughts: [],
+  memory_candidates: [],
+  seed_candidates: [],
 });
 const longSoilResponse = await routeMemoryApi(new Request('https://coast.test/api/memory/soil/organize', {
   method: 'POST',
@@ -685,15 +682,11 @@ await writeConversationState(db, conversationC.id, {
 });
 providerContent = `整理结果如下：\n\`\`\`json\n${JSON.stringify({
   current_text: '正在承接第二轮对话',
-  hand_seeds: [{ name: '第二轮', life_core: '每轮都要接住', usage_hint: '', avoid_hint: '' }],
-  do_not_repeat: '',
-  pocket_candidates: [{
-    candidate_id: 'second-turn-unfinished',
+  afterthoughts: ['第二轮还有一条没说尽的岔路，之后也许值得回来。'],
+  memory_candidates: [],
+  seed_candidates: [{
     title: '第二轮留下的岔路',
-    life_core: '第二轮里暂时放下但仍能再生的方向',
     content: '第一轮与第二轮之间还有一条值得日后重新触碰的岔路。',
-    usage_hint: '再次谈到这条岔路时使用。',
-    avoid_hint: '不要升级成长期记忆。',
     source_refs: [{ turn_id: 'soil-turn-2', role: 'assistant' }],
     source_excerpt: '第二轮回答',
   }],
@@ -712,12 +705,12 @@ const everyReplySoilData = await everyReplySoilResponse.json();
 assert.equal(everyReplySoilResponse.status, 200);
 assert.equal(everyReplySoilData.skipped, undefined, 'a completed reply must not be skipped by the old interval');
 assert.equal(everyReplySoilData.soil.current_text, '正在承接第二轮对话');
-assert.equal(everyReplySoilData.soil.hand_seeds.length, 1);
-assert.equal(everyReplySoilData.soil.pocket_candidates[0].title, '第二轮留下的岔路');
-assert.equal(everyReplySoilData.soil.pocket_candidates[0].source_refs[0].turn_id, 'soil-turn-2', 'organize must retain a true active turn reference');
+assert.deepEqual(everyReplySoilData.soil.afterthoughts, ['第二轮还有一条没说尽的岔路，之后也许值得回来。']);
+assert.equal(everyReplySoilData.soil.seed_candidates[0].title, '第二轮留下的岔路');
+assert.equal(everyReplySoilData.soil.seed_candidates[0].source_refs[0].turn_id, 'soil-turn-2', 'organize must retain a true active turn reference');
 assert.equal(everyReplySoilData.pocket_sync.created, 1, 'a successful model organize must upsert its candidate into pending');
 const organizedPending = await listPockets(db, { conversation_id: conversationC.id, status: 'pending' });
-assert.equal(organizedPending.some((pocket) => pocket.life_core === '第二轮里暂时放下但仍能再生的方向'), true);
+assert.equal(organizedPending.some((pocket) => pocket.title === '第二轮留下的岔路' && pocket.suggested_destination === 'seed'), true);
 
 await writeConversationState(db, conversationC.id, {
   version: 4,
@@ -739,20 +732,17 @@ const degradedSoilData = await degradedSoilResponse.json();
 assert.equal(degradedSoilResponse.status, 200);
 assert.equal(degradedSoilData.degraded, true);
 assert.equal(degradedSoilData.reason, 'soil_organize_invalid');
-assert.equal(degradedSoilData.soil.current_text, '当前没有需要脱离最近上下文再次复述的承接便签。', 'degraded organize should avoid copying the latest turn back into soil');
-assert.equal(degradedSoilData.soil.hand_seeds.length, soilBeforeDegradedOrganize.hand_seeds.length, 'degraded organize must keep old hand seeds');
-assert.ok((await readSoil(db, conversationC.id)).revision > soilBeforeDegradedOrganize.revision, 'a degraded organize should save the soft fallback state');
+assert.equal(degradedSoilData.soil.current_text, soilBeforeDegradedOrganize.current_text, 'degraded organize must keep the last successful current note');
+assert.deepEqual(degradedSoilData.soil.afterthoughts, soilBeforeDegradedOrganize.afterthoughts, 'degraded organize must keep the last successful afterthoughts');
+assert.equal((await readSoil(db, conversationC.id)).revision, soilBeforeDegradedOrganize.revision, 'degraded organize must not advance the successful soil revision');
 assert.equal((await listPockets(db, { conversation_id: conversationC.id, status: 'pending' })).length, pendingBeforeDegradedOrganize, 'a degraded organize must not mutate pending pockets');
 
 providerFinishReason = 'length';
 providerContent = JSON.stringify({
   current_text: '即使 JSON 看起来完整也不能把截断态写进壤',
-  hand_seeds_mode: 'clear',
-  hand_seeds: [],
-  do_not_repeat_mode: 'clear',
-  do_not_repeat: '',
-  pocket_candidates_mode: 'clear',
-  pocket_candidates: [],
+  afterthoughts: [],
+  memory_candidates: [],
+  seed_candidates: [],
 });
 const truncatedSoilResponse = await routeMemoryApi(new Request('https://coast.test/api/memory/soil/organize', {
   method: 'POST',
@@ -762,7 +752,7 @@ const truncatedSoilResponse = await routeMemoryApi(new Request('https://coast.te
 const truncatedSoilData = await truncatedSoilResponse.json();
 assert.equal(truncatedSoilData.degraded, true);
 assert.equal(truncatedSoilData.reason, 'soil_organize_truncated');
-assert.equal(truncatedSoilData.soil.current_text, '当前没有需要脱离最近上下文再次复述的承接便签。');
+assert.equal(truncatedSoilData.soil.current_text, soilBeforeDegradedOrganize.current_text);
 providerFinishReason = 'stop';
 
 providerStatus = 503;
