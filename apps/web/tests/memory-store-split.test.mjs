@@ -45,10 +45,10 @@ assert.match(sources['global-excerpt-store.js'], /confirmGlobalExcerptCandidate/
 const api = await import(`${pathToFileURL(entryPath).href}?split=${Date.now()}`);
 for (const name of [
   'MEMORY_OWNER_ID', 'MEMORY_TAGS', 'MemoryStoreError', 'hasMemoryDatabase',
-  'normalizeHandSeeds', 'normalizePocketCandidates', 'ensureMemorySchema',
+  'normalizeAfterthoughts', 'normalizeSoilCandidates', 'ensureMemorySchema',
   'readSoil', 'writeSoil', 'writeSoilCurrentText',
   'getPocket', 'createPocket', 'listPockets', 'patchPocket', 'deletePocket',
-  'pocketFingerprint', 'upsertSoilPocketCandidates', 'resolvePocket',
+  'pocketFingerprint', 'upsertSoilCandidates', 'resolvePocket',
   'getEntry', 'createEntry', 'listEntries', 'patchEntry', 'deleteEntry',
   'readCustomInstructions', 'writeCustomInstructions',
   'earliestOrganizedMemoryTimestamp', 'organizedMemoryRecordsInRange',
