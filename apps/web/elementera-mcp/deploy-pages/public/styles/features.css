@@ -18,7 +18,7 @@
 
 .feature-head {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
   height: calc(var(--topbar-height) + var(--safe-top));
@@ -30,10 +30,10 @@
 }
 
 .feature-back {
-  width: 38px;
-  height: 38px;
-  padding: 8px;
-  border-radius: 12px;
+  width: 34px;
+  height: 34px;
+  padding: 7px;
+  border-radius: 11px;
 }
 
 .feature-back:hover {
@@ -49,7 +49,7 @@
 
 .feature-head h1 {
   margin: 0;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 680;
   letter-spacing: -0.02em;
 }
@@ -62,7 +62,7 @@
 
 .feature-head-action,
 .round-add {
-  min-height: 36px;
+  min-height: 32px;
   border: 0;
   border-radius: 999px;
   background: var(--surface-soft);
