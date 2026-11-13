@@ -30,7 +30,7 @@ export async function routeGlobalExcerpt(request, env, url) {
       if (value.action === 'clear') {
         if (!Number.isSafeInteger(value.expected_revision)) return json({
           ok: false,
-          error: { type: 'invalid_request', message: '清空全局摘录需要当前版本号。' },
+          error: { type: 'invalid_request', message: '清空自我画像需要当前版本号。' },
         }, 400);
         return json({ ok: true, excerpt: await clearGlobalExcerpt(db, value.expected_revision) });
       }
