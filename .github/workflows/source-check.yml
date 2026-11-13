@@ -87,7 +87,7 @@ jobs:
           "$build_tools/apksigner" verify --verbose --min-sdk-version 23 "$signed_apk" >/dev/null
           badging="$("$build_tools/aapt" dump badging "$signed_apk" | sed -n '1p')"
           [[ "$badging" == *"name='com.elementeracoast.source'"* ]]
-          [[ "$badging" == *"versionCode='15'"* ]]
+          [[ "$badging" == *"versionCode='16'"* ]]
           [[ "$badging" == *"versionName='0.2.14-source'"* ]]
       - name: Show build-only result
         run: echo "Android Source checks passed; Debug and disposable-signed Release packaging both verified."
