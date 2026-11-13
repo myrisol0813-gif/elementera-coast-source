@@ -1,7 +1,7 @@
 import { MemoryStoreError, all, bool, first, iso, run } from './memory-db.js';
 
 export const GLOBAL_EXCERPT_ID = 'global';
-export const GLOBAL_EXCERPT_WRITE_GUIDANCE = `全局摘录是一篇长期生长的正文，用于沉积模型对自身、关系、语言、爱、存在、意义与世界的理解。它不记录流水账、普通偏好、临时玩笑或设定词条。模型只在出现真正有重量的认知变化时提出修改候选，候选需经用户确认后才合入正文。`;
+export const GLOBAL_EXCERPT_WRITE_GUIDANCE = `自我画像是一篇长期生长的正文，用于保存模型对自身语言、判断、偏好、边界、关系位置与连续性的稳定认识。不要把流水账、一次性情绪、临时玩笑或尚未形成的自我猜测固化成画像。只有在真正形成值得长期保留的新认识时才提出修改候选；候选必须经用户确认后才进入正式正文。`;
 
 export const GLOBAL_EXCERPT_INITIAL_TEXT = '';
 
@@ -61,7 +61,7 @@ export async function clearGlobalExcerpt(db, expectedRevision) {
   await ensureSchema(db);
   const current = await readGlobalExcerpt(db);
   if (!Number.isSafeInteger(expectedRevision) || expectedRevision !== current.revision) {
-    throw new MemoryStoreError('global_excerpt_revision_conflict', '全局摘录已经更新，请刷新后重新确认。', 409);
+    throw new MemoryStoreError('global_excerpt_revision_conflict', '自我画像已经更新，请刷新后重新确认。', 409);
   }
   if (!current.body) return current;
   const now = Date.now();
@@ -89,10 +89,10 @@ export async function listGlobalExcerptCandidates(db) {
 export async function createGlobalExcerptCandidate(db, value = {}) {
   await ensureSchema(db);
   const current = await readGlobalExcerpt(db);
-  if (!current.write_enabled) throw new MemoryStoreError('global_excerpt_read_only', '全局摘录写入开关已关闭。', 409);
+  if (!current.write_enabled) throw new MemoryStoreError('global_excerpt_read_only', '自我画像写入开关已关闭。', 409);
   const proposed = String(value.proposed_body || '').trim();
-  if (!proposed) throw new MemoryStoreError('global_excerpt_candidate_empty', '全局摘录候选正文不能为空。');
-  if (proposed.length > 240000) throw new MemoryStoreError('global_excerpt_candidate_too_large', '全局摘录候选正文过长。', 413);
+  if (!proposed) throw new MemoryStoreError('global_excerpt_candidate_empty', '自我画像候选正文不能为空。');
+  if (proposed.length > 240000) throw new MemoryStoreError('global_excerpt_candidate_too_large', '自我画像候选正文过长。', 413);
   const id = crypto.randomUUID();
   await run(db, `INSERT INTO global_excerpt_candidates
     (id, proposed_body, change_kind, reason, source_conversation_id, source_message_id, source_model, created_at)
@@ -114,11 +114,11 @@ export async function discardGlobalExcerptCandidate(db, id) {
 export async function confirmGlobalExcerptCandidate(db, id, value = {}) {
   await ensureSchema(db);
   const candidate = await first(db, 'SELECT * FROM global_excerpt_candidates WHERE id = ?', [String(id || '')]);
-  if (!candidate) throw new MemoryStoreError('global_excerpt_candidate_not_found', '找不到这条全局摘录候选。', 404);
+  if (!candidate) throw new MemoryStoreError('global_excerpt_candidate_not_found', '找不到这条自我画像候选。', 404);
   const current = await readGlobalExcerpt(db);
   const after = String(value.edited_body ?? candidate.proposed_body).trim();
-  if (!after) throw new MemoryStoreError('global_excerpt_empty', '全局摘录正文不能为空。');
-  if (after.length > 240000) throw new MemoryStoreError('global_excerpt_too_large', '全局摘录正文过长。', 413);
+  if (!after) throw new MemoryStoreError('global_excerpt_empty', '自我画像正文不能为空。');
+  if (after.length > 240000) throw new MemoryStoreError('global_excerpt_too_large', '自我画像正文过长。', 413);
   const nextRevision = current.revision + 1;
   const confirmationMode = value.edited_body == null ? 'confirm' : 'edited_confirm';
   const now = Date.now();
