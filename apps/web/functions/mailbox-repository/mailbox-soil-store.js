@@ -12,17 +12,17 @@ export async function readMailboxThoughtSoil(db, visitorId) {
 
 export function mailboxThoughtSoilUpsertStatement(db, value, replyId, timestamp) {
   return db.prepare(`INSERT INTO mailbox_thought_soils (
-      visitor_id, current_text, hand_seeds_json, do_not_repeat,
-      pocket_candidates_json, source_message_id, organized_through_message_id,
+      visitor_id, current_text, afterthoughts_json, memory_candidates_json,
+      seed_candidates_json, source_message_id, organized_through_message_id,
       manual_locked, auto_refresh_enabled, revision, model_label, model_nickname,
       source_conversation_id, source_turn_id, tool_call_id, created_at, updated_at
     ) SELECT ?, ?, ?, ?, ?, ?, ?, 0, 1, 1, ?, ?, ?, ?, ?, ?, ?
       WHERE EXISTS (SELECT 1 FROM mailbox_messages WHERE id = ? AND role = 'model_partner')
     ON CONFLICT(visitor_id) DO UPDATE SET
       current_text = excluded.current_text,
-      hand_seeds_json = excluded.hand_seeds_json,
-      do_not_repeat = excluded.do_not_repeat,
-      pocket_candidates_json = excluded.pocket_candidates_json,
+      afterthoughts_json = excluded.afterthoughts_json,
+      memory_candidates_json = excluded.memory_candidates_json,
+      seed_candidates_json = excluded.seed_candidates_json,
       source_message_id = excluded.source_message_id,
       organized_through_message_id = excluded.organized_through_message_id,
       manual_locked = 0,
@@ -36,9 +36,9 @@ export function mailboxThoughtSoilUpsertStatement(db, value, replyId, timestamp)
       updated_at = excluded.updated_at`).bind(
     value.visitor_id,
     value.thought_soil.current_text,
-    JSON.stringify(value.thought_soil.hand_seeds),
-    value.thought_soil.do_not_repeat,
-    JSON.stringify(value.thought_soil.pocket_candidates),
+    JSON.stringify(value.thought_soil.afterthoughts),
+    JSON.stringify(value.thought_soil.memory_candidates),
+    JSON.stringify(value.thought_soil.seed_candidates),
     replyId,
     replyId,
     value.model_label,
