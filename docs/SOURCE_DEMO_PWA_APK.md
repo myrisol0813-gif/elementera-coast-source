@@ -11,7 +11,7 @@ Open the repository's **Latest Release** and download the current Source Native 
 The visitor build:
 
 - uses `applicationId=com.elementeracoast.source`;
-- currently comes from the `0.2.14-source` source tree (`versionCode=16`);
+- currently comes from the `0.2.15-source` source tree (`versionCode=17`);
 - accepts the local visiting code `123456`;
 - keeps visitor mode **offline-only**;
 - blocks account authorization, model calls and other cloud actions before network transmission;
