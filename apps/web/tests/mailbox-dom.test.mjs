@@ -195,7 +195,9 @@ await waitFor(() => mailboxWindow.document.querySelector('#mailboxPanel').open, 
 await waitFor(() => mailboxWindow.document.querySelector('#mailboxPanelBody').textContent.includes('沿着第一封信继续谈创作'), 'soil panel content');
 assert.equal(mailboxWindow.document.querySelector('#mailboxPanelTitle').textContent, '整理当前对话的纸条');
 assert.match(mailboxWindow.document.querySelector('#mailboxPanelBody').textContent, /沿着第一封信继续谈创作/);
-assert.match(mailboxWindow.document.querySelector('#mailboxPanelBody').textContent, /当前活跃线索 · 1\/7/);
+assert.match(mailboxWindow.document.querySelector('#mailboxPanelBody').textContent, /余思 · 1/);
+assert.match(mailboxWindow.document.querySelector('#mailboxPanelBody').textContent, /记忆候选 · 1/);
+assert.match(mailboxWindow.document.querySelector('#mailboxPanelBody').textContent, /种子候选 · 1/);
 assert.match(mailboxWindow.document.querySelector('#mailboxPanelBody').textContent, /待确认区 · 1/);
 assert.match(mailboxWindow.document.querySelector('#mailboxPanelBody').textContent, /GPT-5.6 Thinking/);
 mailboxWindow.document.querySelector('#mailboxPanel').close();
