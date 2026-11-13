@@ -82,26 +82,27 @@ version_code="$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+).*/\1/p' app/build
 : "${version_name:?Missing versionName}"
 : "${version_code:?Missing versionCode}"
 
-gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace \
+gradle :app:testDebugUnitTest :app:assembleRelease --no-daemon --stacktrace \
   -PCOAST_API_BASE_URL="$url" \
   -PSOURCE_TOUR_ENABLED=false
 
-apk="app/build/outputs/apk/debug/app-debug.apk"
-test -s "$apk"
-bash scripts/sign-disposable-qa.sh "$apk"
+unsigned_apk="app/build/outputs/apk/release/app-release-unsigned.apk"
+test -s "$unsigned_apk"
+
+mkdir -p live-chatgpt-release
+apk_name="elementera-coast-source-${version_name%-source}-live-chatgpt.apk"
+apk="live-chatgpt-release/$apk_name"
+bash scripts/sign-disposable-qa.sh "$unsigned_apk" "$apk"
 
 build_tools="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
 badging="$("$build_tools/aapt" dump badging "$apk" | sed -n '1p')"
 [[ "$badging" == *"name='com.elementeracoast.source'"* ]]
 [[ "$badging" == *"versionCode='$version_code'"* ]]
 [[ "$badging" == *"versionName='$version_name'"* ]]
-"$build_tools/apksigner" verify --verbose "$apk" >/dev/null
+"$build_tools/apksigner" verify --verbose --min-sdk-version 23 "$apk" >/dev/null
 
-mkdir -p live-chatgpt-release
-apk_name="elementera-coast-source-${version_name%-source}-live-chatgpt.apk"
-cp "$apk" "live-chatgpt-release/$apk_name"
 (cd live-chatgpt-release && sha256sum "$apk_name" > SHA256SUMS.txt)
-unzip -t "live-chatgpt-release/$apk_name" >/dev/null
+unzip -t "$apk" >/dev/null
 
 tag="source-live-chatgpt-$GITHUB_RUN_ID"
 notes="$RUNNER_TEMP/live-chatgpt-release-notes.md"

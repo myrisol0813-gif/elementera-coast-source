@@ -57,7 +57,37 @@ jobs:
           grep -Fq 'steps.version_gate.outputs.version_code' "$workflow"
           ! grep -Eq 'source-visitor-v0\.[0-9]' "$workflow"
           ! grep -Eq 'elementera-coast-source-v0\.[0-9].*-visitor-qa[.]apk' "$workflow"
+      - name: Verify disposable QA signing callers
+        shell: bash
+        run: |
+          set -euo pipefail
+          for script in scripts/run-live-chatgpt-qa.sh scripts/run-signed-qa.sh; do
+            grep -Fq ':app:assembleRelease' "$script"
+            grep -Fq 'app/build/outputs/apk/release/app-release-unsigned.apk' "$script"
+            grep -Fq 'bash scripts/sign-disposable-qa.sh "$unsigned_apk" "$apk"' "$script"
+            ! grep -Fq 'app/build/outputs/apk/debug/app-debug.apk' "$script"
+          done
+          ! grep -Fq "versionCode='4'" scripts/run-signed-qa.sh
+          ! grep -Fq "versionName='0.2.2-source'" scripts/run-signed-qa.sh
       - run: gradle :app:testDebugUnitTest --no-daemon --stacktrace
       - run: gradle :app:assembleDebug --no-daemon --stacktrace
+      - name: Exercise disposable Release signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle :app:assembleRelease --no-daemon --stacktrace \
+            -PSOURCE_TOUR_ENABLED=true \
+            -PCOAST_API_BASE_URL=https://elementera-coast-source.invalid
+          unsigned_apk=app/build/outputs/apk/release/app-release-unsigned.apk
+          signed_apk="$RUNNER_TEMP/source-check-signed.apk"
+          test -s "$unsigned_apk"
+          bash scripts/sign-disposable-qa.sh "$unsigned_apk" "$signed_apk"
+          test -s "$signed_apk"
+          build_tools="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          "$build_tools/apksigner" verify --verbose --min-sdk-version 23 "$signed_apk" >/dev/null
+          badging="$("$build_tools/aapt" dump badging "$signed_apk" | sed -n '1p')"
+          [[ "$badging" == *"name='com.elementeracoast.source'"* ]]
+          [[ "$badging" == *"versionCode='15'"* ]]
+          [[ "$badging" == *"versionName='0.2.13-source'"* ]]
       - name: Show build-only result
-        run: echo "Android source checks passed; Releases are published separately with stable signing only."
+        run: echo "Android Source checks passed; Debug and disposable-signed Release packaging both verified."
