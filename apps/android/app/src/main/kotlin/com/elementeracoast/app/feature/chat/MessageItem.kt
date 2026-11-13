@@ -11,6 +11,7 @@ internal fun MessageItem(
     conversationId: String,
     message: ChatMessage,
     isStreamingTail: Boolean,
+    timeLabel: String,
     avatarBitmap: ImageBitmap?,
     metadataMessageId: String?,
     metadataSource: ModelMetadataRemoteDataSource,
@@ -28,6 +29,7 @@ internal fun MessageItem(
         MessageRole.User -> UserMessage(
             conversationId = conversationId,
             message = message,
+            timeLabel = timeLabel,
             attachmentPreviewSource = attachmentPreviewSource,
             onCopy = { onCopy(message) },
             onEdit = { onEdit(message) },
@@ -39,6 +41,7 @@ internal fun MessageItem(
             metadataMessageId = metadataMessageId,
             metadataSource = metadataSource,
             isStreamingTail = isStreamingTail,
+            timeLabel = timeLabel,
             avatarBitmap = avatarBitmap,
             onAvatarClick = onAvatarClick,
             onCopy = { onCopy(message) },
