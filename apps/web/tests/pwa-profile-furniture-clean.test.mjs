@@ -75,7 +75,7 @@ for (const retired of ['summary', 'draft', 'album', 'legacy']) assert.equal(defa
 assert.match(storage, /Object\.keys\(base\.runControl\)/);
 
 const memoryLibrary = await read(resolve(pages, 'public/features/memory/memory-library-view.js'));
-for (const entrance of ['>记忆库<', '>种子库<', '>世界书<', '>全局摘录<', '>自定义指令<']) assert.ok(memoryLibrary.includes(entrance), `Memory v2 entrance missing: ${entrance}`);
+for (const entrance of ['>记忆库<', '>种子库<', '>世界书<', '>用户画像<', '>自我画像<', '>自定义指令<']) assert.ok(memoryLibrary.includes(entrance), `Memory v2 entrance missing: ${entrance}`);
 const dailyConstants = await read(resolve(pages, 'public/features/daily/daily-constants.js'));
 for (const retired of ['summary', 'draft', 'album', 'calendar', 'today-coast']) assert.equal(dailyConstants.toLowerCase().includes(retired), false, `Daily retired route returned: ${retired}`);
 
