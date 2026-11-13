@@ -7,6 +7,7 @@ const render = fs.readFileSync('elementera-mcp/deploy-pages/public/features/chat
 const tokens = fs.readFileSync('elementera-mcp/deploy-pages/public/styles/tokens.css', 'utf8');
 const shell = fs.readFileSync('elementera-mcp/deploy-pages/public/styles/shell.css', 'utf8');
 const chat = fs.readFileSync('elementera-mcp/deploy-pages/public/styles/chat.css', 'utf8');
+const worker = fs.readFileSync('elementera-mcp/deploy-pages/service-worker.js', 'utf8');
 
 assert.match(html, /id="moreButton"[^>]+data-action="chat:window-settings"/);
 assert.match(html, /id="windowContextOverlay"/);
@@ -30,5 +31,6 @@ assert.match(tokens, /--reading-size:\s*16px;/);
 assert.match(shell, /\.model-title\s*\{[^}]*font-size:\s*15px;/s);
 assert.match(chat, /\.composer--chat\s*\{\s*grid-template-columns:\s*38px/s);
 assert.match(chat, /\.window-context-sheet\s*\{/);
+assert.match(worker, /\/public\/features\/chat\/chat-window-settings\.js/);
 
 console.log('source-pwa-window-context: ok');
