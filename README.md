@@ -76,16 +76,27 @@ The ChatGPT OAuth credentials are stored on the Android device with Android Keys
 
 #### Manual equivalent
 
-You can also run your own source backend, expose it with a temporary or permanent HTTPS URL, and build a fresh APK against it:
+You can also run your own source backend, expose it with a temporary or permanent HTTPS URL, and build a fresh APK against it. A local Debug build is still useful for development:
 
 ```bash
 cd apps/android
-gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon \
+gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace \
   -PCOAST_API_BASE_URL="https://YOUR-TUNNEL.trycloudflare.com" \
   -PSOURCE_TOUR_ENABLED=false
 ```
 
-For a longer-lived setup, replace the Quick Tunnel with your own hosted source backend. See [Running and testing](#running-and-testing), [Configuration](#configuration), and `apps/android/README.md`.
+The repository's disposable QA workflows intentionally use the stricter release path instead:
+
+```text
+assembleRelease
+  → app-release-unsigned.apk
+  → scripts/sign-disposable-qa.sh <unsigned> <signed>
+  → apksigner verification
+```
+
+`Source check` now exercises that signing path on every relevant change, so a future signer-interface mismatch fails in CI instead of surfacing only during a manual Live ChatGPT run.
+
+For a longer-lived setup, replace the Quick Tunnel with your own hosted source backend and your own stable signing setup. See [Running and testing](#running-and-testing), [Configuration](#configuration), and `apps/android/README.md`.
 
 ## Table of contents
 
@@ -196,6 +207,20 @@ Relevant ideas include:
 - source and tool records attached to a turn.
 
 The goal is not only to send a message and receive a reply. The goal is also to show what context, tools, files, and backend results were involved in that turn.
+
+### Current-window context and response mode
+
+Each conversation can keep its own `context_settings`. The current source supports:
+
+- opt-in **Reality Context** per conversation;
+- independently toggleable **short reply mode**;
+- a current-window settings surface on both Native and PWA;
+- explicit current-turn receipts showing what reality/response-mode context actually reached the model;
+- message timestamps and cross-day markers without implying that display time was injected into the model.
+
+The shared Reality fields are date, time, manually configured weather city, and the next seven days of Coast calendar entries. Android can additionally collect selected device-local fields such as battery, coarse location, most-recent non-Coast app, today's Top 5 app-usage durations, and a lightweight step-counter value. The PWA shows those Native-only fields as unavailable instead of fabricating browser data.
+
+The backend re-reads the canonical conversation settings before assembly and intersects them with the supplied snapshot, so a client cannot inject a Reality field that the current window did not allow. Short reply mode remains independent: Reality can be fully disabled while short reply mode stays on.
 
 ### 2. Long-term context and memory surfaces
 
@@ -381,6 +406,9 @@ The web side includes application and backend source related to:
 - tool records;
 - MCP-related routes;
 - cross-window experiments;
+- per-window Reality / short-reply / thought-soil settings;
+- compact mobile reading typography and an internally scrolling conversation drawer;
+- current-turn context receipts showing delivered and missing context;
 - UI and DOM tests.
 
 The web app is not distributed here as a generic Vite / React template. It is a source snapshot of a real project tree, with private material removed.
@@ -452,11 +480,14 @@ The Android client keeps the copied native application structure, including area
 - repositories;
 - HTTP / SSE transport;
 - conversation flow;
+- per-window Reality Context and short reply mode;
+- device-local Reality collection with permission-aware fallbacks;
 - Daily surfaces;
 - memory surfaces;
 - visitor mailbox;
 - model workspace;
 - owner settings;
+- theme wardrobe including the optional Cream Paper preset;
 - diagnostic UI.
 
 The Android client does not embed a WebView, React Native app, TypeScript app, or the PWA source. It is a native client that talks to backend contracts.
@@ -578,28 +609,44 @@ The source Native client now includes the original owner calendar, Tidal Library
 
 ## Current feature status (0.2.13-source)
 
-**0.2.13 Native Cream Paper restore:** the optional 奶油纸牌 theme is available again in the Native theme wardrobe and appearance screen, with cream/blush cards, cocoa outlines and hard offset shadows across chat chrome and common settings surfaces. This is a Native-only visual parity pass; the PWA cache remains `coast-source-app-10`, and the 0.2.12 Reality Context / short reply / thought-soil behavior is preserved.
+The source tree currently identifies the Android app as `0.2.13-source` (`versionCode=15`). The PWA cache is currently `coast-source-app-13`.
 
-**0.2.12 Reality Context parity:** the public source now includes per-conversation opt-in Reality Context for date, time, battery, manually configured weather city, optional coarse location, most-recent non-Coast app, today's Top 5 app-usage durations, the next seven days of calendar events, and lightweight step-counter data. Android collects device-local fields only when selected and permitted; the backend rechecks the conversation's allowed fields before context assembly. Short reply mode is independent of the Reality master switch. Both PWA and Native expose transparent current-turn receipts, chat timestamps/cross-day markers, and the existing thought-soil entry. The source PWA cache advances to `coast-source-app-10`.
+### Conversation Reality Context and response mode
 
-This section describes the **current source tree**, not the features of the first `v0.1-source` APK.
+Reality Context is stored per conversation and is opt-in. Shared PWA/Native fields are date, time, manually configured weather city, and the next seven days of Coast calendar entries. Native can additionally provide battery, optional coarse location, the most recent non-Coast foreground app, today's Top 5 app-usage durations, and lightweight step-counter data when selected and available.
 
-**0.2.10 APK signing correction:** public visitor packaging now starts with an unsigned Android Release APK, aligns it, signs it once with V1/V2/V3 and explicit `META-INF/CERT.RSA` / `META-INF/CERT.SF`, and verifies the *downloaded GitHub Release asset* again against its SHA-256 and Android signature metadata. This supersedes the 0.2.9 visitor APK, which a phone installer rejected as having no signature file despite CI-side verification. The cause of the device-specific rejection is not proven; device installation must be retested. Source PWA remains `coast-source-app-09`.
+The backend rechecks the canonical conversation settings before model assembly. Selected-but-unavailable fields remain visibly missing rather than being invented. Short reply mode is independent of the Reality master switch. Both clients expose current-turn receipts, chat timestamps/cross-day markers, and the existing thought-soil entry.
 
-**0.2.9 Native trace + public copy:** the Native reasoning/model receipt now sits in the assistant's action row (short label on narrow screens), rather than in a detached metadata card. The public library uses “书房 / 书架 / 书页” in UI and tool descriptions, and the Native drawer uses “跨窗口选取 / 历史消息搜索”. Internal tool keys and stored data are unchanged. Source PWA cache: `coast-source-app-08` → `coast-source-app-09`.
+### PWA mobile parity
 
-**0.2.8 Native layout:** the public Android client now places the assistant avatar above the full-width reply paper, uses current compact chat spacing, and combines the public private-draft / cross-window and current-turn desk controls in a composer-adjacent drawer. Source-public naming and assets remain distinct; the private Starry Coast artwork and ornamental frame padding are not included.
+The current PWA has a **「这个窗口」** settings sheet for Reality, short reply mode, thought soil and the landing letter. Device-only Reality fields are shown but locked on the PWA. The mobile reading surface uses a compact 14px reading size, the main top-bar title is 16px, and the conversation drawer is pinned to the app viewport with its content as the dedicated vertical scroll area.
 
-**0.2.7 Native parity:** device-local ChatGPT account authorization and model catalog, same-provider thought-soil finalization, model reasoning capability controls, sent-image inline rendering, prompt-cache read/write receipts, output-limit/finalization locking, and revision-safe global-excerpt clear. PWA backend contracts and cache receipts were synchronized without adding private production configuration. See [release history](docs/SOURCE_RELEASE_HISTORY.md) for the distinction between versioned source, historical assets and temporary QA packages.
+The current Source PWA cache is `coast-source-app-13`.
+
+### Native appearance
+
+`0.2.13-source` restores the optional **奶油纸牌 / Cream Paper** Native theme on top of the Reality Context work. The theme wardrobe and appearance screen expose cream/blush cards, cocoa outlines and hard offset shadows across chat chrome and common settings surfaces. This is Native-only visual styling; it does not replace the PWA's separate web theme system.
+
+### Local ChatGPT plan connection
+
+The Native source can connect a user's ChatGPT account on-device. OAuth credentials are protected with Android Keystore and are not uploaded to the Coast backend. The backend still assembles authenticated workspace context, validates owner-authorized tools and stores sanitized receipts; the account-backed model request is made from the device.
+
+### Source QA and APK signing
+
+The public visitor publisher and temporary Live ChatGPT QA path build an **unsigned Release APK**, then call `scripts/sign-disposable-qa.sh <unsigned-apk> <signed-apk>`. The signer ZIP-aligns the original unsigned release, signs it once with disposable Source-only V1/V2/V3 signing material, and verifies the final distributable APK.
+
+`Source check` now exercises this disposable Release signing path in CI. The Live ChatGPT and V1/V2 diagnostic scripts no longer re-sign `app-debug.apk`, and their version checks are read from the current Gradle identity instead of historical hard-coded values.
 
 | Surface | Available in the current open-source implementation | Configuration / limits |
 | --- | --- | --- |
-| Web / PWA | Conversation UI, streaming/SSE paths, visible context and tool records, owner/visitor separation, memory and world-book workspaces, attachment handling | Model responses and tool integrations need independently configured services; no private production data is distributed |
-| Owner calendar | Entries, notes, edits/deletion and recurrence, with owner-authenticated backend routes | Requires self-hosted backend and storage; tested temporary demos use synthetic data |
-| Tidal Library | TXT/EPUB imports, shelf/cover, chapter and page navigation, saved progress, highlights, annotations, reader options | The PWA and Native clients use the same backend contracts when connected to the same host |
-| Android Native | Jetpack Compose chat and Daily surfaces, calendar, book room, themes, local background selection, reading style/weight and user-supplied local fonts | `0.2.13-source`, `versionCode=15`; proprietary preset fonts are **not** bundled. Missing fonts use visibly different system fallbacks |
-| Voice clips | Message-linked speech clip controls, playback and authorized generation endpoints | Actual speech generation requires self-hosted server-side `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`; no voice credentials or preset voice shipped |
-| Exports / tools | Source JSON/HTML snapshot and authorized calendar/reading/voice tool routes | Do not mistake unconfigured integrations or experimental interfaces for production services |
+| Web / PWA | Conversation UI, streaming/SSE paths, per-window context settings, visible context/tool records, owner/visitor separation, memory/world-book workspaces, attachments | Browser-visible Reality is limited to fields the PWA can honestly provide; device-only fields stay locked |
+| Android Native | Jetpack Compose chat/Daily/calendar/library/memory surfaces, local ChatGPT connection, Reality device fields, themes including Cream Paper | `0.2.13-source`, `versionCode=15`; visitor builds are Source-only and disposable-signed |
+| Owner calendar | Entries, notes, edits/deletion and recurrence | Requires self-hosted backend/storage; calendar can feed the next seven days into Reality Context when selected |
+| Tidal Library | TXT/EPUB imports, shelf/cover, chapter/page navigation, progress, highlights, annotations, reader options | PWA and Native use the same backend contracts when pointed at the same host |
+| Voice clips | Message-linked speech clip controls, playback and authorized generation endpoints | Actual generation needs self-hosted `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` |
+| Exports / tools | Source JSON/HTML snapshot and authorized calendar/reading/voice/tool routes | Unconfigured integrations remain visibly unavailable; private production credentials are not distributed |
+
+Historical implementation milestones belong in [source release history](docs/SOURCE_RELEASE_HISTORY.md), not in the current-status section.
 
 ## Android APK downloads and history
 
@@ -753,9 +800,9 @@ You should expect to fork, rename, configure, simplify, and replace parts of it 
 
 ## Project status
 
-`v0.1-source` is the first MIT source release.
+The repository began with `v0.1-source`; the current Android source identity is `0.2.13-source` (`versionCode=15`), with the PWA and backend continuing to evolve independently under the same source tree.
 
-It is an early reference release. The codebase is broad enough to study, but it should not be treated as a mature framework or stable public product.
+It remains a reference implementation rather than a mature framework or hosted product. Current feature status is documented above; older milestones and superseded QA flows are kept in [docs/SOURCE_RELEASE_HISTORY.md](docs/SOURCE_RELEASE_HISTORY.md).
 
 ## License
 
