@@ -1,4 +1,5 @@
 import { escapeAttribute, escapeHtml, q } from '../../core/dom.js';
+import { normalizeContextSettings } from '../chat-state.js';
 
 const WEB_REALITY_FIELDS = Object.freeze([
   ['date', '日期', '今天是哪一天', true],
@@ -12,15 +13,6 @@ const WEB_REALITY_FIELDS = Object.freeze([
   ['steps', '步数', '由 Native 读取轻量系统计步', false],
 ]);
 
-function cleanSettings(value = {}) {
-  const raw = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  return {
-    reality_enabled: raw.reality_enabled === true,
-    reality_fields: [...new Set(Array.isArray(raw.reality_fields) ? raw.reality_fields.map(String) : [])],
-    short_reply_mode: raw.short_reply_mode === true,
-    weather_city: String(raw.weather_city || '').trim().slice(0, 80),
-  };
-}
 
 function switchRow({ field = '', title, note, checked = false, enabled = true, action, extra = '' }) {
   const attrs = [
@@ -63,7 +55,7 @@ export function createChatWindowSettings({
   function render() {
     if (!root) return;
     const state = currentHistory();
-    const settings = cleanSettings(state.context_settings);
+    const settings = normalizeContextSettings(state.context_settings);
     const locked = isUnavailableConversation();
     const fields = new Set(settings.reality_fields);
 
@@ -151,7 +143,7 @@ export function createChatWindowSettings({
   async function writeSettings(nextSettings) {
     if (!runtime.currentId || isUnavailableConversation()) return;
     const previous = currentHistory();
-    const next = { ...previous, context_settings: cleanSettings(nextSettings) };
+    const next = { ...previous, context_settings: normalizeContextSettings(nextSettings) };
     setHistory(runtime.currentId, next);
     renderConversationList();
     renderMessages(runtime.currentId);
@@ -180,7 +172,7 @@ export function createChatWindowSettings({
     }
 
     const state = currentHistory();
-    const settings = cleanSettings(state.context_settings);
+    const settings = normalizeContextSettings(state.context_settings);
 
     if (name === 'window-reality-master') {
       return writeSettings({ ...settings, reality_enabled: !settings.reality_enabled });
