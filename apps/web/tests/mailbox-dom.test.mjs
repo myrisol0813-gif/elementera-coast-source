@@ -93,9 +93,9 @@ const memory = {
   thought_soil: {
     visitor_id: 'visitor-a',
     current_text: '沿着第一封信继续谈创作。',
-    hand_seeds: [{ name: '星光', life_core: '喜欢星星意象。', usage_hint: '聊创作时使用。', avoid_hint: '' }],
-    do_not_repeat: '不再解释慢速回信。',
-    pocket_candidates: [{ title: '蓝色颜料', life_core: '常用蓝色颜料。', content: '创作偏好候选。' }],
+    afterthoughts: ['喜欢星星意象，也还想继续谈它怎么落进创作。'],
+    memory_candidates: [{ title: '蓝色颜料', content: '创作偏好候选。', source_excerpt: '常用蓝色颜料。' }],
+    seed_candidates: [{ title: '星光方向', content: '以后也许可以继续展开星光意象。', source_excerpt: '喜欢星星意象。' }],
     revision: 2,
     model_label: 'GPT-5.6 Thinking',
     updated_at: '2026-08-01T11:00:00.000Z',
@@ -182,7 +182,7 @@ assert.match(mailboxWindow.document.querySelector('#mailboxMessages').textConten
 assert.equal(mailboxWindow.document.querySelector('#mailboxStatusText').textContent, '回信已经抵达。');
 assert.equal(mailboxWindow.document.querySelector('.mailbox-top-actions [data-panel="soil"]'), null, 'thought soil is not a topbar drawer');
 const soilEntry = mailboxWindow.document.querySelector('.thought-soil-entry');
-assert.match(soilEntry.textContent, /1 粒当前活跃线索/);
+assert.match(soilEntry.textContent, /1 条余思/);
 assert.ok(mailboxWindow.document.querySelector('.message.assistant').previousElementSibling.classList.contains('thought-soil-row'));
 assert.equal(mailboxWindow.document.querySelector('.message.user [data-mailbox-action="edit"]') != null, true);
 assert.equal(mailboxWindow.document.querySelector('.message.user [data-mailbox-action="delete"]') != null, true);
