@@ -68,6 +68,7 @@ const devHands = createDevHands({ router, toast, chat });
 chat.setRunSettingsProvider(tools.getSettings);
 chat.setMemoryController(memory);
 chat.setDeskController(desk);
+chat.setLettersController(letters);
 
 const eventOwners = Object.freeze([
   Object.freeze({
