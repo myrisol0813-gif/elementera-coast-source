@@ -78,6 +78,7 @@ function assembleText(value, messages) {
   return [
     value.basePrompt,
     sourceBlock(SOURCE_GUIDES.custom, value.customInstructionsText),
+    sourceBlock(SOURCE_GUIDES.user_portrait, value.userPortraitText),
     sourceBlock(SOURCE_GUIDES.global_excerpt, value.globalExcerptText),
     sourceBlock(SOURCE_GUIDES.dogtalk, value.dogtalkText),
     crossWindowBlock(value.crossWindowItems),
@@ -96,6 +97,7 @@ function assembleText(value, messages) {
 export function trimContextToComfortRange({
   basePrompt = '',
   customInstructionsText = '',
+  userPortraitText = '',
   globalExcerptText = '',
   soilText = '',
   memoryItems = [],
@@ -113,6 +115,7 @@ export function trimContextToComfortRange({
   const value = {
     basePrompt: String(basePrompt || '').trim(),
     customInstructionsText: rawCustomInstructions.trim() ? rawCustomInstructions : '',
+    userPortraitText: String(userPortraitText ?? '').trim(),
     globalExcerptText: String(globalExcerptText ?? '').trim(),
     soilText: String(soilText || '').trim(),
     memoryItems: [...memoryItems].filter(Boolean),
@@ -158,6 +161,7 @@ export function trimContextToComfortRange({
     ],
     kept: {
       custom_instructions: Boolean(value.customInstructionsText),
+      user_portrait: Boolean(value.userPortraitText),
       global_excerpt: Boolean(value.globalExcerptText),
       soil: Boolean(value.soilText),
       memory: value.memoryItems.length,
@@ -170,6 +174,7 @@ export function trimContextToComfortRange({
     },
     keptMessages: keptMessages.map((message) => ({ ...message })),
     keptCustomInstructionsText: value.customInstructionsText,
+    keptUserPortraitText: value.userPortraitText,
     keptGlobalExcerptText: value.globalExcerptText,
     keptSoilText: sourceBody(value.soilText),
     keptMemoryItems: value.memoryItems,
@@ -184,6 +189,8 @@ export function trimContextToComfortRange({
     estimatedTokens,
     comfortCeiling: ceiling,
     exceedsComfortCeiling: estimatedTokens > ceiling,
+    userPortraitStatus: value.userPortraitText ? (estimatedTokens > ceiling ? 'over_budget' : 'complete') : 'empty',
+    userPortraitTokens: estimateContextTokens(value.userPortraitText),
     globalExcerptStatus: value.globalExcerptText ? (estimatedTokens > ceiling ? 'over_budget' : 'complete') : 'empty',
     globalExcerptTokens: estimateContextTokens(value.globalExcerptText),
     currentUserPreserved: Boolean(currentUser),
