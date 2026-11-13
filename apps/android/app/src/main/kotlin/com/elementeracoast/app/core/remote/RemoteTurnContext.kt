@@ -83,13 +83,16 @@ data class RemoteDeskThinkingSoil(
     val label: String = "整理当前对话的纸条",
     val description: String = "",
     val status: String = "未递给",
+    val enabled: Boolean = false,
     val delivered: Boolean = false,
+    val empty: Boolean = true,
     val context: String = "",
     @SerialName("current_text") val currentText: String = "",
-    @SerialName("hand_seeds") val handSeeds: List<String> = emptyList(),
-    @SerialName("hand_seeds_count") val handSeedsCount: Int = 0,
-    @SerialName("pocket_candidates_count") val pocketCandidatesCount: Int = 0,
-    @SerialName("pocket_candidates_status") val pocketCandidatesStatus: String = "未递入"
+    val afterthoughts: List<String> = emptyList(),
+    @SerialName("afterthoughts_count") val afterthoughtsCount: Int = 0,
+    @SerialName("memory_candidates_count") val memoryCandidatesCount: Int = 0,
+    @SerialName("seed_candidates_count") val seedCandidatesCount: Int = 0,
+    @SerialName("candidates_delivered") val candidatesDelivered: Boolean = false
 )
 
 @Serializable
@@ -358,9 +361,9 @@ data class RemotePlanSoilPrepareResponse(
 data class RemoteThoughtSoil(
     @SerialName("conversation_id") val conversationId: String = "",
     @SerialName("current_text") val currentText: String = "",
-    @SerialName("hand_seeds") val handSeeds: List<RemoteThoughtSeed> = emptyList(),
-    @SerialName("do_not_repeat") val doNotRepeat: String = "",
-    @SerialName("pocket_candidates") val pocketCandidates: List<RemoteThoughtPocket> = emptyList(),
+    val afterthoughts: List<String> = emptyList(),
+    @SerialName("memory_candidates") val memoryCandidates: List<RemoteThoughtCandidate> = emptyList(),
+    @SerialName("seed_candidates") val seedCandidates: List<RemoteThoughtCandidate> = emptyList(),
     @SerialName("manual_locked") val manualLocked: Boolean = false,
     @SerialName("auto_refresh_enabled") val autoRefreshEnabled: Boolean = true,
     val revision: Int = 1,
@@ -371,19 +374,8 @@ data class RemoteThoughtSoil(
 )
 
 @Serializable
-data class RemoteThoughtSeed(
-    val name: String = "",
-    @SerialName("life_core") val lifeCore: String = "",
-    @SerialName("usage_hint") val usageHint: String = "",
-    @SerialName("avoid_hint") val avoidHint: String = ""
-)
-
-@Serializable
-data class RemoteThoughtPocket(
+data class RemoteThoughtCandidate(
     val title: String = "",
-    @SerialName("life_core") val lifeCore: String = "",
     val content: String = "",
-    @SerialName("usage_hint") val usageHint: String = "",
-    @SerialName("avoid_hint") val avoidHint: String = "",
     @SerialName("source_excerpt") val sourceExcerpt: String = ""
 )
