@@ -101,7 +101,7 @@ export async function runChatPrelude() {
   assert.equal(dogtalks.get('conversation:conv-1').body, '主窗这一轮想轻轻靠近。');
   assert.ok(document.querySelector('.message.user .message-dogtalk-mark')?.textContent.includes('随本轮'));
   assert.equal(formalChatBodies[0].settings.max_tokens, null, 'natural output must not impose an application token limit');
-  await waitFor(() => document.querySelector('.thought-soil-entry')?.textContent.includes('1 粒当前活跃线索'), 'thought soil entry');
+  await waitFor(() => document.querySelector('.thought-soil-entry')?.textContent.includes('1 条余思'), 'thought soil entry');
   assert.equal(document.querySelector('.thought-soil-entry').dataset.action, 'memory:soil-open');
   assert.equal(document.querySelector('.thought-soil-entry').dataset.scope, 'conversation');
   assert.equal(document.querySelector('.thought-soil-entry').dataset.conversationId, 'conv-1');
@@ -114,10 +114,10 @@ export async function runChatPrelude() {
   setFormalFinishReason('stop');
   document.querySelector('.thought-soil-entry').click();
   await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'thought-soil', 'thought soil route');
-  assert.ok(document.querySelector('#overlayRoot').textContent.includes('勿复读'));
+  assert.ok(document.querySelector('#overlayRoot').textContent.includes('余思 · 1'));
   assert.ok(document.querySelector('#overlayRoot').textContent.includes('暂放的潮汐岔路'));
   assert.ok(document.querySelector('#overlayRoot').textContent.includes('这条岔路先放下，以后也许还会长。'));
-  assert.ok(document.querySelector('#overlayRoot').textContent.includes('这些内容已先放进待确认区。确认前不会参与召回。'));
+  assert.ok(document.querySelector('#overlayRoot').textContent.includes('这些只是模型建议的去处，已送入待确认区；确认前不会参与召回。'));
   assert.ok(document.querySelector('#overlayRoot').textContent.includes('待确认区 · 1'));
   assert.ok(document.querySelector('#overlayRoot').textContent.includes('revision 2 · 整理来源'));
   assert.equal(document.querySelector('[data-action="memory:soil-organize"]'), null, 'manual soil organize entry must stay retired');
@@ -126,7 +126,7 @@ export async function runChatPrelude() {
   const soilBeforeClearCancel = structuredClone(soilFor('conv-1'));
   document.querySelector('[data-action="memory:soil-clear"]').click();
   danger = await waitForDanger('清空当前窗口的整理当前对话的纸条？');
-  assert.ok(danger.textContent.includes('当前、当前活跃线索、勿复读和可落袋候选会被清空。聊天记录、落袋、种子和记忆不会被删除。'));
+  assert.ok(danger.textContent.includes('当前、余思、记忆候选和种子候选会被清空。聊天记录、待确认区、种子库和记忆库不会被删除。'));
   cancelDanger(danger);
   await tick();
   assert.deepEqual(soilFor('conv-1'), soilBeforeClearCancel, 'cancelled soil clear must not write the cleared state');
@@ -270,7 +270,7 @@ export async function runChatTypedRooms() {
   assert.equal(titleBodies.at(-1).assistant, '我把登岛信读完了。');
   assert.equal(conversations.find((item) => item.id === landingConversationId)?.title, '测试标题');
   assert.equal(document.querySelector('#toastRoot').textContent, '登岛信已递出，但模型或供应商达到自身长度上限；可以点“重新生成”再读一次。');
-  assert.ok(document.querySelector('.thought-soil-entry')?.textContent.includes('1 粒当前活跃线索'));
+  assert.ok(document.querySelector('.thought-soil-entry')?.textContent.includes('1 条余思'));
   document.querySelector('.thought-soil-entry').click();
   await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'thought-soil', 'landing thought soil route');
   assert.ok(document.querySelector('#overlayRoot').textContent.includes('继续测试当前窗口'));
@@ -294,7 +294,7 @@ export async function runChatTypedRooms() {
   document.querySelector('[data-action="chat:window-letter-open"]').click();
   await waitFor(() => document.querySelector('[data-action="letters:send-island"]'), 'reopen letter route');
   assert.equal(document.querySelector('[data-action="letters:send-island"]').textContent, '重新递出登岛信');
-  const lockedSoil = { ...soilFor(landingConversationId), current_text: '屋主手动锁定的当前方向', hand_seeds: [], manual_locked: true };
+  const lockedSoil = { ...soilFor(landingConversationId), current_text: '屋主手动锁定的当前方向', afterthoughts: [], memory_candidates: [], seed_candidates: [], manual_locked: true };
   soils.set(landingConversationId, lockedSoil);
   setLandingFinishReason('stop');
   const landingCountBeforeLocked = landingBodies.length;
@@ -302,7 +302,7 @@ export async function runChatTypedRooms() {
   await waitFor(() => landingBodies.length === landingCountBeforeLocked + 1 && document.querySelector('#overlayRoot').hidden, 'locked landing soil readback');
   assert.equal(document.querySelector('#toastRoot').textContent, '登岛信已递出；整理当前对话的纸条已手动锁定，保留原有内容。');
   assert.equal(soilFor(landingConversationId).current_text, '屋主手动锁定的当前方向');
-  assert.equal(soilFor(landingConversationId).hand_seeds.length, 0);
+  assert.equal(soilFor(landingConversationId).afterthoughts.length, 0);
   assert.ok(document.querySelector('.thought-soil-entry')?.textContent.includes('已锁定'));
 
   document.querySelector('#moreButton').click();
