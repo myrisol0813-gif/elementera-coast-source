@@ -94,7 +94,7 @@ export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentS
     const soil = runtime.soils.get(conversationId) || emptySoil(conversationId);
     const afterthoughts = Array.isArray(soil.afterthoughts) ? soil.afterthoughts : [];
     const state = soil.auto_refresh_enabled === false ? ' · 已关闭' : soil.manual_locked ? ' · 已锁定' : '';
-    return `<div class="thought-soil-row"><button class="thought-soil-entry" type="button" data-action="memory:soil-open" data-scope="conversation" data-conversation-id="${escapeAttribute(conversationId)}">思维壤 · ${afterthoughts.length} 条余思${state} <span aria-hidden="true">›</span></button></div>`;
+    return `<div class="thought-soil-row"><button class="thought-soil-entry" type="button" data-action="memory:soil-open" data-scope="conversation" data-conversation-id="${escapeAttribute(conversationId)}">整理当前对话的纸条 · ${afterthoughts.length} 条余思${state} <span aria-hidden="true">›</span></button></div>`;
   }
 
   function soilProvenance(soil) {
@@ -124,17 +124,17 @@ export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentS
       ${candidateBlock(memoryCandidates, '没有想递往记忆库的内容。')}
       <div class="feature-kicker">种子候选 · ${seedCandidates.length}</div>
       ${candidateBlock(seedCandidates, '没有想递往种子库的内容。')}
-      ${memoryCandidates.length || seedCandidates.length ? '<p class="feature-note">这些只是模型建议的去处，已送入待确认袋；确认前不会参与召回。</p>' : ''}
+      ${memoryCandidates.length || seedCandidates.length ? '<p class="feature-note">这些只是模型建议的去处，已送入待确认区；确认前不会参与召回。</p>' : ''}
     `;
     const pocketEntry = pendingPockets.length || memoryCandidates.length || seedCandidates.length
       ? `<section class="feature-group"><div class="feature-card">
-        <button class="feature-row" type="button" data-action="memory:pockets" data-scope="${escapeAttribute(scope)}"${sourceSurface ? ` data-source-surface="${escapeAttribute(sourceSurface)}"` : ''}><span><strong>待确认袋 · ${pendingPockets.length}</strong><small>模型给出的去处只是建议，你仍可以改投另一边或丢弃。</small></span><span>›</span></button>
+        <button class="feature-row" type="button" data-action="memory:pockets" data-scope="${escapeAttribute(scope)}"${sourceSurface ? ` data-source-surface="${escapeAttribute(sourceSurface)}"` : ''}><span><strong>待确认区 · ${pendingPockets.length}</strong><small>模型给出的去处只是建议，你仍可以改投另一边或丢弃。</small></span><span>›</span></button>
       </div></section>`
       : '';
     const enabled = soil.auto_refresh_enabled !== false;
     const switchCard = scope === 'conversation'
       ? `<section class="feature-group"><div class="feature-card">
-        <button class="feature-row" type="button" data-action="memory:soil-toggle" data-value="${enabled ? 'false' : 'true'}"><span><strong>${enabled ? '思维壤已开启' : '思维壤已关闭'}</strong><small>${enabled ? (soil.manual_locked ? '当前为手动锁定：不会自动覆盖，但仍会递入模型上下文。' : '每轮回复后自动整理，并把“当前 / 余思”递入下一轮。') : '停止自动整理，也不递入模型上下文；已有内容会原样保留。'}</small></span><span>${enabled ? '关闭' : '开启'}</span></button>
+        <button class="feature-row" type="button" data-action="memory:soil-toggle" data-value="${enabled ? 'false' : 'true'}"><span><strong>${enabled ? '整理当前对话的纸条已开启' : '整理当前对话的纸条已关闭'}</strong><small>${enabled ? (soil.manual_locked ? '当前为手动锁定：不会自动覆盖，但仍会递入模型上下文。' : '每轮回复后自动整理，并把“当前 / 余思”递入下一轮。') : '停止自动整理，也不递入模型上下文；已有内容会原样保留。'}</small></span><span>${enabled ? '关闭' : '开启'}</span></button>
       </div></section>`
       : '';
     const controls = scope === 'conversation'
@@ -158,7 +158,7 @@ export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentS
     const soil = runtime.soils.get(id) || emptySoil(id);
     const pockets = runtime.pockets.get(id) || [];
     return {
-      title: '思维壤',
+      title: '整理当前对话的纸条',
       subtitle: soil.auto_refresh_enabled === false
         ? '已关闭 · 不整理，也不递入模型上下文'
         : soil.manual_locked
@@ -173,7 +173,7 @@ export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentS
   function soilEditView() {
     const soil = currentSoil();
     return {
-      title: '编辑思维壤',
+      title: '编辑整理当前对话的纸条',
       subtitle: '保存后停止自动覆盖',
       className: 'memory-soil-edit',
       body: `<form class="form-stack" data-submit="memory:soil-save">
