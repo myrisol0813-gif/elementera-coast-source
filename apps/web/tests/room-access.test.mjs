@@ -27,7 +27,7 @@ for (const access of ownerAccess) {
   assert.equal(access.memory, 'conversation_and_global');
   assert.deepEqual(access.modelVisibleTools, [
     'daily.create_moment', 'daily.create_diary', 'daily.moment_comment', 'daily.moment_like',
-    'dogtalk.read', 'memory.search', 'memory.write_candidate', 'memory.global_excerpt_propose',
+    'dogtalk.read', 'memory.search', 'memory.write_candidate',
     'cross_window.search', 'cross_window.keyword_search', 'cross_window.read_messages', 'cross_window.read_recent',
     'calendar.list', 'calendar.create', 'calendar.update', 'calendar.delete',
     'library.books', 'library.read', 'library.notes', 'library.write', 'voice.create',
@@ -56,9 +56,10 @@ for (const [surface, conversation, expected, forbidden] of [
     .filter((tool) => tool.type === 'function')
     .map((tool) => tool.function.name)
     .sort();
-  for (const required of ['create_diary', 'create_moment', 'global_excerpt_propose', 'memory_search', 'memory_write_candidate', 'moment_comment', 'moment_like', 'read_mystic_dogtalk']) {
+  for (const required of ['create_diary', 'create_moment', 'memory_search', 'memory_write_candidate', 'moment_comment', 'moment_like', 'read_mystic_dogtalk']) {
     assert.ok(functionToolNames.includes(required), `${surface} lost required owner tool ${required}`);
   }
+  assert.ok(!functionToolNames.includes('global_excerpt_propose'), `${surface} should route portrait auto-updates through Thought Soil`);
   assert.ok(functionToolNames.includes('calendar_list'), `${surface} lost owner calendar tool`);
   assert.ok(functionToolNames.includes('library_read'), `${surface} lost owner reader tool`);
   assert.equal(
@@ -87,7 +88,6 @@ for (const required of [
   'cross_window_read_messages',
   'cross_window_read_recent',
   'cross_window_search',
-  'global_excerpt_propose',
   'memory_search',
   'memory_write_candidate',
   'moment_comment',
