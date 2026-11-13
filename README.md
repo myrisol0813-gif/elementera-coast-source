@@ -113,7 +113,7 @@ For a longer-lived setup, replace the Quick Tunnel with your own hosted source b
 - [Model workspace and tool records](#model-workspace-and-tool-records)
 - [Attachments, files, and search surfaces](#attachments-files-and-search-surfaces)
 - [MCP and external-interface experiments](#mcp-and-external-interface-experiments)
-- [Current feature status (0.2.14-source)](#current-feature-status-0213-source)
+- [Current feature status (0.2.14-source)](#current-feature-status-0214-source)
 - [Android APK downloads and history](#android-apk-downloads-and-history)
 - [Running and testing](#running-and-testing)
 - [Configuration](#configuration)
@@ -469,7 +469,7 @@ Source identity:
 ```text
 App: Elementera Coast Source
 applicationId = com.elementeracoast.source
-versionCode = 15
+versionCode = 16
 versionName = 0.2.14-source
 ```
 
@@ -498,16 +498,17 @@ The production signing chain, production updater, production API origin, and pro
 
 Elementera Coast treats memory as something that should be organized, inspected, and confirmed, rather than silently mixed into every prompt.
 
-The source release includes early structures around:
+The source release includes structures around:
 
 - memory records;
-- memory candidates;
-- context notes;
-- active or current leads;
+- memory candidates and seed candidates;
+- per-conversation Thought Soil / current-conversation notes;
 - source references;
 - world-book style entries;
 - recall-oriented organization;
 - current-turn context preview.
+
+Thought Soil v2 uses four explicit fields: `current_text`, `afterthoughts`, `memory_candidates`, and `seed_candidates`. Only the current note and optional afterthoughts are carried into the next model turn. Memory and seed candidates are routed to the visible pending-confirmation flow and are never injected into the chat body merely because the organizer suggested them. A successful organization replaces the temporary soil snapshot; an invalid, truncated, or unavailable organizer response preserves the last successful soil and its cursor instead of writing a synthetic fallback.
 
 A typical intended flow is:
 
@@ -610,6 +611,10 @@ The source Native client now includes the original owner calendar, Tidal Library
 ## Current feature status (0.2.14-source)
 
 The source tree currently identifies the Android app as `0.2.14-source` (`versionCode=16`). The PWA cache is currently `coast-source-app-14`.
+
+### Thought Soil v2
+
+The current Source build exposes the per-conversation work note as **Current / Afterthoughts / Destinations**. The PWA and Native client share the same v2 contract, while the public UI keeps the more generic “current conversation note” wording. Suggested memory and seed destinations remain reviewable: they can be confirmed, redirected, or discarded before becoming long-term state. Legacy D1 columns are retained only for historical schema compatibility; the v2 runtime no longer reads or writes the old hand-seed / do-not-repeat / pocket-candidate soil fields.
 
 ### Conversation Reality Context and response mode
 
