@@ -28,7 +28,7 @@ assert.match(settings, /window-letter-open/);
 assert.match(tokens, /--topbar-height:\s*44px;/);
 assert.match(tokens, /--composer-height:\s*48px;/);
 assert.match(tokens, /--reading-size:\s*14px;/);
-assert.match(shell, /\.model-title\s*\{[^}]*font-size:\s*15px;/s);
+assert.match(shell, /\.model-title\s*\{[^}]*font-size:\s*16px;/s);
 assert.match(shell, /\.sidebar\s*\{[^}]*height:\s*var\(--app-viewport-height, 100svh\)[^}]*overflow:\s*hidden;/s);
 assert.match(shell, /\.sidebar-content\s*\{[^}]*height:\s*100%[^}]*overflow-y:\s*auto;/s);
 assert.match(chat, /\.window-context-header h2\s*\{[^}]*font-size:\s*15px;/s);

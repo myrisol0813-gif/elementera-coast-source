@@ -29,7 +29,7 @@ assert.match(library, /这里是你的书房，可以保存阅读进度与笔记
 for (const privateCopy of ['我们共用一间书房', '挑一本一起读', '与潮水一起翻书', '双方笔记']) {
   assert.ok(!library.includes(privateCopy), 'Old shared-library wording remains');
 }
-assert.match(sw, /elementera-coast-source-app-12/);
+assert.match(sw, /elementera-coast-source-app-13/);
 const toolDescriptions = await readFile(new URL('../functions/tool-registry-core.js', import.meta.url), 'utf8');
 const libraryApi = await readFile(new URL('../functions/tidal-library-api.js', import.meta.url), 'utf8');
 const libraryImport = await readFile(new URL('../../android/app/src/main/kotlin/com/elementeracoast/app/feature/daily/LibraryImport.kt', import.meta.url), 'utf8');
