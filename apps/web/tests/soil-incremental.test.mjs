@@ -47,12 +47,9 @@ const originalFetch = globalThis.fetch;
 let providerPayloads = [];
 let providerContent = JSON.stringify({
   current_text: '默认整理成功',
-  hand_seeds_mode: 'keep',
-  hand_seeds: [],
-  do_not_repeat_mode: 'keep',
-  do_not_repeat: '',
-  pocket_candidates_mode: 'keep',
-  pocket_candidates: [],
+  afterthoughts: [],
+  memory_candidates: [],
+  seed_candidates: [],
 });
 let providerFinishReason = 'stop';
 let providerStatus = 200;
@@ -106,12 +103,9 @@ await writeConversationState(db, landingConversation.id, {
 providerPayloads = [];
 providerContent = JSON.stringify({
   current_text: '登岛信开场已经完成',
-  hand_seeds_mode: 'clear',
-  hand_seeds: [],
-  do_not_repeat_mode: 'clear',
-  do_not_repeat: '',
-  pocket_candidates_mode: 'clear',
-  pocket_candidates: [],
+  afterthoughts: [],
+  memory_candidates: [],
+  seed_candidates: [],
 });
 const landingData = await organize(landingConversation.id, 'landing');
 assert.equal(landingData.soil.current_text, '登岛信开场已经完成');
@@ -185,19 +179,16 @@ const degradedData = await organize(conversation.id, 'reply');
 assert.equal(degradedData.degraded, true);
 const degradedSoil = await readSoil(db, conversation.id);
 assert.equal(degradedSoil.organized_through_turn_id, successCursor, 'degraded fallback must not advance the successful cursor');
-assert.equal(degradedSoil.current_text, '当前没有需要脱离最近上下文再次复述的承接便签。');
+assert.equal(degradedSoil.current_text, '滚动承接最新一轮', 'degraded organize keeps the previous successful soil unchanged');
 
 turns.push(turn('visible-101', 'latest-after-degraded-user-marker', 'latest-after-degraded-assistant-marker', '2026-07-15T03:41:00.000Z'));
 await writeConversationState(db, conversation.id, { version: 4, turns });
 providerPayloads = [];
 providerContent = JSON.stringify({
   current_text: '补读失败轮后继续承接',
-  hand_seeds_mode: 'keep',
-  hand_seeds: [],
-  do_not_repeat_mode: 'keep',
-  do_not_repeat: '',
-  pocket_candidates_mode: 'clear',
-  pocket_candidates: [],
+  afterthoughts: [],
+  memory_candidates: [],
+  seed_candidates: [],
 });
 const afterDegradedData = await organize(conversation.id, 'reply');
 const afterDegradedPrompt = providerPayloads.at(-1).messages[0].content;
@@ -211,12 +202,9 @@ providerContent = [
   '第一次不是合法 JSON',
   JSON.stringify({
     current_text: '重试仍正常',
-    hand_seeds_mode: 'keep',
-    hand_seeds: [],
-    do_not_repeat_mode: 'keep',
-    do_not_repeat: '',
-    pocket_candidates_mode: 'clear',
-    pocket_candidates: [],
+    afterthoughts: [],
+    memory_candidates: [],
+    seed_candidates: [],
   }),
 ];
 const retryData = await organize(conversation.id, 'reply');
