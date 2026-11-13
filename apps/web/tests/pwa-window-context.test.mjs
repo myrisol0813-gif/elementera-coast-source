@@ -31,7 +31,7 @@ assert.match(tokens, /--reading-size:\s*14px;/);
 assert.match(shell, /\.model-title\s*\{[^}]*font-size:\s*16px;/s);
 assert.match(shell, /\.sidebar\s*\{[^}]*height:\s*var\(--app-viewport-height, 100svh\)[^}]*overflow:\s*hidden;/s);
 assert.match(shell, /\.sidebar-content\s*\{[^}]*height:\s*100%[^}]*overflow-y:\s*auto;/s);
-assert.match(chat, /\.window-context-header h2\s*\{[^}]*font-size:\s*16px;/s);
+assert.match(chat, /\.window-context-header h2\s*\{[^}]*font-size:\s*15px;/s);
 assert.match(chat, /\.composer--chat\s*\{\s*grid-template-columns:\s*38px/s);
 assert.match(chat, /\.window-context-sheet\s*\{/);
 assert.match(worker, /\/public\/features\/chat\/chat-window-settings\.js/);
