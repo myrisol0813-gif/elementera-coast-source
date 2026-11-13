@@ -30,7 +30,7 @@ const VALUES = {
   landing: {
     ...CONVERSATION_ACCESS,
     backendTools: ['daily.*', 'dogtalk.*', 'memory.search'],
-    modelVisibleTools: ['daily.create_moment', 'daily.create_diary', 'dogtalk.read', 'memory.search', 'memory.global_excerpt_propose'],
+    modelVisibleTools: ['daily.create_moment', 'daily.create_diary', 'dogtalk.read', 'memory.search'],
   },
   official_mcp: {
     ownerOnly: true,
