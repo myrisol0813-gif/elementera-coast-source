@@ -175,8 +175,9 @@ export function createDesk({ router, toast }) {
     const current = slip.current_message || { label: '当前消息', status: '未递给', content: '' };
     const recent = slip.recent_context || { label: '最近上下文', status: '未递给', status_detail: '0 轮', messages: [] };
     const custom = slip.custom_instructions || { label: '核心自定义', status: '未递给', length: 0, content: '' };
-    const globalExcerpt = slip.global_excerpt || { label: '全局摘录', status: '未设置', injection: 'empty', estimated_tokens: 0, length: 0, content: '' };
-    const contextBudget = slip.context_budget || { label: '上下文预算', estimated_tokens: 0, comfort_ceiling: 0, trimmed: false, trimmed_count: 0, sources_preserved: [], global_excerpt: 'empty' };
+    const userPortrait = slip.user_portrait || { label: '用户画像', status: '未设置', injection: 'empty', estimated_tokens: 0, length: 0, content: '' };
+    const globalExcerpt = slip.global_excerpt || { label: '自我画像', status: '未设置', injection: 'empty', estimated_tokens: 0, length: 0, content: '' };
+    const contextBudget = slip.context_budget || { label: '上下文预算', estimated_tokens: 0, comfort_ceiling: 0, trimmed: false, trimmed_count: 0, sources_preserved: [], user_portrait: 'empty', global_excerpt: 'empty' };
     const soil = slip.thinking_soil || {
       label: '整理当前对话的纸条', status: '未递给', context: '', current_text: '', afterthoughts: [],
       memory_candidates_count: 0, seed_candidates_count: 0, candidates_delivered: false,
@@ -195,6 +196,7 @@ export function createDesk({ router, toast }) {
     const customStatus = custom.delivered ? `${custom.status} · 全文 ${Number(custom.length || 0)} 字` : custom.status;
     const recentStatus = recent.status_detail ? `${recent.status} · ${recent.status_detail}` : recent.status;
     const budgetStatus = `${Number(contextBudget.estimated_tokens || 0)} / ${Number(contextBudget.comfort_ceiling || 0)} tok · ${contextBudget.trimmed ? `已裁 ${Number(contextBudget.trimmed_count || 0)}` : '未裁剪'}`;
+    const portraitStatus = userPortrait.length ? `${userPortrait.status} · ${Number(userPortrait.estimated_tokens || 0)} tok` : userPortrait.status;
     const excerptStatus = globalExcerpt.length ? `${globalExcerpt.status} · ${Number(globalExcerpt.estimated_tokens || 0)} tok` : globalExcerpt.status;
     const memoryStatus = memory.confirmation_status ? `${memory.status} · ${memory.confirmation_status} ${Number(memory.count || 0)} 条` : memory.status;
     const worldbookStatus = worldbook.matched_count ? `${worldbook.status} · 命中 ${Number(worldbook.matched_count || 0)} 条` : worldbook.status;
@@ -237,11 +239,13 @@ export function createDesk({ router, toast }) {
           paragraph('comfort ceiling：', contextBudget.comfort_ceiling),
           paragraph('裁剪：', contextBudget.trimmed ? `是 · ${Number(contextBudget.trimmed_count || 0)} 处` : '否'),
           paragraph('保留来源：', Array.isArray(contextBudget.sources_preserved) ? contextBudget.sources_preserved.join('、') : ''),
-          paragraph('全局摘录注入：', contextBudget.global_excerpt || globalExcerpt.injection || 'empty'),
-          contextBudget.exceeds_comfort_ceiling ? '<p class="desk-slip-note">当前组包超过 comfort ceiling；前端没有静默截断全局摘录。</p>' : '',
+          paragraph('用户画像注入：', contextBudget.user_portrait || userPortrait.injection || 'empty'),
+          paragraph('自我画像注入：', contextBudget.global_excerpt || globalExcerpt.injection || 'empty'),
+          contextBudget.exceeds_comfort_ceiling ? '<p class="desk-slip-note">当前组包超过 comfort ceiling；前端没有静默截断两幅画像。</p>' : '',
         ].join(''))}
         ${deskRow(custom.label || '核心自定义', customStatus, [sourceNote(custom.description), custom.content ? deskText(custom.content) : emptyNote()].join(''))}
-        ${deskRow(globalExcerpt.label || '全局摘录', excerptStatus, [sourceNote(globalExcerpt.description), globalExcerpt.content ? deskText(globalExcerpt.content) : emptyNote()].join(''))}
+        ${deskRow(userPortrait.label || '用户画像', portraitStatus, [sourceNote(userPortrait.description), userPortrait.content ? deskText(userPortrait.content) : emptyNote()].join(''))}
+        ${deskRow(globalExcerpt.label || '自我画像', excerptStatus, [sourceNote(globalExcerpt.description), globalExcerpt.content ? deskText(globalExcerpt.content) : emptyNote()].join(''))}
         ${deskRow(soil.label || '整理当前对话的纸条', soil.status, soilDetail)}
         ${deskRow(memory.label || '相关记忆', memoryStatus, [sourceNote(memory.description), memoryDeskDetails(memory.items)].join(''))}
         ${deskRow(worldbook.label || '世界书', worldbookStatus, [sourceNote(worldbook.description), worldbookDeskDetails(worldbook.entries)].join(''))}
