@@ -180,16 +180,19 @@ async function upcomingCalendarText(db, localDate) {
   return entries.map((entry) => `${entry.occurrence_day || entry.day}｜${clip(entry.title, 120)}`).join('\n');
 }
 
-function selectedFields(settings) {
+function selectedFields(settings, allowedFields = null) {
+  const allowed = Array.isArray(allowedFields) ? new Set(allowedFields.map(String)) : null;
   return settings?.reality_enabled === true && Array.isArray(settings?.reality_fields)
-    ? [...new Set(settings.reality_fields.map(String))].filter((key) => Object.hasOwn(REALITY_FIELD_LABELS, key))
+    ? [...new Set(settings.reality_fields.map(String))]
+      .filter((key) => Object.hasOwn(REALITY_FIELD_LABELS, key))
+      .filter((key) => !allowed || allowed.has(key))
     : [];
 }
 
 export async function buildRealityContext(env, {
-  settings = {}, snapshot = {}, localDate = '', localDateTime = '',
+  settings = {}, snapshot = {}, localDate = '', localDateTime = '', allowedFields = null,
 } = {}) {
-  const selected = selectedFields(settings);
+  const selected = selectedFields(settings, allowedFields);
   if (!settings?.reality_enabled) return { enabled: false, selected: [], delivered: [], missing: [], text: '' };
   const safeSnapshot = snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot) ? snapshot : {};
   const delivered = [];
