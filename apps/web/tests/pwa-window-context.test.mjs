@@ -13,13 +13,14 @@ assert.match(html, /id="moreButton"[^>]+data-action="chat:window-settings"/);
 assert.match(html, /id="windowContextOverlay"/);
 assert.doesNotMatch(render, /chat:toggle-short-mode/);
 
-for (const field of ['date', 'time', 'weather', 'calendar']) {
-  assert.match(settings, new RegExp(`\\['${field}'[^\\n]+true\\]`), `${field} should be editable in source PWA`);
+for (const field of ['date', 'time', 'calendar']) {
+  assert.match(settings, new RegExp(`\\['${field}'[^\\n]+\\]`), `${field} should stay available in source PWA`);
 }
-for (const field of ['battery', 'location', 'recent_app', 'app_usage', 'steps']) {
-  assert.match(settings, new RegExp(`\\['${field}'[^\\n]+false\\]`), `${field} should remain Native-only in source PWA`);
+for (const field of ['weather', 'battery', 'location', 'recent_app', 'app_usage', 'steps']) {
+  assert.doesNotMatch(settings, new RegExp(`\\['${field}'[^\\n]+\\]`), `${field} should not be a source PWA reality option`);
 }
-assert.match(settings, /仅 Native 可用/);
+assert.match(settings, /PWA 只递入日期、时间和未来 7 天日历/);
+assert.doesNotMatch(settings, /window-weather-save|windowWeatherCity/);
 assert.match(settings, /现实上下文/);
 assert.match(settings, /整理当前对话的纸条/);
 assert.match(settings, /window-soil-open/);
