@@ -9,7 +9,7 @@ import { dogtalkContext } from './dogtalk-store.js';
 import { readConversationState } from './chat-store.js';
 import { buildRealityContext, responseModeContext } from './reality-context.js';
 import { buildMemoryContext, recallMemoryItems } from './memory-recall.js';
-import { MEMORY_OWNER_ID, readCustomInstructions, readGlobalExcerpt } from './memory-store.js';
+import { MEMORY_OWNER_ID, readCustomInstructions, readGlobalExcerpt, readUserPortrait } from './memory-store.js';
 import { currentMailboxVisitor, mailboxMessages } from './mailbox-service.js';
 import { listVisitorNotebook, readMailboxThoughtSoil } from './mailbox-repository.js';
 import { roomAccess } from './surface-access-rules.js';
@@ -168,13 +168,15 @@ export async function assembleCleanContext(env, {
   const access = roomAccess(surface, { permission, visitorId }); const request = requestSettings(settings);
   const recentTurns = effectiveRecentTurns(request, access);
   const ownerLongContext = permission === 'owner' && OWNER_CUSTOM_INSTRUCTION_SURFACES.has(surface);
-  const [ownerCustomInstructions, globalExcerpt, conversationState] = await Promise.all([
+  const [ownerCustomInstructions, userPortrait, globalExcerpt, conversationState] = await Promise.all([
     ownerLongContext ? readCustomInstructions(env.COAST_CHAT_DB) : Promise.resolve(null),
+    ownerLongContext ? readUserPortrait(env.COAST_CHAT_DB) : Promise.resolve(null),
     ownerLongContext ? readGlobalExcerpt(env.COAST_CHAT_DB) : Promise.resolve(null),
     permission === 'owner' && conversationId ? readConversationState(env.COAST_CHAT_DB, conversationId) : Promise.resolve(null),
   ]);
   const contextSettings = REALITY_CONTEXT_SURFACES.has(surface) ? (conversationState?.context_settings || {}) : {};
   const customInstructionsText = String(ownerCustomInstructions?.content ?? ''); const hasCustomInstructions = Boolean(customInstructionsText.trim());
+  const userPortraitText = String(userPortrait?.body ?? '');
   const globalExcerptText = String(globalExcerpt?.body ?? '');
   let recent = cleanHistory(messages, recentTurns);
   const query = String(lastUser?.content ?? lastUser ?? [...recent].reverse().find((message) => message.role === 'user')?.content ?? '').trim(); recent = ensureCurrentUser(recent, query);
@@ -182,7 +184,7 @@ export async function assembleCleanContext(env, {
   const crossWindowRequest = permission === 'owner' && CROSS_WINDOW_SURFACES.has(surface)
     ? normalizeCrossWindowRequest(crossWindow || {})
     : { mode: 'off', sources: [] };
-  const selection = exposeTools ? resolveToolSelection({ permission, surface, authScope, visitorId, cross_window_mode: crossWindowRequest.mode, global_excerpt_write_enabled: globalExcerpt?.write_enabled === true }) : { backendTools: [], modelVisibleToolRecords: [], modelVisibleTools: [] };
+  const selection = exposeTools ? resolveToolSelection({ permission, surface, authScope, visitorId, cross_window_mode: crossWindowRequest.mode }) : { backendTools: [], modelVisibleToolRecords: [], modelVisibleTools: [] };
   const webSearchEnabled = Boolean(exposeTools && permission === 'owner' && WEB_SEARCH_SURFACES.has(surface)
     && crossWindowRequest.mode !== 'keyword');
   const modelVisibleToolRecords = webSearchEnabled
@@ -212,7 +214,7 @@ export async function assembleCleanContext(env, {
   const dogtalk = papers.dogtalk || directDogtalk; const worldbookItems = worldbook.map((entry) => `${entry.title}：${entry.content}`); const workbenchText = workbenchPrompt(query, modelVisibleTools.length);
   const comfort = trimContextToComfortRange({
     basePrompt: surface === 'mailbox_visitor' ? String(baseSystemPrompt || '').trim() || VISITOR_PROMPT : OWNER_CUSTOM_INSTRUCTION_SURFACES.has(surface) ? OWNER_TECHNICAL_PROMPT : String(baseSystemPrompt || '').trim() || OWNER_TECHNICAL_PROMPT,
-    customInstructionsText: hasCustomInstructions ? customInstructionsText : '', globalExcerptText, soilText, memoryItems, worldbookItems, dogtalkText: dogtalk?.context || '',
+    userPortraitText, customInstructionsText: hasCustomInstructions ? customInstructionsText : '', globalExcerptText, soilText, memoryItems, worldbookItems, dogtalkText: dogtalk?.context || '',
     crossWindowItems: manualCrossWindowItems(manualCrossWindow), workbenchText,
     realityText: reality.text, responseModeText: responseMode.text, messages: recent,
     recentTurns, maxTokens: request.comfortTokens,
@@ -238,6 +240,7 @@ export async function assembleCleanContext(env, {
   const deskSlip = () => createDeskSlip({
     ownerVisible: permission === 'owner', currentMessage: currentDelivered ? deliveredMessages.at(-1).content : query, recentMessages: deliveredRecent,
     customInstructions: comfort.keptCustomInstructionsText, customInstructionsDelivered: comfort.kept.custom_instructions,
+    userPortrait: comfort.keptUserPortraitText, userPortraitStatus: comfort.userPortraitStatus, userPortraitTokens: comfort.userPortraitTokens,
     globalExcerpt: comfort.keptGlobalExcerptText, globalExcerptStatus: comfort.globalExcerptStatus, globalExcerptTokens: comfort.globalExcerptTokens,
     estimatedTokens: comfort.estimatedTokens, comfortCeiling: comfort.comfortCeiling, exceedsComfortCeiling: comfort.exceedsComfortCeiling,
     soil: comfort.kept.soil, soilEnabled, soilContext: soilDesk.context,
@@ -256,7 +259,6 @@ export async function assembleCleanContext(env, {
         env, permission, surface, visitorId, room_scope: roomId || surface, authScope, actor: surface === 'official_mcp' ? 'official_mcp' : 'api_model_partner',
         conversation_id: conversationId, source_turn_id: sourceTurnId, local_date: localDate, model_label: model, user_query: query,
         cross_window_mode: crossWindowRequest.mode,
-        global_excerpt_write_enabled: globalExcerpt?.write_enabled === true,
         cross_window_used_turns: () => modelCrossWindowReads?.total_delivered_turns || 0,
         cross_window_used_chars: () => modelCrossWindowReads?.total_delivered_chars || 0,
         on_cross_window_read: onCrossWindowRead,
