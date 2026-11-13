@@ -13,7 +13,7 @@ const env = { COAST_CHAT_DB: db, COAST_SESSION_SECRET: 'turn-desk-details-'.repe
 const conversation = await createConversation(db, '本轮上下文预览全文验收');
 const customContent = `【自定义指令全文】\n${'自定义原文不应被本轮上下文预览截断。'.repeat(42)}`;
 const soilCurrent = `整理当前对话的纸条全文：${'潮声沿着纸页继续向前，不在七百字处消失。'.repeat(36)}`;
-const seedCore = `当前活跃线索全文：${'只显示实际递给模型的当前活跃线索。'.repeat(8)}`;
+const afterthought = `余思全文：${'只显示实际递给模型的公开余思。'.repeat(8)}`;
 const memoryCore = `记忆核心全文：${'这一段故意超过旧的五百二十字裁剪限制。'.repeat(42)}`;
 const memoryContent = `记忆 content 全文：${'这是被选中记录的完整 content，不应用短 preview 替代。'.repeat(36)}`;
 const usageHint = `使用时机全文：${'只有谈到透明桌面与记忆收据时使用。'.repeat(12)}`;
@@ -25,8 +25,9 @@ const pendingSecret = 'PENDING_DETAIL_MUST_NOT_APPEAR';
 await writeCustomInstructions(db, { content: customContent });
 await writeSoil(db, conversation.id, {
   current_text: soilCurrent,
-  hand_seeds: [{ name: '透明当前活跃线索', life_core: seedCore }],
-  pocket_candidates: [{ candidate_id: 'candidate_turn_desk_full_details', title: '待确认候选', life_core: pendingSecret, content: pendingSecret }],
+  afterthoughts: [afterthought],
+  memory_candidates: [{ candidate_id: 'candidate_turn_desk_full_details', title: '待确认候选', content: pendingSecret }],
+  seed_candidates: [],
 });
 await createEntry(db, {
   entry_type: 'memory', scope: 'global', conversation_id: null, title: '全量透明记忆', life_core: memoryCore, usage_hint: usageHint, avoid_hint: avoidHint,
@@ -57,10 +58,11 @@ assert.equal(slip.thinking_soil.delivered, true);
 assert.ok(slip.thinking_soil.current_text.length > 700);
 assert.equal(slip.thinking_soil.context.includes(slip.thinking_soil.current_text), true);
 assert.equal(system.includes(slip.thinking_soil.context), true);
-assert.equal(slip.thinking_soil.hand_seeds.length, 1);
-assert.ok(slip.thinking_soil.hand_seeds[0].includes('透明当前活跃线索'));
-assert.equal(slip.thinking_soil.pocket_candidates_count, 1);
-assert.equal(slip.thinking_soil.pocket_candidates_delivered, false);
+assert.equal(slip.thinking_soil.afterthoughts.length, 1);
+assert.ok(slip.thinking_soil.afterthoughts[0].includes('余思全文'));
+assert.equal(slip.thinking_soil.memory_candidates_count, 1);
+assert.equal(slip.thinking_soil.seed_candidates_count, 0);
+assert.equal(slip.thinking_soil.candidates_delivered, false);
 assert.equal(system.includes(pendingSecret), false);
 
 const memory = slip.related_memory.items.find((item) => item.title === '全量透明记忆');
@@ -122,7 +124,7 @@ const deskSource = await readFile(new URL('../elementera-mcp/deploy-pages/public
 assert.equal(deskSource.includes('custom.preview'), false);
 for (const token of ['custom.content', 'recent.messages', 'worldbook.entries', 'dogtalk.context', 'workbench.tool_results', 'workbench.model_visible_tools']) assert.ok(deskSource.includes(token));
 for (const token of ['requested_turns', 'loaded_turns', 'delivered_to_model_turns', 'attempted_delivered_turns', 'attempted_chars', 'attempted_estimated_tokens', 'provider_error_type', 'provider_error_message']) assert.ok(deskSource.includes(token), `cross-window desk UI must expose ${token}`);
-for (const label of ['用户消息', '模型伙伴回复', '核心', '使用时机', '勿误用', '当前整理', '当前活跃线索', '待确认候选', '工具结果 JSON', '本轮总计', '尝试递送字符', 'Provider 错误类型', 'Provider 错误摘要']) assert.ok(deskSource.includes(label));
+for (const label of ['用户消息', '模型伙伴回复', '核心', '使用时机', '勿误用', '当前', '余思', '去处候选', '工具结果 JSON', '本轮总计', '尝试递送字符', 'Provider 错误类型', 'Provider 错误摘要']) assert.ok(deskSource.includes(label));
 assert.equal(deskSource.includes('source.delivered_turns'), false, 'PWA desk must not read retired cross-window source fields');
 for (const retired of ['今日海岸', 'today_coast', 'calendar.', '/api/calendar']) assert.equal(deskSource.includes(retired), false);
 
