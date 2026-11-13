@@ -36,16 +36,22 @@ export async function listMailboxMemoryPockets(db, visitorId, {
 
 export async function prepareMailboxPocketCandidates(value) {
   const memoryAllowed = Number(value.allow_memory || 0) === 1 || value.allow_memory === true;
+  const memoryCandidates = Array.isArray(value.thought_soil?.memory_candidates)
+    ? value.thought_soil.memory_candidates
+    : [];
   const candidateValues = memoryAllowed
-    ? await Promise.all(value.thought_soil.pocket_candidates.map(async (candidate) => ({
+    ? await Promise.all(memoryCandidates.map(async (candidate) => ({
       ...candidate,
+      life_core: candidate.content,
+      usage_hint: '',
+      avoid_hint: '',
       id: `mailbox-pocket-${crypto.randomUUID()}`,
-      fingerprint: await pocketFingerprint(value.visitor_id, candidate.life_core),
+      fingerprint: await pocketFingerprint(value.visitor_id, candidate.content),
     })))
     : [];
   return {
     candidateValues,
-    memoryCandidatesSkipped: memoryAllowed ? 0 : value.thought_soil.pocket_candidates.length,
+    memoryCandidatesSkipped: memoryAllowed ? 0 : memoryCandidates.length,
   };
 }
 
