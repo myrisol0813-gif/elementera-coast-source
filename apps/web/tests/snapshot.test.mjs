@@ -25,8 +25,10 @@ console.log('snapshot-redaction: ok');
 
 
 const source = await readFile(new URL('../functions/snapshot-api.js', import.meta.url), 'utf8');
-assert.match(source, /global_excerpt/);
-assert.match(source, /global_excerpt_revisions/);
+assert.match(source, /user_portrait/);
+assert.match(source, /user_portrait_revisions/);
+assert.match(source, /self_portrait/);
+assert.match(source, /self_portrait_revisions/);
 assert.match(source, /model_echo_summaries/);
 
 assert.match(source, /write_guidance|globalExcerpt/);
