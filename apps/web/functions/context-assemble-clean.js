@@ -162,7 +162,7 @@ function mergeModelReads(previous, next) {
 
 export async function assembleCleanContext(env, {
   surface, conversationId, roomId, visitorId, sourceTurnId = null, messages = [], lastUser, settings = {}, localDate = new Date().toISOString().slice(0, 10),
-  localDateTime = '', realityContext = null, recentEntryIds = [], authScope = null, model = '', permission: requestedPermission, preview = false, baseSystemPrompt = '', exposeTools = true, initialFurniture = [], crossWindow = null,
+  localDateTime = '', realityContext = null, realityAllowedFields = null, recentEntryIds = [], authScope = null, model = '', permission: requestedPermission, preview = false, baseSystemPrompt = '', exposeTools = true, initialFurniture = [], crossWindow = null,
 } = {}) {
   const permission = requestedPermission || (surface === 'mailbox_visitor' ? 'visitor' : 'owner');
   const access = roomAccess(surface, { permission, visitorId }); const request = requestSettings(settings);
@@ -201,7 +201,7 @@ export async function assembleCleanContext(env, {
       ? readCrossWindow(env.COAST_CHAT_DB, { ...crossWindowRequest, current_conversation_id: conversationId })
       : Promise.resolve(null),
     permission === 'owner' && conversationId
-      ? buildRealityContext(env, { settings: contextSettings, snapshot: realityContext, localDate, localDateTime })
+      ? buildRealityContext(env, { settings: contextSettings, snapshot: realityContext, localDate, localDateTime, allowedFields: realityAllowedFields })
       : Promise.resolve({ enabled: false, selected: [], delivered: [], missing: [], text: '' }),
   ]);
   const responseMode = responseModeContext(contextSettings);

@@ -218,7 +218,7 @@ Each conversation can keep its own `context_settings`. The current source suppor
 - explicit current-turn receipts showing what reality/response-mode context actually reached the model;
 - message timestamps and cross-day markers without implying that display time was injected into the model.
 
-The shared Reality fields are date, time, manually configured weather city, and the next seven days of Coast calendar entries. Android can additionally collect selected device-local fields such as battery, coarse location, most-recent non-Coast app, today's Top 5 app-usage durations, and a lightweight step-counter value. The PWA shows those Native-only fields as unavailable instead of fabricating browser data.
+The PWA intentionally keeps Reality Context lightweight: it can deliver date, local time, and the next seven days of Coast calendar entries without waiting on external weather or device services. Android Native keeps the fuller Reality set, including the manually configured weather city plus selected device-local fields such as battery, coarse location, most-recent non-Coast app, today's Top 5 app-usage durations, and a lightweight step-counter value.
 
 The backend re-reads the canonical conversation settings before assembly and intersects them with the supplied snapshot, so a client cannot inject a Reality field that the current window did not allow. Short reply mode remains independent: Reality can be fully disabled while short reply mode stays on.
 
@@ -610,7 +610,7 @@ The source Native client now includes the original owner calendar, Tidal Library
 
 ## Current feature status (0.2.15-source)
 
-The source tree currently identifies the Android app as `0.2.15-source` (`versionCode=17`). The PWA cache is currently `coast-source-app-14`.
+The source tree currently identifies the Android app as `0.2.15-source` (`versionCode=17`). The PWA cache is currently `coast-source-app-15`.
 
 ### Thought Soil v2
 
@@ -618,15 +618,15 @@ The current Source build exposes the per-conversation work note as **Current / A
 
 ### Conversation Reality Context and response mode
 
-Reality Context is stored per conversation and is opt-in. Shared PWA/Native fields are date, time, manually configured weather city, and the next seven days of Coast calendar entries. Native can additionally provide battery, optional coarse location, the most recent non-Coast foreground app, today's Top 5 app-usage durations, and lightweight step-counter data when selected and available.
+Reality Context is stored per conversation and is opt-in. The PWA path is deliberately lightweight and only delivers date, local time, and the next seven days of Coast calendar entries. Native retains weather plus battery, optional coarse location, the most recent non-Coast foreground app, today's Top 5 app-usage durations, and lightweight step-counter data when selected and available.
 
 The backend rechecks the canonical conversation settings before model assembly. Selected-but-unavailable fields remain visibly missing rather than being invented. Short reply mode is independent of the Reality master switch. Both clients expose current-turn receipts, chat timestamps/cross-day markers, and the existing thought-soil entry.
 
 ### PWA mobile parity
 
-The current PWA has a **「这个窗口」** settings sheet for Reality, short reply mode, thought soil and the landing letter. Device-only Reality fields are shown but locked on the PWA. The mobile reading surface uses a compact 14px reading size, the main top-bar title is 16px, and the conversation drawer is pinned to the app viewport with its content as the dedicated vertical scroll area.
+The current PWA has a **「这个窗口」** settings sheet for Reality, short reply mode, thought soil and the landing letter. Its Reality controls are limited to date, local time, and the next seven days of calendar entries; weather and Native-only device fields are intentionally absent so they cannot delay a browser chat turn. The mobile reading surface uses a compact 14px reading size, the main top-bar title is 16px, and the conversation drawer is pinned to the app viewport with its content as the dedicated vertical scroll area.
 
-The current Source PWA cache is `coast-source-app-14`.
+The current Source PWA cache is `coast-source-app-15`.
 
 ### Native appearance
 
@@ -644,7 +644,7 @@ The public visitor publisher and temporary Live ChatGPT QA path build an **unsig
 
 | Surface | Available in the current open-source implementation | Configuration / limits |
 | --- | --- | --- |
-| Web / PWA | Conversation UI, streaming/SSE paths, per-window context settings, visible context/tool records, owner/visitor separation, memory/world-book workspaces, attachments | Browser-visible Reality is limited to fields the PWA can honestly provide; device-only fields stay locked |
+| Web / PWA | Conversation UI, streaming/SSE paths, per-window context settings, visible context/tool records, owner/visitor separation, memory/world-book workspaces, attachments | Reality is intentionally limited to date, local time, and next-seven-days calendar context; weather/device reads are not part of the PWA send path |
 | Android Native | Jetpack Compose chat/Daily/calendar/library/memory surfaces, local ChatGPT connection, Reality device fields, themes including Cream Paper | `0.2.15-source`, `versionCode=17`; visitor builds are Source-only and disposable-signed |
 | Owner calendar | Entries, notes, edits/deletion and recurrence | Requires self-hosted backend/storage; calendar can feed the next seven days into Reality Context when selected |
 | Tidal Library | TXT/EPUB imports, shelf/cover, chapter/page navigation, progress, highlights, annotations, reader options | PWA and Native use the same backend contracts when pointed at the same host |

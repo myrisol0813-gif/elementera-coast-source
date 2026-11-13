@@ -62,6 +62,7 @@ import {
 const BODY_LIMIT = 2 * 1024 * 1024;
 const CONVERSATIONS_PATH = '/api/chat/conversations';
 const FORMAL_CHAT_PATH = '/api/chat';
+const PWA_REALITY_FIELDS = Object.freeze(['date', 'time', 'calendar']);
 const LANDING_LETTER_PATH = '/api/chat/landing-letter';
 const MODEL_METADATA_PATH = '/api/chat/message-metadata';
 const ATTACHMENTS_PATH = '/api/chat/attachments';
@@ -503,6 +504,7 @@ async function formalChat(request, env) {
     localDate: localDate(value.local_date),
     localDateTime: value.local_datetime,
     realityContext: value.reality_context,
+    realityAllowedFields: PWA_REALITY_FIELDS,
     surface: conversationSurface(conversation.room_type),
     recentEntryIds: value.recent_entry_ids,
     model: value.model,

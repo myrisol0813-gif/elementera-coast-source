@@ -3,6 +3,7 @@ import { D1Database } from './d1-helper.mjs';
 import { createConversation, normalizeState as normalizeServerState, writeConversationState } from '../functions/chat-store.js';
 import { assembleCleanContext } from '../functions/context-assemble-clean.js';
 import { createCalendarEntry } from '../functions/calendar-store.js';
+import { buildRealityContext } from '../functions/reality-context.js';
 import { normalizeState as normalizeClientState } from '../elementera-mcp/deploy-pages/public/features/chat-state.js';
 
 const db = new D1Database();
@@ -45,6 +46,38 @@ const assembled = await assembleCleanContext(env, {
   permission: 'owner',
   preview: true,
 });
+
+const originalFetch = globalThis.fetch;
+let forbiddenWeatherFetches = 0;
+try {
+  globalThis.fetch = async () => {
+    forbiddenWeatherFetches += 1;
+    throw new Error('Source PWA light reality must not fetch weather');
+  };
+  const pwaLight = await buildRealityContext(env, {
+    settings: {
+      reality_enabled: true,
+      reality_fields: ['date', 'time', 'weather', 'battery', 'calendar', 'steps'],
+      weather_city: 'Taiyuan',
+    },
+    snapshot: {
+      timezone: 'Asia/Shanghai',
+      battery: { percent: 88, charging: false },
+      steps: { count: 9999, basis: 'test' },
+    },
+    localDate: '2026-11-13',
+    localDateTime: '2026-11-13 02:30',
+    allowedFields: ['date', 'time', 'calendar'],
+  });
+  assert.deepEqual(pwaLight.selected, ['date', 'time', 'calendar']);
+  assert.equal(forbiddenWeatherFetches, 0);
+  assert.match(pwaLight.text, /2026-11-13/);
+  assert.match(pwaLight.text, /02:30/);
+  assert.match(pwaLight.text, /Source test event/);
+  assert.doesNotMatch(pwaLight.text, /88%|9999|天气/);
+} finally {
+  globalThis.fetch = originalFetch;
+}
 
 const system = assembled.modelMessages[0]?.content || '';
 assert.match(system, /2026-11-13/);
