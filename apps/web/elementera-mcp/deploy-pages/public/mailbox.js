@@ -7,9 +7,9 @@ function emptyThoughtSoil(visitorId = '') {
   return {
     visitor_id: visitorId,
     current_text: '',
-    hand_seeds: [],
-    do_not_repeat: '',
-    pocket_candidates: [],
+    afterthoughts: [],
+    memory_candidates: [],
+    seed_candidates: [],
     revision: 1,
     model_label: null,
     model_nickname: null,
@@ -104,8 +104,8 @@ function systemMessage(message) {
 
 function thoughtSoilEntry() {
   const soil = state.memory.thought_soil || emptyThoughtSoil(state.visitor?.visitor_id);
-  const handSeeds = Array.isArray(soil.hand_seeds) ? soil.hand_seeds : [];
-  return `<div class="thought-soil-row"><button class="thought-soil-entry" type="button" data-panel="soil">整理当前对话的纸条 · ${Math.min(handSeeds.length, 7)} 粒当前活跃线索 <span aria-hidden="true">›</span></button></div>`;
+  const afterthoughts = Array.isArray(soil.afterthoughts) ? soil.afterthoughts : [];
+  return `<div class="thought-soil-row"><button class="thought-soil-entry" type="button" data-panel="soil">整理当前对话的纸条 · ${Math.min(afterthoughts.length, 7)} 条余思 <span aria-hidden="true">›</span></button></div>`;
 }
 
 function renderMessages() {
@@ -251,24 +251,31 @@ function section(title, body) {
 
 function thoughtSoilBody() {
   const soil = state.memory.thought_soil || emptyThoughtSoil(state.visitor?.visitor_id);
-  const seeds = Array.isArray(soil.hand_seeds) ? soil.hand_seeds.slice(0, 7) : [];
-  const candidates = Array.isArray(soil.pocket_candidates) ? soil.pocket_candidates : [];
-  const seedBody = seeds.length
-    ? seeds.map((seed) => `<div class="feature-row static"><span><strong>${escapeHtml(seed.name || seed.life_core)}</strong><small>${escapeHtml(seed.life_core || '')}${seed.usage_hint ? `<br>使用：${escapeHtml(seed.usage_hint)}` : ''}${seed.avoid_hint ? `<br>避免：${escapeHtml(seed.avoid_hint)}` : ''}</small></span></div>`).join('')
-    : '<p>还没有当前活跃线索。</p>';
-  const candidateBody = candidates.length
-    ? `${candidates.map((candidate) => `<div class="feature-row static"><span><strong>${escapeHtml(candidate.title || candidate.life_core || '可落袋内容')}</strong><small>${escapeHtml(candidate.life_core || '')}${candidate.source_excerpt ? `<br>来源：${escapeHtml(candidate.source_excerpt)}` : ''}</small></span></div>`).join('')}<p class="feature-note">这些内容只在当前访客的待确认区里；确认前不会成为访客记事。</p>`
-    : '<p>还没有可落袋内容。</p>';
+  const afterthoughts = Array.isArray(soil.afterthoughts) ? soil.afterthoughts.slice(0, 7) : [];
+  const memoryCandidates = Array.isArray(soil.memory_candidates) ? soil.memory_candidates : [];
+  const seedCandidates = Array.isArray(soil.seed_candidates) ? soil.seed_candidates : [];
+  const afterthoughtBody = afterthoughts.length
+    ? afterthoughts.map((item) => `<div class="feature-row static"><span><small>${escapeHtml(item)}</small></span></div>`).join('')
+    : '<p>这一刻没有想留下的余思。</p>';
+  const candidateRows = (items, emptyText) => items.length
+    ? items.map((candidate) => `<div class="feature-row static"><span><strong>${escapeHtml(candidate.title || candidate.content || '一条候选')}</strong><small>${escapeHtml(candidate.content || '')}${candidate.source_excerpt ? `<br>来源：${escapeHtml(candidate.source_excerpt)}` : ''}</small></span></div>`).join('')
+    : `<p>${escapeHtml(emptyText)}</p>`;
+  const destinationBody = `
+    <div class="feature-kicker">记忆候选 · ${memoryCandidates.length}</div>
+    ${candidateRows(memoryCandidates, '没有想递往访客记事本的内容。')}
+    <div class="feature-kicker">种子候选 · ${seedCandidates.length}</div>
+    ${candidateRows(seedCandidates, '没有想留下继续生长的方向。')}
+    ${memoryCandidates.length || seedCandidates.length ? '<p class="feature-note">记忆候选会按访客权限进入待确认区；种子候选只留在当前访客整理纸条，不进入屋主种子库。</p>' : ''}
+  `;
   const pending = state.memory.pending_pockets || [];
   const pendingEntry = pending.length
     ? `<section class="feature-group"><div class="feature-card"><button class="feature-row" type="button" data-panel="pockets"><span><strong>待确认区 · ${pending.length}</strong><small>确认后才会进入访客记事本。</small></span><span>›</span></button></div></section>`
     : '';
   const model = [soil.model_label, soil.model_nickname].filter(Boolean).join(' · ') || '尚未整理';
   const provenance = `<p class="feature-note generation-provenance">revision ${Number(soil.revision || 1)} · 整理来源 · ${escapeHtml(model)}${soil.updated_at ? ` · ${escapeHtml(timeLabel(soil.updated_at))}` : ''}</p>`;
-  return `${section('当前', textBlock(soil.current_text, '还没有整理当前方向。'))}
-    ${section(`当前活跃线索 · ${seeds.length}/7`, seedBody)}
-    ${section('勿复读', textBlock(soil.do_not_repeat))}
-    ${section('可落袋', candidateBody)}
+  return `${section('当前', textBlock(soil.current_text, '还没有需要继续承接的内容。'))}
+    ${section(`余思 · ${afterthoughts.length}`, afterthoughtBody)}
+    ${section('去处', destinationBody)}
     ${pendingEntry}${provenance}`;
 }
 
