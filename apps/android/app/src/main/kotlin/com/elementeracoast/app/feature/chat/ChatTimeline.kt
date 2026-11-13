@@ -118,17 +118,12 @@ internal fun ChatTimeline(
                         )
                     }
                     val streamingTail = isStreaming && message.id == streamingMessageId
+                    val isLatestAssistant = index == latestAssistantIndex && message.role == MessageRole.Assistant
+                    val inlineSoil = if (isLatestAssistant) thoughtSoil else null
                     if (message.role == MessageRole.Assistant && !streamingTail && message.furnitureRuns.isNotEmpty()) {
                         FurnitureBubble(
                             runs = message.furnitureRuns,
                             onOpenActionLog = onOpenActionLog,
-                            modifier = Modifier.padding(bottom = 5.dp)
-                        )
-                    }
-                    if (index == latestAssistantIndex && thoughtSoil != null) {
-                        ThoughtSoilEntry(
-                            soil = thoughtSoil,
-                            onClick = onOpenThoughtSoil,
                             modifier = Modifier.padding(bottom = 5.dp)
                         )
                     }
@@ -138,15 +133,19 @@ internal fun ChatTimeline(
                             message.generationSource in setOf("chat", "landing", "radio", "lighthouse") &&
                             it.isNotBlank()
                     }
+                    val timeLabel = if (streamingTail) "" else messageTimeLabel(message.createdAtLabel)
                     MessageItem(
                         conversationId = conversationId,
                         message = message,
+                        timeLabel = timeLabel,
                         isStreamingTail = streamingTail,
                         avatarBitmap = avatarBitmap,
+                        thoughtSoil = inlineSoil,
                         metadataMessageId = metadataMessageId,
                         metadataSource = metadataSource,
                         attachmentPreviewSource = attachmentPreviewSource,
                         onAvatarClick = onAvatarClick,
+                        onOpenThoughtSoil = onOpenThoughtSoil,
                         onCopy = onCopy,
                         voiceClips = voiceClips.filter { it.messageId == message.remoteVariantId || (it.messageId.isBlank() && it.turnId == message.turnId) },
                         onVoice = { onVoice(message) },
@@ -155,17 +154,6 @@ internal fun ChatTimeline(
                         onAction = onAction,
                         onFootprint = onFootprint
                     )
-                    val timeLabel = messageTimeLabel(message.createdAtLabel)
-                    if (timeLabel.isNotBlank() && !streamingTail) {
-                        Text(
-                            text = timeLabel,
-                            modifier = Modifier
-                                .align(if (message.role == MessageRole.User) Alignment.End else Alignment.Start)
-                                .padding(top = 2.dp, start = if (message.role == MessageRole.Assistant) 46.dp else 0.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .48f),
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
                     if (metadataMessageId != null) {
                         ModelUsageFooter(
                             conversationId = conversationId,
