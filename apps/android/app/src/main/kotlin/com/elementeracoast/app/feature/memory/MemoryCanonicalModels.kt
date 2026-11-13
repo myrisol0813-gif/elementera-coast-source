@@ -26,6 +26,7 @@ data class MemoryPocket(
     val usageHint: String,
     val avoidHint: String,
     val sourceExcerpt: String,
+    val suggestedDestination: String = "",
     val status: String
 )
 
