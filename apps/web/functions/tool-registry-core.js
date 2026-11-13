@@ -111,7 +111,6 @@ async function dogtalkHandler(db, input, context) {
   return dogtalkContext(db, { room_scope: 'conversation', conversation_id: input.conversation_id || context.conversation_id || null }, input.user_query || '', { when_confused: true, consume_direct: true });
 }
 
-const globalExcerptGate = (context) => context.permission === 'owner' && context.global_excerpt_write_enabled === true;
 const crossWindowBaseGate = (context) => context.permission === 'owner'
   && ['main_chat', 'radio'].includes(context.surface);
 const crossWindowLetterGate = (context) => crossWindowBaseGate(context)
@@ -196,15 +195,14 @@ const REGISTRY = Object.freeze([
   }),
   entry({
     tool_key: 'memory.global_excerpt_propose',
-    display_name: '改动待确认的全局摘录',
-    description: '仅在写入开关开启时，为整篇全局摘录提出一份完整修改稿；只进入待确认区。',
-    model_exposed: true,
+    display_name: '提出待确认的自我画像修改',
+    description: '为整篇自我画像提出一份完整修改稿；自动整理由思维壤负责。',
+    model_exposed: false,
     model_group: 'core',
     auth_scopes: ['write:soil'],
-    turn_gate: globalExcerptGate,
     summary_policy: 'content_redacted',
     model_tool: modelTool('global_excerpt_propose',
-      `${GLOBAL_EXCERPT_WRITE_GUIDANCE} 提交整篇修改后的正式正文，并说明为什么值得改变。不要写普通偏好、临时玩笑、设定堆砌、词条式说明或每轮总结。`,
+      `${GLOBAL_EXCERPT_WRITE_GUIDANCE} 提交整篇修改后的正式正文，并说明这次认识为何值得改变。`,
       { properties: {
         proposed_body: { type: 'string', minLength: 1, maxLength: 240000 },
         change_kind: { type: 'string', enum: ['append', 'rewrite', 'refine'] },
@@ -550,7 +548,7 @@ function cleanModelToolResult(toolKey, output) {
     return { memories, count: memories.length, vector_enabled: output?.vector_enabled === true };
   }
   if (toolKey === 'memory.write_candidate') return { created: true, candidate_id: String(output?.id || ''), title: String(output?.title || '').slice(0, 120), status: 'pending' };
-  if (toolKey === 'memory.global_excerpt_propose') return { created: true, candidate_id: String(output?.id || ''), status: 'pending', area: 'global_excerpt' };
+  if (toolKey === 'memory.global_excerpt_propose') return { created: true, candidate_id: String(output?.id || ''), status: 'pending', area: 'self_portrait' };
   return output;
 }
 
