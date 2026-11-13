@@ -630,7 +630,7 @@ The current Source PWA cache is `coast-source-app-14`.
 
 ### Native appearance
 
-`0.2.15-source` restores the optional **奶油纸牌 / Cream Paper** Native theme on top of the Reality Context work. The theme wardrobe and appearance screen expose cream/blush cards, cocoa outlines and hard offset shadows across chat chrome and common settings surfaces. This is Native-only visual styling; it does not replace the PWA's separate web theme system.
+`0.2.14-source` restored the optional **奶油纸牌 / Cream Paper** Native theme on top of the Reality Context work. `0.2.15-source` keeps that appearance work and adds the lightweight ChatGPT-plan Thought Soil organizer policy described above. The theme wardrobe and appearance screen expose cream/blush cards, cocoa outlines and hard offset shadows across chat chrome and common settings surfaces. This is Native-only visual styling; it does not replace the PWA's separate web theme system.
 
 ### Local ChatGPT plan connection
 
