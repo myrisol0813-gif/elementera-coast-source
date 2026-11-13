@@ -44,33 +44,47 @@ for endpoint in /api/calendar/entries /api/library/books; do
 done
 echo 'Isolated test login and D1 APIs confirmed.'
 cd "$root/apps/android"
-gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon -PCOAST_API_BASE_URL="$url" -PSOURCE_PREVIEW_PASSWORD_HINT="$QA_PASSWORD"
-apk=app/build/outputs/apk/debug/app-debug.apk
-test -s "$apk"
-bash scripts/sign-disposable-qa.sh "$apk"
+version_name="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)".*/\1/p' app/build.gradle.kts | sed -n '1p')"
+version_code="$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+).*/\1/p' app/build.gradle.kts | sed -n '1p')"
+: "${version_name:?Missing versionName}"
+: "${version_code:?Missing versionCode}"
+base_version="${version_name%-source}"
+
+gradle :app:testDebugUnitTest :app:assembleRelease --no-daemon --stacktrace \
+  -PCOAST_API_BASE_URL="$url" \
+  -PSOURCE_PREVIEW_PASSWORD_HINT="$QA_PASSWORD"
+
+unsigned_apk="app/build/outputs/apk/release/app-release-unsigned.apk"
+test -s "$unsigned_apk"
+mkdir -p source-qa
+apk_name="elementera-coast-source-v${base_version}-signed-qa.apk"
+apk="source-qa/$apk_name"
+bash scripts/sign-disposable-qa.sh "$unsigned_apk" "$apk"
+
 bt=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
 package=$("$bt/aapt" dump badging "$apk" | head -n 1)
 [[ "$package" == *"name='com.elementeracoast.source'"* ]]
-[[ "$package" == *"versionCode='4'"* ]]
-[[ "$package" == *"versionName='0.2.2-source'"* ]]
-mkdir -p source-qa
-cp "$apk" source-qa/elementera-coast-source-v0.2.2-signed-qa.apk
-(cd source-qa && sha256sum elementera-coast-source-v0.2.2-signed-qa.apk > SHA256SUMS.txt)
-unzip -t source-qa/elementera-coast-source-v0.2.2-signed-qa.apk >/dev/null
-(cd source-qa && zip -0 -q elementera-coast-source-v0.2.2-signed-qa.zip elementera-coast-source-v0.2.2-signed-qa.apk)
-unzip -t source-qa/elementera-coast-source-v0.2.2-signed-qa.zip >/dev/null
-unzip -p source-qa/elementera-coast-source-v0.2.2-signed-qa.zip elementera-coast-source-v0.2.2-signed-qa.apk | sha256sum | cut -d' ' -f1 > "$RUNNER_TEMP/source-extracted-sha"
+[[ "$package" == *"versionCode='$version_code'"* ]]
+[[ "$package" == *"versionName='$version_name'"* ]]
+"$bt/apksigner" verify --verbose --min-sdk-version 23 "$apk" >/dev/null
+
+(cd source-qa && sha256sum "$apk_name" > SHA256SUMS.txt)
+unzip -t "$apk" >/dev/null
+zip_name="elementera-coast-source-v${base_version}-signed-qa.zip"
+(cd source-qa && zip -0 -q "$zip_name" "$apk_name")
+unzip -t "source-qa/$zip_name" >/dev/null
+unzip -p "source-qa/$zip_name" "$apk_name" | sha256sum | cut -d' ' -f1 > "$RUNNER_TEMP/source-extracted-sha"
 cut -d' ' -f1 source-qa/SHA256SUMS.txt | diff - "$RUNNER_TEMP/source-extracted-sha"
 echo 'Original APK and ZIP-contained APK match byte-for-byte; both ZIP structures passed CRC testing.'
 tag="source-v1v2-$GITHUB_RUN_ID"
-gh release create "$tag" source-qa/*.apk source-qa/*.zip source-qa/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --title 'Source 0.2.2 signed temporary QA' --notes "Temporary isolated source PWA $url, password 123456. APK uses this tunnel. Data removed after runner exits. Disposable QA signing certificate."
+gh release create "$tag" source-qa/*.apk source-qa/*.zip source-qa/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --title "Source ${base_version} signed temporary QA" --notes "Temporary isolated source PWA $url, password 123456. APK uses this tunnel. Data removed after runner exits. Disposable QA signing certificate."
 gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" -f state=success -f context=source-v1v2-live -f description='Live 30min QA, password 123456' -f target_url="$url" >/dev/null
 {
   echo '### Verified temporary source APK and PWA'
   echo "PWA: $url"
   echo "Password: $QA_PASSWORD"
-  echo "APK: https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/elementera-coast-source-v0.2.2-signed-qa.apk"
-  echo "ZIP-wrapped APK: https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/elementera-coast-source-v0.2.2-signed-qa.zip"
+  echo "APK: https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$apk_name"
+  echo "ZIP-wrapped APK: https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$zip_name"
   echo "SHA256: $(cut -d' ' -f1 source-qa/SHA256SUMS.txt)"
 } >> "$GITHUB_STEP_SUMMARY"
 echo 'Verified temporary APK published; keeping tunnel alive for 30 minutes.'
