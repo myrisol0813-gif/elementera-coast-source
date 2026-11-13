@@ -39,10 +39,28 @@ import com.elementeracoast.app.ui.theme.SnowLetterSurface
 import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
 import kotlinx.coroutines.launch
 
-private data class ExcerptDiffPreview(
+private data class PortraitDiffPreview(
     val proposed: AnnotatedString,
     val removedText: String
 )
+
+@Composable
+fun UserPortraitScreen(
+    repository: MemoryRepository,
+    onSnackbar: (String) -> Unit
+) {
+    val snapshot by repository.snapshot.collectAsState()
+    PortraitScreen(
+        document = snapshot.userPortrait,
+        title = "用户画像",
+        refresh = repository::refreshUserPortrait,
+        setAutoOrganize = repository::setUserPortraitWriteEnabled,
+        clear = repository::clearUserPortrait,
+        confirm = repository::confirmUserPortraitCandidate,
+        discard = repository::discardUserPortraitCandidate,
+        onSnackbar = onSnackbar
+    )
+}
 
 @Composable
 fun GlobalExcerptScreen(
@@ -50,28 +68,50 @@ fun GlobalExcerptScreen(
     onSnackbar: (String) -> Unit
 ) {
     val snapshot by repository.snapshot.collectAsState()
-    val excerpt = snapshot.globalExcerpt
-    val scope = rememberCoroutineScope()
-    var guidanceOpen by remember { mutableStateOf(false) }
-    var historyOpen by remember { mutableStateOf(false) }
-    var expandedRevisionIds by remember { mutableStateOf(emptySet<String>()) }
-    var editingCandidateId by remember { mutableStateOf<String?>(null) }
-    var editBody by remember { mutableStateOf("") }
-    var busyId by remember { mutableStateOf<String?>(null) }
-    var clearConfirmation by remember { mutableStateOf(false) }
+    PortraitScreen(
+        document = snapshot.globalExcerpt,
+        title = "自我画像",
+        refresh = repository::refreshGlobalExcerpt,
+        setAutoOrganize = repository::setGlobalExcerptWriteEnabled,
+        clear = repository::clearGlobalExcerpt,
+        confirm = repository::confirmGlobalExcerptCandidate,
+        discard = repository::discardGlobalExcerptCandidate,
+        onSnackbar = onSnackbar
+    )
+}
 
-    LaunchedEffect(Unit) {
-        runCatching { repository.refreshGlobalExcerpt() }
-            .onFailure { onSnackbar("全局摘录读取失败：${it.message ?: "未知错误"}") }
+@Composable
+private fun PortraitScreen(
+    document: GlobalExcerpt,
+    title: String,
+    refresh: suspend () -> Unit,
+    setAutoOrganize: suspend (Boolean) -> Unit,
+    clear: suspend (Int) -> Unit,
+    confirm: suspend (String, String?) -> Unit,
+    discard: suspend (String) -> Unit,
+    onSnackbar: (String) -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var guidanceOpen by remember(title) { mutableStateOf(false) }
+    var historyOpen by remember(title) { mutableStateOf(false) }
+    var expandedRevisionIds by remember(title) { mutableStateOf(emptySet<String>()) }
+    var editingCandidateId by remember(title) { mutableStateOf<String?>(null) }
+    var editBody by remember(title) { mutableStateOf("") }
+    var busyId by remember(title) { mutableStateOf<String?>(null) }
+    var clearConfirmation by remember(title) { mutableStateOf(false) }
+
+    LaunchedEffect(title) {
+        runCatching { refresh() }
+            .onFailure { onSnackbar("$title 读取失败：${it.message ?: "未知错误"}") }
     }
 
-    fun runAction(id: String = "excerpt", success: String, block: suspend () -> Unit) {
+    fun runAction(id: String = "portrait", success: String, block: suspend () -> Unit) {
         if (busyId != null) return
         busyId = id
         scope.launch {
             runCatching { block() }
                 .onSuccess { onSnackbar(success) }
-                .onFailure { onSnackbar("全局摘录操作失败：${it.message ?: "未知错误"}") }
+                .onFailure { onSnackbar("$title 操作失败：${it.message ?: "未知错误"}") }
             busyId = null
         }
     }
@@ -79,17 +119,15 @@ fun GlobalExcerptScreen(
     if (clearConfirmation) {
         AlertDialog(
             onDismissRequest = { if (busyId == null) clearConfirmation = false },
-            title = { Text("清空全局摘录正文？") },
-            text = {
-                Text("正式正文会变为空白；已有修改历史仍保留，待确认候选不会删除。不会影响当前对话纸条、记忆、种子或聊天。")
-            },
+            title = { Text("清空$title 正文？") },
+            text = { Text("正式正文会变为空白；已有修改历史仍保留，待确认修改不会删除。") },
             confirmButton = {
                 Button(
                     enabled = busyId == null,
                     onClick = {
-                        val version = excerpt.revision
-                        runAction("clear", "全局摘录正文已清空，历史仍可查看。") {
-                            repository.clearGlobalExcerpt(version)
+                        val version = document.revision
+                        runAction("clear", "$title 正文已清空，历史仍可查看。") {
+                            clear(version)
                             clearConfirmation = false
                         }
                     }
@@ -123,9 +161,9 @@ fun GlobalExcerptScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text("写入说明 / 收录准则", fontWeight = FontWeight.SemiBold)
+                            Text("书写时的目光", fontWeight = FontWeight.SemiBold)
                             Text(
-                                "给模型看的写入边界，与正式正文分开。",
+                                "这段文字会长久参与未来的认识。",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall
                             )
@@ -134,10 +172,7 @@ fun GlobalExcerptScreen(
                     }
                     if (guidanceOpen) {
                         Spacer(Modifier.height(10.dp))
-                        Text(
-                            excerpt.writeGuidance.ifBlank { "这里只沉积真正有重量的长期认知变化；候选必须经过确认后才进入正式正文。" },
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Text(document.writeGuidance, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
@@ -155,19 +190,20 @@ fun GlobalExcerptScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("模型写入", fontWeight = FontWeight.SemiBold)
+                        Text("自动整理", fontWeight = FontWeight.SemiBold)
                         Text(
-                            if (excerpt.writeEnabled) "开启 · 模型可提出候选，仍需用户确认" else "关闭 · 正式正文只读，不生成候选",
+                            if (document.writeEnabled) "开启 · 思维壤可在形成新认识时提出修改候选"
+                            else "关闭 · 正式正文仍会照常参与上下文",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
                     Switch(
-                        checked = excerpt.writeEnabled,
+                        checked = document.writeEnabled,
                         enabled = busyId == null,
                         onCheckedChange = { enabled ->
-                            runAction(success = if (enabled) "全局摘录写入已开启。" else "全局摘录现在只读。") {
-                                repository.setGlobalExcerptWriteEnabled(enabled)
+                            runAction(success = if (enabled) "$title 自动整理已开启。" else "$title 停止自动整理。") {
+                                setAutoOrganize(enabled)
                             }
                         }
                     )
@@ -182,11 +218,10 @@ fun GlobalExcerptScreen(
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
                 Text("正式正文", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                if (excerpt.body.isNotBlank()) {
-                    TextButton(
-                        enabled = busyId == null,
-                        onClick = { clearConfirmation = true }
-                    ) { Text("清空正文", color = MaterialTheme.colorScheme.error) }
+                if (document.body.isNotBlank()) {
+                    TextButton(enabled = busyId == null, onClick = { clearConfirmation = true }) {
+                        Text("清空正文", color = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
             Spacer(Modifier.height(6.dp))
@@ -197,29 +232,25 @@ fun GlobalExcerptScreen(
                 fallbackShape = RoundedCornerShape(20.dp)
             ) {
                 Text(
-                    excerpt.body.ifBlank { "这里还是空白的。今后确认的摘录会出现在这里。" },
+                    document.body.ifBlank { "这幅画像还没有开始书写。" },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 18.dp),
                     style = MaterialTheme.typography.bodyLarge
                 )
             }
         }
 
-        if (excerpt.candidates.isNotEmpty()) {
+        if (document.candidates.isNotEmpty()) {
             item {
+                Text("待确认修改 · ${document.candidates.size}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "待确认修改 · ${excerpt.candidates.size}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    "默认预览完整候选正文，变动处用柔和色块标出。驳回后直接消失，不留下驳回历史。",
+                    "完整正文预览会标出本次变化；确认后才会成为新的正式画像。",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall
                 )
             }
-            items(excerpt.candidates, key = { it.id }) { candidate ->
+            items(document.candidates, key = { it.id }) { candidate ->
                 val diff = diffPreview(
-                    excerpt.body,
+                    document.body,
                     candidate.proposedBody,
                     MaterialTheme.colorScheme.primary.copy(alpha = .16f)
                 )
@@ -230,10 +261,7 @@ fun GlobalExcerptScreen(
                     fallbackShape = RoundedCornerShape(20.dp)
                 ) {
                     Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                        Text(
-                            candidate.reason.ifBlank { "模型提出了一处长期认知修改。" },
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Text(candidate.reason.ifBlank { "这一轮形成了新的认识。" }, fontWeight = FontWeight.SemiBold)
                         val source = listOfNotNull(
                             candidate.sourceModel.takeIf(String::isNotBlank),
                             candidate.sourceConversationId?.takeIf(String::isNotBlank),
@@ -249,11 +277,7 @@ fun GlobalExcerptScreen(
                         if (diff.removedText.isNotBlank()) {
                             Spacer(Modifier.height(8.dp))
                             Text("本次删除 / 被替换部分", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
-                            Text(
-                                diff.removedText,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                            Text(diff.removedText, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                         }
                         Spacer(Modifier.height(12.dp))
                         if (editingCandidateId == candidate.id) {
@@ -269,8 +293,8 @@ fun GlobalExcerptScreen(
                                 Button(
                                     enabled = busyId == null && editBody.isNotBlank(),
                                     onClick = {
-                                        runAction(candidate.id, "编辑后的全局摘录已确认。") {
-                                            repository.confirmGlobalExcerptCandidate(candidate.id, editBody)
+                                        runAction(candidate.id, "编辑后的$title 已确认。") {
+                                            confirm(candidate.id, editBody)
                                             editingCandidateId = null
                                         }
                                     }
@@ -282,8 +306,8 @@ fun GlobalExcerptScreen(
                                 Button(
                                     enabled = busyId == null,
                                     onClick = {
-                                        runAction(candidate.id, "全局摘录已确认更新。") {
-                                            repository.confirmGlobalExcerptCandidate(candidate.id)
+                                        runAction(candidate.id, "$title 已确认更新。") {
+                                            confirm(candidate.id, null)
                                         }
                                     }
                                 ) { Text("确认") }
@@ -294,8 +318,8 @@ fun GlobalExcerptScreen(
                                 TextButton(
                                     enabled = busyId == null,
                                     onClick = {
-                                        runAction(candidate.id, "这条候选已经消失，正式正文没有改变。") {
-                                            repository.discardGlobalExcerptCandidate(candidate.id)
+                                        runAction(candidate.id, "这条候选已经放下，正式正文没有改变。") {
+                                            discard(candidate.id)
                                         }
                                     }
                                 ) { Text("驳回") }
@@ -319,17 +343,17 @@ fun GlobalExcerptScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text("修改记录 · ${excerpt.revisions.size}", fontWeight = FontWeight.SemiBold)
+                            Text("修改记录 · ${document.revisions.size}", fontWeight = FontWeight.SemiBold)
                             Text("只记录已经确认进入正式正文的变化。", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                         }
                         Text(if (historyOpen) "⌃" else "⌄", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     if (historyOpen) {
                         Spacer(Modifier.height(8.dp))
-                        if (excerpt.revisions.isEmpty()) {
+                        if (document.revisions.isEmpty()) {
                             Text("还没有正式修改记录。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         } else {
-                            excerpt.revisions.forEach { revision ->
+                            document.revisions.forEach { revision ->
                                 val open = revision.id in expandedRevisionIds
                                 Column(
                                     Modifier
@@ -377,8 +401,8 @@ fun GlobalExcerptScreen(
     }
 }
 
-private fun diffPreview(before: String, after: String, tint: androidx.compose.ui.graphics.Color): ExcerptDiffPreview {
-    if (before == after) return ExcerptDiffPreview(AnnotatedString(after), "")
+private fun diffPreview(before: String, after: String, tint: androidx.compose.ui.graphics.Color): PortraitDiffPreview {
+    if (before == after) return PortraitDiffPreview(AnnotatedString(after), "")
     val maxPrefix = minOf(before.length, after.length)
     var prefix = 0
     while (prefix < maxPrefix && before[prefix] == after[prefix]) prefix += 1
@@ -402,5 +426,5 @@ private fun diffPreview(before: String, after: String, tint: androidx.compose.ui
         if (suffix > 0) append(after.substring(changedAfterEnd))
     }
     val removed = if (changedBeforeEnd > prefix) before.substring(prefix, changedBeforeEnd).trim() else ""
-    return ExcerptDiffPreview(annotated, removed)
+    return PortraitDiffPreview(annotated, removed)
 }
