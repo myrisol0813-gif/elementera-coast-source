@@ -31,6 +31,7 @@ const CORE = Object.freeze([
   '/public/features/chat-state.js',
   '/public/features/chat.js',
   '/public/features/chat/chat-actions.js',
+  '/public/features/chat/chat-window-settings.js',
   '/public/features/chat/chat-voice.js',
   '/public/features/chat/chat-attachments.js',
   '/public/features/chat/chat-context.js',
