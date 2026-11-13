@@ -271,7 +271,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     const chatHtml = snapshotChatHtml(snapshot, signature);
     const sections = [
       snapshotDataSection('整理当前对话的纸条', snapshot.thinking_soil),
-      snapshotDataSection('记忆系统 / 全局摘录 / 自定义指令', snapshot.memory),
+      snapshotDataSection('记忆系统 / 用户画像 / 自我画像 / 自定义指令', snapshot.memory),
       snapshotDataSection('世界书', snapshot.worldbook),
       snapshotDataSection('访客信箱 / 来信（隐私摘要）', snapshot.mailbox),
       snapshotDataSection('日记与动态', snapshot.daily),
