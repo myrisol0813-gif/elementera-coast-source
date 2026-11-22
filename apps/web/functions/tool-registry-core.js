@@ -226,7 +226,7 @@ const REGISTRY = Object.freeze([
     model_tool: modelTool('vault_search_index', '确实需要已收藏资料时，先检索少量索引与短摘录。返回收藏 ID，不读取完整正文。', {
       properties: {
         query: { type: 'string', minLength: 1, maxLength: 100 },
-        kind: { type: 'string', enum: ['all','text','audio','image','file'] },
+        kind: { type: 'string', enum: ['all','text','soil','audio','image','file'] },
         limit: { type: 'integer', minimum: 1, maximum: 8 },
       },
       required: ['query'],
@@ -236,7 +236,7 @@ const REGISTRY = Object.freeze([
       description: '仅返回已主动收藏的少量目录、定位 ID 与短预览，不自动读取所有正文或基本媒体库。',
       inputSchema: objectSchema({
         query: { type: 'string', minLength: 1, maxLength: 100 },
-        kind: { type: 'string', enum: ['all','text','audio','image','file'] },
+        kind: { type: 'string', enum: ['all','text','soil','audio','image','file'] },
         limit: { type: 'integer', minimum: 1, maximum: 8 },
       }, ['query']),
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
