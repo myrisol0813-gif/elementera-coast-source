@@ -6,8 +6,8 @@ This directory contains the source-available Android client derived from the cur
 
 - App: Elementera Coast Source
 - `applicationId = com.elementeracoast.source`
-- `versionCode = 18`
-- `versionName = 0.2.16-source`
+- `versionCode = 19`
+- `versionName = 0.2.17-source-soil`
 - Kotlin + Jetpack Compose
 - JDK 17 / Android SDK 34 / Gradle 8.9
 
