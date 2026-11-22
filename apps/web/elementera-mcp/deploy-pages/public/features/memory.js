@@ -18,6 +18,7 @@ import { createSoilViews, emptySoil } from './memory/memory-soil-view.js';
 export function createMemory({ chat, router, toast, storage }) {
   const runtime = {
     soils: new Map(),
+    soilHistory: new Map(),
     pockets: new Map(),
     entries: { memory: [], seed: [] },
     libraryTab: 'memory',
@@ -71,6 +72,7 @@ export function createMemory({ chat, router, toast, storage }) {
     const data = await fetchSoilRequest(conversationId);
     const soil = data.soil || emptySoil(conversationId);
     runtime.soils.set(conversationId, soil);
+    runtime.soilHistory.set(conversationId, Array.isArray(data.history) ? data.history : []);
     return soil;
   }
 
