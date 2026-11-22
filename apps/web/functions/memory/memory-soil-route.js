@@ -1,5 +1,5 @@
 import { json, methodNotAllowed } from '../http.js';
-import { MemoryStoreError, readSoil, writeSoil } from '../memory-store.js';
+import { MemoryStoreError, readSoil, writeSoil, listSoilSnapshots } from '../memory-store.js';
 import { decorateSoilProvenance } from '../provenance-store.js';
 import { body, conversationIdFrom } from './memory-request.js';
 import { organizeConversationSoil } from './memory-soil-organizer.js';
@@ -8,7 +8,13 @@ export async function routeSoil(request, env, url) {
   const conversationId = conversationIdFrom(url);
   if (request.method === 'GET') {
     const value = await readSoil(env.COAST_CHAT_DB, conversationId);
-    return json({ ok: true, soil: await decorateSoilProvenance(env.COAST_CHAT_DB, value) });
+    const history = await listSoilSnapshots(env.COAST_CHAT_DB, conversationId);
+    return json({
+      ok: true,
+      soil: await decorateSoilProvenance(env.COAST_CHAT_DB, value),
+      history: history.snapshots,
+      history_truncated: history.truncated,
+    });
   }
   if (request.method === 'PUT') {
     const value = await body(request);
