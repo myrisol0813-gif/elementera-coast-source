@@ -5,6 +5,7 @@ import { activeMessages, createState, flatMessagesToState, normalizeState } from
 import { createChatActions } from './chat/chat-actions.js';
 import { createChatAttachments } from './chat/chat-attachments.js';
 import { createChatVoice } from './chat/chat-voice.js';
+import { createChatTreasures } from './chat/chat-treasures.js';
 import { createChatWindowSettings } from './chat/chat-window-settings.js';
 import { createChatConversations } from './chat/chat-conversations.js';
 import { createChatGeneration } from './chat/chat-generation.js';
@@ -174,6 +175,7 @@ export function createChat({ storage, toast, dogtalk }) {
   });
 
   const voice = createChatVoice({ runtime, toast, renderMessages });
+  const treasures = createChatTreasures({ runtime, currentHistory, toast });
 
   async function persistProfile(profile) {
     const data = await requestJson(API.profile, {
@@ -344,6 +346,7 @@ export function createChat({ storage, toast, dogtalk }) {
     attachments: chatAttachments,
     voice,
     windowSettings,
+    treasures,
   });
 
   async function bootstrap() {
