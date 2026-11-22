@@ -216,4 +216,33 @@ assert.equal(vaultSnapshot.treasures.count, 2, 'global snapshot includes selecte
 assert.equal(vaultSnapshot.treasures.complete, true);
 const settingsExport = readFileSync(new URL('../elementera-mcp/deploy-pages/public/features/settings.js', import.meta.url), 'utf8');
 assert.match(settingsExport, /snapshot\.coast_vault/, 'global HTML must render vault snapshot as well');
+const { saveSoilSnapshot } = await import('../functions/memory-store.js');
+await saveSoilSnapshot(db, conversation.id, {
+  turn_id: 'turn-vault-1',
+  assistant: { id: 'assistant-vault-1', model_id: 'test-model' },
+}, {
+  current_text: '旧思维壤第一段\\n\\n旧思维壤第二段'.replaceAll('\\n', '\n'),
+  afterthoughts: ['余思此刻值得珍藏'],
+  revision: 1,
+  display_author: 'test-model',
+});
+const soilFavorite = await saveTreasure(db, {
+  kind: 'soil', conversation_id: conversation.id, source_id: 'assistant-vault-1',
+  paragraph_indices: [1, 2], notes: '旧土层索引',
+});
+assert.equal(soilFavorite.excerpt, '旧思维壤第二段\n\n余思此刻值得珍藏');
+assert.deepEqual(soilFavorite.paragraph_indices, [1, 2]);
+assert.equal(soilFavorite.turn_id, 'turn-vault-1');
+assert.equal(soilFavorite.message_id, 'assistant-vault-1');
+assert.equal((await listTreasures(db, { q: '旧土层索引', kind: 'soil' })).items[0].id, soilFavorite.id);
+const readSoilTreasure = await executeRegisteredTool(db, 'vault.read', {
+  ids: [soilFavorite.id],
+}, vaultContext);
+assert.equal(readSoilTreasure.items[0].content, '旧思维壤第二段\n\n余思此刻值得珍藏');
+assert.equal(readSoilTreasure.items[0].notes, '旧土层索引');
+const fromSoilIndex = await executeRegisteredTool(db, 'vault.search', {
+  query: '旧土层索引', kind: 'soil',
+}, vaultContext);
+assert.equal(fromSoilIndex.results[0].kind, 'soil');
+
 console.log('coast vault SQLite integration: ok');
