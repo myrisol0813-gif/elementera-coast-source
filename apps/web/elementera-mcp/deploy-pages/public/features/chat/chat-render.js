@@ -50,7 +50,7 @@ export function variantControl(kind, turnId, active, total) {
   </span>`;
 }
 
-export function actionButton(action, title, { active = false, reaction = '' } = {}) {
+export function actionButton(action, title, { active = false, reaction = '', legacy = false } = {}) {
   const iconName = {
     copy: 'copy',
     'edit-user': 'edit',
@@ -61,7 +61,7 @@ export function actionButton(action, title, { active = false, reaction = '' } = 
     favorite: 'heart',
     'delete-assistant': 'trash',
   }[action];
-  return `<button class="action-button ${active ? 'is-active' : ''}" type="button" data-action="chat:${action}" ${reaction ? `data-reaction="${reaction}"` : ''} title="${escapeAttribute(title)}" aria-label="${escapeAttribute(title)}">${icon(iconName)}</button>`;
+  return `<button class="action-button ${active ? 'is-active' : ''}${legacy ? ' is-legacy' : ''}" type="button" data-action="chat:${action}" ${reaction ? `data-reaction="${reaction}"` : ''} title="${escapeAttribute(title)}" aria-label="${escapeAttribute(title)}">${icon(iconName)}</button>`;
 }
 
 function conversationRow(conversation, runtime, roomTypeLabels) {
@@ -185,9 +185,10 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
       const treasureIndex = runtime.treasureIndicators?.get(conversationId);
       const userSaved = treasureIndex?.messageIds.has(branch.user?.id || '')
         || treasureIndex?.userMediaTurns.has(turn.id) || false;
-      const assistantSaved = treasureIndex
-        ? treasureIndex.messageIds.has(branch.assistant?.id || '')
-        : branch.assistant?.favorite === true;
+      const assistantSaved = treasureIndex?.messageIds.has(branch.assistant?.id || '') || false;
+      const legacyAssistantHeart = branch.assistant?.favorite === true;
+      const legacyAssistantPending = Boolean(treasureIndex) && legacyAssistantHeart && !assistantSaved;
+      const assistantHeartActive = assistantSaved || legacyAssistantHeart;
       const loading = runtime.generation
         && runtime.generation.conversationId === conversationId
         && runtime.generation.turnId === turn.id
@@ -215,7 +216,7 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
         ? `<div class="message-date-divider">${escapeHtml(assistantStamp.date)}</div>`
         : '';
       if (branch.assistant && assistantStamp?.key) lastDateKey = assistantStamp.key;
-      const assistant = branch.assistant ? `<article class="message assistant ${assistantImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}" data-message-id="${escapeAttribute(branch.assistant.id || '')}"><button class="avatar" type="button" data-action="settings:avatar" aria-label="更换助手头像"></button><div class="content">${renderFurnitureBubble(branch.assistant.furniture_runs, { conversationId })}<div class="assistant-text">${formatRichText(branch.assistant.content)}${branch.assistant.errorDetail ? `<span class="message-error">${escapeHtml(branch.assistant.errorDetail)}</span>` : ''}${loading ? '<span class="typing-cursor"></span>' : ''}</div>${assistantAttachment}${voiceAudioCards(conversationId, turn.id, branch.assistant.id)}${assistantImported ? `<span class="message-dogtalk-mark">RikkaHub 旧档案${branch.assistant.model_id ? ` · ${escapeHtml(shortModelName(branch.assistant.model_id))}` : ''}</span>` : ''}${assistantStamp?.time ? `<span class="message-time is-assistant">${escapeHtml(assistantStamp.time)}</span>` : ''}<div class="message-actions">${actionButton('copy', '复制')}${actionButton('voice', '生成语音')}${actionButton('like', '点赞', { active: branch.assistant.liked, reaction: 'liked' })}${actionButton('regenerate', '重新生成')}${actionButton('favorite', '收藏', { active: assistantSaved, reaction: 'favorite' })}${actionButton('delete-assistant', '删除')}${variantControl('assistant', turn.id, branch.assistantIndex, branch.assistants.length)}${generationFootprint(branch.assistant, turn.id)}</div>${loading ? '' : renderModelMetadataTrace(branch.assistant, conversationId)}</div></article>` : '';
+      const assistant = branch.assistant ? `<article class="message assistant ${assistantImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}" data-message-id="${escapeAttribute(branch.assistant.id || '')}" data-legacy-favorite="${legacyAssistantHeart}"><button class="avatar" type="button" data-action="settings:avatar" aria-label="更换助手头像"></button><div class="content">${renderFurnitureBubble(branch.assistant.furniture_runs, { conversationId })}<div class="assistant-text">${formatRichText(branch.assistant.content)}${branch.assistant.errorDetail ? `<span class="message-error">${escapeHtml(branch.assistant.errorDetail)}</span>` : ''}${loading ? '<span class="typing-cursor"></span>' : ''}</div>${assistantAttachment}${voiceAudioCards(conversationId, turn.id, branch.assistant.id)}${assistantImported ? `<span class="message-dogtalk-mark">RikkaHub 旧档案${branch.assistant.model_id ? ` · ${escapeHtml(shortModelName(branch.assistant.model_id))}` : ''}</span>` : ''}${assistantStamp?.time ? `<span class="message-time is-assistant">${escapeHtml(assistantStamp.time)}</span>` : ''}<div class="message-actions">${actionButton('copy', '复制')}${actionButton('voice', '生成语音')}${actionButton('like', '点赞', { active: branch.assistant.liked, reaction: 'liked' })}${actionButton('regenerate', '重新生成')}${actionButton('favorite', legacyAssistantPending ? '旧红心 · 待迁入拾潮' : '收藏', { active: assistantHeartActive, legacy: legacyAssistantPending, reaction: 'favorite' })}${actionButton('delete-assistant', '删除')}${variantControl('assistant', turn.id, branch.assistantIndex, branch.assistants.length)}${generationFootprint(branch.assistant, turn.id)}</div>${loading ? '' : renderModelMetadataTrace(branch.assistant, conversationId)}</div></article>` : '';
       const soil = branch.assistant
         ? runtime.memory?.renderSoilEntry(conversationId, turn.id, branch.assistant.id || '', turn.id === latestAssistantTurnId) || ''
         : '';
