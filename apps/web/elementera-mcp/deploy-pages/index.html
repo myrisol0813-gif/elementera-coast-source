@@ -34,7 +34,8 @@
     <aside id="sidebar" class="sidebar" aria-label="聊天与房间">
       <div class="sidebar-top">
         <button id="sidebarClose" class="icon-button" type="button" data-action="shell:close-sidebar" data-icon="close" aria-label="关闭侧边栏"></button>
-        <label class="sidebar-search"><span data-icon="search"></span><input id="sidebarSearch" type="search" data-input="shell:filter-sidebar" placeholder="搜索聊天" autocomplete="off"></label>
+        <label class="sidebar-search"><span data-icon="search"></span><input id="sidebarSearch" type="search" data-input="sidebar-search:query" placeholder="搜索窗口与原文" autocomplete="off"></label>
+        <div id="sidebarSearchResults" class="coast-search-results" aria-live="polite" hidden></div>
       </div>
 
       <nav class="sidebar-content" aria-label="前端入口">
