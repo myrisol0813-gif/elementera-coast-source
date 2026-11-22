@@ -38,11 +38,11 @@ export function createMemoryActions({
   fetchGlobalExcerpt,
   fetchVectorStatus,
 }) {
-  async function openSoil({ conversation_id: conversationId = '' } = {}) {
+  async function openSoil({ conversation_id: conversationId = '', message_id: messageId = '' } = {}) {
     const id = conversationId || currentId();
     if (!id) return;
     await Promise.all([fetchSoil(id), fetchPockets(id)]);
-    return router.open('thought-soil', { conversation_id: id });
+    return router.open('thought-soil', { conversation_id: id, ...(messageId ? { message_id: messageId } : {}) });
   }
 
   async function openPockets() {
@@ -111,6 +111,7 @@ export function createMemoryActions({
     }
     if (name === 'soil-open') return openSoil({
       conversation_id: target.dataset.conversationId || '',
+      message_id: target.dataset.messageId || '',
     });
     if (name === 'done') return router.back();
     if (name === 'soil-edit') return router.open('thought-soil-edit');
