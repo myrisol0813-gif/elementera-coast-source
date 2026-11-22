@@ -20,6 +20,7 @@ async function initializeMemorySchema(db) {
     manual_locked INTEGER NOT NULL DEFAULT 0,
     auto_refresh_enabled INTEGER NOT NULL DEFAULT 1,
     organized_through_turn_id TEXT NOT NULL DEFAULT '',
+    source_assistant_id TEXT NOT NULL DEFAULT '',
     tool_call_ids_json TEXT NOT NULL DEFAULT '[]',
     revision INTEGER NOT NULL DEFAULT 1,
     created_at INTEGER NOT NULL,
@@ -27,6 +28,7 @@ async function initializeMemorySchema(db) {
     FOREIGN KEY (conversation_id) REFERENCES conversations(id)
   )`);
   await ensureColumn(db, 'conversation_soils', 'organized_through_turn_id', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, 'conversation_soils', 'source_assistant_id', "TEXT NOT NULL DEFAULT ''");
   for (const [column, declaration] of [
     ['actor', "TEXT NOT NULL DEFAULT 'owner'"],
     ['surface', "TEXT NOT NULL DEFAULT 'web_manual'"],
