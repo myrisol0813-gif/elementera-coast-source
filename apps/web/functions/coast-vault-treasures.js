@@ -95,7 +95,8 @@ export async function listTreasures(db, { kind = 'all', q = '', cursor = 0, conv
   const turnId = turn_id ? validId(turn_id, 'turn') : '';
   const result = await db.prepare(
     "SELECT t.* FROM coast_vault_treasures t JOIN conversations c ON c.id = t.conversation_id " +
-    "WHERE c.user_id = 'owner' AND (? = 'all' OR t.kind = ?) " +
+    "WHERE c.user_id = 'owner' AND c.deleted_at IS NULL AND c.conversation_kind = 'chat' " +
+    "AND (? = 'all' OR t.kind = ?) " +
     "AND (? = '' OR t.conversation_id = ?) AND (? = '' OR t.turn_id = ?) " +
     "AND (t.excerpt LIKE ? ESCAPE '!' OR t.notes LIKE ? ESCAPE '!') " +
     "ORDER BY t.updated_at DESC, t.id DESC LIMIT ? OFFSET ?"
@@ -194,7 +195,8 @@ export async function updateTreasure(db, id, { notes } = {}) {
   }
   const changed = await db.prepare(
     "UPDATE coast_vault_treasures SET notes = ?, updated_at = ? WHERE id = ? " +
-    "AND conversation_id IN (SELECT id FROM conversations WHERE user_id = 'owner')"
+    "AND conversation_id IN (SELECT id FROM conversations WHERE user_id = 'owner' " +
+    "AND deleted_at IS NULL AND conversation_kind = 'chat')"
   ).bind(notes, Date.now(), key).run();
   if (!changed?.meta?.changes) throw new TreasureError('not_found', '收藏不存在。', 404);
   return shape(await db.prepare('SELECT * FROM coast_vault_treasures WHERE id = ?').bind(key).first());
@@ -205,7 +207,8 @@ export async function removeTreasure(db, id) {
   const key = validId(id, 'treasure');
   const response = await db.prepare(
     "DELETE FROM coast_vault_treasures WHERE id = ? " +
-    "AND conversation_id IN (SELECT id FROM conversations WHERE user_id = 'owner')"
+    "AND conversation_id IN (SELECT id FROM conversations WHERE user_id = 'owner' " +
+    "AND deleted_at IS NULL AND conversation_kind = 'chat')"
   ).bind(key).run();
   return { removed: Boolean(response?.meta?.changes), media_deleted: false };
 }
