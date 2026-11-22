@@ -8,6 +8,7 @@ import {
   normalizeSoilCandidates,
 } from './memory-normalize.js';
 import { ensureMemorySchema } from './memory-schema.js';
+import { soilSnapshotStatement } from './memory-soil-history.js';
 
 export function soilFromRow(row) {
   return {
@@ -54,7 +55,7 @@ export async function readSoil(db, id) {
   return soilFromRow(await first(db, 'SELECT * FROM conversation_soils WHERE conversation_id = ?', [conversationId]));
 }
 
-export async function writeSoil(db, id, value = {}, { automatic = false, provenance = {} } = {}) {
+export async function writeSoil(db, id, value = {}, { automatic = false, provenance = {}, snapshotBranch = null } = {}) {
   await ensureMemorySchema(db);
   const conversationId = sanitizeId(id, 'conversation');
   const current = await readSoil(db, conversationId);
@@ -82,14 +83,15 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
     })
     : ownerIdentity();
   const timestamp = Date.now();
-  await run(db, `UPDATE conversation_soils SET
+  const updateSql = `UPDATE conversation_soils SET
     current_text = ?, afterthoughts_json = ?, memory_candidates_json = ?, seed_candidates_json = ?,
     user_portrait_candidate_json = ?, self_portrait_candidate_json = ?,
     manual_locked = ?, auto_refresh_enabled = ?, organized_through_turn_id = ?,
     actor = ?, surface = ?, model_label = ?, model_nickname = ?, symbol = ?, display_author = ?,
     source_conversation_id = ?, source_turn_id = ?, tool_call_id = ?,
     revision = revision + 1, updated_at = ?
-    WHERE conversation_id = ?`, [
+    WHERE conversation_id = ?`;
+  const updateValues = [
     next.current_text,
     JSON.stringify(next.afterthoughts),
     JSON.stringify(next.memory_candidates),
@@ -110,7 +112,20 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
     clip(provenance.tool_call_id, 240) || null,
     timestamp,
     conversationId,
-  ]);
+  ];
+  const snapshot = snapshotBranch ? soilSnapshotStatement(db, conversationId, snapshotBranch, {
+    current_text: next.current_text,
+    afterthoughts: next.afterthoughts,
+    revision: current.revision + 1,
+    model_label: identity.model_label || '',
+    display_author: identity.display_author || '',
+  }) : null;
+  if (snapshot) {
+    // D1 batch commits both writes, or neither.
+    await db.batch([db.prepare(updateSql).bind(...updateValues), snapshot]);
+  } else {
+    await run(db, updateSql, updateValues);
+  }
   return readSoil(db, conversationId);
 }
 
