@@ -44,7 +44,7 @@ import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
 import kotlinx.coroutines.launch
 
 internal data class DailyLandingItem(val title: String, val subtitle: String)
-internal enum class DailyPage { Home, Moments, MomentCompose, Diary, DiaryCompose, Calendar, Library, Pet }
+internal enum class DailyPage { Home, Moments, MomentCompose, Diary, DiaryCompose, Calendar, Library, Vault, Pet }
 
 @Composable
 fun DailyLanding(
@@ -131,6 +131,7 @@ fun DailyLanding(
                 compact = true
             )
             DailyPage.Calendar -> FeaturePageTopBar("日历", "公历 · 日程与随记", { page = DailyPage.Home }, compact = true)
+            DailyPage.Vault -> FeaturePageTopBar("海岸文件库", "基本文件库与拾潮珍藏", { page = DailyPage.Home }, compact = true)
             DailyPage.Library -> Unit
             DailyPage.Pet -> FeaturePageTopBar(
                 "宠物系统",
@@ -157,6 +158,7 @@ fun DailyLanding(
                 DailyPage.Diary -> DiaryScreen(repository, onActionLogged, onSnackbar) { page = DailyPage.DiaryCompose }
                 DailyPage.DiaryCompose -> DiaryComposeScreen(repository, onActionLogged, onSnackbar) { page = DailyPage.Diary }
                 DailyPage.Calendar -> CalendarScreen(sideRooms, onSnackbar)
+                DailyPage.Vault -> CoastVaultScreen(sideRooms, onSnackbar)
                 DailyPage.Library -> TidalLibraryScreen(
                     sideRooms, onSnackbar,
                     importRequest = libraryImportRequest,
@@ -187,6 +189,7 @@ private fun DailyHome(onOpen: (DailyPage) -> Unit, onFutureWidgets: () -> Unit) 
     val mapping = listOf(
         Triple(DailyPage.Moments, DailyLandingItem("碳硅圈", "前端默认朋友圈"), Icons.Default.FavoriteBorder),
         Triple(DailyPage.Diary, DailyLandingItem("日记", "留下今天的纸页"), Icons.Default.Edit),
+        Triple(DailyPage.Vault, DailyLandingItem("文件库", "媒体归总与拾潮珍藏"), Icons.Default.AutoStories),
         Triple(DailyPage.Calendar, DailyLandingItem("日历", "公历日程与纪念日"), Icons.Default.CalendarMonth),
         Triple(DailyPage.Library, DailyLandingItem("书房", "翻书、划线与批注"), Icons.Default.AutoStories),
         Triple(DailyPage.Pet, DailyLandingItem("宠物系统", "还在准备休憩箱"), Icons.Default.Pets)
@@ -233,6 +236,7 @@ private fun DailyHomeCard(item: DailyLandingItem, icon: ImageVector, onClick: ()
 internal fun dailyLandingItems(): List<DailyLandingItem> = listOf(
     DailyLandingItem("碳硅圈", "前端默认朋友圈"),
     DailyLandingItem("日记", "留下今天的纸页"),
+    DailyLandingItem("文件库", "媒体归总与拾潮珍藏"),
     DailyLandingItem("日历", "公历日程与纪念日"),
     DailyLandingItem("书房", "翻书、划线与批注"),
     DailyLandingItem("宠物系统", "还在准备休憩箱")
