@@ -112,7 +112,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     subtitle: '前端本机显示',
     className: 'settings-panel',
     body: group('外观',
-      row('主题', '浅色 / 深色 / 黑金', 'settings:theme')
+      row('主题', '七种可选外观 · 含雪粒信笺', 'settings:theme')
       + row('用户气泡颜色', '屋主消息气泡', 'settings:bubble')
       + row('重点色', '橙色 / 金色 / 蓝色 / 粉色', 'settings:accent')
       + row('文字气质', '经典宋体 / 柔和现代 / 手札', 'settings:font')),
@@ -134,7 +134,18 @@ export function createSettings({ storage, shell, chat, router, toast }) {
   router.register('settings-theme', () => ({
     title: '主题',
     subtitle: '选择本地主题',
-    body: group('主题', row('浅色', 'Light', 'settings:set-theme', 'data-value="light"') + row('深色', 'Dark', 'settings:set-theme', 'data-value="dark"') + row('黑金', 'Gold', 'settings:set-theme', 'data-value="gold"')),
+    body: group('主题', [
+      ['light', '浅色', '简洁明亮'],
+      ['dark', '深色', '静谧深灰'],
+      ['gold', '黑金', '深夜的金色灯光'],
+      ['paper', '雪粒信笺', '小信纸与柔软的蓝白纸边'],
+      ['mist', '海雾蓝', '潮水与薄雾'],
+      ['sage', '苔原绿', '安静的草地与苔藓'],
+      ['blush', '薄暮粉', '夕照中的浅粉'],
+    ].map(([value, title, subtitle]) => row(
+      title, subtitle, 'settings:set-theme',
+      `class="theme-choice" data-value="${value}" aria-pressed="${preferences().theme === value}"`,
+    )).join('')),
   }));
 
   router.register('settings-font', () => ({

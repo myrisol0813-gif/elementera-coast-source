@@ -1,7 +1,14 @@
 import { q, qa } from '../core/dom.js';
 
-const THEMES = Object.freeze(['light', 'dark', 'gold']);
-const THEME_LABELS = Object.freeze({ light: '浅色', dark: '深色', gold: '黑金' });
+const THEMES = Object.freeze(['light', 'dark', 'gold', 'paper', 'mist', 'sage', 'blush']);
+const THEME_LABELS = Object.freeze({
+  light: '浅色', dark: '深色', gold: '黑金',
+  paper: '雪粒信笺', mist: '海雾蓝', sage: '苔原绿', blush: '薄暮粉',
+});
+const THEME_BACKGROUNDS = Object.freeze({
+  light: '#ffffff', dark: '#171717', gold: '#0b0b0c',
+  paper: '#edf3f6', mist: '#eaf3f7', sage: '#eef2e9', blush: '#f8eff2',
+});
 const ROOTS = Object.freeze({
   sidebar: '#sidebar',
   scrim: '#scrim',
@@ -48,7 +55,7 @@ export function createShell({ storage }) {
     const label = q('#themeLabel');
     if (label) label.textContent = THEME_LABELS[theme];
     const themeMeta = q('meta[name="theme-color"]');
-    if (themeMeta) themeMeta.content = theme === 'light' ? '#ffffff' : theme === 'gold' ? '#0b0b0c' : '#171717';
+    if (themeMeta) themeMeta.content = THEME_BACKGROUNDS[theme];
   }
 
   function updateStatus() {
@@ -99,14 +106,6 @@ export function createShell({ storage }) {
     if (scrim) scrim.hidden = true;
   }
 
-  function cycleTheme() {
-    storage.update((state) => {
-      const index = THEMES.indexOf(state.preferences.theme);
-      state.preferences.theme = THEMES[(index + 1) % THEMES.length];
-    });
-    applyPreferences();
-  }
-
   function setTheme(theme) {
     if (!THEMES.includes(theme)) return;
     storage.update((state) => { state.preferences.theme = theme; });
@@ -146,7 +145,6 @@ export function createShell({ storage }) {
   function handleAction(name) {
     if (name === 'open-sidebar') return openSidebar();
     if (name === 'close-sidebar') return closeSidebar();
-    if (name === 'cycle-theme') return cycleTheme();
   }
 
   function handleInput(name, target) {
@@ -201,7 +199,6 @@ export function createShell({ storage }) {
     applyPreferences,
     openSidebar,
     closeSidebar,
-    cycleTheme,
     setTheme,
     filterSidebar,
     handleAction,
