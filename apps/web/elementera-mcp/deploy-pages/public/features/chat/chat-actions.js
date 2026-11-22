@@ -32,6 +32,7 @@ export function createChatActions({
   attachments,
   voice,
   windowSettings,
+  treasures,
 }) {
   function turnIdFrom(target) {
     return target.dataset.turn || target.closest('[data-turn]')?.dataset.turn || '';
@@ -134,9 +135,9 @@ export function createChatActions({
       await navigator.clipboard.writeText(text);
       return toast('已复制');
     }
-    if (name === 'like' || name === 'favorite') {
-      const reaction = name === 'like' ? 'liked' : 'favorite';
-      const state = toggleAssistantReaction(currentHistory(), turnId, reaction);
+    if (name === 'favorite') return treasures?.open(target);
+    if (name === 'like') {
+      const state = toggleAssistantReaction(currentHistory(), turnId, 'liked');
       setHistory(runtime.currentId, state);
       renderMessages();
       return saveHistory(runtime.currentId, state).catch(() => undefined);
