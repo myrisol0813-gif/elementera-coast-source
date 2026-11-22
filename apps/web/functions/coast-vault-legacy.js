@@ -33,7 +33,7 @@ export async function inspectLegacyHearts(db, { cursor = 0, apply = false } = {}
             'INSERT OR IGNORE INTO coast_vault_treasures ' +
             '(id,source_key,kind,conversation_id,turn_id,message_id,source_id,role,excerpt,selections_json,notes,created_at,updated_at) ' +
             'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)'
-          ).bind('treasure_' + crypto.randomUUID(), 'text:' + item.id, 'text',
+          ).bind('treasure_' + crypto.randomUUID(), 'text:' + row.conversation_id + ':' + item.id, 'text',
             row.conversation_id, turn.id, item.id, item.id, 'assistant',
             item.content.slice(0, 12000), '[]', '', timestamp, timestamp).run();
           inserted += Number(response?.meta?.changes) || 0;
