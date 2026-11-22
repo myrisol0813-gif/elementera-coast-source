@@ -141,10 +141,10 @@ export async function saveTreasure(db, input = {}) {
     let thoughts = [];
     try { thoughts = JSON.parse(row.afterthoughts_json || '[]'); } catch { /* invalid legacy layer */ }
     const sections = [row.current_text, ...(Array.isArray(thoughts) ? thoughts : [])]
-      .flatMap(item => String(item || '').split(/\\n\\s*\\n/))
+      .flatMap(item => String(item || '').split(/\n\s*\n/))
       .map(item => item.trim()).filter(Boolean);
     if (!sections.length) throw new TreasureError('source_empty', '这一层思维壤没有可珍藏的正文。', 409);
-    const selected = selectTreasureParagraphs(sections.join('\\n\\n'), input.paragraph_indices);
+    const selected = selectTreasureParagraphs(sections.join('\n\n'), input.paragraph_indices);
     excerpt = selected.excerpt;
     indices = selected.indices;
     messageId = row.assistant_message_id;
