@@ -39,6 +39,10 @@ export function createChatActions({
   }
 
   async function submitComposer() {
+    if (runtime.searchPreview?.has(runtime.currentId)) {
+      toast('正在只读预览旧版本，请先点「结束预览」再继续聊天。');
+      return false;
+    }
     if (runtime.generation) {
       runtime.generation.controller.abort();
       return;
@@ -82,6 +86,17 @@ export function createChatActions({
     if (name === 'delete-conversation') return deleteConversation(conversationId).catch((error) => toast(`删除失败：${error.message}`));
     if (name === 'mic') return toast('语音输入还没接入。');
 
+    if (name === 'end-search-preview') {
+      runtime.searchPreview?.delete(runtime.currentId);
+      renderMessages();
+      toast('已回到正式聊天分支，未修改任何历史消息。');
+      return;
+    }
+    const inPreview = runtime.searchPreview?.has(runtime.currentId);
+    if (inPreview && !['favorite', 'copy'].includes(name)) {
+      toast('旧版本正在只读预览。请先结束预览，再修改或生成聊天。');
+      return;
+    }
     const turnId = turnIdFrom(target);
     if (name === 'generation-detail') {
       const turn = currentHistory().turns.find((item) => item.id === turnId);
@@ -130,7 +145,8 @@ export function createChatActions({
     }
     if (name === 'voice') return voice.select(target);
     if (name === 'copy') {
-      const turn = currentHistory().turns.find((item) => item.id === turnId);
+      const visible = runtime.searchPreview?.get(runtime.currentId) || currentHistory();
+      const turn = visible.turns.find((item) => item.id === turnId);
       const text = turn ? activeBranch(turn).assistant?.content || '' : '';
       await navigator.clipboard.writeText(text);
       return toast('已复制');
