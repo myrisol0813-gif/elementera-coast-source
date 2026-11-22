@@ -45,6 +45,7 @@ async function route(request, env) {
   if (path === '/treasures') {
     if (request.method === 'GET') return json({ ok: true, ...(await listTreasures(env.COAST_CHAT_DB, {
       kind: params.get('kind'), q: params.get('q'), cursor: params.get('cursor') || 0,
+      conversation_id: params.get('conversation_id') || '', turn_id: params.get('turn_id') || '',
     })) });
     if (request.method === 'POST') return json({
       ok: true, item: await saveTreasure(env.COAST_CHAT_DB, await readJson(request, 16000)),
