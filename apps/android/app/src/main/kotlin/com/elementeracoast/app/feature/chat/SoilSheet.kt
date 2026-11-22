@@ -38,6 +38,7 @@ internal fun SoilBottomSheet(
     onSave: (String, List<String>) -> Unit,
     onResumeAutomatic: () -> Unit,
     onOpenPendingBag: () -> Unit,
+    onTreasure: (ThoughtSoilSnapshot) -> Unit,
     onDismiss: () -> Unit
 ) {
     var editing by remember(soil.conversationId, soil.isHistorical) { mutableStateOf(false) }
@@ -160,6 +161,17 @@ internal fun SoilBottomSheet(
                     }
                 ) {
                     Text("打开记忆 / 种子待确认区")
+                }
+            }
+
+            if (soil.isHistorical && soil.sourceAssistantMessageId.isNotBlank()) {
+                SoilCard(title = "珍藏这一层") {
+                    Text(
+                        "可以单独选择旧「当前」或「余思」的段落拾入潮间。原思维壤不会被修改。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    TextButton(onClick = { onTreasure(soil) }) { Text("♡ 珍藏本轮思维壤") }
                 }
             }
 
