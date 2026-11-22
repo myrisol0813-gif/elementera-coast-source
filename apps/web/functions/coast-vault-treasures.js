@@ -174,7 +174,9 @@ export async function saveTreasure(db, input = {}) {
   if (excerpt.length > TREASURE_LIMITS.excerpt_chars) {
     throw new TreasureError('excerpt_too_long', '单条摘录最多 12000 字。');
   }
-  const sourceKey = kind + ':' + sourceId;
+  // A provider/imported message ID may recur in another conversation.
+  // Tie the unique favorite to its owner conversation, not just the message.
+  const sourceKey = kind + ':' + conversationId + ':' + sourceId;
   const now = Date.now();
   const id = 'treasure_' + crypto.randomUUID();
   await db.prepare(
