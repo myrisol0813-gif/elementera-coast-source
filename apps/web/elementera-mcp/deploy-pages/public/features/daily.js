@@ -155,6 +155,7 @@ export function createDaily({ storage, router, toast, chat }) {
     const entries = [
       ['moments', '碳硅圈', '前端内部朋友圈', 'heart'],
       ['diary', '日记', '留下今天的纸页', 'edit'],
+      ['vault', '文件库', '媒体归档与拾潮珍藏', 'book'],
       ['calendar', '日历', '公历日程与纪念日', 'calendar'],
       ['library', '书房', '翻书、划线与批注', 'book'],
       ['pets', '宠物系统', '还在准备休憩箱', 'heart'],
