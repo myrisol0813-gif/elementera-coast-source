@@ -25,7 +25,7 @@ function clip(value, max) {
  * memory recall pipeline or initial model context construction.
  * Search returns short index records, not the saved full text.
  */
-export async function searchVaultForModel(db, { query = '', limit = 5, kind = 'all' } = {}) {
+export async function searchVaultForModel(db, { query = '', limit = 5, kind = 'all', cursor = 0 } = {}) {
   const needle = String(query || '').trim();
   if (!needle || needle.length > 100) {
     throw new TreasureError('invalid_query', '请先提供 1–100 字的拾潮搜索关键词。');
@@ -33,11 +33,18 @@ export async function searchVaultForModel(db, { query = '', limit = 5, kind = 'a
   const requested = Number(limit);
   const count = Number.isInteger(requested)
     ? Math.min(VAULT_MODEL_LIMITS.search_results, Math.max(1, requested)) : 5;
-  const page = await listTreasures(db, { q: needle, kind });
+  const offset = Number(cursor);
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000) {
+    throw new TreasureError('invalid_cursor', '拾潮检索游标无效。');
+  }
+  const page = await listTreasures(db, { q: needle, kind, cursor: offset });
+  const returned = Math.min(page.items.length, count);
+  const more = page.items.length > returned || Boolean(page.next_cursor);
   return {
     query: needle,
-    count: Math.min(page.items.length, count),
-    has_more: page.items.length > count || Boolean(page.next_cursor),
+    count: returned,
+    has_more: more,
+    next_cursor: more ? String(offset + returned) : null,
     results: page.items.slice(0, count).map((item) => ({
       id: item.id,
       kind: item.kind,
@@ -49,7 +56,7 @@ export async function searchVaultForModel(db, { query = '', limit = 5, kind = 'a
       notes_preview: clip(item.notes, 140),
       updated_at: item.updated_at,
     })),
-    next_step: '仅选择真正需要的收藏 ID，使用 vault_read_selected 精读，不要加载所有命中。',
+    next_step: '先从本页 ID 选必要收藏精读；若仍需寻找且 next_cursor 不为空，使用同一关键词与该 cursor 再查下一页。',
   };
 }
 
