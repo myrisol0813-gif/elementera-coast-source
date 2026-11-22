@@ -85,7 +85,8 @@ export function createChatTreasures({ runtime, currentHistory, toast, renderMess
     const conversationId = runtime.currentId;
     const turnId = article.dataset.turn;
     const messageId = article.dataset.messageId;
-    const turn = currentHistory().turns.find((item) => item.id === turnId);
+    const visibleHistory = runtime.searchPreview?.get(conversationId) || currentHistory();
+    const turn = visibleHistory.turns.find((item) => item.id === turnId);
     const branch = turn ? activeBranch(turn) : null;
     const role = article.classList.contains('user') ? 'user' : 'assistant';
     const variant = role === 'user' ? branch?.user : branch?.assistant;
