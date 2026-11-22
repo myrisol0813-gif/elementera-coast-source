@@ -45,8 +45,8 @@ jobs:
         run: |
           set -euo pipefail
           grep -Fq 'applicationId = "com.elementeracoast.source"' app/build.gradle.kts
-          grep -Fq 'versionCode = 20' app/build.gradle.kts
-          grep -Fq 'versionName = "0.2.18-source"' app/build.gradle.kts
+          grep -Fq 'versionCode = 21' app/build.gradle.kts
+          grep -Fq 'versionName = "0.2.19-source"' app/build.gradle.kts
           ! grep -Eiq 'app[.]elementeracoast[.]com' app/build.gradle.kts
       - name: Verify Source visitor release version plumbing
         shell: bash
