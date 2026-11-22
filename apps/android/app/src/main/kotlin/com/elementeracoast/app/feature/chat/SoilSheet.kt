@@ -2,6 +2,7 @@ package com.elementeracoast.app.feature.chat
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,8 +14,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,9 +35,15 @@ import com.elementeracoast.app.ui.theme.snowLetterSheetContainerColor
 internal fun SoilBottomSheet(
     soil: ThoughtSoilSnapshot,
     onSetEnabled: (Boolean) -> Unit,
+    onSave: (String, List<String>) -> Unit,
+    onResumeAutomatic: () -> Unit,
     onOpenPendingBag: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    var editing by remember(soil.conversationId, soil.isHistorical) { mutableStateOf(false) }
+    var currentDraft by remember(soil.revision, editing) { mutableStateOf(soil.currentText) }
+    var afterthoughtDraft by remember(soil.revision, editing) { mutableStateOf(soil.afterthoughts.joinToString("\n")) }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = snowLetterSheetContainerColor()
@@ -47,6 +59,7 @@ internal fun SoilBottomSheet(
                 Text("整理当前对话的纸条", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                 Text(
                     when {
+                        soil.isHistorical -> "这一轮留下的旧纸条 · 仅供翻阅，不进入上下文"
                         !soil.autoRefreshEnabled -> "当前窗口 · 已关闭，不整理也不递入上下文"
                         soil.manualLocked -> "当前窗口 · 手动内容已锁定 · 当前与余思仍会递入上下文"
                         else -> "当前 · 余思 · 去处"
@@ -56,7 +69,7 @@ internal fun SoilBottomSheet(
                 )
             }
 
-            SoilCard(
+            if (!soil.isHistorical) SoilCard(
                 title = if (soil.autoRefreshEnabled) "当前对话纸条已开启" else "当前对话纸条已关闭",
                 meta = if (soil.autoRefreshEnabled) "自动整理 · 当前 / 余思注入上下文" else "停止整理 · 不注入上下文"
             ) {
@@ -107,7 +120,7 @@ internal fun SoilBottomSheet(
                 }
             }
 
-            SoilCard(
+            if (!soil.isHistorical) SoilCard(
                 title = "去处",
                 meta = "模型建议 · 仍需确认"
             ) {
@@ -164,6 +177,48 @@ internal fun SoilBottomSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall
                 )
+            }
+
+            if (!soil.isHistorical) {
+                SoilCard(title = "手动整理") {
+                    Text(
+                        "修改后会锁定自动覆盖；如果想继续由模型整理，请解除手动锁定。",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Row {
+                        TextButton(onClick = { editing = !editing }) {
+                            Text(if (editing) "收起编辑" else "编辑当前与余思")
+                        }
+                        if (soil.manualLocked) {
+                            TextButton(onClick = onResumeAutomatic) { Text("解除手动锁定") }
+                        }
+                    }
+                    if (editing) {
+                        OutlinedTextField(
+                            modifier = Modifier.fillMaxWidth(),
+                            value = currentDraft,
+                            onValueChange = { currentDraft = it.take(4000) },
+                            label = { Text("当前 · 最多4000字") },
+                            minLines = 3,
+                            maxLines = 10
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            modifier = Modifier.fillMaxWidth(),
+                            value = afterthoughtDraft,
+                            onValueChange = { afterthoughtDraft = it },
+                            label = { Text("余思 · 每行一条，最多7条，每条2000字") },
+                            minLines = 3,
+                            maxLines = 10
+                        )
+                        TextButton(onClick = {
+                            onSave(currentDraft, afterthoughtDraft.split('\n')
+                                .map { it.trim().take(2000) }.filter { it.isNotEmpty() }.take(7))
+                            editing = false
+                        }) { Text("保存并手动锁定") }
+                    }
+                }
             }
 
             Spacer(Modifier.height(20.dp))
