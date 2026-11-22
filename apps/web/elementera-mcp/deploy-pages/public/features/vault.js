@@ -134,7 +134,7 @@ export function createCoastVault({ router, chat, toast }) {
     legacyBusy = true;
     try {
       const inspect = async (apply = false) => {
-        let cursor = '', count = 0, added = 0, exhausted = false;
+        let cursor = '', count = 0, added = 0, oversized = 0, exhausted = false;
         for (let page = 0; page < 1000; page += 1) {
           const result = apply
             ? await requestJson(API.vaultLegacyHearts, {
@@ -145,11 +145,12 @@ export function createCoastVault({ router, chat, toast }) {
               + (cursor ? '?cursor=' + encodeURIComponent(cursor) : ''));
           count += Number(result.recognized) || 0;
           added += Number(result.inserted) || 0;
+          oversized += Number(result.oversized) || 0;
           cursor = result.next_cursor || '';
           if (!cursor) { exhausted = true; break; }
         }
         if (!exhausted) throw new Error('旧收藏过多，本次尚未遍历完整索引。');
-        return { count, added };
+        return { count, added, oversized };
       };
       const preview = await inspect(false);
       if (!preview.count) {
@@ -159,11 +160,14 @@ export function createCoastVault({ router, chat, toast }) {
       // Real D1 writes must only follow an explicit owner-triggered preview
       // and confirmation. There are no automatic migrations on startup.
       if (!confirm('预览：发现 ' + preview.count
-        + ' 个旧助手红心。迁移只补充拾潮收藏，不清除旧标记，也不覆盖既有备注。继续吗？')) return;
+        + ' 个旧助手红心，其中 ' + preview.oversized
+        + ' 个因原文超长不会自动迁移，也不会被截断；它们仍完整留在旧聊天里。'
+        + ' 本次只补充可完整保存的收藏，不清除旧标记，也不覆盖既有备注。继续吗？')) return;
       if (!confirm('请先在设置中完成全局 JSON 导出备份。确认你已保存备份，并要执行旧红心迁移？')) return;
       const migrated = await inspect(true);
       toast('旧红心迁移完成：识别 ' + migrated.count
-        + ' 条，本次新增 ' + migrated.added + ' 条；未覆盖任何既有珍藏。');
+        + ' 条，本次新增 ' + migrated.added
+        + ' 条；超长原文 ' + migrated.oversized + ' 条保留待手动整理，没有截断旧聊天。');
       await router.refresh({ preserveScroll: true });
     } catch (error) {
       toast('旧红心迁移未完整结束，可重新检查并安全重试：' + (error.message || '网络失败'));
