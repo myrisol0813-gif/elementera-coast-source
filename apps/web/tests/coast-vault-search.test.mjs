@@ -73,6 +73,18 @@ const treasureUi = readFileSync(new URL('../elementera-mcp/deploy-pages/public/f
 assert.match(treasureUi, /mediaChoices/);
 assert.match(treasureUi, /paragraph_indices/);
 assert.match(treasureUi, /'DELETE'/);
+const chatRender = readFileSync(new URL('../elementera-mcp/deploy-pages/public/features/chat/chat-render.js', import.meta.url), 'utf8');
+const chatLoader = readFileSync(new URL('../elementera-mcp/deploy-pages/public/features/chat/chat-conversations.js', import.meta.url), 'utf8');
+const vaultUi = readFileSync(new URL('../elementera-mcp/deploy-pages/public/features/vault.js', import.meta.url), 'utf8');
+assert.match(chatRender, /treasureIndicators/, 'PWA heart buttons must use persisted server treasures');
+assert.match(chatRender, /assistantSaved/, 'assistant saved state must be visible');
+assert.match(chatRender, /userSaved/, 'user saved state must be visible');
+assert.match(treasureUi, /refreshIndex/, 'saving a favorite must refresh its visible heart');
+assert.match(chatLoader, /refreshTreasureIndex/, 'reloaded windows must refresh their saved heart state');
+assert.match(vaultUi, /transferLegacyHearts/, 'old favorite migration is an explicit user option');
+assert.match(vaultUi, /JSON 导出备份/, 'migration UI must request an owner backup');
+assert.match(vaultUi, /confirm: true/, 'migration route must never run silently on page load');
+
 console.log('coast vault & cross-window message search: ok');
 
 
