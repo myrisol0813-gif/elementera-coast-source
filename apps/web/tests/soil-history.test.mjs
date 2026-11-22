@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { createConversation } from '../functions/chat-store.js';
-import { readSoil, writeSoil, listSoilSnapshots, saveSoilSnapshot } from '../functions/memory-store.js';
+import { readSoil, writeSoil, listSoilSnapshots, saveSoilSnapshot, allSoilSnapshots } from '../functions/memory-store.js';
 import { routeMemoryApi } from '../functions/memory-router.js';
 
 class Statement {
@@ -78,4 +78,20 @@ const json = await response.json();
 assert.equal(json.history.length, 2);
 assert.equal(json.history_truncated, false);
 assert.equal(json.soil.current_text, '我手动改了最新活壤');
+// UI API may be bounded, but a full export must recover every immutable layer.
+const insert = db.database.prepare(`INSERT INTO conversation_soil_snapshots (
+ conversation_id, turn_id, assistant_message_id, current_text,
+ afterthoughts_json, revision, model_label, display_author, created_at
+) VALUES (?, ?, ?, ?, '[]', 1, 'test', 'test', ?)`);
+for (let i = 0; i < 1001; i += 1) {
+  insert.run(conversation.id, 'turn-stress-' + i, 'assistant-stress-' + i, '历史-' + i, i + 1);
+}
+const bounded = await listSoilSnapshots(db, conversation.id);
+assert.equal(bounded.snapshots.length, 1000);
+assert.equal(bounded.truncated, true);
+assert.ok(bounded.next_offset != null);
+const complete = await allSoilSnapshots(db, conversation.id);
+assert.equal(complete.length, 1003);
+assert.ok(complete.some(item => item.assistant_message_id === 'assistant-one'));
+assert.ok(complete.some(item => item.assistant_message_id === 'assistant-stress-0'));
 console.log('soil-history: ok');
