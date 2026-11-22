@@ -35,6 +35,7 @@ export function createChat({ storage, toast, dogtalk }) {
     conversations: [],
     histories: new Map(),
     treasureIndicators: new Map(),
+    searchPreview: new Map(),
     rikkahubAttachments: new Map(),
     rikkahubExpanded: false,
     currentId: '',
@@ -122,6 +123,7 @@ export function createChat({ storage, toast, dogtalk }) {
   function setHistory(conversationId, value) {
     const state = normalizeState(value);
     runtime.histories.set(conversationId, state);
+    runtime.searchPreview.delete(conversationId);
     return state;
   }
 
@@ -425,7 +427,8 @@ export function createChat({ storage, toast, dogtalk }) {
     if (userIndex < 0) { toast('消息版本已不存在，未跳转到其他版本。'); return false; }
     turn.user.active = userIndex;
     if (assistantIndex >= 0) turn.assistant.activeByUserVariant[String(userIndex)] = assistantIndex;
-    setHistory(hit.conversation_id, state);
+    // Display this inactive branch without changing canonical writable history.
+    runtime.searchPreview.set(hit.conversation_id, state);
     renderMessages(hit.conversation_id);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
