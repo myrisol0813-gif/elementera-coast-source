@@ -199,6 +199,52 @@ class SideRoomsRepository(private val config: CoastApiConfig, private val client
         catch (error: IOException) { throw CoastApiException(CoastApiErrorKind.Network, "voice_network_failed", "无法连接海岸声音存储。", cause = error) }
     }
 
+    // Shared Coast Vault API. No local duplicate database and no paid audio regeneration.
+    suspend fun vaultMedia(kind: String = "all", query: String = "", cursor: String = ""): JsonObject =
+        request("/api/coast-vault/media?kind=" + encode(kind) + "&q=" + encode(query) + "&cursor=" + encode(cursor))
+
+    suspend fun vaultTreasures(kind: String = "all", query: String = "", cursor: String = ""): JsonObject =
+        request("/api/coast-vault/treasures?kind=" + encode(kind) + "&q=" + encode(query) + "&cursor=" + encode(cursor))
+
+    suspend fun vaultSave(kind: String, conversationId: String, sourceId: String, notes: String): JsonObject =
+        request("/api/coast-vault/treasures", "POST", kotlinx.serialization.json.buildJsonObject {
+            put("kind", kotlinx.serialization.json.JsonPrimitive(kind))
+            put("conversation_id", kotlinx.serialization.json.JsonPrimitive(conversationId))
+            put("source_id", kotlinx.serialization.json.JsonPrimitive(sourceId))
+            put("notes", kotlinx.serialization.json.JsonPrimitive(notes))
+        })
+
+    suspend fun vaultChangeNote(treasureId: String, notes: String): JsonObject =
+        request("/api/coast-vault/treasures/" + path(treasureId), "PATCH",
+            kotlinx.serialization.json.buildJsonObject {
+                put("notes", kotlinx.serialization.json.JsonPrimitive(notes))
+            })
+
+    suspend fun vaultRemove(treasureId: String): JsonObject =
+        request("/api/coast-vault/treasures/" + path(treasureId), "DELETE")
+
+    suspend fun vaultAttachment(id: String, conversationId: String): ByteArray = withContext(Dispatchers.IO) {
+        val location = "/api/chat/attachments/" + path(id) + "?conversation_id=" + encode(conversationId) + "&inline=1"
+        try {
+            client.newCall(Request.Builder().url(config.url(location)).get().build()).execute().use { response ->
+                if (!response.isSuccessful) throw CoastApiException(
+                    coastErrorKind(response.code, "attachment_unavailable"),
+                    "attachment_unavailable", "原附件暂时不可读取。", response.code
+                )
+                val length = response.body?.contentLength() ?: -1L
+                if (length > 8 * 1024 * 1024) throw CoastApiException(
+                    CoastApiErrorKind.Decode, "attachment_too_large", "附件超出 8 MB。")
+                val bytes = response.body?.bytes() ?: ByteArray(0)
+                if (bytes.isEmpty() || bytes.size > 8 * 1024 * 1024) throw CoastApiException(
+                    CoastApiErrorKind.Decode, "attachment_invalid", "附件为空或不完整。")
+                bytes
+            }
+        } catch (error: CoastApiException) { throw error }
+        catch (error: IOException) { throw CoastApiException(
+            CoastApiErrorKind.Network, "attachment_network_failed", "无法下载原附件。", cause = error
+        ) }
+    }
+
     companion object {
         fun production(context: Context): SideRoomsRepository {
             val app = context.applicationContext
