@@ -69,6 +69,10 @@ assert.match(media, /chat_attachments/);
 assert.doesNotMatch(media, /text-to-speech|ELEVENLABS_API_KEY/);
 assert.match(vaultApi, /routeCoastVaultApi/);
 assert.match(pwa, /openSearchResult/);
+const treasureUi = readFileSync(new URL('../elementera-mcp/deploy-pages/public/features/chat/chat-treasures.js', import.meta.url), 'utf8');
+assert.match(treasureUi, /mediaChoices/);
+assert.match(treasureUi, /paragraph_indices/);
+assert.match(treasureUi, /'DELETE'/);
 console.log('coast vault & cross-window message search: ok');
 
 
@@ -138,6 +142,9 @@ const fileFavorite = await saveTreasure(db, {
   notes: '第一次查看文件',
 });
 assert.equal((await listTreasures(db, { q: '第一次查看文件' })).items[0].id, fileFavorite.id);
+const scoped = await listTreasures(db, { conversation_id: conversation.id, turn_id: 'turn-vault-1' });
+assert.equal(scoped.items.length, 2, 'scoped message sheet sees only this conversation turn');
+assert.equal((await listTreasures(db, { conversation_id: conversation.id, turn_id: 'missing-turn' })).items.length, 0);
 const afterSave = await listMediaLibrary(db, { kind: 'image' });
 assert.equal(afterSave.items[0].favorited, true);
 const modified = await updateTreasure(db, fileFavorite.id, { notes: '更新过的文件备注' });
