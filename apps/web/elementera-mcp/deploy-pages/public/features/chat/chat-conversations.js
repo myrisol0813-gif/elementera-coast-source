@@ -88,6 +88,7 @@ export function createChatConversations({
 
   async function loadConversation(value) {
     const conversationId = sanitizeId(value, 'conversation');
+    runtime.searchPreview?.clear(); // Reopening a room returns to the persisted branch.
     if (runtime.deletedIds.has(conversationId)) return false;
     const conversation = runtime.conversations.find((item) => item.id === conversationId) || null;
     setComposerReady(false, '正在载入聊天记录…');
@@ -204,6 +205,7 @@ export function createChatConversations({
     }
     runtime.conversations = runtime.conversations.filter((item) => item.id !== conversationId);
     runtime.histories.delete(conversationId);
+    runtime.searchPreview?.delete(conversationId);
     runtime.treasureIndicators?.delete(conversationId);
     runtime.rikkahubAttachments.delete(conversationId);
     runtime.recallHistory.delete(conversationId);
