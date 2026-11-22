@@ -22,6 +22,7 @@ export function soilFromRow(row) {
     manual_locked: Number(row.manual_locked || 0) === 1,
     auto_refresh_enabled: Number(row.auto_refresh_enabled ?? 1) === 1,
     organized_through_turn_id: row.organized_through_turn_id || '',
+    source_assistant_id: row.source_assistant_id || '',
     actor: row.actor || 'owner',
     surface: row.surface || 'web_manual',
     model_label: row.model_label || null,
@@ -86,7 +87,7 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
   const updateSql = `UPDATE conversation_soils SET
     current_text = ?, afterthoughts_json = ?, memory_candidates_json = ?, seed_candidates_json = ?,
     user_portrait_candidate_json = ?, self_portrait_candidate_json = ?,
-    manual_locked = ?, auto_refresh_enabled = ?, organized_through_turn_id = ?,
+    manual_locked = ?, auto_refresh_enabled = ?, organized_through_turn_id = ?, source_assistant_id = ?,
     actor = ?, surface = ?, model_label = ?, model_nickname = ?, symbol = ?, display_author = ?,
     source_conversation_id = ?, source_turn_id = ?, tool_call_id = ?,
     revision = revision + 1, updated_at = ?
@@ -101,6 +102,7 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
     next.manual_locked ? 1 : 0,
     next.auto_refresh_enabled ? 1 : 0,
     next.organized_through_turn_id,
+    snapshotBranch?.assistant?.id || current.source_assistant_id || '',
     identity.actor,
     identity.surface,
     identity.model_label,
