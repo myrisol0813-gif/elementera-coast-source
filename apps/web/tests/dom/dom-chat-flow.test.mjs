@@ -132,12 +132,12 @@ export async function runChatPrelude() {
   assert.deepEqual(soilFor('conv-1'), soilBeforeClearCancel, 'cancelled soil clear must not write the cleared state');
   document.querySelector('[data-action="memory:done"]').click();
   await tick();
-  assert.equal(document.querySelectorAll('.message.user .action-button').length, 2);
+  assert.equal(document.querySelectorAll('.message.user .action-button').length, 3, 'user messages include 拾潮收藏');
   assert.equal(document.querySelectorAll('.message.assistant .action-button').length, 6);
-  assert.equal(document.querySelectorAll('.message .action-button svg').length, 8);
+  assert.equal(document.querySelectorAll('.message .action-button svg').length, 9);
   assert.deepEqual(
     [...document.querySelectorAll('.message .action-button svg')].map((svg) => svg.getAttribute('viewBox')),
-    Array(8).fill('0 0 32 32'),
+    Array(9).fill('0 0 32 32'),
   );
 
   const userStateBeforeCancel = structuredClone(histories.get('conv-1'));
