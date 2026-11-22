@@ -1,5 +1,6 @@
 package com.elementeracoast.app.feature.chat
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.elementeracoast.app.core.model.ChatMessage
+import com.elementeracoast.app.core.model.ChatSearchFocus
 import com.elementeracoast.app.core.model.MessageAction
 import com.elementeracoast.app.core.model.MessageRole
 import com.elementeracoast.app.core.model.ThoughtSoilSnapshot
@@ -57,6 +59,7 @@ private fun messageTimeLabel(value: String?): String =
 internal fun ChatTimeline(
     conversationId: String,
     messages: List<ChatMessage>,
+    searchFocus: ChatSearchFocus?,
     thoughtSoil: ThoughtSoilSnapshot?,
     isStreaming: Boolean,
     streamingMessageId: Long?,
@@ -79,8 +82,12 @@ internal fun ChatTimeline(
     val streamingIndex = messages.indexOfFirst { it.id == streamingMessageId }
     val streamingLength = messages.getOrNull(streamingIndex)?.text?.length ?: 0
     val latestAssistantIndex = messages.indexOfLast { it.role == MessageRole.Assistant }
-    LaunchedEffect(conversationId, messages.size, streamingMessageId, streamingLength, thoughtSoil?.revision) {
-        val target = if (streamingIndex >= 0) streamingIndex else messages.lastIndex
+    val targetIndex = if (searchFocus?.conversationId == conversationId)
+        messages.indexOfFirst { it.remoteVariantId == searchFocus.messageId } else -1
+    LaunchedEffect(conversationId, messages.size, streamingMessageId, streamingLength,
+        thoughtSoil?.revision, searchFocus?.requestId, targetIndex) {
+        val target = if (targetIndex >= 0) targetIndex
+            else if (streamingIndex >= 0) streamingIndex else messages.lastIndex
         if (target >= 0) listState.scrollToItem(target)
     }
 
@@ -104,7 +111,14 @@ internal fun ChatTimeline(
             verticalArrangement = Arrangement.spacedBy(CoastChatTokens.MessageGap)
         ) {
             itemsIndexed(messages, key = { _, message -> message.id }) { index, message ->
-                Column {
+                val isSearchMatch = targetIndex == index && searchFocus?.conversationId == conversationId
+                Column(
+                    modifier = if (isSearchMatch) Modifier
+                        .background(
+                            MaterialTheme.colorScheme.primary.copy(alpha = .09f),
+                            androidx.compose.foundation.shape.RoundedCornerShape(15.dp)
+                        ).padding(vertical = 4.dp) else Modifier
+                ) {
                     val dateKey = messageDateKey(message.createdAtLabel)
                     val previousDateKey = messages.getOrNull(index - 1)?.let { messageDateKey(it.createdAtLabel) }.orEmpty()
                     if (dateKey.isNotBlank() && dateKey != previousDateKey) {
@@ -137,7 +151,9 @@ internal fun ChatTimeline(
                             organizer = history.organizer,
                             updatedAt = history.updatedAt,
                             history = emptyList(),
-                            isHistorical = true
+                            isHistorical = true,
+                            sourceTurnId = history.turnId,
+                            sourceAssistantMessageId = history.assistantMessageId
                         )
                     }
                     if (message.role == MessageRole.Assistant && !streamingTail && message.furnitureRuns.isNotEmpty()) {

@@ -494,3 +494,57 @@
     grid-template-columns: minmax(0, 1fr) auto;
   }
 }
+
+/* Search results extend the existing sidebar search, without replacing room navigation. */
+.coast-search-results {
+  grid-column: 1 / -1;
+  max-height: min(42vh, 360px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 7px;
+  border-radius: 15px;
+  background: var(--surface-soft);
+}
+.coast-search-title {
+  margin: 2px 8px 8px;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+.coast-search-result {
+  display: grid;
+  width: 100%;
+  gap: 3px;
+  margin: 3px 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  text-align: left;
+  background: var(--surface-raised);
+  color: var(--text);
+  cursor: pointer;
+}
+.coast-search-result:hover,
+.coast-search-result:focus-visible {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised));
+}
+.coast-search-result-title { font-size: 13px; }
+.coast-search-result-context,
+.coast-search-result-snippet,
+.coast-search-hint { color: var(--text-soft); font-size: 12px; }
+.coast-search-result-snippet { overflow-wrap: anywhere; }
+.coast-search-more {
+  width: 100%;
+  padding: 9px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--surface-raised);
+  color: var(--accent);
+  cursor: pointer;
+}
+.coast-search-error { color: var(--text); padding: 7px; font-size: 12px; }
+.message.coast-search-target {
+  border-radius: 15px;
+  outline: 2px solid color-mix(in srgb, var(--accent) 58%, transparent);
+  outline-offset: 4px;
+}

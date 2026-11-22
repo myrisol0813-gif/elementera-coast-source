@@ -2,6 +2,7 @@ import { listLibraryBooks, getLibraryBook, readLibraryChapter, listLibraryNotes,
 import { generateVoiceClip } from './voice-clips.js';
 import { createCalendarEntry, deleteCalendarEntry, listCalendarEntries, updateCalendarEntry } from './calendar-store.js';
 import { searchAuthorizedMemory } from './authorized-memory.js';
+import { searchVaultForModel, readVaultForModel } from './coast-vault-model-tools.js';
 import { CROSS_WINDOW_MODEL_TOOLS, executeCrossWindowModelTool } from './cross-window-model-tool.js';
 import { DAILY_MODEL_TOOLS, dailyWriteReceipt, executeDailyModelTool } from './daily-model-tools.js';
 import {
@@ -216,6 +217,58 @@ const REGISTRY = Object.freeze([
       source_message_id: context.source_turn_id || null,
       source_model: context.model_label || '',
     }),
+  }),
+  entry({
+    tool_key: 'vault.search', display_name: '按词翻看拾潮目录',
+    description: '仅在需要回顾主动珍藏时按关键词查询少量拾潮条目，不自动注入上下文。',
+    model_exposed: true, model_group: 'core', auth_scopes: ['read:coast'],
+    summary_policy: 'content_redacted',
+    model_tool: modelTool('vault_search_index', '确实需要已收藏资料时，先检索少量索引与短摘录。返回收藏 ID，不读取完整正文。', {
+      properties: {
+        query: { type: 'string', minLength: 1, maxLength: 100 },
+        kind: { type: 'string', enum: ['all','text','soil','audio','image','file'] },
+        limit: { type: 'integer', minimum: 1, maximum: 8 },
+        cursor: { type: 'integer', minimum: 0, maximum: 100000 },
+      },
+      required: ['query'],
+    }),
+    official_mcp: officialMcpTool({
+      order: 405, name: 'search_coast_treasures', title: '按关键词搜索拾潮收藏',
+      description: '仅返回已主动收藏的少量目录、定位 ID 与短预览，不自动读取所有正文或基本媒体库。',
+      inputSchema: objectSchema({
+        query: { type: 'string', minLength: 1, maxLength: 100 },
+        kind: { type: 'string', enum: ['all','text','soil','audio','image','file'] },
+        limit: { type: 'integer', minimum: 1, maximum: 8 },
+        cursor: { type: 'integer', minimum: 0, maximum: 100000 },
+      }, ['query']),
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      invoking: '正在翻找拾潮目录…', invoked: '拾潮目录已找到',
+    }),
+    handler: (db, input) => searchVaultForModel(db, input),
+  }),
+  entry({
+    tool_key: 'vault.read', display_name: '精读选中的拾潮收藏',
+    description: '按检索获得的 1–3 个收藏 ID 读取有限正文及备注。',
+    model_exposed: true, model_group: 'core', auth_scopes: ['read:coast'],
+    summary_policy: 'content_redacted',
+    model_tool: modelTool('vault_read_selected', '按 ID 精读最多 3 条确实需要的拾潮收藏。不要在无需回顾时调用。', {
+      properties: {
+        ids: { type: 'array', minItems: 1, maxItems: 3,
+          items: { type: 'string', minLength: 1, maxLength: 160 } },
+      },
+      required: ['ids'],
+    }),
+    official_mcp: officialMcpTool({
+      order: 406, name: 'read_coast_treasures', title: '精读指定的拾潮收藏',
+      description: '凭已获得的收藏 ID 仅读取 1–3 条正文和备注；不遍历未选中内容。',
+      inputSchema: objectSchema({
+        ids: { type: 'array', minItems: 1, maxItems: 3,
+          items: { type: 'string', minLength: 1, maxLength: 160 } },
+      }, ['ids']),
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      invoking: '正在取出选中的收藏…', invoked: '指定拾潮收藏已读到',
+    }),
+    handler: (db, input) => readVaultForModel(db, input),
   }),
   entry({
     tool_key: 'memory.search', display_name: '搜索已确认记忆', description: '检索已经确认的 Memory v2 记忆与种子。', model_exposed: true, model_group: 'core', auth_scopes: ['read:coast'],

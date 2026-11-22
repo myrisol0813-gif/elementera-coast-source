@@ -38,6 +38,7 @@ import {
   modelMetadataApi,
   saveModelEcho,
 } from './model-metadata-api.js';
+import { ChatSearchError, searchChatMessages } from './chat-search.js';
 import {
   ChatStoreError,
   createConversation,
@@ -730,6 +731,7 @@ export function isChatApiPath(pathname) {
     || pathname === '/api/chat/native-tool'
     || pathname === '/api/chat/native-echo'
     || pathname === '/api/chat/history'
+    || pathname === '/api/chat/search'
     || pathname === '/api/chat/profile'
     || pathname === '/api/chat/title'
     || pathname === CONVERSATIONS_PATH
@@ -748,6 +750,13 @@ export async function routeChatApi(request, env) {
     if (pathname === '/api/chat/native-tool') return await executeNativeChatGptTool(request, env);
     if (pathname === '/api/chat/native-echo') return await saveNativeChatGptEcho(request, env);
     if (pathname === '/api/chat/history') return await history(request, env);
+    if (pathname === '/api/chat/search') {
+      if (request.method !== 'GET') return methodNotAllowed('GET');
+      const params = new URL(request.url).searchParams;
+      return json({ ok: true, ...(await searchChatMessages(env.COAST_CHAT_DB, {
+        q: params.get('q'), cursor: params.get('cursor') || '', limit: params.get('limit'),
+      })) });
+    }
     if (pathname === '/api/chat/profile') return await profile(request, env);
     if (pathname === '/api/chat/title') return await title(request, env);
     return await conversations(request, env, pathname);
@@ -756,6 +765,7 @@ export async function routeChatApi(request, env) {
     if (error instanceof ChatAttachmentError) return apiError(error.type, error.message, error.status, error.details);
     if (error instanceof DogtalkStoreError) return apiError(error.type, error.message, error.status);
     if (error instanceof ChatStoreError) return apiError(error.type, error.message, error.status);
+    if (error instanceof ChatSearchError) return apiError(error.type, error.message, error.status);
     return unexpectedApiError('chat-api', error, 'chat_store_failed', '主聊天存储操作失败');
   }
 }

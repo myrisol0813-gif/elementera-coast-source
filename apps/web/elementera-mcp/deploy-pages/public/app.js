@@ -15,6 +15,8 @@ import { createMemory } from './features/memory.js';
 import { createModels } from './features/models.js';
 import { createSettings } from './features/settings.js';
 import { createShell } from './features/shell.js';
+import { createSidebarSearch } from './features/sidebar-search.js';
+import { createCoastVault } from './features/vault.js';
 import { createTools } from './features/tools.js';
 import { createDesk } from './features/desk.js';
 import { createToolroom } from './features/toolroom.js';
@@ -53,6 +55,8 @@ const shell = createShell({ storage });
 const router = createRouter(overlayRoot);
 const dogtalk = createDogtalk({ toast });
 const chat = createChat({ storage, toast, dogtalk });
+const sidebarSearch = createSidebarSearch({ chat, shell });
+const vault = createCoastVault({ router, chat, toast });
 const memory = createMemory({ chat, router, toast, storage });
 const models = createModels({ chat, router, toast });
 const tools = createTools({ storage, router, toast, memory });
@@ -88,9 +92,11 @@ const eventOwners = Object.freeze([
     destroy() {},
   }),
   shell,
+  sidebarSearch,
   chat,
   models,
   daily,
+  vault,
   calendar,
   library,
   memory,

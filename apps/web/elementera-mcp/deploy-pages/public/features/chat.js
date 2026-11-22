@@ -5,6 +5,7 @@ import { activeMessages, createState, flatMessagesToState, normalizeState } from
 import { createChatActions } from './chat/chat-actions.js';
 import { createChatAttachments } from './chat/chat-attachments.js';
 import { createChatVoice } from './chat/chat-voice.js';
+import { createChatTreasures } from './chat/chat-treasures.js';
 import { createChatWindowSettings } from './chat/chat-window-settings.js';
 import { createChatConversations } from './chat/chat-conversations.js';
 import { createChatGeneration } from './chat/chat-generation.js';
@@ -33,6 +34,8 @@ export function createChat({ storage, toast, dogtalk }) {
   const runtime = {
     conversations: [],
     histories: new Map(),
+    treasureIndicators: new Map(),
+    searchPreview: new Map(),
     rikkahubAttachments: new Map(),
     rikkahubExpanded: false,
     currentId: '',
@@ -120,6 +123,7 @@ export function createChat({ storage, toast, dogtalk }) {
   function setHistory(conversationId, value) {
     const state = normalizeState(value);
     runtime.histories.set(conversationId, state);
+    runtime.searchPreview.delete(conversationId);
     return state;
   }
 
@@ -174,6 +178,7 @@ export function createChat({ storage, toast, dogtalk }) {
   });
 
   const voice = createChatVoice({ runtime, toast, renderMessages });
+  const treasures = createChatTreasures({ runtime, currentHistory, toast, renderMessages });
 
   async function persistProfile(profile) {
     const data = await requestJson(API.profile, {
@@ -225,6 +230,7 @@ export function createChat({ storage, toast, dogtalk }) {
     renderMessages,
     closeMenu,
     voice,
+    refreshTreasureIndex: treasures.refreshIndex,
   });
 
   const windowSettings = createChatWindowSettings({
@@ -344,6 +350,7 @@ export function createChat({ storage, toast, dogtalk }) {
     attachments: chatAttachments,
     voice,
     windowSettings,
+    treasures,
   });
 
   async function bootstrap() {
@@ -392,6 +399,52 @@ export function createChat({ storage, toast, dogtalk }) {
     return handlers[HANDLER_NAMES[context.eventType]]?.(context.name, context.target, event);
   }
 
+  // Search navigation previews an inactive branch locally; it does not silently
+  // rewrite the owner's persisted choice of active variants.
+  async function openSearchResult(hit) {
+    if (!hit?.conversation_id) return false;
+    if (!await loadConversation(hit.conversation_id)) return false;
+    if (hit.kind === 'conversation') {
+      if (ui.scroller) ui.scroller.scrollTop = 0;
+      return true;
+    }
+    const original = currentHistory();
+    const index = original.turns.findIndex((turn) => turn.id === hit.turn_id);
+    if (index < 0) { toast('原始轮次已不存在，无法定位。'); return false; }
+    const state = structuredClone(original);
+    const turn = state.turns[index];
+    const id = hit.message_id;
+    let userIndex = -1, assistantIndex = -1;
+    if (hit.role === 'user') {
+      userIndex = turn.user.variants.findIndex((variant) => variant.id === id);
+    } else {
+      for (let i = 0; i < turn.user.variants.length; i += 1) {
+        const variants = turn.assistant.variantsByUserVariant[String(i)] || [];
+        const candidate = variants.findIndex((variant) => variant.id === id);
+        if (candidate >= 0) { userIndex = i; assistantIndex = candidate; break; }
+      }
+    }
+    if (userIndex < 0) { toast('消息版本已不存在，未跳转到其他版本。'); return false; }
+    turn.user.active = userIndex;
+    if (assistantIndex >= 0) turn.assistant.activeByUserVariant[String(userIndex)] = assistantIndex;
+    // Display this inactive branch without changing canonical writable history.
+    runtime.searchPreview.set(hit.conversation_id, state);
+    renderMessages(hit.conversation_id);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const elements = [...(ui.messages?.querySelectorAll('.message') || [])];
+        const target = elements.find((element) => element.dataset.messageId === id)
+          || elements.find((element) => element.dataset.turn === hit.turn_id
+            && element.classList.contains(hit.role));
+        if (!target) { toast('已打开窗口，但原消息无法在当前视图定位。'); return; }
+        target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        target.classList.add('coast-search-target');
+        setTimeout(() => target.classList.remove('coast-search-target'), 2600);
+      });
+    });
+    return true;
+  }
+
   async function mount() {
     bindUi();
     setComposerReady(false, '正在连接…');
@@ -433,6 +486,7 @@ export function createChat({ storage, toast, dogtalk }) {
     refreshFromCoast,
     getActiveMessages: () => activeMessages(currentHistory()),
     getCurrentConversationId: () => runtime.currentId,
+    openSearchResult,
     getCurrentConversation: () => runtime.conversations.find((item) => item.id === runtime.currentId) || null,
     openRoomType,
     getProfile: () => runtime.profile,

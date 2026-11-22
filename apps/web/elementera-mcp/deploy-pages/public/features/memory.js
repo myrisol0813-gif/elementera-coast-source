@@ -145,6 +145,7 @@ export function createMemory({ chat, router, toast, storage }) {
 
   router.register('thought-soil', soilViews.soilView);
   router.register('thought-soil-edit', soilViews.soilEditView);
+  router.register('thought-soil-treasure', soilViews.soilTreasureView);
   router.register('memory-pockets', pocketViews.pocketsView);
   router.register('memory', libraryViews.memoryView);
   router.register('memory-entry-edit', libraryViews.entryEditView);

@@ -33,6 +33,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import com.elementeracoast.app.core.model.ChatSearchHit
+import com.elementeracoast.app.feature.daily.SideRoomsRepository
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,12 +71,65 @@ internal fun CoastDrawer(
     onClose: () -> Unit,
     onOpenRoomType: (RoomType) -> Unit,
     onSelectConversation: (String) -> Unit,
+    onSelectSearchHit: (ChatSearchHit) -> Unit,
     onRenameConversation: (String, String) -> Unit,
     onDeleteConversation: (String) -> Unit,
     onOpenFeature: (FeatureDestination) -> Unit,
     onCycleTheme: () -> Unit
 ) {
     var query by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val repository = remember(context.applicationContext) {
+        SideRoomsRepository.production(context.applicationContext)
+    }
+    val scope = rememberCoroutineScope()
+    var searchHits by remember { mutableStateOf<List<ChatSearchHit>>(emptyList()) }
+    var searchCursor by remember { mutableStateOf("") }
+    var searchBusy by remember { mutableStateOf(false) }
+    var searchError by remember { mutableStateOf("") }
+
+    LaunchedEffect(query) {
+        val requested = query.trim()
+        if (requested.isBlank()) {
+            searchHits = emptyList()
+            searchCursor = ""
+            searchBusy = false
+            searchError = ""
+            return@LaunchedEffect
+        }
+        delay(260)
+        searchBusy = true
+        try {
+            val response = repository.chatSearch(requested)
+            searchHits = (response["results"] as? JsonArray).orEmpty()
+                .mapNotNull { (it as? JsonObject)?.let(ChatSearchHit::fromJson) }
+            searchCursor = response["next_cursor"]?.toString()?.trim('"').orEmpty()
+            searchError = ""
+        } catch (error: Exception) {
+            searchError = error.message ?: "搜索暂时不可用。"
+            searchHits = emptyList()
+            searchCursor = ""
+        } finally { searchBusy = false }
+    }
+
+    fun loadMoreSearch() {
+        val requested = query.trim()
+        val cursor = searchCursor
+        if (requested.isBlank() || cursor.isBlank() || searchBusy) return
+        scope.launch {
+            searchBusy = true
+            try {
+                val response = repository.chatSearch(requested, cursor)
+                if (query.trim() != requested) return@launch
+                searchHits = searchHits + (response["results"] as? JsonArray).orEmpty()
+                    .mapNotNull { (it as? JsonObject)?.let(ChatSearchHit::fromJson) }
+                searchCursor = response["next_cursor"]?.toString()?.trim('"').orEmpty()
+                searchError = ""
+            } catch (error: Exception) {
+                if (query.trim() == requested) searchError = error.message ?: "加载下一页失败。"
+            } finally { searchBusy = false }
+        }
+    }
 
     ModalDrawerSheet(
         modifier = Modifier.width(CoastChatTokens.DrawerWidth),
@@ -114,7 +177,12 @@ internal fun CoastDrawer(
                     Spacer(Modifier.width(CoastChatTokens.DrawerSearchGap))
                     BasicTextField(
                         value = query,
-                        onValueChange = { query = it },
+                        onValueChange = {
+                            query = it.take(100)
+                            searchHits = emptyList()
+                            searchCursor = ""
+                            searchError = ""
+                        },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         textStyle = MaterialTheme.typography.bodyMedium.copy(
@@ -124,7 +192,7 @@ internal fun CoastDrawer(
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         decorationBox = { inner ->
                             if (query.isEmpty()) {
-                                Text("搜索聊天", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("搜索窗口与原文", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             inner()
                         }
@@ -182,6 +250,60 @@ internal fun CoastDrawer(
                 item {
                     Spacer(Modifier.height(6.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+                if (query.isNotBlank()) {
+                    item { DrawerSectionLabel("聊天原文") }
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            if (searchBusy && searchHits.isEmpty()) {
+                                Text("正在查找原文…",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            searchHits.forEach { hit ->
+                                Column(
+                                    modifier = Modifier.fillMaxWidth()
+                                        .coastSurfaceBackground(
+                                            MaterialTheme.colorScheme.surfaceVariant,
+                                            RoundedCornerShape(14.dp)
+                                        )
+                                        .clickable {
+                                            if (hit.kind == "conversation") onSelectConversation(hit.conversationId)
+                                            else onSelectSearchHit(hit)
+                                        }
+                                        .padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(hit.conversationTitle.ifBlank { "未命名聊天" },
+                                        fontWeight = FontWeight.SemiBold,
+                                        style = MaterialTheme.typography.bodyMedium)
+                                    Text(if (hit.kind == "conversation") "窗口标题" else
+                                        if (hit.role == com.elementeracoast.app.core.model.MessageRole.User)
+                                            "用户原文" else "助手原文",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary)
+                                    Text(hit.snippet.take(230), maxLines = 4,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        overflow = TextOverflow.Ellipsis,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            if (searchError.isNotBlank()) {
+                                Text("搜索失败：" + searchError,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error)
+                            }
+                            if (!searchBusy && searchHits.isEmpty() && searchError.isBlank()) {
+                                Text("没有找到匹配的聊天原文。",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            if (searchCursor.isNotBlank()) {
+                                TextButton(onClick = ::loadMoreSearch, enabled = !searchBusy) {
+                                    Text("继续查找")
+                                }
+                            }
+                        }
+                    }
                 }
                 item { DrawerSectionLabel("聊天窗口") }
                 item {

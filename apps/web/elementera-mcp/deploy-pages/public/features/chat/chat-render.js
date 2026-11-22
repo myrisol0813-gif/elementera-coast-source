@@ -50,7 +50,7 @@ export function variantControl(kind, turnId, active, total) {
   </span>`;
 }
 
-export function actionButton(action, title, { active = false, reaction = '' } = {}) {
+export function actionButton(action, title, { active = false, reaction = '', legacy = false } = {}) {
   const iconName = {
     copy: 'copy',
     'edit-user': 'edit',
@@ -61,7 +61,7 @@ export function actionButton(action, title, { active = false, reaction = '' } = 
     favorite: 'heart',
     'delete-assistant': 'trash',
   }[action];
-  return `<button class="action-button ${active ? 'is-active' : ''}" type="button" data-action="chat:${action}" ${reaction ? `data-reaction="${reaction}"` : ''} title="${escapeAttribute(title)}" aria-label="${escapeAttribute(title)}">${icon(iconName)}</button>`;
+  return `<button class="action-button ${active ? 'is-active' : ''}${legacy ? ' is-legacy' : ''}" type="button" data-action="chat:${action}" ${reaction ? `data-reaction="${reaction}"` : ''} title="${escapeAttribute(title)}" aria-label="${escapeAttribute(title)}">${icon(iconName)}</button>`;
 }
 
 function conversationRow(conversation, runtime, roomTypeLabels) {
@@ -176,11 +176,19 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
   function renderMessages(conversationId = runtime.currentId) {
     discardStreamingPatches(conversationId);
     if (!ui.messages || conversationId !== runtime.currentId) return;
-    const state = runtime.histories.get(conversationId) || createState();
+    const preview = runtime.searchPreview?.get(conversationId);
+    const state = preview || runtime.histories.get(conversationId) || createState();
     const latestAssistantTurnId = [...state.turns].reverse().find((turn) => activeBranch(turn).assistant)?.id || '';
     let lastDateKey = '';
     const html = state.turns.map((turn) => {
       const branch = activeBranch(turn);
+      const treasureIndex = runtime.treasureIndicators?.get(conversationId);
+      const userSaved = treasureIndex?.messageIds.has(branch.user?.id || '')
+        || treasureIndex?.userMediaTurns.has(turn.id) || false;
+      const assistantSaved = treasureIndex?.messageIds.has(branch.assistant?.id || '') || false;
+      const legacyAssistantHeart = branch.assistant?.favorite === true;
+      const legacyAssistantPending = Boolean(treasureIndex) && legacyAssistantHeart && !assistantSaved;
+      const assistantHeartActive = assistantSaved || legacyAssistantHeart;
       const loading = runtime.generation
         && runtime.generation.conversationId === conversationId
         && runtime.generation.turnId === turn.id
@@ -202,19 +210,22 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
       const user = branch.user && !branch.user.hidden
         ? branch.user.message_source === 'official_mcp'
           ? officialMcpLetter(branch.user, turn.id, userAttachment, userStamp?.time || '')
-          : `<article class="message user ${userImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}"><div class="content">${branch.user.content ? `<div class="user-bubble">${escapeHtml(branch.user.content)}</div>` : ''}${userAttachment}${userImported ? '<span class="message-dogtalk-mark">RikkaHub 旧档案</span>' : ''}${branch.user.dogtalk_snapshot_id ? '<span class="message-dogtalk-mark">私人草稿 · 随本轮</span>' : ''}${userStamp?.time ? `<span class="message-time is-user">${escapeHtml(userStamp.time)}</span>` : ''}<div class="message-actions">${actionButton('edit-user', '编辑')}${actionButton('delete-user', '删除')}${variantControl('user', turn.id, branch.userIndex, turn.user.variants.length)}</div></div></article>`
+          : `<article class="message user ${userImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}" data-message-id="${escapeAttribute(branch.user.id || '')}"><div class="content">${branch.user.content ? `<div class="user-bubble">${escapeHtml(branch.user.content)}</div>` : ''}${userAttachment}${userImported ? '<span class="message-dogtalk-mark">RikkaHub 旧档案</span>' : ''}${branch.user.dogtalk_snapshot_id ? '<span class="message-dogtalk-mark">私人草稿 · 随本轮</span>' : ''}${userStamp?.time ? `<span class="message-time is-user">${escapeHtml(userStamp.time)}</span>` : ''}<div class="message-actions">${actionButton('edit-user', '编辑')}${actionButton('favorite', '拾入潮间', { active: userSaved, reaction: 'favorite' })}${actionButton('delete-user', '删除')}${variantControl('user', turn.id, branch.userIndex, turn.user.variants.length)}</div></div></article>`
         : '';
       const assistantDivider = branch.assistant && assistantStamp?.key && assistantStamp.key !== lastDateKey
         ? `<div class="message-date-divider">${escapeHtml(assistantStamp.date)}</div>`
         : '';
       if (branch.assistant && assistantStamp?.key) lastDateKey = assistantStamp.key;
-      const assistant = branch.assistant ? `<article class="message assistant ${assistantImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}" data-message-id="${escapeAttribute(branch.assistant.id || '')}"><button class="avatar" type="button" data-action="settings:avatar" aria-label="更换助手头像"></button><div class="content">${renderFurnitureBubble(branch.assistant.furniture_runs, { conversationId })}<div class="assistant-text">${formatRichText(branch.assistant.content)}${branch.assistant.errorDetail ? `<span class="message-error">${escapeHtml(branch.assistant.errorDetail)}</span>` : ''}${loading ? '<span class="typing-cursor"></span>' : ''}</div>${assistantAttachment}${voiceAudioCards(conversationId, turn.id, branch.assistant.id)}${assistantImported ? `<span class="message-dogtalk-mark">RikkaHub 旧档案${branch.assistant.model_id ? ` · ${escapeHtml(shortModelName(branch.assistant.model_id))}` : ''}</span>` : ''}${assistantStamp?.time ? `<span class="message-time is-assistant">${escapeHtml(assistantStamp.time)}</span>` : ''}<div class="message-actions">${actionButton('copy', '复制')}${actionButton('voice', '生成语音')}${actionButton('like', '点赞', { active: branch.assistant.liked, reaction: 'liked' })}${actionButton('regenerate', '重新生成')}${actionButton('favorite', '收藏', { active: branch.assistant.favorite, reaction: 'favorite' })}${actionButton('delete-assistant', '删除')}${variantControl('assistant', turn.id, branch.assistantIndex, branch.assistants.length)}${generationFootprint(branch.assistant, turn.id)}</div>${loading ? '' : renderModelMetadataTrace(branch.assistant, conversationId)}</div></article>` : '';
+      const assistant = branch.assistant ? `<article class="message assistant ${assistantImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}" data-message-id="${escapeAttribute(branch.assistant.id || '')}" data-legacy-favorite="${legacyAssistantHeart}"><button class="avatar" type="button" data-action="settings:avatar" aria-label="更换助手头像"></button><div class="content">${renderFurnitureBubble(branch.assistant.furniture_runs, { conversationId })}<div class="assistant-text">${formatRichText(branch.assistant.content)}${branch.assistant.errorDetail ? `<span class="message-error">${escapeHtml(branch.assistant.errorDetail)}</span>` : ''}${loading ? '<span class="typing-cursor"></span>' : ''}</div>${assistantAttachment}${voiceAudioCards(conversationId, turn.id, branch.assistant.id)}${assistantImported ? `<span class="message-dogtalk-mark">RikkaHub 旧档案${branch.assistant.model_id ? ` · ${escapeHtml(shortModelName(branch.assistant.model_id))}` : ''}</span>` : ''}${assistantStamp?.time ? `<span class="message-time is-assistant">${escapeHtml(assistantStamp.time)}</span>` : ''}<div class="message-actions">${actionButton('copy', '复制')}${actionButton('voice', '生成语音')}${actionButton('like', '点赞', { active: branch.assistant.liked, reaction: 'liked' })}${actionButton('regenerate', '重新生成')}${actionButton('favorite', legacyAssistantPending ? '旧红心 · 待迁入拾潮' : '收藏', { active: assistantHeartActive, legacy: legacyAssistantPending, reaction: 'favorite' })}${actionButton('delete-assistant', '删除')}${variantControl('assistant', turn.id, branch.assistantIndex, branch.assistants.length)}${generationFootprint(branch.assistant, turn.id)}</div>${loading ? '' : renderModelMetadataTrace(branch.assistant, conversationId)}</div></article>` : '';
       const soil = branch.assistant
         ? runtime.memory?.renderSoilEntry(conversationId, turn.id, branch.assistant.id || '', turn.id === latestAssistantTurnId) || ''
         : '';
       return userDivider + user + soil + assistantDivider + assistant;
     }).join('');
-    ui.messages.innerHTML = html || '<div class="empty-state">这里还没有消息。</div>';
+    const previewNote = preview
+      ? '<div class="coast-search-preview-note" role="status">正在预览搜索命中的旧消息版本 · 不影响正式聊天历史 <button type="button" data-action="chat:end-search-preview">结束预览</button></div>'
+      : '';
+    ui.messages.innerHTML = previewNote + (html || '<div class="empty-state">这里还没有消息。</div>');
     hydrateModelMetadataTraces(ui.messages);
     const avatarUrl = runtime.profile.assistant_avatar_dataurl;
     if (avatarUrl) {

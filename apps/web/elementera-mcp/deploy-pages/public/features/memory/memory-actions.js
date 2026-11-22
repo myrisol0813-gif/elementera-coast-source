@@ -1,4 +1,5 @@
 import { q } from '../../core/dom.js';
+import { API, requestJson } from '../../core/api.js';
 import { MEMORY_FILTER_KINDS, MEMORY_TAGS } from './memory-constants.js';
 import {
   createEntryRequest,
@@ -113,6 +114,17 @@ export function createMemoryActions({
       conversation_id: target.dataset.conversationId || '',
       message_id: target.dataset.messageId || '',
     });
+    if (name === 'soil-treasure-open') return router.open('thought-soil-treasure', {
+      conversation_id: target.dataset.conversationId || '',
+      message_id: target.dataset.messageId || '',
+    });
+    if (name === 'soil-treasure-remove') {
+      if (!confirm('取消这层旧思维壤的珍藏？原历史仍会保留。')) return;
+      await requestJson(API.vaultTreasures + '/' + encodeURIComponent(target.dataset.id), { method: 'DELETE' });
+      await router.refresh({ preserveScroll: true });
+      toast('已取消这层珍藏，不影响原思维壤。');
+      return;
+    }
     if (name === 'done') return router.back();
     if (name === 'soil-edit') return router.open('thought-soil-edit');
     if (name === 'pockets') return openPockets();
@@ -237,6 +249,31 @@ export function createMemoryActions({
 
   async function handleSubmit(name, form) {
     const field = (fieldName) => q(`[name="${fieldName}"]`, form)?.value || '';
+    if (name === 'soil-treasure-save') {
+      const conversationId = form.dataset.conversationId;
+      const sourceId = form.dataset.messageId;
+      const total = Number(form.dataset.sectionCount);
+      const chosen = [...form.querySelectorAll('input[name="paragraph"]:checked')]
+        .map(node => Number(node.value)).sort((a, b) => a - b);
+      if (!Number.isSafeInteger(total) || total < 1 ||
+          !chosen.length || chosen.some(index => !Number.isInteger(index) || index < 0 || index >= total)) {
+        throw new Error('请选中至少一段有效的旧思维壤文字。');
+      }
+      if (chosen.length !== total && chosen.length > 40) {
+        throw new Error('一次最多选择 40 段思维壤文字。');
+      }
+      await requestJson(API.vaultTreasures, {
+        method: 'POST',
+        body: JSON.stringify({
+          kind: 'soil', conversation_id: conversationId, source_id: sourceId,
+          ...(chosen.length === total ? {} : { paragraph_indices: chosen }),
+          notes: field('notes').trim(),
+        }),
+      });
+      await router.back();
+      toast('这层思维壤已原位拾入潮间。');
+      return;
+    }
     if (name === 'search') {
       runtime.filters.query = field('query').trim();
       await fetchEntries(runtime.libraryTab);

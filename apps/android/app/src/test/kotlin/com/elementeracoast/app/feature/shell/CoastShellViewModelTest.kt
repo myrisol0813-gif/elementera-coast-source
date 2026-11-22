@@ -4,6 +4,11 @@ import com.elementeracoast.app.core.auth.AuthRepository
 import com.elementeracoast.app.core.auth.AuthSession
 import com.elementeracoast.app.core.auth.SessionRestoreResult
 import com.elementeracoast.app.core.local.MemoryLocalPersistence
+import com.elementeracoast.app.core.model.ChatSearchHit
+import com.elementeracoast.app.core.remote.RemoteTurn
+import com.elementeracoast.app.core.remote.RemoteUserBranch
+import com.elementeracoast.app.core.remote.RemoteAssistantBranches
+import com.elementeracoast.app.core.remote.RemoteVariant
 import com.elementeracoast.app.core.model.ConversationContextSettings
 import com.elementeracoast.app.core.model.CrossWindowLimits
 import com.elementeracoast.app.core.model.CrossWindowMode
@@ -61,6 +66,37 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CoastShellViewModelTest {
+    @Test
+    fun historicalSearchPreviewDoesNotChangeWritableCachedBranchOrNextReply() {
+        val fixture = Fixture()
+        val conversation = fixture.conversations.seed(RoomType.Main, "有两个版本的窗口")
+        val original = RemoteHistory(conversationId = conversation.id, turns = listOf(RemoteTurn(
+            id = "turn-branch",
+            user = RemoteUserBranch(active = 1, variants = listOf(
+                RemoteVariant(id = "user-past", content = "旧版本的问题"),
+                RemoteVariant(id = "user-now", content = "当前版本的问题")
+            )),
+            assistant = RemoteAssistantBranches(
+                activeByUserVariant = mapOf("1" to 0),
+                variantsByUserVariant = mapOf(
+                    "0" to listOf(RemoteVariant(id = "assistant-past", content = "旧版回答")),
+                    "1" to listOf(RemoteVariant(id = "assistant-now", content = "当前回答"))
+                )
+            )
+        )))
+        fixture.chat.histories[conversation.id] = original
+        val vm = fixture.vm()
+        vm.openSearchHit(ChatSearchHit(
+            "message", conversation.id, conversation.title, "turn-branch",
+            "assistant-past", MessageRole.Assistant, "旧版回答"
+        ))
+        assertEquals("旧版回答", vm.state.value.messages.last().text)
+        assertEquals(1, fixture.chat.histories[conversation.id]?.turns?.first()?.user?.active)
+        assertEquals("当前回答", ChatSyncMapper.toUi(fixture.chat.histories[conversation.id]!!).last().text)
+        vm.sendMessage("请接着当前聊天")
+        assertEquals(1, fixture.chat.histories[conversation.id]?.turns?.first()?.user?.active)
+    }
+
     @Test
     fun restoredSessionLoadsSharedConversationHistoryAndProfile() {
         val fixture = Fixture()

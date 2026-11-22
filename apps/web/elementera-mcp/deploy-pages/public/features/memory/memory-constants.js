@@ -1,6 +1,7 @@
 export const MEMORY_ROUTES = new Set([
   'thought-soil',
   'thought-soil-edit',
+  'thought-soil-treasure',
   'memory-pockets',
   'memory',
   'memory-entry-edit',

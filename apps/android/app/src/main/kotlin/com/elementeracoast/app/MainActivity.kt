@@ -72,6 +72,7 @@ class MainActivity : ComponentActivity() {
                         onCrossWindowChange = vm::updateCrossWindow,
                         onOpenRoomType = vm::openRoomType,
                         onSelectConversation = vm::selectConversation,
+                        onSelectSearchHit = vm::openSearchHit,
                         onNewConversation = vm::newConversation,
                         onRenameConversation = vm::renameConversation,
                         onDeleteConversation = vm::deleteConversation,

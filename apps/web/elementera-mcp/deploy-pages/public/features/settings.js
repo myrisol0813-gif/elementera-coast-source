@@ -46,6 +46,39 @@ function sizeLabel(bytes) {
     : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+// A generated archive is not necessarily a complete recoverable backup.
+// Keep missing payloads and incomplete indexes visible before migration.
+export function auditFullArchiveCompleteness(archive) {
+  const warnings = [];
+  if (archive?.format !== 'elementera-coast-full-archive' || archive?.version !== 1) {
+    warnings.push('文件格式或版本不符合完整海岸包约定');
+  }
+  if (!Array.isArray(archive?.chat?.conversations)) {
+    warnings.push('缺少完整聊天窗口目录');
+  }
+  if (!archive?.coast_vault ||
+      archive.coast_vault.basic_media?.complete !== true ||
+      archive.coast_vault.treasures?.complete !== true) {
+    warnings.push('基本文件库或拾潮索引缺失或存在未导出的分页');
+  }
+  const attachmentCount = Number(archive?.attachments?.count) || 0;
+  const attachments = archive?.attachments?.payloads;
+  if (attachmentCount > 0 && !Array.isArray(attachments)) {
+    warnings.push('附件原件清单缺失');
+  } else if (Array.isArray(attachments)) {
+    const unavailable = attachments.filter(item => item?.unavailable === true).length;
+    const omitted = Math.max(0, attachmentCount - attachments.length);
+    if (unavailable || omitted) warnings.push('附件原件缺失 ' + (unavailable + omitted) + ' 项');
+  }
+  const voices = archive?.voice?.clips;
+  const voicePayloads = archive?.voice?.payloads;
+  if (Array.isArray(voices) && voices.length > 0 &&
+      (!Array.isArray(voicePayloads) || voicePayloads.length < voices.length)) {
+    warnings.push('已存语音原件数量与索引不一致');
+  }
+  return warnings;
+}
+
 export function createSettings({ storage, shell, chat, router, toast }) {
   const preferences = () => storage.read().preferences;
 
@@ -212,7 +245,13 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     const body = JSON.stringify(archive, null, 2);
     const bytes = new Blob([body], { type: 'application/json' }).size;
     downloadFile(body, `elementera-coast-full-${timestampLabel()}.coastpack.json`, 'application/json');
-    toast(`完整前端包已生成 · ${sizeLabel(bytes)} · 模型后端返回原文 ${Number(archive.model_echoes?.length || 0)} 条 · 附件原件 ${Number(archive.attachments?.payloads?.length || 0)} 个`, 5200);
+    const warnings = auditFullArchiveCompleteness(archive);
+    if (warnings.length) {
+      toast('海岸包已生成，但尚不能视为完整备份：' + warnings.join('；')
+        + '。请保留原始数据、核对导出文件，不要直接迁移旧红心。', 11000);
+    } else {
+      toast(`完整前端包已生成 · ${sizeLabel(bytes)} · 模型后端返回原文 ${Number(archive.model_echoes?.length || 0)} 条 · 附件原件 ${Number(archive.attachments?.payloads?.length || 0)} 个。请核对已下载文件再迁移。`, 6500);
+    }
   }
 
   async function exportV1Snapshot() {
@@ -289,6 +328,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
       snapshotDataSection('公历日历', snapshot.calendar),
       snapshotDataSection('书房', snapshot.tidal_library),
       snapshotDataSection('语音留存索引', snapshot.voice),
+      snapshotDataSection('海岸文件库 · 基本媒体与拾潮珍藏（含备注/来源）', snapshot.coast_vault),
       snapshotDataSection('模型资料与回波摘要', { model_profile: snapshot.model_profile, model_echo_summaries: snapshot.model_echo_summaries }),
       snapshotDataSection('工具日志摘要', snapshot.tools),
       snapshotDataSection('附件索引与元数据', snapshot.attachments),

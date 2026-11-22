@@ -29,7 +29,7 @@ class FeatureParityTest {
     }
 
     @Test fun dailyLandingKeepsFiveEntrances() = assertEquals(
-        listOf("碳硅圈", "日记", "日历", "书房", "宠物系统"), dailyLandingItems().map { it.title }
+        listOf("碳硅圈", "日记", "文件库", "日历", "书房", "宠物系统"), dailyLandingItems().map { it.title }
     )
 
     @Test fun memoryLandingKeepsMemoryV2AndPairedPortraitEntrances() = assertEquals(
