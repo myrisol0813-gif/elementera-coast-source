@@ -12,6 +12,7 @@ import {
   createUserPortraitCandidate,
   upsertSoilCandidates,
   writeSoil,
+  saveSoilSnapshot,
 } from '../memory-store.js';
 import { ModelRequestError, performFormalChat } from '../models.js';
 import {
@@ -584,6 +585,14 @@ export async function organizeConversationSoil(env, conversationId, value) {
     manual_locked: oldSoil.manual_locked,
     auto_refresh_enabled: oldSoil.auto_refresh_enabled,
   };
+  // Preserve the last pre-upgrade live soil before replacing it.
+  const previousBranch = turns.find(branch =>
+    branch.turn_id === oldSoil.organized_through_turn_id
+    && branch.turn_id !== latestTurn.turn_id
+  );
+  if (previousBranch && (oldSoil.current_text || oldSoil.afterthoughts?.length)) {
+    await saveSoilSnapshot(env.COAST_CHAT_DB, conversationId, previousBranch, oldSoil);
+  }
   let writtenSoil = await writeSoil(env.COAST_CHAT_DB, conversationId, soilValue, {
     automatic: true,
     provenance: {
@@ -591,6 +600,7 @@ export async function organizeConversationSoil(env, conversationId, value) {
       source_conversation_id: conversationId,
       source_turn_id: soilValue.organized_through_turn_id || '',
     },
+    snapshotBranch: latestTurn,
   });
   if (organizedBy) {
     await saveGenerationProvenance(env.COAST_CHAT_DB, 'soil', conversationId, organizedBy);
