@@ -28,7 +28,7 @@ function mediaChoices(variant, role, voices) {
   return records;
 }
 
-export function createChatTreasures({ runtime, currentHistory, toast }) {
+export function createChatTreasures({ runtime, currentHistory, toast, renderMessages }) {
   async function getSaved(conversationId, turnId) {
     const collected = [];
     let cursor = '';
@@ -42,6 +42,41 @@ export function createChatTreasures({ runtime, currentHistory, toast }) {
       if (!cursor) return collected;
     }
     throw new Error('同一轮收藏数量超过查看上限，请到拾潮中整理。');
+  }
+
+  // Server treasure rows, not the retired favorite boolean, are authoritative.
+  // Called on conversation load and after confirmed saves/removals. No automatic
+  // background writes or model context injection.
+  async function refreshIndex(conversationId) {
+    if (!conversationId) return;
+    const rows = [];
+    let cursor = '';
+    for (let page = 0; page < 250; page += 1) {
+      const query = API.vaultTreasures + '?conversation_id=' + encodeURIComponent(conversationId)
+        + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '');
+      const result = await requestJson(query);
+      rows.push(...(result.items || []));
+      cursor = result.next_cursor || '';
+      if (!cursor) break;
+    }
+    if (cursor) throw new Error('当前窗口的珍藏索引超过读取上限。');
+    const messageIds = new Set(rows.map((item) => item.message_id).filter(Boolean));
+    const userMediaTurns = new Set(rows.filter((item) =>
+      item.kind === 'image' || item.kind === 'file').map((item) => item.turn_id).filter(Boolean));
+    runtime.treasureIndicators.set(conversationId, { messageIds, userMediaTurns });
+    // Update only the visible hearts, never force a whole chat re-render or
+    // scroll the user away from the original source message.
+    if (runtime.currentId === conversationId) {
+      for (const article of document.querySelectorAll('.message[data-message-id][data-turn]')) {
+        const button = article.querySelector('[data-action="chat:favorite"]');
+        if (!button) continue;
+        const id = article.dataset.messageId || '';
+        const saved = messageIds.has(id) || (article.classList.contains('user')
+          && userMediaTurns.has(article.dataset.turn || ''));
+        button.classList.toggle('is-active', saved);
+        button.setAttribute('aria-pressed', String(saved));
+      }
+    }
   }
 
   async function open(target) {
@@ -174,6 +209,7 @@ export function createChatTreasures({ runtime, currentHistory, toast }) {
             ...(change.body ? { body: JSON.stringify(change.body) } : {}),
           });
         }
+        await refreshIndex(conversationId);
         close();
         toast(changes.length ? '已更新拾潮收藏，原媒体不受影响。' : '收藏内容没有变化。');
       } catch (failure) {
@@ -186,5 +222,5 @@ export function createChatTreasures({ runtime, currentHistory, toast }) {
     else dialog.setAttribute('open', '');
   }
 
-  return Object.freeze({ open });
+  return Object.freeze({ open, refreshIndex });
 }
