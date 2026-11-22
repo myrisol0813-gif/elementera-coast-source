@@ -90,7 +90,7 @@ console.log('coast vault & cross-window message search: ok');
 
 // Live SQLite/D1 compatibility: test the real service, not just a mocked result.
 const { D1Database } = await import('./d1-helper.mjs');
-const { createConversation, writeConversationState, deleteConversation } = await import('../functions/chat-store.js');
+const { createConversation, writeConversationState, readConversationState, deleteConversation } = await import('../functions/chat-store.js');
 const { uploadChatAttachment, bindChatAttachmentsToTurn } = await import('../functions/chat-attachments.js');
 const { ensureVoiceSchema } = await import('../functions/voice-clips.js');
 const { searchChatMessages } = await import('../functions/chat-search.js');
