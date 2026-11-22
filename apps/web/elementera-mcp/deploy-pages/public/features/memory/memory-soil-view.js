@@ -94,6 +94,8 @@ function candidateBlock(items, emptyText) {
 export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentSoil }) {
   function renderSoilEntry(conversationId, turnId = '', assistantId = '', isLatest = false) {
     const live = runtime.soils.get(conversationId) || emptySoil(conversationId);
+    const tooManyLayers = runtime.soilHistoryTruncated.get(conversationId) === true;
+
     const historical = (runtime.soilHistory.get(conversationId) || [])
       .find(item => item.turn_id === turnId && item.assistant_message_id === assistantId);
     if (!historical && !isLatest) return '';
@@ -102,11 +104,12 @@ export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentS
     const state = isLatest
       ? live.auto_refresh_enabled === false ? ' · 已关闭' : live.manual_locked ? ' · 已锁定' : ''
       : ' · 已留存';
+    const overflowLabel = isLatest && tooManyLayers ? ' · 更早历史请见导出' : '';
     const messageAttr = isLatest ? '' : ` data-message-id="${escapeAttribute(assistantId)}"`;
     return `<div class="thought-soil-row"><button class="thought-soil-entry" type="button"
       data-action="memory:soil-open" data-scope="conversation"
       data-conversation-id="${escapeAttribute(conversationId)}"${messageAttr}>
-      思维壤 · ${afterthoughts.length} 条余思${state} <span aria-hidden="true">›</span>
+      思维壤 · ${afterthoughts.length} 条余思${state}${overflowLabel} <span aria-hidden="true">›</span>
     </button></div>`;
   }
 
@@ -206,7 +209,7 @@ export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentS
         ? '已关闭 · 不整理，也不递入模型上下文'
         : soil.manual_locked
           ? '手动内容已锁定 · 当前与余思仍会递入模型上下文'
-          : '当前 · 余思 · 去处',
+          : (runtime.soilHistoryTruncated.get(id) ? '当前 · 余思 · 去处｜旧历史仅展示最近1000层，完整内容可导出' : '当前 · 余思 · 去处'),
       className: 'memory-soil',
       headerAction: '<button class="feature-head-action" type="button" data-action="memory:done">完成</button>',
       body: soilBody(soil, { scope: 'conversation', pendingPockets: pockets }),
