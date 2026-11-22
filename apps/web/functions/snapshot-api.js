@@ -32,6 +32,8 @@ import { listToolRuns } from './tool-run-log.js';
 import { mailboxOwnerSummary } from './mailbox-service.js';
 import { listCalendarEntries } from './calendar-store.js';
 import { listVoiceClips, voiceClipAudio } from './voice-clips.js';
+import { listMediaLibrary } from './coast-vault-media.js';
+import { listTreasures } from './coast-vault-treasures.js';
 import { exportLibrary } from './tidal-library.js';
 import { apiError, json, methodNotAllowed } from './http.js';
 
@@ -150,6 +152,32 @@ async function pocketsForConversation(db, conversationId) {
   return output;
 }
 
+// Export only indexes and user-selected text/notes here; full archive already
+// adds persisted attachment and voice payloads through their canonical storage.
+async function exportCoastVault(db) {
+  async function collect(read) {
+    const items = [];
+    let cursor = '';
+    for (let page = 0; page < 250; page += 1) {
+      const result = await read(cursor);
+      items.push(...result.items);
+      cursor = result.next_cursor || '';
+      if (!cursor) return { items, count: items.length, complete: true, next_cursor: null };
+    }
+    return { items, count: items.length, complete: false, next_cursor: cursor };
+  }
+  const [basic, treasures] = await Promise.all([
+    collect((cursor) => listMediaLibrary(db, { cursor: cursor || 0 })),
+    collect((cursor) => listTreasures(db, { cursor: cursor || 0 })),
+  ]);
+  return {
+    basic_media: basic,
+    treasures,
+    media_binary_included: false,
+    media_source: 'canonical_chat_attachment_and_generated_voice_records',
+  };
+}
+
 async function buildSnapshot(env) {
   const db = env.COAST_CHAT_DB;
   const conversations = await listConversations(db);
@@ -201,6 +229,7 @@ async function buildSnapshot(env) {
     mailboxSummary,
     calendarEntries,
     tidalLibrary,
+    coastVault,
   ] = await Promise.all([
     allMemoryEntries(db),
     readCustomInstructions(db),
@@ -222,6 +251,7 @@ async function buildSnapshot(env) {
     mailboxOwnerSummary(db),
     listCalendarEntries(db, { all: true }),
     exportLibrary(db),
+    exportCoastVault(db),
   ]);
 
   const raw = {
@@ -247,6 +277,8 @@ async function buildSnapshot(env) {
       'daily',
       'calendar',
       'voice_clip_index',
+      'media_library_index',
+      'treasures',
       'tidal_library',
       'model_profile',
       'tool_settings',
@@ -326,6 +358,7 @@ async function buildSnapshot(env) {
     calendar: { entries: calendarEntries },
     voice: { clips: voiceClips, binary_included: false },
     tidal_library: tidalLibrary,
+    coast_vault: coastVault,
     model_profile: profile,
     model_echo_summaries: modelEchoSummaries,
     tools: {
