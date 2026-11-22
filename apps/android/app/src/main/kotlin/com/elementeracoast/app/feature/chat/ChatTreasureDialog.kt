@@ -77,8 +77,7 @@ internal fun ChatTreasureDialog(
     voiceClips: List<VoiceClip>,
     repository: SideRoomsRepository,
     onDismiss: () -> Unit,
-    onSaved: () -> Unit,
-    onNotice: (String) -> Unit
+    onSaved: () -> Unit
 ) {
     val turnId = message.turnId.orEmpty()
     val choices = remember(message.remoteVariantId, message.text, message.attachments, voiceClips) {
@@ -106,13 +105,13 @@ internal fun ChatTreasureDialog(
         try {
             val rows = mutableListOf<JsonObject>()
             var cursor = ""
-            repeat(6) {
+            for (pageIndex in 0 until 6) {
                 val page = repository.vaultTreasures(conversationId = conversationId,
                     turnId = turnId, cursor = cursor)
                 rows.addAll((page["items"] as? JsonArray).orEmpty()
                     .mapNotNull { it as? JsonObject })
                 cursor = page["next_cursor"]?.jsonPrimitive?.contentOrNull.orEmpty()
-                if (cursor.isBlank()) return@repeat
+                if (cursor.isBlank()) break
             }
             if (cursor.isNotBlank()) throw IllegalStateException("收藏数量超出当前查看上限。")
             val related = rows.filter { it.vText("kind") + ":" + it.vText("source_id") in keys }
@@ -167,7 +166,7 @@ internal fun ChatTreasureDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (loading) Text("正在读取这条消息的收藏状态…")
                 if (!loading && choices.isEmpty()) Text("没有可珍藏的正文或媒体。")
-                if (!loading && error.isBlank() || !loading && saved.isNotEmpty()) choices.forEach { choice ->
+                if (!loading) choices.forEach { choice ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
                             checked = choice.key in selected,
