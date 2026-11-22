@@ -222,7 +222,7 @@ export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentS
 
   function soilTreasureSegments(snapshot) {
     return [snapshot?.current_text, ...(Array.isArray(snapshot?.afterthoughts) ? snapshot.afterthoughts : [])]
-      .flatMap(item => String(item || '').split(/\\n\\s*\\n/))
+      .flatMap(item => String(item || '').split(/\n\s*\n/))
       .map(item => item.trim()).filter(Boolean);
   }
 
