@@ -151,7 +151,9 @@ internal fun ChatTimeline(
                             organizer = history.organizer,
                             updatedAt = history.updatedAt,
                             history = emptyList(),
-                            isHistorical = true
+                            isHistorical = true,
+                            sourceTurnId = history.turnId,
+                            sourceAssistantMessageId = history.assistantMessageId
                         )
                     }
                     if (message.role == MessageRole.Assistant && !streamingTail && message.furnitureRuns.isNotEmpty()) {
