@@ -42,6 +42,21 @@ async function initializeMemorySchema(db) {
   await run(db, `UPDATE conversation_soils
     SET tool_call_ids_json = json_array(tool_call_id)
     WHERE tool_call_id IS NOT NULL AND json_array_length(tool_call_ids_json) = 0`);
+  // Additive and non-destructive: each assistant variant keeps its own paper.
+  await run(db, `CREATE TABLE IF NOT EXISTS conversation_soil_snapshots (
+    conversation_id TEXT NOT NULL,
+    turn_id TEXT NOT NULL,
+    assistant_message_id TEXT NOT NULL,
+    current_text TEXT NOT NULL DEFAULT '',
+    afterthoughts_json TEXT NOT NULL DEFAULT '[]',
+    revision INTEGER NOT NULL,
+    model_label TEXT NOT NULL DEFAULT '',
+    display_author TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (conversation_id, assistant_message_id),
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+  )`);
+  await run(db, 'CREATE INDEX IF NOT EXISTS idx_soil_snapshots_conversation ON conversation_soil_snapshots(conversation_id, created_at DESC)');
   await run(db, `CREATE TABLE IF NOT EXISTS memory_pockets (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL DEFAULT 'owner',
