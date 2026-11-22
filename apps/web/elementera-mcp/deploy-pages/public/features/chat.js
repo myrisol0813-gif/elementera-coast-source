@@ -34,6 +34,7 @@ export function createChat({ storage, toast, dogtalk }) {
   const runtime = {
     conversations: [],
     histories: new Map(),
+    treasureIndicators: new Map(),
     rikkahubAttachments: new Map(),
     rikkahubExpanded: false,
     currentId: '',
@@ -175,7 +176,7 @@ export function createChat({ storage, toast, dogtalk }) {
   });
 
   const voice = createChatVoice({ runtime, toast, renderMessages });
-  const treasures = createChatTreasures({ runtime, currentHistory, toast });
+  const treasures = createChatTreasures({ runtime, currentHistory, toast, renderMessages });
 
   async function persistProfile(profile) {
     const data = await requestJson(API.profile, {
@@ -227,6 +228,7 @@ export function createChat({ storage, toast, dogtalk }) {
     renderMessages,
     closeMenu,
     voice,
+    refreshTreasureIndex: treasures.refreshIndex,
   });
 
   const windowSettings = createChatWindowSettings({
