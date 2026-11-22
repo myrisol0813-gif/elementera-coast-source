@@ -289,6 +289,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
       snapshotDataSection('公历日历', snapshot.calendar),
       snapshotDataSection('书房', snapshot.tidal_library),
       snapshotDataSection('语音留存索引', snapshot.voice),
+      snapshotDataSection('海岸文件库 · 基本媒体与拾潮珍藏（含备注/来源）', snapshot.coast_vault),
       snapshotDataSection('模型资料与回波摘要', { model_profile: snapshot.model_profile, model_echo_summaries: snapshot.model_echo_summaries }),
       snapshotDataSection('工具日志摘要', snapshot.tools),
       snapshotDataSection('附件索引与元数据', snapshot.attachments),
