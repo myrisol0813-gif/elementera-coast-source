@@ -397,4 +397,11 @@ assert.match(auditFullArchiveCompleteness({
 }).join('；'), /语音原件/,
 'missing voice binary payload must be reported as incomplete');
 
+assert.match(chatRenderPreview, /legacyAssistantHeart/,
+  'historical red hearts stay visible while migration awaits owner confirmation');
+assert.match(chatRenderPreview, /data-legacy-favorite/,
+  'saved-heart refresh can distinguish old favorites from new treasure records');
+assert.match(chatTreasuresPreview, /oldHeart && !saved/,
+  'a partial migration must not silently hide remaining legacy hearts');
+
 console.log('coast vault SQLite integration: ok');
