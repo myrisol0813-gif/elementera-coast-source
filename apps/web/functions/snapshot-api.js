@@ -154,7 +154,7 @@ async function pocketsForConversation(db, conversationId) {
 
 // Export only indexes and user-selected text/notes here; full archive already
 // adds persisted attachment and voice payloads through their canonical storage.
-async function exportCoastVault(db) {
+export async function exportCoastVault(db) {
   async function collect(read) {
     const items = [];
     let cursor = '';
