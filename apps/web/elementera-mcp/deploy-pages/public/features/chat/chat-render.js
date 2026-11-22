@@ -176,7 +176,8 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
   function renderMessages(conversationId = runtime.currentId) {
     discardStreamingPatches(conversationId);
     if (!ui.messages || conversationId !== runtime.currentId) return;
-    const state = runtime.histories.get(conversationId) || createState();
+    const preview = runtime.searchPreview?.get(conversationId);
+    const state = preview || runtime.histories.get(conversationId) || createState();
     const latestAssistantTurnId = [...state.turns].reverse().find((turn) => activeBranch(turn).assistant)?.id || '';
     let lastDateKey = '';
     const html = state.turns.map((turn) => {
@@ -220,7 +221,10 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
         : '';
       return userDivider + user + soil + assistantDivider + assistant;
     }).join('');
-    ui.messages.innerHTML = html || '<div class="empty-state">这里还没有消息。</div>';
+    const previewNote = preview
+      ? '<div class="coast-search-preview-note" role="status">正在预览搜索命中的旧消息版本 · 不影响正式聊天历史 <button type="button" data-action="chat:end-search-preview">结束预览</button></div>'
+      : '';
+    ui.messages.innerHTML = previewNote + (html || '<div class="empty-state">这里还没有消息。</div>');
     hydrateModelMetadataTraces(ui.messages);
     const avatarUrl = runtime.profile.assistant_avatar_dataurl;
     if (avatarUrl) {
