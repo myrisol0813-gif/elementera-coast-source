@@ -78,7 +78,7 @@ function shape(row) {
   };
 }
 
-export async function listTreasures(db, { kind = 'all', q = '', cursor = 0 } = {}) {
+export async function listTreasures(db, { kind = 'all', q = '', cursor = 0, conversation_id = '', turn_id = '' } = {}) {
   await initialize(db);
   const type = String(kind || 'all');
   if (!['all', 'text', 'audio', 'image', 'file'].includes(type)) {
@@ -90,12 +90,16 @@ export async function listTreasures(db, { kind = 'all', q = '', cursor = 0 } = {
   if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000) {
     throw new TreasureError('invalid_cursor', '收藏翻页位置无效。');
   }
+  const conversationId = conversation_id ? validId(conversation_id, 'conversation') : '';
+  const turnId = turn_id ? validId(turn_id, 'turn') : '';
   const result = await db.prepare(
     "SELECT t.* FROM coast_vault_treasures t JOIN conversations c ON c.id = t.conversation_id " +
     "WHERE c.user_id = 'owner' AND (? = 'all' OR t.kind = ?) " +
+    "AND (? = '' OR t.conversation_id = ?) AND (? = '' OR t.turn_id = ?) " +
     "AND (t.excerpt LIKE ? ESCAPE '!' OR t.notes LIKE ? ESCAPE '!') " +
     "ORDER BY t.updated_at DESC, t.id DESC LIMIT ? OFFSET ?"
-  ).bind(type, type, like(query), like(query), TREASURE_LIMITS.result_page + 1, offset).all();
+  ).bind(type, type, conversationId, conversationId, turnId, turnId,
+    like(query), like(query), TREASURE_LIMITS.result_page + 1, offset).all();
   const rows = result?.results || [];
   return {
     items: rows.slice(0, TREASURE_LIMITS.result_page).map(shape),
