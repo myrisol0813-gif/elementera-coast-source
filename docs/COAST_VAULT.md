@@ -23,7 +23,7 @@ The additive `coast_vault_treasures` table is created only in a host that has co
 
 ## Known gaps in draft branch
 
-The existing message-row heart UI is not yet connected to the new multi-item selection sheet; the Native sidebar has not yet adopted exact-message full-text navigation. Favorites of historical thought-soil snapshots, comprehensive JSON+HTML exports, deleted-original media retention, and any media held only by non-chat modules remain out of scope for the first PR iteration. The basic library only indexes media that actually exists in the host's canonical tables.
+The Web PWA message-row heart now opens a draft multi-item sheet for text paragraphs, images, saved audio and attachments; Native has not yet adopted this selection sheet or exact-message full-text navigation. Favorites of historical thought-soil snapshots, comprehensive JSON+HTML exports, deleted-original media retention, and any media held only by non-chat modules remain out of scope for the first PR iteration. The basic library only indexes media that actually exists in the host's canonical tables.
 
 The server contains no new automatic memory/context injection for this collection. Users can search it, but the model has no general background right to read it; a separate permissioned two-step tool contract must be added before claiming model recall support.
 
