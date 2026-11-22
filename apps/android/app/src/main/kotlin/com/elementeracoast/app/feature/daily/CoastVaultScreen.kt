@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -43,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -78,7 +80,7 @@ private val basicKinds = listOf("all" to "全部", "image" to "影像", "audio" 
 private val treasureKinds = listOf("all" to "全部", "writing" to "文字", "image" to "影像",
     "audio" to "声音", "other" to "其他")
 
-private fun vaultSection(kind: String, treasure: Boolean): String = when (kind) {
+internal fun vaultSection(kind: String, treasure: Boolean): String = when (kind) {
     "image" -> "影像"
     "audio" -> "声音"
     "file" -> if (treasure) "其他" else "文件"
@@ -90,7 +92,7 @@ private fun vaultSectionOrder(treasure: Boolean): List<String> =
     if (treasure) listOf("文字", "影像", "声音", "其他")
     else listOf("影像", "声音", "文件")
 
-private fun vaultVisibleRows(rows: List<JsonObject>, mode: String, kind: String): List<JsonObject> {
+internal fun vaultVisibleRows(rows: List<JsonObject>, mode: String, kind: String): List<JsonObject> {
     if (mode != "treasures") return rows
     return when (kind) {
         "writing" -> rows.filter { it.vaultText("kind") == "text" || it.vaultText("kind") == "soil" }
@@ -190,16 +192,37 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
                         verticalArrangement = Arrangement.spacedBy(9.dp)) {
                         Text("检索", fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.titleSmall)
-                        OutlinedTextField(
-                            value = query, onValueChange = { query = it.take(100) },
-                            modifier = Modifier.fillMaxWidth(), singleLine = true,
-                            placeholder = { Text("搜索文件、语音或收藏备注", style = MaterialTheme.typography.bodySmall) },
-                            trailingIcon = {
+                        SnowLetterSurface(
+                            modifier = Modifier.fillMaxWidth(),
+                            role = SnowLetterSurfaceRole.ComposerField,
+                            fallbackColor = MaterialTheme.colorScheme.surface,
+                            fallbackShape = RoundedCornerShape(16.dp)
+                        ) {
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.weight(1f)) {
+                                    BasicTextField(
+                                        value = query, onValueChange = { query = it.take(100) },
+                                        modifier = Modifier.fillMaxWidth(), singleLine = true,
+                                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        ),
+                                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                        decorationBox = { inner ->
+                                            Box {
+                                                if (query.isEmpty()) Text("搜索文件、语音或备注",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                inner()
+                                            }
+                                        }
+                                    )
+                                }
                                 TextButton(onClick = { submittedQuery = query; revision++ }) {
                                     Text("搜索")
                                 }
                             }
-                        )
+                        }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             labels.forEach { (value, title) ->
                                 val selected = kind == value
