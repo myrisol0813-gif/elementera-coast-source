@@ -269,21 +269,21 @@ const chatRenderPreview = readFileSync(new URL('../elementera-mcp/deploy-pages/p
 const chatActionsPreview = readFileSync(new URL('../elementera-mcp/deploy-pages/public/features/chat/chat-actions.js', import.meta.url), 'utf8');
 const chatConversationsPreview = readFileSync(new URL('../elementera-mcp/deploy-pages/public/features/chat/chat-conversations.js', import.meta.url), 'utf8');
 const chatTreasuresPreview = readFileSync(new URL('../elementera-mcp/deploy-pages/public/features/chat/chat-treasures.js', import.meta.url), 'utf8');
-assert.match(chatFeature, /runtime\\.searchPreview\\.set\\(hit\\.conversation_id, state\\)/,
+assert.match(chatFeature, /runtime\.searchPreview\.set\(hit\.conversation_id, state\)/,
   'a historical search must put an inactive variant into transient preview only');
-assert.doesNotMatch(chatFeature, /setHistory\\(hit\\.conversation_id, state\\)/,
+assert.doesNotMatch(chatFeature, /setHistory\(hit\.conversation_id, state\)/,
   'a search must not replace canonical history before the next send');
-assert.match(chatRenderPreview, /preview \\|\\| runtime\\.histories\\.get/,
+assert.match(chatRenderPreview, /preview \|\| runtime\.histories\.get/,
   'preview is only a presentation layer');
 assert.match(chatRenderPreview, /chat:end-search-preview/,
   'a user can return to canonical active branch before sending');
-assert.match(chatActionsPreview, /runtime\\.searchPreview\\?\\.has\\(runtime\\.currentId\\)/,
+assert.match(chatActionsPreview, /runtime\.searchPreview\\?\.has\(runtime\.currentId\)/,
   'sending and edits are blocked while an old branch is being previewed');
-assert.match(chatActionsPreview, /runtime\\.searchPreview\\?\\.get\\(runtime\\.currentId\\) \\|\\| currentHistory\\(\\)/,
+assert.match(chatActionsPreview, /runtime\.searchPreview\\?\.get\(runtime\.currentId\) \|\| currentHistory\(\)/,
   'copying a historical message must copy the displayed version');
-assert.match(chatTreasuresPreview, /runtime\\.searchPreview\\?\\.get\\(conversationId\\) \\|\\| currentHistory\\(\\)/,
+assert.match(chatTreasuresPreview, /runtime\.searchPreview\\?\.get\(conversationId\) \|\| currentHistory\(\)/,
   'saving a historical favorite uses the displayed original variant ID');
-assert.match(chatConversationsPreview, /runtime\\.searchPreview\\?\\.clear\\(\\)/,
+assert.match(chatConversationsPreview, /runtime\.searchPreview\\?\.clear\(\)/,
   'opening another room ends transient preview without writing it');
 
 console.log('coast vault SQLite integration: ok');
