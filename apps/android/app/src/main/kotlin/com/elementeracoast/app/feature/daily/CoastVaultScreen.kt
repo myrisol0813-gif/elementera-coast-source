@@ -4,6 +4,8 @@ import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import com.elementeracoast.app.core.model.ChatSearchHit
+import com.elementeracoast.app.core.model.MessageRole
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -62,7 +64,8 @@ private val vaultTreasureKinds = listOf("all" to "全部", "text" to "文字", "
  * media database: all notes and favorites are written to the Coast backend.
  */
 @Composable
-fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Unit) {
+fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Unit,
+    onOpenSource: (ChatSearchHit) -> Unit) {
     val scope = rememberCoroutineScope()
     var mode by remember { mutableStateOf("basic") }
     var kind by remember { mutableStateOf("all") }
@@ -148,7 +151,7 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
             }
         }
         items(rows, key = { it.vaultText("id") }) { item ->
-            CoastVaultCard(item, mode == "treasures", repository, onSnackbar) { revision++ }
+            CoastVaultCard(item, mode == "treasures", repository, onSnackbar, onOpenSource) { revision++ }
         }
         if (nextCursor.isNotBlank()) item {
             TextButton(
@@ -171,6 +174,7 @@ private fun CoastVaultCard(
     treasure: Boolean,
     repository: SideRoomsRepository,
     onSnackbar: (String) -> Unit,
+    onOpenSource: (ChatSearchHit) -> Unit,
     onChanged: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -280,6 +284,24 @@ private fun CoastVaultCard(
                 }
                 if (kind == "image" || kind == "file" || kind == "audio") {
                     TextButton(enabled = !busy, onClick = ::download) { Text("保存文件") }
+                }
+                if (conversation.isNotBlank()) {
+                    TextButton(enabled = !busy, onClick = {
+                        val messageId = item.vaultText("message_id")
+                        val turnId = item.vaultText("turn_id")
+                        val role = when (item.vaultText("role")) {
+                            "user" -> MessageRole.User
+                            "assistant" -> MessageRole.Assistant
+                            else -> null
+                        }
+                        onOpenSource(ChatSearchHit(
+                            kind = if (messageId.isNotBlank() && turnId.isNotBlank() && role != null)
+                                "message" else "conversation",
+                            conversationId = conversation, conversationTitle = "",
+                            turnId = turnId, messageId = messageId, role = role,
+                            snippet = excerpt.take(180)
+                        ))
+                    }) { Text("回到来源") }
                 }
             }
         }
