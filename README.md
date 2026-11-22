@@ -828,3 +828,9 @@ It remains a reference implementation rather than a mature framework or hosted p
 MIT License.
 
 See `LICENSE`.
+
+## Source Native 0.2.19 · Paper-gallery Vault (Draft)
+
+The Source Android visitor's media-gallery presentation tracks the Native paper-gallery revision: compact text-only `基本文件库` / `拾潮` tabs, paper search, category sections, two-column image frames, collapsed text, saved-audio progress strips, and textual detail menus. It uses only the Source application's own visitor permissions and backend contracts; no private production media or credentials are included. Voice replay uses existing clips and does not generate paid audio. The visitor-only QA APK remains a separate package with its own disposable signing certificate.
+
+Version `21 / 0.2.19-source` must pass Source Web and Android CI and publish its own Release asset before real-device QA.
