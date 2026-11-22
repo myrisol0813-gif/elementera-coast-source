@@ -64,12 +64,15 @@ fun ChatWindow(
     onOpenActionLog: (Set<String>) -> Unit,
     onOpenPendingMemory: () -> Unit,
     onSetThoughtSoilEnabled: (Boolean) -> Unit,
+    onSaveThoughtSoil: (String, List<String>) -> Unit,
+    onResumeThoughtSoil: () -> Unit,
     onPlaceholder: (String) -> Unit
 ) {
     var input by rememberSaveable(state.activeConversationId) { mutableStateOf("") }
     var avatarDialogOpen by rememberSaveable { mutableStateOf(false) }
     var editingMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var soilOpen by rememberSaveable { mutableStateOf(false) }
+    var selectedSoil by remember(state.activeConversationId) { mutableStateOf<com.elementeracoast.app.core.model.ThoughtSoilSnapshot?>(null) }
     var deskOpen by rememberSaveable { mutableStateOf(false) }
     var drawerOpen by rememberSaveable(state.activeConversationId) { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
@@ -168,7 +171,7 @@ fun ChatWindow(
                     onPlaceholder("生成足迹：$model · $source")
                 },
                 onOpenActionLog = onOpenActionLog,
-                onOpenThoughtSoil = { if (state.thoughtSoil != null) soilOpen = true },
+                onOpenThoughtSoil = { clicked -> selectedSoil = clicked; soilOpen = true },
                 modifier = Modifier.weight(1f)
             )
 
@@ -216,13 +219,15 @@ fun ChatWindow(
         }
     }
 
-    val soil = state.thoughtSoil
+    val soil = if (selectedSoil?.isHistorical == true) selectedSoil else state.thoughtSoil
     if (soilOpen && soil != null) {
         SoilBottomSheet(
             soil = soil,
             onSetEnabled = onSetThoughtSoilEnabled,
+            onSave = onSaveThoughtSoil,
+            onResumeAutomatic = onResumeThoughtSoil,
             onOpenPendingBag = onOpenPendingMemory,
-            onDismiss = { soilOpen = false }
+            onDismiss = { soilOpen = false; selectedSoil = null }
         )
     }
 
