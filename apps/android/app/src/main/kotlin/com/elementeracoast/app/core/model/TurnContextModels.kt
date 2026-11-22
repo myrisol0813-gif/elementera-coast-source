@@ -32,6 +32,8 @@ data class ThoughtSoilSnapshot(
     val updatedAt: String,
     val history: List<SoilHistoricSnapshot> = emptyList(),
     val isHistorical: Boolean = false,
+    val sourceTurnId: String = "",
+    val sourceAssistantMessageId: String = "",
     val historyTruncated: Boolean = false
 )
 
