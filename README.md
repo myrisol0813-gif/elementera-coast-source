@@ -668,6 +668,17 @@ Historical implementation milestones belong in [source release history](docs/SOU
 
 **Older builds are not recommended downloads.** The `0.2.6` through `0.2.9` visitor packages are superseded; `0.2.9` was reported rejected by a phone installer and withdrawn. Earlier `0.2.2` Quick Tunnel demos and the original `v0.1-source` preview are historical milestones, not current installation instructions; the `v0.1-source` release is no longer available on the Releases page. Keep their implementation notes in [source release history](docs/SOURCE_RELEASE_HISTORY.md), not in the current APK download instructions.
 
+
+## Coast Vault and exact chat search (feature branch)
+
+The Coast Vault feature introduces two separate surfaces backed by the same authorized server:
+
+- **Basic media library:** reads existing persisted chat images, attachments and previously generated audio. It does not automatically save arbitrary chat text or invoke paid text-to-speech for old clips.
+- **拾潮 / Treasures:** an explicit user-created favorites layer for selected message text or media. It supports notes, text search, cancellation without deleting the underlying media, and original source IDs. A guarded legacy-heart migration is available for review and idempotent import.
+- **Chat search:** the sidebar query also requests bounded full-text matches from the backend, returning conversation, turn, message and branch/variant identities instead of searching room titles alone.
+
+This code is on a draft integration branch. Do not treat a feature-branch APK, a green Web job, or the presence of D1 schema creation code as proof of a completed production deployment. Old chat/media data that was never persisted cannot be reconstructed. For implementation details, safety requirements and endpoint semantics, see [Coast Vault technical note](docs/COAST_VAULT.md).
+
 ## Running and testing
 
 ### Web
@@ -808,7 +819,7 @@ You should expect to fork, rename, configure, simplify, and replace parts of it 
 
 ## Project status
 
-The repository began with `v0.1-source`; the current Android source identity is `0.2.17-source` (`versionCode=18`), with the PWA and backend continuing to evolve independently under the same source tree.
+The repository began with `v0.1-source`; the current feature-branch Android source identity is `0.2.18-source` (`versionCode=20`), with the PWA and backend continuing to evolve independently under the same source tree.
 
 It remains a reference implementation rather than a mature framework or hosted product. Current feature status is documented above; older milestones and superseded QA flows are kept in [docs/SOURCE_RELEASE_HISTORY.md](docs/SOURCE_RELEASE_HISTORY.md).
 
