@@ -27,12 +27,12 @@ for (const access of ownerAccess) {
   assert.equal(access.memory, 'conversation_and_global');
   assert.deepEqual(access.modelVisibleTools, [
     'daily.create_moment', 'daily.create_diary', 'daily.moment_comment', 'daily.moment_like',
-    'dogtalk.read', 'memory.search', 'memory.write_candidate', 'memory.global_excerpt_propose',
+    'dogtalk.read', 'vault.search', 'vault.read', 'memory.search', 'memory.write_candidate', 'memory.global_excerpt_propose',
     'cross_window.search', 'cross_window.keyword_search', 'cross_window.read_messages', 'cross_window.read_recent',
     'calendar.list', 'calendar.create', 'calendar.update', 'calendar.delete',
     'library.books', 'library.read', 'library.notes', 'library.write', 'voice.create',
   ]);
-  assert.deepEqual(access.backendTools, ['daily.*', 'dogtalk.*', 'memory.*', 'cross_window.*', 'calendar.*', 'library.*', 'voice.create']);
+  assert.deepEqual(access.backendTools, ['daily.*', 'dogtalk.*', 'memory.*', 'cross_window.*', 'calendar.*', 'library.*', 'voice.create', 'vault.*']);
 }
 for (const access of ownerAccess.slice(1)) {
   assert.deepEqual(access.backendTools, ownerAccess[0].backendTools, 'main/radio/lighthouse backend tools must stay identical');
