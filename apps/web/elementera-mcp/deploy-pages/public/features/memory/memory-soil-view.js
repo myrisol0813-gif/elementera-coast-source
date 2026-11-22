@@ -92,11 +92,22 @@ function candidateBlock(items, emptyText) {
 }
 
 export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentSoil }) {
-  function renderSoilEntry(conversationId) {
-    const soil = runtime.soils.get(conversationId) || emptySoil(conversationId);
+  function renderSoilEntry(conversationId, turnId = '', assistantId = '', isLatest = false) {
+    const live = runtime.soils.get(conversationId) || emptySoil(conversationId);
+    const historical = (runtime.soilHistory.get(conversationId) || [])
+      .find(item => item.turn_id === turnId && item.assistant_message_id === assistantId);
+    if (!historical && !isLatest) return '';
+    const soil = isLatest ? live : historical;
     const afterthoughts = Array.isArray(soil.afterthoughts) ? soil.afterthoughts : [];
-    const state = soil.auto_refresh_enabled === false ? ' · 已关闭' : soil.manual_locked ? ' · 已锁定' : '';
-    return `<div class="thought-soil-row"><button class="thought-soil-entry" type="button" data-action="memory:soil-open" data-scope="conversation" data-conversation-id="${escapeAttribute(conversationId)}">整理当前对话的纸条 · ${afterthoughts.length} 条余思${state} <span aria-hidden="true">›</span></button></div>`;
+    const state = isLatest
+      ? live.auto_refresh_enabled === false ? ' · 已关闭' : live.manual_locked ? ' · 已锁定' : ''
+      : ' · 已留存';
+    const messageAttr = isLatest ? '' : ` data-message-id="${escapeAttribute(assistantId)}"`;
+    return `<div class="thought-soil-row"><button class="thought-soil-entry" type="button"
+      data-action="memory:soil-open" data-scope="conversation"
+      data-conversation-id="${escapeAttribute(conversationId)}"${messageAttr}>
+      思维壤 · ${afterthoughts.length} 条余思${state} <span aria-hidden="true">›</span>
+    </button></div>`;
   }
 
   function soilProvenance(soil) {
@@ -165,7 +176,27 @@ export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentS
       ${controls}`;
   }
 
-  function soilView({ conversation_id: conversationId = '' } = {}) {
+  function soilView({ conversation_id: conversationId = '', message_id: messageId = '' } = {}) {
+    const history = (runtime.soilHistory.get(conversationId || currentId()) || [])
+      .find(item => item.assistant_message_id === messageId);
+    if (messageId && history) {
+      const afterthoughts = Array.isArray(history.afterthoughts) ? history.afterthoughts : [];
+      const afterthoughtBody = afterthoughts.length
+        ? afterthoughts.map(item => `<div class="feature-row static"><span><small>${escapeHtml(item)}</small></span></div>`).join('')
+        : '<p>这一刻没有想留下的余思。</p>';
+      return {
+        title: '思维壤 · 这一轮',
+        subtitle: '旧土层只供翻阅 · 不参与模型上下文',
+        className: 'memory-soil',
+        headerAction: '<button class="feature-head-action" type="button" data-action="memory:done">完成</button>',
+        body: `${section('当前', textBlock(history.current_text, '这一轮没有留下当前纸条。'))}
+          ${section(`余思 · ${afterthoughts.length}`, afterthoughtBody)}
+          <p class="feature-note generation-provenance">revision ${Number(history.revision || 1)}
+          · 整理来源 · ${escapeHtml(history.display_author || history.model_label || '未知')}
+          · ${escapeHtml(memoryDate(history.created_at) || '')}</p>`,
+      };
+    }
+
     const id = conversationId || currentId();
     const soil = runtime.soils.get(id) || emptySoil(id);
     const pockets = runtime.pockets.get(id) || [];
