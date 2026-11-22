@@ -319,8 +319,38 @@ class CoastApiClient(
         return jsonRequest(Request.Builder().url(config.url("/api/models$suffix")).get().build(), RemoteModelCatalogResponse.serializer())
     }
 
+    suspend fun getThoughtSoilResponse(conversationId: String): RemoteThoughtSoilResponse =
+        jsonRequest(Request.Builder().url(config.url("/api/memory/soil?conversation_id=${encodeQuery(conversationId)}")).get().build(), RemoteThoughtSoilResponse.serializer())
+
     suspend fun getThoughtSoil(conversationId: String): RemoteThoughtSoil =
-        jsonRequest(Request.Builder().url(config.url("/api/memory/soil?conversation_id=${encodeQuery(conversationId)}")).get().build(), RemoteThoughtSoilResponse.serializer()).soil
+        getThoughtSoilResponse(conversationId).soil
+
+    suspend fun saveThoughtSoil(conversationId: String, currentText: String, afterthoughts: List<String>): RemoteThoughtSoil {
+        val payload = buildJsonObject {
+            put("current_text", currentText)
+            put("afterthoughts", kotlinx.serialization.json.buildJsonArray {
+                afterthoughts.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) }
+            })
+            put("manual_locked", true)
+        }.toString()
+        return jsonRequest(
+            Request.Builder().url(config.url("/api/memory/soil?conversation_id=${encodeQuery(conversationId)}"))
+                .put(jsonBody(payload)).build(),
+            RemoteThoughtSoilResponse.serializer()
+        ).soil
+    }
+
+    suspend fun resumeThoughtSoil(conversationId: String): RemoteThoughtSoil {
+        val payload = buildJsonObject {
+            put("manual_locked", false)
+            put("auto_refresh_enabled", true)
+        }.toString()
+        return jsonRequest(
+            Request.Builder().url(config.url("/api/memory/soil?conversation_id=${encodeQuery(conversationId)}"))
+                .put(jsonBody(payload)).build(),
+            RemoteThoughtSoilResponse.serializer()
+        ).soil
+    }
 
     suspend fun setThoughtSoilEnabled(conversationId: String, enabled: Boolean): RemoteThoughtSoil {
         val payload = kotlinx.serialization.json.buildJsonObject {
