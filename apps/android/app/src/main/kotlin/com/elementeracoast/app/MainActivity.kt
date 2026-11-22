@@ -90,6 +90,8 @@ class MainActivity : ComponentActivity() {
                         onMessageAction = vm::handleMessageAction,
                         onOpenActionLog = vm::openActionLog,
                         onSetThoughtSoilEnabled = vm::setThoughtSoilEnabled,
+                        onSaveThoughtSoil = vm::saveThoughtSoilManual,
+                        onResumeThoughtSoil = vm::resumeThoughtSoilAutomatic,
                         onSetContextSettings = vm::setContextSettings,
                         onImportMessages = vm::importMessages,
                         onLocalActionLogged = vm::logLocalAction,

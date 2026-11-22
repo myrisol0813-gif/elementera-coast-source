@@ -11,6 +11,7 @@ export {
   writeSoil,
   writeSoilCurrentText,
 } from './memory-store/memory-soil-store.js';
+export { saveSoilSnapshot, listSoilSnapshots, allSoilSnapshots } from './memory-store/memory-soil-history.js';
 export {
   getPocket,
   createPocket,

@@ -521,6 +521,15 @@ class CoastShellViewModelTest {
             return soil(conversationId, emptyList()).copy(autoRefreshEnabled = enabled)
         }
 
+        override suspend fun saveManual(
+            conversationId: String, current: String, afterthoughts: List<String>
+        ): ThoughtSoilSnapshot = soil(conversationId, afterthoughts).copy(
+            currentText = current, manualLocked = true
+        )
+
+        override suspend fun resumeAutomatic(conversationId: String): ThoughtSoilSnapshot =
+            soil(conversationId, emptyList())
+
         override suspend fun organizeAfterReply(conversationId: String, modelId: String): ThoughtSoilSnapshot {
             organizeCalls += 1
             return soil(

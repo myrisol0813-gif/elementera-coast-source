@@ -3,6 +3,7 @@ package com.elementeracoast.app.feature.memory
 import com.elementeracoast.app.core.model.PortraitCandidateSnapshot
 import com.elementeracoast.app.core.model.ThoughtCandidateSnapshot
 import com.elementeracoast.app.core.model.ThoughtSoilSnapshot
+import com.elementeracoast.app.core.model.SoilHistoricSnapshot
 import com.elementeracoast.app.core.network.CoastApiClient
 import com.elementeracoast.app.core.network.CoastApiException
 import com.elementeracoast.app.feature.chatgpt.ChatGptPlanRepository
@@ -16,6 +17,8 @@ internal fun selectThoughtSoilReasoningEffort(supported: List<String>): String? 
 interface ThoughtSoilRepository {
     suspend fun load(conversationId: String): ThoughtSoilSnapshot
     suspend fun setEnabled(conversationId: String, enabled: Boolean): ThoughtSoilSnapshot
+    suspend fun saveManual(conversationId: String, current: String, afterthoughts: List<String>): ThoughtSoilSnapshot
+    suspend fun resumeAutomatic(conversationId: String): ThoughtSoilSnapshot
     suspend fun organizeAfterReply(conversationId: String, modelId: String): ThoughtSoilSnapshot
 }
 
@@ -23,11 +26,32 @@ class DefaultThoughtSoilRepository(
     private val api: CoastApiClient,
     private val plan: ChatGptPlanRepository? = null
 ) : ThoughtSoilRepository {
-    override suspend fun load(conversationId: String): ThoughtSoilSnapshot =
-        api.getThoughtSoil(conversationId).toSnapshot(conversationId)
+    override suspend fun load(conversationId: String): ThoughtSoilSnapshot {
+        val response = api.getThoughtSoilResponse(conversationId)
+        return response.soil.toSnapshot(conversationId).copy(
+            history = response.history.map { item ->
+                SoilHistoricSnapshot(item.turnId, item.assistantMessageId,
+                    item.currentText, item.afterthoughts, item.revision,
+                    item.displayAuthor.ifBlank { item.modelLabel }, item.createdAt)
+            },
+            historyTruncated = response.historyTruncated
+        )
+    }
 
-    override suspend fun setEnabled(conversationId: String, enabled: Boolean): ThoughtSoilSnapshot =
-        api.setThoughtSoilEnabled(conversationId, enabled).toSnapshot(conversationId)
+    override suspend fun setEnabled(conversationId: String, enabled: Boolean): ThoughtSoilSnapshot {
+        api.setThoughtSoilEnabled(conversationId, enabled)
+        return load(conversationId)
+    }
+
+    override suspend fun saveManual(conversationId: String, current: String, afterthoughts: List<String>): ThoughtSoilSnapshot {
+        api.saveThoughtSoil(conversationId, current, afterthoughts)
+        return load(conversationId)
+    }
+
+    override suspend fun resumeAutomatic(conversationId: String): ThoughtSoilSnapshot {
+        api.resumeThoughtSoil(conversationId)
+        return load(conversationId)
+    }
 
     override suspend fun organizeAfterReply(conversationId: String, modelId: String): ThoughtSoilSnapshot {
         if (modelId.startsWith("chatgpt-plan:")) {
@@ -53,13 +77,14 @@ class DefaultThoughtSoilRepository(
                 result.inputTokens, result.cachedTokens, result.outputTokens
             )
             require(committed.ok) { "当前对话纸条结果未能保存。" }
-            return committed.soil.toSnapshot(conversationId)
+            return load(conversationId)
         }
         return try {
-            api.organizeThoughtSoil(conversationId, modelId).soil.toSnapshot(conversationId)
+            api.organizeThoughtSoil(conversationId, modelId)
+            load(conversationId)
         } catch (error: CoastApiException) {
             if (error.type != "soil_locked") throw error
-            api.getThoughtSoil(conversationId).toSnapshot(conversationId)
+            load(conversationId)
         }
     }
 }

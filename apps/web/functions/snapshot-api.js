@@ -23,6 +23,7 @@ import {
   listGlobalExcerptCandidates,
   listGlobalExcerptRevisions,
   readSoil,
+  allSoilSnapshots,
 } from './memory-store.js';
 import { listAllMessageModelMetadata } from './model-metadata-store.js';
 import { listWorldbookEntries } from './worldbook.js';
@@ -162,14 +163,15 @@ async function buildSnapshot(env) {
   const dogtalk = [];
 
   for (const conversation of conversations) {
-    const [state, soil, pocketItems, dog] = await Promise.all([
+    const [state, soil, soilHistory, pocketItems, dog] = await Promise.all([
       readConversationState(db, conversation.id),
       readSoil(db, conversation.id),
+      allSoilSnapshots(db, conversation.id),
       pocketsForConversation(db, conversation.id),
       getMysticDogtalk(db, { room_scope: 'conversation', conversation_id: conversation.id }),
     ]);
     conversationRecords.push({ conversation, history: state });
-    soils.push({ conversation_id: conversation.id, soil });
+    soils.push({ conversation_id: conversation.id, soil, history: soilHistory });
     pockets.push(...pocketItems);
     if (dog?.id || dog?.body) dogtalk.push({ conversation_id: conversation.id, dogtalk: dog });
     voiceClips.push(...await listVoiceClips(db, conversation.id));
@@ -232,6 +234,7 @@ async function buildSnapshot(env) {
       'radio',
       'lighthouse',
       'thinking_soil',
+      'thinking_soil_history',
       'memory_entries',
       'memory_pockets',
       'user_portrait',

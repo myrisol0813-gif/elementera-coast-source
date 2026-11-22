@@ -325,7 +325,21 @@ data class RemoteDeskToolResult(
 @Serializable
 data class RemoteThoughtSoilResponse(
     val ok: Boolean = false,
-    val soil: RemoteThoughtSoil = RemoteThoughtSoil()
+    val soil: RemoteThoughtSoil = RemoteThoughtSoil(),
+    val history: List<RemoteSoilSnapshot> = emptyList(),
+    @SerialName("history_truncated") val historyTruncated: Boolean = false
+)
+
+@Serializable
+data class RemoteSoilSnapshot(
+    @SerialName("turn_id") val turnId: String = "",
+    @SerialName("assistant_message_id") val assistantMessageId: String = "",
+    @SerialName("current_text") val currentText: String = "",
+    val afterthoughts: List<String> = emptyList(),
+    val revision: Int = 1,
+    @SerialName("display_author") val displayAuthor: String = "",
+    @SerialName("model_label") val modelLabel: String = "",
+    @SerialName("created_at") val createdAt: String = ""
 )
 
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)

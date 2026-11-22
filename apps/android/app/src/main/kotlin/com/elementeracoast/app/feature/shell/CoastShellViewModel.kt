@@ -871,6 +871,42 @@ class CoastShellViewModel(
         }
     }
 
+    fun saveThoughtSoilManual(current: String, afterthoughts: List<String>) {
+        if (tourBlocksCloudAction()) return
+        val id = _state.value.activeConversationId
+        if (id.isBlank()) return
+        viewModelScope.launch(workDispatcher) {
+            try {
+                val soil = backend.thoughtSoil.saveManual(id, current, afterthoughts)
+                if (_state.value.activeConversationId == id) _state.update {
+                    it.copy(thoughtSoil = soil, snackbarMessage = "当前纸条已保存并手动锁定；解除锁定后才会恢复自动整理。")
+                }
+            } catch (error: CoastApiException) {
+                handleBackendError(error, "纸条手动保存失败", keepAuthenticatedOnNetworkError = true)
+            } catch (_: Exception) {
+                _state.update { it.copy(snackbarMessage = "纸条手动保存失败。") }
+            }
+        }
+    }
+
+    fun resumeThoughtSoilAutomatic() {
+        if (tourBlocksCloudAction()) return
+        val id = _state.value.activeConversationId
+        if (id.isBlank()) return
+        viewModelScope.launch(workDispatcher) {
+            try {
+                val soil = backend.thoughtSoil.resumeAutomatic(id)
+                if (_state.value.activeConversationId == id) _state.update {
+                    it.copy(thoughtSoil = soil, snackbarMessage = "已解除手动锁定，恢复自动整理。")
+                }
+            } catch (error: CoastApiException) {
+                handleBackendError(error, "解除纸条锁定失败", keepAuthenticatedOnNetworkError = true)
+            } catch (_: Exception) {
+                _state.update { it.copy(snackbarMessage = "解除纸条锁定失败。") }
+            }
+        }
+    }
+
     fun setThoughtSoilEnabled(enabled: Boolean) {
         if (tourBlocksCloudAction()) return
         val conversationId = _state.value.activeConversationId

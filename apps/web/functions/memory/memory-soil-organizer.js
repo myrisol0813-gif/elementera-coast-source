@@ -12,6 +12,7 @@ import {
   createUserPortraitCandidate,
   upsertSoilCandidates,
   writeSoil,
+  saveSoilSnapshot,
 } from '../memory-store.js';
 import { ModelRequestError, performFormalChat } from '../models.js';
 import {
@@ -584,6 +585,33 @@ export async function organizeConversationSoil(env, conversationId, value) {
     manual_locked: oldSoil.manual_locked,
     auto_refresh_enabled: oldSoil.auto_refresh_enabled,
   };
+  // Preserve the last pre-upgrade live soil before replacing it.
+  // The prior reply may now be an inactive variant after regeneration.
+  // Resolve by its persisted assistant message ID instead of guessing by turn.
+  const previousAssistantId = String(oldSoil.source_assistant_id || '');
+  let previousBranch = null;
+  if (previousAssistantId) {
+    for (const turn of state.turns || []) {
+      for (const variants of Object.values(turn?.assistant?.variantsByUserVariant || {})) {
+        const assistant = (variants || []).find(item => item?.id === previousAssistantId);
+        if (assistant) {
+          previousBranch = { turn_id: turn.id, assistant };
+          break;
+        }
+      }
+      if (previousBranch) break;
+    }
+  } else {
+    // Old pre-feature soil has no message ID. Only attribute it to a
+    // distinct earlier completed turn; same-turn regenerate is ambiguous.
+    previousBranch = completedTurns(state).find(branch =>
+      branch.turn_id === oldSoil.organized_through_turn_id
+      && branch.turn_id !== latestTurn.turn_id
+    );
+  }
+  if (previousBranch && (oldSoil.current_text || oldSoil.afterthoughts?.length)) {
+    await saveSoilSnapshot(env.COAST_CHAT_DB, conversationId, previousBranch, oldSoil);
+  }
   let writtenSoil = await writeSoil(env.COAST_CHAT_DB, conversationId, soilValue, {
     automatic: true,
     provenance: {
@@ -591,6 +619,7 @@ export async function organizeConversationSoil(env, conversationId, value) {
       source_conversation_id: conversationId,
       source_turn_id: soilValue.organized_through_turn_id || '',
     },
+    snapshotBranch: latestTurn,
   });
   if (organizedBy) {
     await saveGenerationProvenance(env.COAST_CHAT_DB, 'soil', conversationId, organizedBy);
