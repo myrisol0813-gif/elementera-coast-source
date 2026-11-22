@@ -1,4 +1,5 @@
 import { escapeAttribute, escapeHtml } from '../../core/dom.js';
+import { API, requestJson } from '../../core/api.js';
 import { memoryDate, section, shortModelName, textBlock, tokenSuffix } from './memory-format.js';
 
 export function emptySoil(conversationId) {
@@ -196,7 +197,10 @@ export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentS
           ${section(`余思 · ${afterthoughts.length}`, afterthoughtBody)}
           <p class="feature-note generation-provenance">revision ${Number(history.revision || 1)}
           · 整理来源 · ${escapeHtml(history.display_author || history.model_label || '未知')}
-          · ${escapeHtml(memoryDate(history.created_at) || '')}</p>`,
+          · ${escapeHtml(memoryDate(history.created_at) || '')}</p>
+          <div class="button-row"><button type="button" data-action="memory:soil-treasure-open"
+             data-conversation-id="${escapeAttribute(conversationId || currentId())}"
+             data-message-id="${escapeAttribute(messageId)}">♡ 珍藏本轮思维壤</button></div>`,
       };
     }
 
@@ -216,6 +220,56 @@ export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentS
     };
   }
 
+  function soilTreasureSegments(snapshot) {
+    return [snapshot?.current_text, ...(Array.isArray(snapshot?.afterthoughts) ? snapshot.afterthoughts : [])]
+      .flatMap(item => String(item || '').split(/\\n\\s*\\n/))
+      .map(item => item.trim()).filter(Boolean);
+  }
+
+  async function soilTreasureView({ conversation_id: conversationId = '', message_id: messageId = '' } = {}) {
+    const snapshot = (runtime.soilHistory.get(conversationId) || [])
+      .find(item => item.assistant_message_id === messageId);
+    if (!snapshot) return {
+      title: '旧思维壤已不在当前历史中',
+      subtitle: '请从原聊天重新打开。',
+      className: 'memory-soil',
+      body: '<p class="feature-note">找不到对应的原位土层，没有保存新的收藏。</p>',
+    };
+    const segments = soilTreasureSegments(snapshot);
+    if (!segments.length) return {
+      title: '这一层没有可摘录的文字',
+      className: 'memory-soil', body: '<p class="feature-note">无可珍藏的当前或余思。</p>',
+    };
+    const query = '?kind=soil&conversation_id=' + encodeURIComponent(conversationId)
+      + '&turn_id=' + encodeURIComponent(snapshot.turn_id);
+    const data = await requestJson(API.vaultTreasures + query);
+    const saved = (data.items || []).find(item => item.source_id === messageId && item.kind === 'soil');
+    const chosen = Array.isArray(saved?.paragraph_indices) ? saved.paragraph_indices : [];
+    const rows = segments.map((segment, index) => {
+      const checked = !saved || !chosen.length || chosen.includes(index);
+      return '<label class="feature-row"><input type="checkbox" name="paragraph" value="' + index + '"'
+        + (checked ? ' checked' : '') + '><span><small>'
+        + escapeHtml(segment.slice(0, 1100)) + '</small></span></label>';
+    }).join('');
+    return {
+      title: '拾入潮间 · 旧思维壤',
+      subtitle: '只收藏选中的原位文字，不改变旧土层，不自动注入模型上下文。',
+      className: 'memory-soil',
+      body: '<form class="form-stack" data-submit="memory:soil-treasure-save"'
+        + ' data-conversation-id="' + escapeAttribute(conversationId) + '"'
+        + ' data-message-id="' + escapeAttribute(messageId) + '"'
+        + ' data-section-count="' + segments.length + '">'
+        + '<p class="feature-note">逐段选择旧「当前」及「余思」；收藏后可在拾潮中搜索备注和回到源消息。</p>'
+        + rows
+        + '<label>备注<textarea name="notes" rows="3" maxlength="1200" placeholder="用于日后关键词查找，可留空">'
+        + escapeHtml(saved?.notes || '') + '</textarea></label>'
+        + '<div class="button-row"><button class="primary-wide" type="submit">保存选中的摘录</button></div>'
+        + '</form>'
+        + (saved ? '<div class="button-row"><button type="button" data-action="memory:soil-treasure-remove" data-id="'
+            + escapeAttribute(saved.id) + '">取消这层珍藏</button></div>' : ''),
+    };
+  }
+
   function soilEditView() {
     const soil = currentSoil();
     return {
@@ -232,5 +286,5 @@ export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentS
     };
   }
 
-  return Object.freeze({ renderSoilEntry, soilView, soilEditView });
+  return Object.freeze({ renderSoilEntry, soilView, soilTreasureView, soilEditView });
 }
