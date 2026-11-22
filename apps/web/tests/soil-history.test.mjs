@@ -41,6 +41,7 @@ await writeSoil(db, conversation.id, {
   afterthoughts: ['第一轮的余思'],
   organized_through_turn_id: first.turn_id,
 }, { automatic: true, snapshotBranch: first });
+assert.equal((await readSoil(db, conversation.id)).source_assistant_id, 'assistant-one');
 let result = await listSoilSnapshots(db, conversation.id);
 assert.equal(result.snapshots.length, 1);
 assert.deepEqual(result.snapshots[0].afterthoughts, ['第一轮的余思']);
@@ -52,6 +53,7 @@ await writeSoil(db, conversation.id, {
   organized_through_turn_id: second.turn_id,
 }, { automatic: true, snapshotBranch: second });
 result = await listSoilSnapshots(db, conversation.id);
+assert.equal((await readSoil(db, conversation.id)).source_assistant_id, 'assistant-two');
 assert.equal(result.snapshots.length, 2);
 assert.equal(result.snapshots.find(s => s.assistant_message_id === 'assistant-one').current_text, '第一轮的当前');
 assert.equal(result.snapshots.find(s => s.assistant_message_id === 'assistant-two').current_text, '第二轮的当前');
