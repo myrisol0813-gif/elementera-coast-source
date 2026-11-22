@@ -1327,9 +1327,9 @@ class CoastShellViewModel(
     private fun showHistory(conversationId: String, history: RemoteHistory) {
         if (_state.value.activeConversationId != conversationId) return
         val hit = pendingSearchHit?.takeIf { it.conversationId == conversationId }
-        // Preview this exact variant in the local cache; no automatic history PUT.
+        // Search previews are presentation-only. Never replace the cached canonical
+        // history: a later send/regenerate/mutation must use the persisted active branch.
         val displayed = hit?.let { previewSearchVariant(history, it) } ?: history
-        if (hit != null && displayed !== history) backend.chat.cacheHistory(conversationId, displayed)
         _state.update {
             it.copy(
                 messages = ChatSyncMapper.toUi(displayed),
