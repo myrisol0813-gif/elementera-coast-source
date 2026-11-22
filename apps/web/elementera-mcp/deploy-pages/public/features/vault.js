@@ -36,6 +36,7 @@ function mediaPreview(item) {
 export function createCoastVault({ router, chat, toast }) {
   let items = [];
   let current = { mode: 'basic', kind: 'all', q: '', cursor: '' };
+  let legacyBusy = false;
 
   function params(extra = {}) {
     return { ...current, ...extra, cursor: extra.cursor || '' };
@@ -108,11 +109,16 @@ export function createCoastVault({ router, chat, toast }) {
       items.map(itemCard).join('') + '</div>'
       : '<p class="coast-vault-empty">' +
         escapeHtml(message || (mode === 'basic' ? '还没有能够读取的已保存媒体。' : '还没有主动珍藏的内容。')) + '</p>';
+    const migration = mode === 'treasures'
+      ? '<p class="coast-vault-hint"><button type="button" class="coast-vault-next"'
+        + ' data-action="vault:legacy">检查旧红心 · 确认后迁入拾潮</button>'
+        + ' 只增补旧助手红心，不删除旧标记或覆盖新备注；请先完成完整 JSON 备份。</p>'
+      : '';
     return {
       title: '海岸文件库',
       subtitle: mode === 'basic' ? '自动归集真实媒体 · 不收录聊天文字' : '拾潮 · 只收录你主动珍藏的东西',
       className: 'daily-panel coast-vault-panel',
-      body: modeBar + searchForm + itemsHtml + (next
+      body: modeBar + searchForm + migration + itemsHtml + (next
         ? '<button type="button" class="coast-vault-next" data-action="vault:more" data-cursor="' +
           escapeAttribute(next) + '">下一页</button>' : '') +
         '<p class="coast-vault-hint">媒体库收录当前可访问的海岸附件和已生成语音；原来不存在或已经失效的文件无法凭索引恢复。</p>',
@@ -123,7 +129,51 @@ export function createCoastVault({ router, chat, toast }) {
     return q('[data-vault-index="' + index + '"]');
   }
 
+  async function transferLegacyHearts() {
+    if (legacyBusy) return;
+    legacyBusy = true;
+    try {
+      const inspect = async (apply = false) => {
+        let cursor = '', count = 0, added = 0, exhausted = false;
+        for (let page = 0; page < 1000; page += 1) {
+          const result = apply
+            ? await requestJson(API.vaultLegacyHearts, {
+              method: 'POST',
+              body: JSON.stringify({ confirm: true, cursor: cursor || 0 }),
+            })
+            : await requestJson(API.vaultLegacyHearts
+              + (cursor ? '?cursor=' + encodeURIComponent(cursor) : ''));
+          count += Number(result.recognized) || 0;
+          added += Number(result.inserted) || 0;
+          cursor = result.next_cursor || '';
+          if (!cursor) { exhausted = true; break; }
+        }
+        if (!exhausted) throw new Error('旧收藏过多，本次尚未遍历完整索引。');
+        return { count, added };
+      };
+      const preview = await inspect(false);
+      if (!preview.count) {
+        toast('没有检测到需要扫描的旧助手红心；已有拾潮收藏不受影响。');
+        return;
+      }
+      // Real D1 writes must only follow an explicit owner-triggered preview
+      // and confirmation. There are no automatic migrations on startup.
+      if (!confirm('预览：发现 ' + preview.count
+        + ' 个旧助手红心。迁移只补充拾潮收藏，不清除旧标记，也不覆盖既有备注。继续吗？')) return;
+      if (!confirm('请先在设置中完成全局 JSON 导出备份。确认你已保存备份，并要执行旧红心迁移？')) return;
+      const migrated = await inspect(true);
+      toast('旧红心迁移完成：识别 ' + migrated.count
+        + ' 条，本次新增 ' + migrated.added + ' 条；未覆盖任何既有珍藏。');
+      await router.refresh({ preserveScroll: true });
+    } catch (error) {
+      toast('旧红心迁移未完整结束，可重新检查并安全重试：' + (error.message || '网络失败'));
+    } finally {
+      legacyBusy = false;
+    }
+  }
+
   async function handle(name, target) {
+    if (name === 'legacy') return transferLegacyHearts();
     if (name === 'open') return router.open('vault-home', { mode: 'basic' });
     if (name === 'mode') return router.open('vault-home', { mode: target.dataset.mode }, { replace: true });
     if (name === 'more') return router.open('vault-home', params({ cursor: target.dataset.cursor }), { replace: true });
