@@ -1,0 +1,157 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import {
+  searchMatchesForConversation, CHAT_SEARCH_LIMITS, ChatSearchError,
+} from '../functions/chat-search.js';
+import {
+  selectTreasureParagraphs, TREASURE_LIMITS, TreasureError,
+} from '../functions/coast-vault-treasures.js';
+
+const state = {
+  turns: [
+    {
+      id: 'turn-1',
+      user: { active: 1, variants: [
+        { id: 'user-a', content: '用户说：阳光是书页', created_at: '2026-01-01' },
+        { id: 'user-b', content: '第二种说法，没有关键词' },
+      ] },
+      assistant: { variantsByUserVariant: {
+        0: [{ id: 'ai-a', content: '我把阳光的书页拾起来' },
+            { id: 'ai-b', content: '重生成的另一段阳光' }],
+        1: [{ id: 'ai-c', content: '当前回答，无命中' }],
+      } },
+    },
+    {
+      id: 'turn-2',
+      user: { active: 0, variants: [
+        { id: 'hidden', content: '阳光秘密', hidden: true },
+      ] },
+      assistant: { variantsByUserVariant: { 0: [] } },
+    },
+  ],
+};
+const row = { id: 'conversation-a', title: '阅读随笔', room_type: 'main', state_json: JSON.stringify(state) };
+const found = searchMatchesForConversation(row, '阳光');
+assert.equal(found.length, 3, 'only actual visible variants, not full JSON field keys');
+assert.deepEqual(found.map(item => item.message_id), ['user-a', 'ai-a', 'ai-b']);
+assert.equal(found[0].user_variant_index, 0);
+assert.equal(found[2].assistant_variant_index, 1);
+assert.equal(found[2].turn_id, 'turn-1');
+assert.equal(found[2].role, 'assistant');
+assert.equal(found[2].kind, 'message');
+assert.ok(found.every(item => item.conversation_id === 'conversation-a'));
+assert.equal(searchMatchesForConversation({ ...row, title: '阳光主题' }, '阳光').length, 4);
+assert.equal(searchMatchesForConversation({ ...row, state_json: '{broken' }, '阳光').length, 0);
+assert.ok(CHAT_SEARCH_LIMITS.page_results <= 50);
+
+const all = selectTreasureParagraphs('第一段\n\n第二段\n\n第三段', null);
+assert.equal(all.excerpt, '第一段\n\n第二段\n\n第三段');
+assert.deepEqual(all.indices, []);
+const picked = selectTreasureParagraphs('第一段\n\n第二段\n\n第三段', [2, 0]);
+assert.equal(picked.excerpt, '第一段\n\n第三段');
+assert.deepEqual(picked.indices, [0, 2]);
+assert.throws(() => selectTreasureParagraphs('第一段\n\n第二段', [1, 1]), TreasureError);
+assert.throws(() => selectTreasureParagraphs('第一段\n\n第二段', [3]), TreasureError);
+assert.ok(TREASURE_LIMITS.note_chars >= 1000);
+
+// Regression contracts: the new read APIs must not be silently added to
+// the automatic memory/context assembly path.
+const route = readFileSync(new URL('../functions/api-router.js', import.meta.url), 'utf8');
+const chat = readFileSync(new URL('../functions/chat-router.js', import.meta.url), 'utf8');
+const media = readFileSync(new URL('../functions/coast-vault-media.js', import.meta.url), 'utf8');
+const vaultApi = readFileSync(new URL('../functions/coast-vault-api.js', import.meta.url), 'utf8');
+const pwa = readFileSync(new URL('../elementera-mcp/deploy-pages/public/features/sidebar-search.js', import.meta.url), 'utf8');
+assert.match(route, /isCoastVaultApiPath/);
+assert.match(chat, /searchChatMessages/);
+assert.match(chat, /pathname === '\/api\/chat\/search'/);
+assert.match(media, /coast_voice_clips/);
+assert.match(media, /chat_attachments/);
+assert.doesNotMatch(media, /text-to-speech|ELEVENLABS_API_KEY/);
+assert.match(vaultApi, /routeCoastVaultApi/);
+assert.match(pwa, /openSearchResult/);
+console.log('coast vault & cross-window message search: ok');
+
+
+// Live SQLite/D1 compatibility: test the real service, not just a mocked result.
+const { D1Database } = await import('./d1-helper.mjs');
+const { createConversation, writeConversationState } = await import('../functions/chat-store.js');
+const { uploadChatAttachment, bindChatAttachmentsToTurn } = await import('../functions/chat-attachments.js');
+const { ensureVoiceSchema } = await import('../functions/voice-clips.js');
+const { searchChatMessages } = await import('../functions/chat-search.js');
+const { listMediaLibrary } = await import('../functions/coast-vault-media.js');
+const {
+  saveTreasure, listTreasures, updateTreasure, removeTreasure,
+} = await import('../functions/coast-vault-treasures.js');
+const { inspectLegacyHearts } = await import('../functions/coast-vault-legacy.js');
+
+const db = new D1Database();
+const conversation = await createConversation(db, '阳光与旧诗', 'main');
+const upload = await uploadChatAttachment(db, conversation.id, {
+  name: 'snow.png', type: 'image/png', size: 5,
+  async arrayBuffer() { return Uint8Array.of(1, 2, 3, 4, 5).buffer; },
+});
+await writeConversationState(db, conversation.id, {
+  version: 4,
+  turns: [{
+    id: 'turn-vault-1',
+    user: { active: 0, variants: [{
+      id: 'user-vault-1', content: '阳光就是被烧上天的书页。',
+      attachments: [{ ...upload, id: upload.id, type: 'image', name: 'snow.png', mime: 'image/png', size: 5 }],
+    }] },
+    assistant: { activeByUserVariant: { 0: 0 }, variantsByUserVariant: {
+      0: [{ id: 'assistant-vault-1', content: '我将书页留在档案里。', favorite: true }],
+    } },
+  }],
+});
+await bindChatAttachmentsToTurn(db, conversation.id, 'turn-vault-1', [upload.id]);
+await ensureVoiceSchema(db);
+await db.prepare(
+  'INSERT INTO coast_voice_clips (id,conversation_id,turn_id,message_id,source,model_label,voice_id,text,audio_bytes,created_at) ' +
+  'VALUES (?,?,?,?,?,?,?,?,?,?)'
+).bind('voice-vault-1', conversation.id, 'turn-vault-1', 'assistant-vault-1',
+  'manual', null, 'voice-demo', '晚风里有阳光', 3, Date.now()).run();
+await db.prepare('INSERT INTO coast_voice_chunks (clip_id,chunk_index,body_b64) VALUES (?,?,?)')
+  .bind('voice-vault-1', 0, 'AQID').run();
+
+const searched = await searchChatMessages(db, { q: '书页' });
+assert.equal(searched.results.filter(item => item.kind === 'message').length, 2);
+assert.equal(searched.results.find(item => item.role === 'assistant').message_id, 'assistant-vault-1');
+assert.equal(searched.next_cursor, null);
+
+const catalog = await listMediaLibrary(db);
+assert.equal(catalog.items.length, 2);
+assert.deepEqual(new Set(catalog.items.map(item => item.kind)), new Set(['audio', 'image']));
+const imageItem = catalog.items.find(item => item.kind === 'image');
+assert.equal(imageItem.message_id, 'user-vault-1');
+assert.equal(imageItem.favorited, false);
+const audioItem = catalog.items.find(item => item.kind === 'audio');
+assert.equal(audioItem.message_id, 'assistant-vault-1');
+assert.match(audioItem.url, /voice\/clips/);
+
+const textFavorite = await saveTreasure(db, {
+  kind: 'text', conversation_id: conversation.id, source_id: 'user-vault-1',
+  notes: '这是一段收藏备注',
+});
+assert.equal(textFavorite.excerpt, '阳光就是被烧上天的书页。');
+const fileFavorite = await saveTreasure(db, {
+  kind: 'image', conversation_id: conversation.id, source_id: upload.id,
+  notes: '第一次查看文件',
+});
+assert.equal((await listTreasures(db, { q: '第一次查看文件' })).items[0].id, fileFavorite.id);
+const afterSave = await listMediaLibrary(db, { kind: 'image' });
+assert.equal(afterSave.items[0].favorited, true);
+const modified = await updateTreasure(db, fileFavorite.id, { notes: '更新过的文件备注' });
+assert.equal(modified.notes, '更新过的文件备注');
+const afterCancel = await removeTreasure(db, fileFavorite.id);
+assert.equal(afterCancel.media_deleted, false);
+assert.equal((await listMediaLibrary(db, { kind: 'image' })).items[0].favorited, false);
+
+const preview = await inspectLegacyHearts(db);
+assert.equal(preview.dry_run, true);
+assert.equal(preview.recognized, 1);
+const applied = await inspectLegacyHearts(db, { apply: true });
+assert.equal(applied.inserted, 1);
+assert.equal((await inspectLegacyHearts(db, { apply: true })).inserted, 0);
+assert.equal((await listTreasures(db, { q: '书页' })).items.length, 2);
+assert.equal((await listTreasures(db, { q: '这是一段收藏备注' })).items[0].id, textFavorite.id);
+console.log('coast vault SQLite integration: ok');
