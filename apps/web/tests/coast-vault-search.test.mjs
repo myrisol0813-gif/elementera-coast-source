@@ -175,12 +175,12 @@ const vaultContext = {
 const indexed = await executeModelTool(db, {
   id: 'vault-search-test',
   function: { name: 'vault_search_index', arguments: JSON.stringify({
-    query: '这里写着我喜欢的诗', limit: 2,
+    query: '这是一段收藏备注', limit: 2,
   }) },
 }, vaultContext);
 assert.equal(indexed.count, 1);
 assert.deepEqual(indexed.results.map(item => item.id), [textFavorite.id]);
-assert.equal(indexed.results[0].notes_preview, '这里写着我喜欢的诗');
+assert.equal(indexed.results[0].notes_preview, '这是一段收藏备注');
 assert.equal(Object.hasOwn(indexed.results[0], 'content'), false,
   'search stage must not return saved full content');
 
@@ -192,18 +192,18 @@ const selectedRead = await executeModelTool(db, {
 }, vaultContext);
 assert.equal(selectedRead.requested_count, 2);
 assert.equal(selectedRead.count, 1, 'removed favorite is not silently recreated');
-assert.equal(selectedRead.items[0].content, '极光就是被烧上天的诗灰。');
-assert.equal(selectedRead.items[0].notes, '这里写着我喜欢的诗');
+assert.equal(selectedRead.items[0].content, '阳光就是被烧上天的书页。');
+assert.equal(selectedRead.items[0].notes, '这是一段收藏备注');
 assert.equal(selectedRead.items[1].available, false);
 await assert.rejects(() => executeRegisteredTool(db, 'vault.search',
-  { query: '诗灰' }, { permission: 'visitor', surface: 'mailbox_visitor', visitorId: 'visitor-a' }),
+  { query: '书页' }, { permission: 'visitor', surface: 'mailbox_visitor', visitorId: 'visitor-a' }),
   /当前房间|权限/);
 await assert.rejects(() => executeRegisteredTool(db, 'vault.read',
   { ids: [textFavorite.id, textFavorite.id] }, vaultContext), /重复/);
 const { listToolRuns } = await import('../functions/tool-run-log.js');
 const recordedVault = (await listToolRuns(db)).filter(item => item.tool_key.startsWith('vault.'));
 assert.ok(recordedVault.length >= 2);
-assert.doesNotMatch(JSON.stringify(recordedVault), /极光就是被烧上天的诗灰|这里写着我喜欢的诗/,
+assert.doesNotMatch(JSON.stringify(recordedVault), /极光就是被烧上天的书页|这是一段收藏备注/,
   'tool logs may not contain private treasure content');
 const autoMemory = readFileSync(new URL('../functions/memory-recall.js', import.meta.url), 'utf8');
 assert.doesNotMatch(autoMemory, /coast-vault-model-tools|vault_read_selected|vault_search_index/,
