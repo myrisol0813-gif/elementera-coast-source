@@ -1600,3 +1600,68 @@
   border: 1px solid color-mix(in srgb,var(--line) 78%, transparent);
   box-shadow: 0 5px 18px rgba(89,119,136,.06);
 }
+
+/* Coastal vault: one source of media, a separate layer of selected treasures. */
+.coast-vault-panel .feature-body { display: grid; align-content: start; gap: 16px; }
+.coast-vault-modes { display: flex; gap: 8px; flex-wrap: wrap; }
+.coast-vault-modes button,
+.coast-vault-search button,
+.coast-vault-actions button,
+.coast-vault-next {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 13px;
+  color: var(--text);
+  background: var(--surface-soft);
+  cursor: pointer;
+}
+.coast-vault-modes button[aria-current="page"] {
+  background: color-mix(in srgb, var(--accent) 13%, var(--surface-raised));
+  color: var(--accent);
+  font-weight: 650;
+}
+.coast-vault-search {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+.coast-vault-search label { color: var(--text-soft); font-size: 12px; }
+.coast-vault-search input,
+.coast-vault-search select,
+.coast-vault-note {
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface-raised);
+  color: var(--text);
+  min-width: 0;
+}
+.coast-vault-search input { flex: 1 1 180px; }
+.coast-vault-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: 12px;
+}
+.coast-vault-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 15px;
+  background: var(--surface-raised);
+}
+.coast-vault-meta { display: flex; justify-content: space-between; gap: 9px; color: var(--text); }
+.coast-vault-meta strong { min-width: 0; overflow-wrap: anywhere; }
+.coast-vault-meta small, .coast-vault-hint { color: var(--text-soft); font-size: 12px; }
+.coast-vault-image { width: 100%; max-height: 240px; object-fit: contain; border-radius: 12px; }
+.coast-vault-card audio { width: 100%; }
+.coast-vault-excerpt { color: var(--text-soft); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 130px; overflow-y: auto; }
+.coast-vault-file { color: var(--accent); }
+.coast-vault-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.coast-vault-note { flex: 1 1 170px; }
+.coast-vault-mark { color: var(--accent); font-size: 13px; }
+.coast-vault-empty { padding: 25px; text-align: center; color: var(--text-soft); }
+.coast-vault-next { justify-self: center; }
