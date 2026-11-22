@@ -118,7 +118,7 @@ internal fun ChatTreasureDialog(
             saved = related.associateBy { it.vText("kind") + ":" + it.vText("source_id") }
             selected = if (related.isEmpty()) keys else saved.keys
             val total = textChoice?.paragraphs?.size ?: 0
-            val storedIndices = saved[textChoice?.key]?.vIndices().orEmpty()
+            val storedIndices = textChoice?.let { saved[it.key]?.vIndices() }.orEmpty()
             paragraphs = if (storedIndices.isEmpty()) (0 until total).toSet() else storedIndices
             notes = related.firstOrNull { it.vText("notes").isNotBlank() }?.vText("notes").orEmpty()
             error = ""
