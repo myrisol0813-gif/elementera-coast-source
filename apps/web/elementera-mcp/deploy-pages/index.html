@@ -16,16 +16,16 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai:wght@400&family=Noto+Serif+SC:wght@400;500;600&display=swap">
-  <link rel="stylesheet" href="/public/styles/tokens.css?v=coast-source-app-19">
-  <link rel="stylesheet" href="/public/styles/shell.css?v=coast-source-app-19">
-  <link rel="stylesheet" href="/public/styles/chat.css?v=coast-source-app-19">
-  <link rel="stylesheet" href="/public/styles/calendar.css?v=coast-source-app-19">
-  <link rel="stylesheet" href="/public/styles/library.css?v=coast-source-app-19">
-  <link rel="stylesheet" href="/public/styles/mcp-letter.css?v=coast-source-app-19">
-  <link rel="stylesheet" href="/public/styles/rikkahub.css?v=coast-source-app-19">
-  <link rel="stylesheet" href="/public/styles/features.css?v=coast-source-app-19">
-  <link rel="stylesheet" href="/public/styles/desk.css?v=coast-source-app-19">
-  <link rel="stylesheet" href="/public/styles/dev-hands.css?v=coast-source-app-19">
+  <link rel="stylesheet" href="/public/styles/tokens.css?v=coast-source-app-20">
+  <link rel="stylesheet" href="/public/styles/shell.css?v=coast-source-app-20">
+  <link rel="stylesheet" href="/public/styles/chat.css?v=coast-source-app-20">
+  <link rel="stylesheet" href="/public/styles/calendar.css?v=coast-source-app-20">
+  <link rel="stylesheet" href="/public/styles/library.css?v=coast-source-app-20">
+  <link rel="stylesheet" href="/public/styles/mcp-letter.css?v=coast-source-app-20">
+  <link rel="stylesheet" href="/public/styles/rikkahub.css?v=coast-source-app-20">
+  <link rel="stylesheet" href="/public/styles/features.css?v=coast-source-app-20">
+  <link rel="stylesheet" href="/public/styles/desk.css?v=coast-source-app-20">
+  <link rel="stylesheet" href="/public/styles/dev-hands.css?v=coast-source-app-20">
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -89,9 +89,19 @@
       </header>
 
       <section id="chatWindow" class="window-surface" data-window-scope="conversation">
-        <section id="messageScroller" class="message-scroller" aria-label="聊天消息">
-          <div id="messages" class="messages"><div class="empty-state">正在载入…</div></div>
-        </section>
+        <div class="paper-chat-canvas">
+          <div class="paper-chat-sheet" aria-hidden="true">
+            <svg class="paper-chat-clip" viewBox="0 0 46 76" focusable="false" aria-hidden="true">
+              <g transform="rotate(-19 23 39)" fill="none" stroke="#d7a84d" stroke-linecap="round">
+                <rect x="11" y="6" width="23" height="62" rx="11.5" stroke-width="3.1"/>
+                <path d="M25 20 v34 a5 5 0 0 1 -10 0 V22 a5 5 0 0 1 10 0" stroke-width="2"/>
+              </g>
+            </svg>
+          </div>
+          <section id="messageScroller" class="message-scroller" aria-label="聊天消息">
+            <div id="messages" class="messages"><div class="empty-state">正在载入…</div></div>
+          </section>
+        </div>
 
         <div id="chatStatus" class="chat-status" role="status" aria-live="polite" hidden></div>
         <div id="toolStatus" class="chat-status" data-kind="loading" role="status" aria-live="polite" hidden></div>
@@ -127,6 +137,6 @@
     <div id="toastRoot" class="toast" role="status" aria-live="polite" hidden></div>
   </div>
 
-  <script type="module" src="/public/app.js?v=coast-source-app-19"></script>
+  <script type="module" src="/public/app.js?v=coast-source-app-20"></script>
 </body>
 </html>

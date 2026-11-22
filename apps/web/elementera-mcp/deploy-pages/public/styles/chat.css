@@ -1114,128 +1114,156 @@
   }
 }
 
-/* Native-inspired fine-cut edges: shorter folds, pixel-sized wobble and a centered shadow.
-   Pseudo-elements never clip the message content or interactive controls. */
+/* Snow Letter is layered: a stationary reading sheet, separately scrolling
+   messages, and smaller cut-paper furniture. This preset changes no other theme. */
+.paper-chat-canvas {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+.paper-chat-canvas > .message-scroller { position: relative; min-width: 0; min-height: 0; }
+.paper-chat-sheet { display: none; }
+:root[data-theme="paper"] {
+  --coast-letter-cut: polygon(
+    1.8% 4.44px,
+    9.215% 2.10px,
+    16.631% 3.48px,
+    24.046% 2.52px,
+    31.462% 4.44px,
+    38.877% 2.10px,
+    46.292% 3.48px,
+    53.708% 2.52px,
+    61.123% 4.44px,
+    68.538% 2.10px,
+    75.954% 3.48px,
+    83.369% 2.52px,
+    90.785% 4.44px,
+    98.2% 2.10px,
+    calc(100% - 1.44px) 5.37%,
+    calc(100% - 2.34px) 8.941%,
+    calc(100% - 1.86px) 12.511%,
+    calc(100% - 3.12px) 16.081%,
+    calc(100% - 1.44px) 19.652%,
+    calc(100% - 2.34px) 23.222%,
+    calc(100% - 1.86px) 26.793%,
+    calc(100% - 3.12px) 30.363%,
+    calc(100% - 1.44px) 33.933%,
+    calc(100% - 2.34px) 37.504%,
+    calc(100% - 1.86px) 41.074%,
+    calc(100% - 3.12px) 44.644%,
+    calc(100% - 1.44px) 48.215%,
+    calc(100% - 2.34px) 51.785%,
+    calc(100% - 1.86px) 55.356%,
+    calc(100% - 3.12px) 58.926%,
+    calc(100% - 1.44px) 62.496%,
+    calc(100% - 2.34px) 66.067%,
+    calc(100% - 1.86px) 69.637%,
+    calc(100% - 3.12px) 73.207%,
+    calc(100% - 1.44px) 76.778%,
+    calc(100% - 2.34px) 80.348%,
+    calc(100% - 1.86px) 83.919%,
+    calc(100% - 3.12px) 87.489%,
+    calc(100% - 1.44px) 91.059%,
+    calc(100% - 2.34px) 94.63%,
+    98.2% calc(100% - 2.52px),
+    90.785% calc(100% - 3.48px),
+    83.369% calc(100% - 2.10px),
+    75.954% calc(100% - 4.44px),
+    68.538% calc(100% - 2.52px),
+    61.123% calc(100% - 3.48px),
+    53.708% calc(100% - 2.10px),
+    46.292% calc(100% - 4.44px),
+    38.877% calc(100% - 2.52px),
+    31.462% calc(100% - 3.48px),
+    24.046% calc(100% - 2.10px),
+    16.631% calc(100% - 4.44px),
+    9.215% calc(100% - 2.52px),
+    1.8% calc(100% - 3.48px),
+    3.12px 94.63%,
+    1.86px 91.059%,
+    2.34px 87.489%,
+    1.44px 83.919%,
+    3.12px 80.348%,
+    1.86px 76.778%,
+    2.34px 73.207%,
+    1.44px 69.637%,
+    3.12px 66.067%,
+    1.86px 62.496%,
+    2.34px 58.926%,
+    1.44px 55.356%,
+    3.12px 51.785%,
+    1.86px 48.215%,
+    2.34px 44.644%,
+    1.44px 41.074%,
+    3.12px 37.504%,
+    1.86px 33.933%,
+    2.34px 30.363%,
+    1.44px 26.793%,
+    3.12px 23.222%,
+    1.86px 19.652%,
+    2.34px 16.081%,
+    1.44px 12.511%,
+    3.12px 8.941%,
+    1.86px 5.37%
+  );
+  --coast-letter-strip: polygon(
+  2% 3px, 10% 1.7px, 19% 3px, 28% 1.8px, 37% 2.8px, 46% 1.9px, 55% 3.1px, 64% 1.6px, 73% 3px, 82% 1.8px, 91% 2.8px, 98% 2px,
+  calc(100% - 2px) 28%, calc(100% - 3px) 61%, calc(100% - 2px) 90%,
+  98% calc(100% - 2px), 89% calc(100% - 3px), 80% calc(100% - 1.6px), 71% calc(100% - 2.8px), 62% calc(100% - 1.8px), 53% calc(100% - 3px), 44% calc(100% - 1.7px), 35% calc(100% - 2.8px), 26% calc(100% - 1.9px), 17% calc(100% - 3px), 8% calc(100% - 1.7px), 2% calc(100% - 3px),
+  2px 82%, 3px 53%, 2px 24%
+);
+  --coast-letter-ink: #fffefa;
+  --coast-letter-frost: #f2f7fa;
+  --coast-letter-shadow: rgba(122, 150, 168, .12);
+}
+:root[data-theme="paper"] .paper-chat-sheet {
+  display: block;
+  position: absolute;
+  z-index: 0;
+  inset: 7px 10px 2px;
+  pointer-events: none;
+}
+:root[data-theme="paper"] .paper-chat-sheet::before,
+:root[data-theme="paper"] .paper-chat-sheet::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  clip-path: var(--coast-letter-cut);
+}
+:root[data-theme="paper"] .paper-chat-sheet::before {
+  z-index: 0;
+  inset: -1px;
+  background: rgba(127, 152, 166, .13);
+  filter: blur(2px);
+}
+:root[data-theme="paper"] .paper-chat-sheet::after {
+  z-index: 1;
+  inset: 0;
+  background: var(--coast-letter-ink);
+}
+:root[data-theme="paper"] .paper-chat-clip {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 22px;
+  width: 35px;
+  height: 60px;
+  opacity: .56;
+}
+:root[data-theme="paper"] .message-scroller { background: transparent; }
+:root[data-theme="paper"] .messages { padding-top: 76px; padding-inline: 15px; }
+:root[data-theme="paper"] .messages:has(> .empty-state) {
+  display: grid;
+  align-items: center;
+  justify-items: center;
+}
 :root[data-theme="paper"] .message.assistant {
   position: relative;
   isolation: isolate;
   padding: 21px clamp(19px, 4vw, 29px) 23px;
   margin: 3px 0 22px;
-  /* At phone width, adjacent folds sit about 20–22px apart. */
-  --coast-paper-cut: polygon(
-    2% 5px,
-    8% 2.5px,
-    14% 4.5px,
-    20% 3.5px,
-    26% 5px,
-    32% 2.5px,
-    38% 4.5px,
-    44% 3.5px,
-    50% 5px,
-    56% 2.5px,
-    62% 4.5px,
-    68% 3.5px,
-    74% 5px,
-    80% 2.5px,
-    86% 4.5px,
-    92% 3.5px,
-    98% 5px,
-    calc(100% - 5.4px) 2.5%,
-    calc(100% - 2.7px) 5%,
-    calc(100% - 4.2px) 7.5%,
-    calc(100% - 3px) 10%,
-    calc(100% - 5.4px) 12.5%,
-    calc(100% - 2.7px) 15%,
-    calc(100% - 4.2px) 17.5%,
-    calc(100% - 3px) 20%,
-    calc(100% - 5.4px) 22.5%,
-    calc(100% - 2.7px) 25%,
-    calc(100% - 4.2px) 27.5%,
-    calc(100% - 3px) 30%,
-    calc(100% - 5.4px) 32.5%,
-    calc(100% - 2.7px) 35%,
-    calc(100% - 4.2px) 37.5%,
-    calc(100% - 3px) 40%,
-    calc(100% - 5.4px) 42.5%,
-    calc(100% - 2.7px) 45%,
-    calc(100% - 4.2px) 47.5%,
-    calc(100% - 3px) 50%,
-    calc(100% - 5.4px) 52.5%,
-    calc(100% - 2.7px) 55%,
-    calc(100% - 4.2px) 57.5%,
-    calc(100% - 3px) 60%,
-    calc(100% - 5.4px) 62.5%,
-    calc(100% - 2.7px) 65%,
-    calc(100% - 4.2px) 67.5%,
-    calc(100% - 3px) 70%,
-    calc(100% - 5.4px) 72.5%,
-    calc(100% - 2.7px) 75%,
-    calc(100% - 4.2px) 77.5%,
-    calc(100% - 3px) 80%,
-    calc(100% - 5.4px) 82.5%,
-    calc(100% - 2.7px) 85%,
-    calc(100% - 4.2px) 87.5%,
-    calc(100% - 3px) 90%,
-    calc(100% - 5.4px) 92.5%,
-    calc(100% - 2.7px) 95%,
-    calc(100% - 4.2px) 97.5%,
-    98% calc(100% - 4.5px),
-    92% calc(100% - 2.5px),
-    86% calc(100% - 5px),
-    80% calc(100% - 3.5px),
-    74% calc(100% - 4.5px),
-    68% calc(100% - 2.5px),
-    62% calc(100% - 5px),
-    56% calc(100% - 3.5px),
-    50% calc(100% - 4.5px),
-    44% calc(100% - 2.5px),
-    38% calc(100% - 5px),
-    32% calc(100% - 3.5px),
-    26% calc(100% - 4.5px),
-    20% calc(100% - 2.5px),
-    14% calc(100% - 5px),
-    8% calc(100% - 3.5px),
-    2% calc(100% - 4.5px),
-    5.4px 97.5%,
-    3px 95%,
-    4.2px 92.5%,
-    2.7px 90%,
-    5.4px 87.5%,
-    3px 85%,
-    4.2px 82.5%,
-    2.7px 80%,
-    5.4px 77.5%,
-    3px 75%,
-    4.2px 72.5%,
-    2.7px 70%,
-    5.4px 67.5%,
-    3px 65%,
-    4.2px 62.5%,
-    2.7px 60%,
-    5.4px 57.5%,
-    3px 55%,
-    4.2px 52.5%,
-    2.7px 50%,
-    5.4px 47.5%,
-    3px 45%,
-    4.2px 42.5%,
-    2.7px 40%,
-    5.4px 37.5%,
-    3px 35%,
-    4.2px 32.5%,
-    2.7px 30%,
-    5.4px 27.5%,
-    3px 25%,
-    4.2px 22.5%,
-    2.7px 20%,
-    5.4px 17.5%,
-    3px 15%,
-    4.2px 12.5%,
-    2.7px 10%,
-    5.4px 7.5%,
-    3px 5%,
-    4.2px 2.5%
-  );
 }
 :root[data-theme="paper"] .message.assistant::before,
 :root[data-theme="paper"] .message.assistant::after {
@@ -1243,22 +1271,68 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  clip-path: var(--coast-paper-cut);
+  clip-path: var(--coast-letter-cut);
 }
 :root[data-theme="paper"] .message.assistant::before {
   z-index: -1;
-  background: linear-gradient(147deg, #fffefa 0%, #fcfefa 65%, #f7fbfb 100%);
+  background: linear-gradient(147deg, var(--coast-letter-ink), #fcfefa 65%, #f7fbfb);
 }
 :root[data-theme="paper"] .message.assistant::after {
   z-index: -2;
-  /* Center the ambient shadow: no right/down displacement. */
-  inset: -2px;
-  background: rgba(116, 143, 161, .26);
-  filter: blur(4px);
-  opacity: .72;
+  inset: -1px;
+  background: var(--coast-letter-shadow);
+  filter: blur(2px);
+  opacity: .58;
 }
 :root[data-theme="paper"] .message.user .user-bubble {
   border-radius: 15px 17px 14px 16px;
   border: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
 }
 :root[data-theme="paper"] .composer { border-top-color: color-mix(in srgb, var(--line) 75%, transparent); }
+/* Composer and dogtalk retain their real controls and minimum hit areas;
+   only a paint layer behind them receives the small irregular cut. */
+:root[data-theme="paper"] .input-pill,
+:root[data-theme="paper"] .dogtalk-composer,
+:root[data-theme="paper"] .dogtalk-composer-placeholder {
+  position: relative;
+  isolation: isolate;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+:root[data-theme="paper"] .input-pill {
+  padding: 6px 9px 6px 16px;
+}
+:root[data-theme="paper"] .input-pill::before,
+:root[data-theme="paper"] .input-pill::after,
+:root[data-theme="paper"] .dogtalk-composer::before,
+:root[data-theme="paper"] .dogtalk-composer::after,
+:root[data-theme="paper"] .dogtalk-composer-placeholder::before,
+:root[data-theme="paper"] .dogtalk-composer-placeholder::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  clip-path: var(--coast-letter-strip);
+}
+:root[data-theme="paper"] .input-pill::before,
+:root[data-theme="paper"] .dogtalk-composer::before,
+:root[data-theme="paper"] .dogtalk-composer-placeholder::before {
+  z-index: -1;
+  background: var(--coast-letter-frost);
+}
+:root[data-theme="paper"] .input-pill::after,
+:root[data-theme="paper"] .dogtalk-composer::after,
+:root[data-theme="paper"] .dogtalk-composer-placeholder::after {
+  z-index: -2;
+  inset: -1px;
+  background: rgba(113, 141, 160, .13);
+  filter: blur(2px);
+}
+:root[data-theme="paper"] .input-pill:focus-within::before {
+  background: color-mix(in srgb, var(--coast-letter-frost) 90%, var(--line));
+}
+:root[data-theme="paper"] .input-pill:focus-within {
+  outline: 2px solid color-mix(in srgb, var(--accent) 36%, transparent);
+  outline-offset: 1px;
+}
