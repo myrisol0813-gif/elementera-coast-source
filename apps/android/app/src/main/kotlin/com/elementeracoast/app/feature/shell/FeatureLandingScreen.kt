@@ -2,6 +2,7 @@ package com.elementeracoast.app.feature.shell
 
 import androidx.compose.runtime.Composable
 import com.elementeracoast.app.core.model.ChatMessage
+import com.elementeracoast.app.core.model.ChatSearchHit
 import com.elementeracoast.app.core.model.CoastShellState
 import com.elementeracoast.app.core.model.FeatureDestination
 import com.elementeracoast.app.feature.chatgpt.ChatGptConnectState
@@ -30,6 +31,7 @@ internal fun FeatureLandingScreen(
     onMemoryPendingConsumed: () -> Unit,
     messages: List<ChatMessage>,
     onBackToChat: () -> Unit,
+    onOpenSearchHit: (ChatSearchHit) -> Unit,
     onRefresh: () -> Unit,
     onUpdateModelPartnerAvatar: (String) -> Unit,
     onSelectModel: (String) -> Unit,
@@ -51,6 +53,7 @@ internal fun FeatureLandingScreen(
                 onUpdateModelPartnerAvatar = onUpdateModelPartnerAvatar,
                 onRefreshCoast = onRefresh,
                 onBackToChat = onBackToChat,
+                onOpenSource = onOpenSearchHit,
                 onActionLogged = onLocalActionLogged,
                 onSnackbar = onPlaceholder
             )
