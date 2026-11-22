@@ -73,8 +73,14 @@ export function createChatTreasures({ runtime, currentHistory, toast, renderMess
         const id = article.dataset.messageId || '';
         const saved = messageIds.has(id) || (article.classList.contains('user')
           && userMediaTurns.has(article.dataset.turn || ''));
-        button.classList.toggle('is-active', saved);
-        button.setAttribute('aria-pressed', String(saved));
+        const oldHeart = article.classList.contains('assistant')
+          && article.dataset.legacyFavorite === 'true';
+        button.classList.toggle('is-active', saved || oldHeart);
+        button.classList.toggle('is-legacy', oldHeart && !saved);
+        button.setAttribute('aria-pressed', String(saved || oldHeart));
+        const title = oldHeart && !saved ? '旧红心 · 待迁入拾潮' : '收藏';
+        button.title = title;
+        button.setAttribute('aria-label', title);
       }
     }
   }
