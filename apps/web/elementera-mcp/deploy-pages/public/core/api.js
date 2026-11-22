@@ -13,6 +13,7 @@ export const API = Object.freeze({
   chatSearch: '/api/chat/search',
   vaultMedia: '/api/coast-vault/media',
   vaultTreasures: '/api/coast-vault/treasures',
+  vaultLegacyHearts: '/api/coast-vault/legacy-hearts',
   profile: '/api/chat/profile',
   title: '/api/chat/title',
   crossWindowSources: '/api/chat/cross-window/sources',
