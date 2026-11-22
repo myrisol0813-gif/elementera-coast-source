@@ -179,6 +179,13 @@ internal fun SoilBottomSheet(
                 )
             }
 
+            if (!soil.isHistorical && soil.historyTruncated) {
+                Text(
+                    "历史已超过阅读上限：当前仅加载最近1000层。完整旧层仍保留在后端，可通过全量导出取得。",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             if (!soil.isHistorical) {
                 SoilCard(title = "手动整理") {
                     Text(
