@@ -54,7 +54,7 @@ private fun JsonObject.vaultItems(name: String): List<JsonObject> =
     (this[name] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
 
 private val vaultBasicKinds = listOf("all" to "全部", "image" to "影像", "audio" to "声音", "file" to "文件")
-private val vaultTreasureKinds = listOf("all" to "全部", "text" to "文字", "image" to "影像",
+private val vaultTreasureKinds = listOf("all" to "全部", "text" to "文字", "soil" to "思维壤", "image" to "影像",
     "audio" to "声音", "file" to "其他")
 
 /**
@@ -218,7 +218,7 @@ private fun CoastVaultCard(
             verticalArrangement = Arrangement.spacedBy(9.dp)
         ) {
             val heading = if (treasure) {
-                if (kind == "text") "文字摘录" else "珍藏 · " + kind
+                if (kind == "text") "文字摘录" else if (kind == "soil") "原位思维壤" else "珍藏 · " + kind
             } else item.vaultText("name").ifBlank { "海岸媒体" }
             Text(heading, fontWeight = FontWeight.Bold)
             if (kind == "image") CoastVaultImage(repository, sourceId, conversation, onSnackbar)
@@ -227,7 +227,7 @@ private fun CoastVaultCard(
             if (excerpt.isNotBlank()) {
                 Text(excerpt.take(800), style = MaterialTheme.typography.bodyMedium)
             }
-            if (kind != "text") Text(
+            if (kind != "text" && kind != "soil") Text(
                 "来源窗口：" + conversation.take(24),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
