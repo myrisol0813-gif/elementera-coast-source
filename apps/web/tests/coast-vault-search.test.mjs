@@ -364,4 +364,37 @@ assert.equal((await readConversationState(db, longLegacyConversation.id))
 assert.equal((await listTreasures(db, { conversation_id: longLegacyConversation.id }))
   .items.length, 0, 'original remains in chat rather than creating a truncated treasure');
 
+const { auditFullArchiveCompleteness } = await import('../elementera-mcp/deploy-pages/public/features/settings.js');
+const completeBackup = {
+  format: 'elementera-coast-full-archive',
+  version: 1,
+  chat: { conversations: [] },
+  coast_vault: {
+    basic_media: { complete: true, count: 1 },
+    treasures: { complete: true, count: 1 },
+  },
+  attachments: { count: 1, payloads: [{ id: 'saved-image', data_base64: 'AA==' }] },
+  voice: { clips: [], payloads: [] },
+};
+assert.deepEqual(auditFullArchiveCompleteness(completeBackup), [],
+  'complete archive with original attachment payload should be ready to verify on disk');
+assert.match(auditFullArchiveCompleteness({
+  ...completeBackup,
+  attachments: { count: 1, payloads: [{ id: 'saved-image', unavailable: true }] },
+}).join('；'), /附件原件缺失/,
+'failed original-attachment fetch must not be mistaken for a complete backup');
+assert.match(auditFullArchiveCompleteness({
+  ...completeBackup,
+  coast_vault: { ...completeBackup.coast_vault, treasures: { complete: false } },
+}).join('；'), /索引/,
+'truncated favorite index must be visible before old-heart migration');
+assert.match(auditFullArchiveCompleteness({
+  ...completeBackup, coast_vault: undefined,
+}).join('；'), /索引/,
+'missing vault section must be treated as incomplete rather than silently accepted');
+assert.match(auditFullArchiveCompleteness({
+  ...completeBackup, voice: { clips: [{ id: 'voice-1' }], payloads: [] },
+}).join('；'), /语音原件/,
+'missing voice binary payload must be reported as incomplete');
+
 console.log('coast vault SQLite integration: ok');
