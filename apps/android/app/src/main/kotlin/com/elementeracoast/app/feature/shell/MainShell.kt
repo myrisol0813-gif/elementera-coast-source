@@ -77,6 +77,8 @@ fun MainShell(
     onMessageAction: (MessageAction) -> Unit,
     onOpenActionLog: (Set<String>) -> Unit,
     onSetThoughtSoilEnabled: (Boolean) -> Unit,
+    onSaveThoughtSoil: (String, List<String>) -> Unit,
+    onResumeThoughtSoil: () -> Unit,
     onSetContextSettings: (ConversationContextSettings) -> Unit,
     onImportMessages: (List<ChatMessage>) -> Unit,
     onLocalActionLogged: (String, String, String) -> Unit,
@@ -191,6 +193,8 @@ fun MainShell(
                             onMessageAction = onMessageAction,
                             onOpenActionLog = onOpenActionLog,
                             onSetThoughtSoilEnabled = onSetThoughtSoilEnabled,
+                            onSaveThoughtSoil = onSaveThoughtSoil,
+                            onResumeThoughtSoil = onResumeThoughtSoil,
                             onOpenPendingMemory = {
                                 openPendingMemoryOnLanding = true
                                 onOpenFeature(FeatureDestination.Memory)
