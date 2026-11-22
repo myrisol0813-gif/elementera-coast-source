@@ -342,4 +342,26 @@ assert.equal((await inspectLegacyHearts(db, { apply: true })).inserted, 2,
 assert.equal((await inspectLegacyHearts(db, { apply: true })).inserted, 0,
   'repeating legacy migration must stay idempotent across imported windows');
 
+// Full preservation takes precedence over truncating a legacy heart in silence.
+const longLegacyConversation = await createConversation(db, '超长旧红心', 'main');
+const longLegacyBody = '旧'.repeat(12001);
+await writeConversationState(db, longLegacyConversation.id, {
+  version: 4, turns: [{
+    id: 'long-legacy-turn',
+    user: { active: 0, variants: [{ id: 'long-user', content: '保留旧话' }] },
+    assistant: { activeByUserVariant: { 0: 0 }, variantsByUserVariant: {
+      0: [{ id: 'long-assistant', content: longLegacyBody, favorite: true }],
+    } },
+  }],
+});
+const longPreview = await inspectLegacyHearts(db);
+assert.equal(longPreview.oversized, 1, 'preview must identify a heart longer than excerpt limit');
+const longApplied = await inspectLegacyHearts(db, { apply: true });
+assert.equal(longApplied.oversized, 1, 'apply must not silently truncate long original');
+assert.equal(longApplied.inserted, 0, 'oversized originals need explicit separate selection');
+assert.equal((await readConversationState(db, longLegacyConversation.id))
+  .turns[0].assistant.variantsByUserVariant['0'][0].content.length, 12001);
+assert.equal((await listTreasures(db, { conversation_id: longLegacyConversation.id }))
+  .items.length, 0, 'original remains in chat rather than creating a truncated treasure');
+
 console.log('coast vault SQLite integration: ok');
