@@ -79,6 +79,7 @@ fun ChatWindow(
     var editingMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var soilOpen by rememberSaveable { mutableStateOf(false) }
     var selectedSoil by remember(state.activeConversationId) { mutableStateOf<com.elementeracoast.app.core.model.ThoughtSoilSnapshot?>(null) }
+    var soilTreasureTarget by remember(state.activeConversationId) { mutableStateOf<com.elementeracoast.app.core.model.ThoughtSoilSnapshot?>(null) }
     var deskOpen by rememberSaveable { mutableStateOf(false) }
     var drawerOpen by rememberSaveable(state.activeConversationId) { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
@@ -275,7 +276,25 @@ fun ChatWindow(
             onSave = onSaveThoughtSoil,
             onResumeAutomatic = onResumeThoughtSoil,
             onOpenPendingBag = onOpenPendingMemory,
+            onTreasure = { historical ->
+                soilOpen = false
+                selectedSoil = null
+                soilTreasureTarget = historical
+            },
             onDismiss = { soilOpen = false; selectedSoil = null }
+        )
+    }
+
+    soilTreasureTarget?.let { historical ->
+        SoilTreasureDialog(
+            soil = historical,
+            repository = sideRooms,
+            onDismiss = { soilTreasureTarget = null },
+            onSaved = {
+                soilTreasureTarget = null
+                treasureRevision += 1
+                onPlaceholder("旧思维壤的珍藏已更新，原来的土层仍在。")
+            }
         )
     }
 
