@@ -122,8 +122,8 @@ fun ChatWindow(
     }.map { treasureField(it, "turn_id") }.toSet()
     val visibleMessages = state.messages.map { message ->
         if (!treasureLoaded) message else message.copy(favorite =
-            message.remoteVariantId in favoritedIds ||
-            (message.role == MessageRole.User && message.turnId in userMediaTurns))
+            message.remoteVariantId.orEmpty() in favoritedIds ||
+            (message.role == MessageRole.User && message.turnId.orEmpty() in userMediaTurns))
     }
 
     DisposableEffect(voicePlayer) { onDispose { voicePlayer.close() } }
