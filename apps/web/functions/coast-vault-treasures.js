@@ -1,6 +1,7 @@
 import { ensureChatSchema, getConversation, readConversationState } from './chat-store.js';
 import { ensureChatAttachmentSchema } from './chat-attachments.js';
 import { ensureVoiceSchema } from './voice-clips.js';
+import { ensureMemorySchema } from './memory-store.js';
 
 export const TREASURE_LIMITS = Object.freeze({
   note_chars: 1200, result_page: 40, excerpt_chars: 12000, paragraphs_per_item: 40,
@@ -81,7 +82,7 @@ function shape(row) {
 export async function listTreasures(db, { kind = 'all', q = '', cursor = 0, conversation_id = '', turn_id = '' } = {}) {
   await initialize(db);
   const type = String(kind || 'all');
-  if (!['all', 'text', 'audio', 'image', 'file'].includes(type)) {
+  if (!['all', 'text', 'soil', 'audio', 'image', 'file'].includes(type)) {
     throw new TreasureError('invalid_kind', '收藏分类无效。');
   }
   const query = String(q || '').trim();
@@ -113,7 +114,7 @@ export async function saveTreasure(db, input = {}) {
   const conversationId = validId(input.conversation_id, 'conversation');
   const sourceId = validId(input.source_id || input.message_id, 'source');
   const kind = String(input.kind || '');
-  if (!['text', 'audio', 'image', 'file'].includes(kind)) {
+  if (!['text', 'soil', 'audio', 'image', 'file'].includes(kind)) {
     throw new TreasureError('invalid_kind', '暂不支持该收藏类型。');
   }
   await getConversation(db, conversationId);
@@ -130,6 +131,25 @@ export async function saveTreasure(db, input = {}) {
     messageId = sourceId;
     turnId = found.turn.id;
     role = found.role;
+  } else if (kind === 'soil') {
+    await ensureMemorySchema(db);
+    const row = await db.prepare(
+      'SELECT conversation_id, turn_id, assistant_message_id, current_text, afterthoughts_json ' +
+      'FROM conversation_soil_snapshots WHERE conversation_id = ? AND assistant_message_id = ?'
+    ).bind(conversationId, sourceId).first();
+    if (!row) throw new TreasureError('source_not_found', '这一轮原位思维壤已不存在。', 404);
+    let thoughts = [];
+    try { thoughts = JSON.parse(row.afterthoughts_json || '[]'); } catch { /* invalid legacy layer */ }
+    const sections = [row.current_text, ...(Array.isArray(thoughts) ? thoughts : [])]
+      .flatMap(item => String(item || '').split(/\\n\\s*\\n/))
+      .map(item => item.trim()).filter(Boolean);
+    if (!sections.length) throw new TreasureError('source_empty', '这一层思维壤没有可珍藏的正文。', 409);
+    const selected = selectTreasureParagraphs(sections.join('\\n\\n'), input.paragraph_indices);
+    excerpt = selected.excerpt;
+    indices = selected.indices;
+    messageId = row.assistant_message_id;
+    turnId = row.turn_id;
+    role = 'assistant';
   } else if (kind === 'audio') {
     await ensureVoiceSchema(db);
     const row = await db.prepare(
