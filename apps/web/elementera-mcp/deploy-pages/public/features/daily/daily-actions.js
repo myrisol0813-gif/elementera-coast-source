@@ -212,6 +212,7 @@ export function createDailyActions({
     }
     if (name === 'calendar') return router.open('calendar');
     if (name === 'library') return router.open('library-home');
+    if (name === 'vault') return router.open('vault-home', { mode: 'basic' });
     if (name === 'pets') return router.open('daily-placeholder', { title: '宠物系统' });
     if (name === 'widgets') return router.open('daily-placeholder', { title: '未来小组件' });
   }
