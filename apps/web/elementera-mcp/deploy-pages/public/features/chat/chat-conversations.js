@@ -17,6 +17,7 @@ export function createChatConversations({
   renderMessages,
   closeMenu,
   voice,
+  refreshTreasureIndex,
 }) {
   async function fetchConversations() {
     const data = await requestJson(API.conversations);
@@ -111,6 +112,9 @@ export function createChatConversations({
       setStatus('');
       renderMessages(conversationId);
       setComposerReady(true);
+      void refreshTreasureIndex?.(conversationId).catch(() => {
+        // Optional heart index does not block history or model input.
+      });
       void voice?.load(conversationId);
       runtime.memory?.onConversationChanged(conversationId)?.catch((error) => console.warn('[memory:conversation]', error));
       runtime.desk?.onConversationChanged(data.history || {}, conversationId);
@@ -200,6 +204,7 @@ export function createChatConversations({
     }
     runtime.conversations = runtime.conversations.filter((item) => item.id !== conversationId);
     runtime.histories.delete(conversationId);
+    runtime.treasureIndicators?.delete(conversationId);
     runtime.rikkahubAttachments.delete(conversationId);
     runtime.recallHistory.delete(conversationId);
     if (runtime.currentId === conversationId) {
