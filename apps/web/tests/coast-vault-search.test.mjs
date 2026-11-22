@@ -78,7 +78,7 @@ console.log('coast vault & cross-window message search: ok');
 
 // Live SQLite/D1 compatibility: test the real service, not just a mocked result.
 const { D1Database } = await import('./d1-helper.mjs');
-const { createConversation, writeConversationState } = await import('../functions/chat-store.js');
+const { createConversation, writeConversationState, deleteConversation } = await import('../functions/chat-store.js');
 const { uploadChatAttachment, bindChatAttachmentsToTurn } = await import('../functions/chat-attachments.js');
 const { ensureVoiceSchema } = await import('../functions/voice-clips.js');
 const { searchChatMessages } = await import('../functions/chat-search.js');
@@ -245,4 +245,11 @@ const fromSoilIndex = await executeRegisteredTool(db, 'vault.search', {
 }, vaultContext);
 assert.equal(fromSoilIndex.results[0].kind, 'soil');
 
+// A removed conversation must not remain searchable through saved excerpts.
+await deleteConversation(db, conversation.id);
+assert.equal((await listTreasures(db)).items.length, 0, 'deleted chat stays hidden from treasure shelves');
+assert.equal((await listTreasures(db, { q: '诗灰' })).items.length, 0);
+await assert.rejects(() => updateTreasure(db, textFavorite.id, { notes: '不可复活已删窗口' }), TreasureError);
+assert.equal((await removeTreasure(db, textFavorite.id)).removed, false,
+  'deleted chat treasures cannot be mutated by the normal owner shelf endpoint');
 console.log('coast vault SQLite integration: ok');
