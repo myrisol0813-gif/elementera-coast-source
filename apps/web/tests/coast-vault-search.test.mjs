@@ -309,4 +309,37 @@ assert.match(chatTreasuresPreview, /runtime\.searchPreview\?\.get\(conversationI
 assert.match(chatConversationsPreview, /runtime\.searchPreview\?\.clear\(\)/,
   'opening another room ends transient preview without writing it');
 
+// Two independent imported chat windows may reuse provider-generated message IDs.
+// A favorite must remain in its original window rather than silently stealing
+// the other window's entry or overwriting its notes.
+const sameIdChats = [];
+for (const title of ['导入窗口一', '导入窗口二']) {
+  const item = await createConversation(db, title, 'main');
+  await writeConversationState(db, item.id, {
+    version: 4, turns: [{
+      id: 'same-imported-turn-id',
+      user: { active: 0, variants: [{ id: 'same-imported-user-id', content: title }] },
+      assistant: { activeByUserVariant: { 0: 0 }, variantsByUserVariant: {
+        0: [{ id: 'same-imported-assistant-id', content: '共享 ID，但各自独立：' + title, favorite: true }],
+      } },
+    }],
+  });
+  const favorite = await saveTreasure(db, { kind: 'text', conversation_id: item.id,
+    source_id: 'same-imported-user-id', notes: title + '的备注' });
+  assert.equal(favorite.conversation_id, item.id);
+  assert.equal(favorite.excerpt, title);
+  sameIdChats.push({ conversation: item, favorite });
+}
+assert.notEqual(sameIdChats[0].favorite.id, sameIdChats[1].favorite.id,
+  'same message ID in different chat windows must produce different treasures');
+assert.equal((await listTreasures(db, { q: '导入窗口' })).items.length, 2);
+assert.equal((await listTreasures(db, { conversation_id: sameIdChats[0].conversation.id }))
+  .items[0].notes, '导入窗口一的备注');
+assert.equal((await listTreasures(db, { conversation_id: sameIdChats[1].conversation.id }))
+  .items[0].notes, '导入窗口二的备注');
+assert.equal((await inspectLegacyHearts(db, { apply: true })).inserted, 2,
+  'old assistant favorites also use conversation-scoped IDs');
+assert.equal((await inspectLegacyHearts(db, { apply: true })).inserted, 0,
+  'repeating legacy migration must stay idempotent across imported windows');
+
 console.log('coast vault SQLite integration: ok');
