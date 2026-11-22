@@ -72,7 +72,7 @@ internal fun ChatTimeline(
     onAction: (MessageAction) -> Unit,
     onFootprint: (ChatMessage) -> Unit,
     onOpenActionLog: (Set<String>) -> Unit,
-    onOpenThoughtSoil: () -> Unit,
+    onOpenThoughtSoil: (ThoughtSoilSnapshot) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -119,7 +119,27 @@ internal fun ChatTimeline(
                     }
                     val streamingTail = isStreaming && message.id == streamingMessageId
                     val isLatestAssistant = index == latestAssistantIndex && message.role == MessageRole.Assistant
-                    val inlineSoil = if (isLatestAssistant) thoughtSoil else null
+                    val history = thoughtSoil?.history?.firstOrNull {
+                        it.turnId == message.turnId && it.assistantMessageId == message.remoteVariantId
+                    }
+                    val inlineSoil = when {
+                        message.role != MessageRole.Assistant -> null
+                        isLatestAssistant -> thoughtSoil
+                        history == null -> null
+                        else -> thoughtSoil.copy(
+                            currentText = history.currentText,
+                            afterthoughts = history.afterthoughts,
+                            memoryCandidates = emptyList(),
+                            seedCandidates = emptyList(),
+                            userPortraitCandidate = null,
+                            selfPortraitCandidate = null,
+                            revision = history.revision,
+                            organizer = history.organizer,
+                            updatedAt = history.updatedAt,
+                            history = emptyList(),
+                            isHistorical = true
+                        )
+                    }
                     if (message.role == MessageRole.Assistant && !streamingTail && message.furnitureRuns.isNotEmpty()) {
                         FurnitureBubble(
                             runs = message.furnitureRuns,
@@ -145,7 +165,7 @@ internal fun ChatTimeline(
                         metadataSource = metadataSource,
                         attachmentPreviewSource = attachmentPreviewSource,
                         onAvatarClick = onAvatarClick,
-                        onOpenThoughtSoil = onOpenThoughtSoil,
+                        onOpenThoughtSoil = { inlineSoil?.let(onOpenThoughtSoil) },
                         onCopy = onCopy,
                         voiceClips = voiceClips.filter { it.messageId == message.remoteVariantId || (it.messageId.isBlank() && it.turnId == message.turnId) },
                         onVoice = { onVoice(message) },
