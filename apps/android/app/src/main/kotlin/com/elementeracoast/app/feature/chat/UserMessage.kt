@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -121,6 +122,8 @@ internal fun UserMessage(
                         )
                     }
                     MessageActionButton(Icons.Default.Edit, "编辑", onClick = onEdit)
+                    MessageActionButton(Icons.Default.FavoriteBorder, "拾潮收藏", active = message.favorite,
+                        onClick = { onAction(MessageAction.ToggleFavorite(message.id)) })
                     MessageActionButton(Icons.Default.ContentCopy, "复制", onClick = onCopy)
                     MessageActionButton(
                         Icons.Default.DeleteOutline,
