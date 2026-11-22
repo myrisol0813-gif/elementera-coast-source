@@ -113,7 +113,7 @@ For a longer-lived setup, replace the Quick Tunnel with your own hosted source b
 - [Model workspace and tool records](#model-workspace-and-tool-records)
 - [Attachments, files, and search surfaces](#attachments-files-and-search-surfaces)
 - [MCP and external-interface experiments](#mcp-and-external-interface-experiments)
-- [Current feature status (0.2.17-source)](#current-feature-status-0216-source)
+- [Current feature status (0.2.19-source)](#current-feature-status-0219-source)
 - [Android APK downloads and history](#android-apk-downloads-and-history)
 - [Running and testing](#running-and-testing)
 - [Configuration](#configuration)
@@ -469,8 +469,8 @@ Source identity:
 ```text
 App: Elementera Coast Source
 applicationId = com.elementeracoast.source
-versionCode = 19
-versionName = 0.2.17-source
+versionCode = 21
+versionName = 0.2.19-source
 ```
 
 The Android client keeps the copied native application structure, including areas such as:
@@ -611,9 +611,9 @@ They should be treated as experimental.
 
 The source Native client now includes the original owner calendar, Tidal Library shelf and reader, EPUB/TXT import and audio-clip actions, using the same source backend contracts as the PWA. Only the interface and generic implementation are mirrored; private data, accounts, identities and signing are excluded. See [Native parity acceptance](docs/SOURCE_NATIVE_PARITY_2026-10-21.md).
 
-## Current feature status (0.2.17-source)
+## Current feature status (0.2.19-source)
 
-The source tree currently identifies the Android app as `0.2.17-source` (`versionCode=18`). The PWA cache is currently `coast-source-app-17`.
+The current Source Android Gradle identity is `0.2.19-source` (`versionCode=21`), and the Source PWA cache is `coast-source-app-25`.
 
 ### Thought Soil v2
 
@@ -629,7 +629,7 @@ The backend rechecks the canonical conversation settings before model assembly. 
 
 The current PWA has a **「这个窗口」** settings sheet for Reality, short reply mode, thought soil and the landing letter. Its Reality controls are limited to date, local time, and the next seven days of calendar entries; weather and Native-only device fields are intentionally absent so they cannot delay a browser chat turn. The mobile reading surface uses a compact 14px reading size, the main top-bar title is 16px, and the conversation drawer is pinned to the app viewport with its content as the dedicated vertical scroll area.
 
-The current Source PWA cache is `coast-source-app-17`.
+The current Source PWA cache is `coast-source-app-25`.
 
 ### Native appearance
 
@@ -648,7 +648,7 @@ The public visitor publisher and temporary Live ChatGPT QA path build an **unsig
 | Surface | Available in the current open-source implementation | Configuration / limits |
 | --- | --- | --- |
 | Web / PWA | Conversation UI, streaming/SSE paths, per-window context settings, visible context/tool records, owner/visitor separation, memory/world-book workspaces, attachments | Reality is intentionally limited to date, local time, and next-seven-days calendar context; weather/device reads are not part of the PWA send path |
-| Android Native | Jetpack Compose chat/Daily/calendar/library/memory surfaces, local ChatGPT connection, Reality device fields, themes including Cream Paper | `0.2.17-source`, `versionCode=18`; visitor builds are Source-only and disposable-signed |
+| Android Native | Jetpack Compose chat/Daily/calendar/library/memory surfaces, local ChatGPT connection, Reality device fields, themes including Cream Paper | `0.2.19-source`, `versionCode=21`; visitor builds are Source-only and disposable-signed |
 | Owner calendar | Entries, notes, edits/deletion and recurrence | Requires self-hosted backend/storage; calendar can feed the next seven days into Reality Context when selected |
 | Tidal Library | TXT/EPUB imports, shelf/cover, chapter/page navigation, progress, highlights, annotations, reader options | PWA and Native use the same backend contracts when pointed at the same host |
 | Voice clips | Message-linked speech clip controls, playback and authorized generation endpoints | Actual generation needs self-hosted `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` |
@@ -664,12 +664,12 @@ Historical implementation milestones belong in [source release history](docs/SOU
 - **Live ChatGPT test:** fork the repository, enable Actions and run [Live ChatGPT Test](.github/workflows/source-live-chatgpt-test.yml). It builds a fresh temporary APK and backend; fetch the package and random login password from that run's Draft Release during its test window.
 - **Persistent self-hosting:** configure your own Pages/D1 backend, Android API URL and signing setup. See [deployment instructions](docs/SOURCE_DEMO_PWA_APK.md) and [configuration](#configuration). Neither private production credentials nor signing keys are shipped.
 
-**Version clarity:** the source tree is currently `0.2.17-source` (`versionCode=18`), whereas [Latest Releases](../../releases/latest) is the authoritative download target as newer builds are published. Each visitor QA build uses disposable signing material and normally cannot be installed as an in-place update over a separately signed QA APK. Uninstall only `com.elementeracoast.source` if Android reports a signing conflict; this does not affect any separately packaged private installation.
+**Version clarity:** the source tree is currently `0.2.19-source` (`versionCode=21`), whereas [Latest Releases](../../releases/latest) is the authoritative download target as newer builds are published. Each visitor QA build uses disposable signing material and normally cannot be installed as an in-place update over a separately signed QA APK. Uninstall only `com.elementeracoast.source` if Android reports a signing conflict; this does not affect any separately packaged private installation.
 
 **Older builds are not recommended downloads.** The `0.2.6` through `0.2.9` visitor packages are superseded; `0.2.9` was reported rejected by a phone installer and withdrawn. Earlier `0.2.2` Quick Tunnel demos and the original `v0.1-source` preview are historical milestones, not current installation instructions; the `v0.1-source` release is no longer available on the Releases page. Keep their implementation notes in [source release history](docs/SOURCE_RELEASE_HISTORY.md), not in the current APK download instructions.
 
 
-## Coast Vault and exact chat search (feature branch)
+## Coast Vault and exact chat search
 
 The Coast Vault feature introduces two separate surfaces backed by the same authorized server:
 
@@ -677,7 +677,7 @@ The Coast Vault feature introduces two separate surfaces backed by the same auth
 - **拾潮 / Treasures:** an explicit user-created favorites layer for selected message text or media. It supports notes, text search, cancellation without deleting the underlying media, and original source IDs. A guarded legacy-heart migration is available for review and idempotent import.
 - **Chat search:** the sidebar query also requests bounded full-text matches from the backend, returning conversation, turn, message and branch/variant identities instead of searching room titles alone.
 
-This code is on a draft integration branch. Do not treat a feature-branch APK, a green Web job, or the presence of D1 schema creation code as proof of a completed production deployment. Old chat/media data that was never persisted cannot be reconstructed. For implementation details, safety requirements and endpoint semantics, see [Coast Vault technical note](docs/COAST_VAULT.md).
+The Coast Vault implementation is merged into the Source main branch and has passed the corresponding Web/Android CI checks. That does **not** establish a live production deployment or real-device/backend acceptance; self-hosted instances still need their own backend configuration and end-to-end validation. Old chat/media data that was never persisted cannot be reconstructed, and legacy-heart migration requires explicit review and authorization. For implementation details, safety requirements and endpoint semantics, see [Coast Vault technical note](docs/COAST_VAULT.md).
 
 ## Running and testing
 
@@ -819,7 +819,7 @@ You should expect to fork, rename, configure, simplify, and replace parts of it 
 
 ## Project status
 
-The repository began with `v0.1-source`; the current feature-branch Android source identity is `0.2.18-source` (`versionCode=20`), with the PWA and backend continuing to evolve independently under the same source tree.
+The repository began with `v0.1-source`; its current main-branch Android source identity is `0.2.19-source` (`versionCode=21`) and the PWA cache is `coast-source-app-25`. The published Source Visitor QA APK remains a disposable-signed, offline-only inspection build; live self-hosting requires separate configuration.
 
 It remains a reference implementation rather than a mature framework or hosted product. Current feature status is documented above; older milestones and superseded QA flows are kept in [docs/SOURCE_RELEASE_HISTORY.md](docs/SOURCE_RELEASE_HISTORY.md).
 
@@ -829,7 +829,7 @@ MIT License.
 
 See `LICENSE`.
 
-## Source Native 0.2.19 · Paper-gallery Vault (Draft)
+## Source Native 0.2.19 · Paper-gallery Vault
 
 The Source Android visitor's media-gallery presentation tracks the Native paper-gallery revision: compact text-only `基本文件库` / `拾潮` tabs, paper search, category sections, two-column image frames, collapsed text, saved-audio progress strips, and textual detail menus. It uses only the Source application's own visitor permissions and backend contracts; no private production media or credentials are included. Voice replay uses existing clips and does not generate paid audio. The visitor-only QA APK remains a separate package with its own disposable signing certificate.
 
