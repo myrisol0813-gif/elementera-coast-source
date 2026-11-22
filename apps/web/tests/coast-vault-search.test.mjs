@@ -196,6 +196,29 @@ assert.equal(indexed.results[0].notes_preview, '这是一段收藏备注');
 assert.equal(Object.hasOwn(indexed.results[0], 'content'), false,
   'search stage must not return saved full content');
 
+// Two-stage directory results must allow walking past the first bounded page
+// without returning full treasured text to the model.
+const firstVaultPage = await executeModelTool(db, {
+  id: 'vault-paging-first',
+  function: { name: 'vault_search_index', arguments: JSON.stringify({
+    query: '书页', limit: 1, cursor: 0,
+  }) },
+}, vaultContext);
+assert.equal(firstVaultPage.count, 1);
+assert.equal(firstVaultPage.has_more, true);
+assert.equal(firstVaultPage.next_cursor, '1');
+const secondVaultPage = await executeModelTool(db, {
+  id: 'vault-paging-next',
+  function: { name: 'vault_search_index', arguments: JSON.stringify({
+    query: '书页', limit: 1, cursor: 1,
+  }) },
+}, vaultContext);
+assert.equal(secondVaultPage.count, 1);
+assert.equal(secondVaultPage.next_cursor, null);
+assert.notEqual(firstVaultPage.results[0].id, secondVaultPage.results[0].id);
+await assert.rejects(() => executeRegisteredTool(db, 'vault.search',
+  { query: '书页', cursor: -2 }, vaultContext), /游标/);
+
 const selectedRead = await executeModelTool(db, {
   id: 'vault-read-test',
   function: { name: 'vault_read_selected', arguments: JSON.stringify({
