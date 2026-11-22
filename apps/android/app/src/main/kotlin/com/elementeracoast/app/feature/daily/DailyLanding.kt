@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.elementeracoast.app.core.model.ChatSearchHit
 import com.elementeracoast.app.core.network.CoastApiException
 import com.elementeracoast.app.feature.shell.FeaturePageTopBar
 import com.elementeracoast.app.ui.theme.SnowLetterSurface
@@ -53,6 +54,7 @@ fun DailyLanding(
     onUpdateModelPartnerAvatar: (String) -> Unit,
     onRefreshCoast: () -> Unit,
     onBackToChat: () -> Unit,
+    onOpenSource: (ChatSearchHit) -> Unit,
     onActionLogged: (String, String, String) -> Unit,
     onSnackbar: (String) -> Unit
 ) {
@@ -158,7 +160,7 @@ fun DailyLanding(
                 DailyPage.Diary -> DiaryScreen(repository, onActionLogged, onSnackbar) { page = DailyPage.DiaryCompose }
                 DailyPage.DiaryCompose -> DiaryComposeScreen(repository, onActionLogged, onSnackbar) { page = DailyPage.Diary }
                 DailyPage.Calendar -> CalendarScreen(sideRooms, onSnackbar)
-                DailyPage.Vault -> CoastVaultScreen(sideRooms, onSnackbar)
+                DailyPage.Vault -> CoastVaultScreen(sideRooms, onSnackbar, onOpenSource)
                 DailyPage.Library -> TidalLibraryScreen(
                     sideRooms, onSnackbar,
                     importRequest = libraryImportRequest,
