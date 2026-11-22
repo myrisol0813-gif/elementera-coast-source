@@ -5,7 +5,7 @@ const MEDIA_TYPES = Object.freeze([
   ['all', '全部'], ['image', '影像'], ['audio', '声音'], ['file', '文件'],
 ]);
 const SAVED_TYPES = Object.freeze([
-  ['all', '全部'], ['text', '文字'], ['image', '影像'], ['audio', '声音'], ['file', '其他'],
+  ['all', '全部'], ['text', '文字'], ['soil', '思维壤'], ['image', '影像'], ['audio', '声音'], ['file', '其他'],
 ]);
 
 function option(value, label, current) {
@@ -44,7 +44,7 @@ export function createCoastVault({ router, chat, toast }) {
   function itemCard(item, index) {
     const saved = current.mode === 'treasures';
     const name = saved
-      ? (item.kind === 'text' ? '文字摘录' : item.kind === 'audio' ? '语音收藏' : '媒体收藏')
+      ? (item.kind === 'text' ? '文字摘录' : item.kind === 'soil' ? '原位思维壤' : item.kind === 'audio' ? '语音收藏' : '媒体收藏')
       : item.name || '媒体';
     const primary = saved ? item.excerpt || '' : item.source_text || '';
     const storageHint = item.kind === 'text'
@@ -62,7 +62,7 @@ export function createCoastVault({ router, chat, toast }) {
     return '<article class="coast-vault-card" data-vault-index="' + index + '">' +
       '<div class="coast-vault-meta"><strong>' + escapeHtml(name) + '</strong><small>' +
       escapeHtml(item.kind === 'audio' ? '声音' : item.kind === 'image' ? '影像' :
-        item.kind === 'file' ? '其他文件' : '文字') + '</small></div>' +
+        item.kind === 'file' ? '其他文件' : item.kind === 'soil' ? '旧思维壤' : '文字') + '</small></div>' +
       (saved ? mediaPreview(item) : (item.kind !== 'file' ? mediaPreview({
         ...item, source_id: item.id,
       }) : mediaPreview({ ...item, source_id: item.id }))) +
