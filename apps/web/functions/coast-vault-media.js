@@ -64,7 +64,7 @@ export async function listMediaLibrary(db, { kind = 'all', q = '', cursor = 0 } 
     'v.audio_bytes AS size, v.text AS source_text, v.created_at',
     'FROM coast_voice_clips v JOIN conversations c ON c.id = v.conversation_id',
     "WHERE c.user_id = 'owner' AND c.deleted_at IS NULL AND c.conversation_kind = 'chat'",
-    ') media LEFT JOIN coast_vault_treasures saved ON saved.source_key = (media.kind || \':\' || media.id)',
+    ') media LEFT JOIN coast_vault_treasures saved ON saved.source_key = (media.kind || \':\' || media.conversation_id || \':\' || media.id)',
     'WHERE (? = \'all\' OR media.kind = ?) AND (media.name LIKE ? ESCAPE \'!\' OR COALESCE(media.source_text, \'\') LIKE ? ESCAPE \'!\')',
     'ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?',
   ].join(' ');
