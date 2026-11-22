@@ -206,15 +206,28 @@ class SideRoomsRepository(private val config: CoastApiConfig, private val client
     suspend fun vaultMedia(kind: String = "all", query: String = "", cursor: String = ""): JsonObject =
         request("/api/coast-vault/media?kind=" + encode(kind) + "&q=" + encode(query) + "&cursor=" + encode(cursor))
 
-    suspend fun vaultTreasures(kind: String = "all", query: String = "", cursor: String = ""): JsonObject =
-        request("/api/coast-vault/treasures?kind=" + encode(kind) + "&q=" + encode(query) + "&cursor=" + encode(cursor))
+    suspend fun vaultTreasures(
+        kind: String = "all", query: String = "", cursor: String = "",
+        conversationId: String = "", turnId: String = ""
+    ): JsonObject = request(
+        "/api/coast-vault/treasures?kind=" + encode(kind) + "&q=" + encode(query) +
+            "&cursor=" + encode(cursor) + "&conversation_id=" + encode(conversationId) +
+            "&turn_id=" + encode(turnId)
+    )
 
-    suspend fun vaultSave(kind: String, conversationId: String, sourceId: String, notes: String): JsonObject =
+    suspend fun vaultSave(
+        kind: String, conversationId: String, sourceId: String, notes: String,
+        paragraphIndices: List<Int>? = null
+    ): JsonObject =
         request("/api/coast-vault/treasures", "POST", kotlinx.serialization.json.buildJsonObject {
             put("kind", kotlinx.serialization.json.JsonPrimitive(kind))
             put("conversation_id", kotlinx.serialization.json.JsonPrimitive(conversationId))
             put("source_id", kotlinx.serialization.json.JsonPrimitive(sourceId))
             put("notes", kotlinx.serialization.json.JsonPrimitive(notes))
+            if (paragraphIndices != null) put("paragraph_indices",
+                kotlinx.serialization.json.JsonArray(paragraphIndices.map {
+                    kotlinx.serialization.json.JsonPrimitive(it)
+                }))
         })
 
     suspend fun vaultChangeNote(treasureId: String, notes: String): JsonObject =
