@@ -17,12 +17,17 @@ const backendTools = listRegisteredTools({ permission: 'owner', surface: 'main_c
 assert.ok(backendTools.some((tool) => tool.tool_key === 'calendar.list'));
 assert.ok(backendTools.some((tool) => tool.tool_key === 'voice.create'));
 assert.ok(backendTools.some((tool) => tool.tool_key === 'memory.search'));
+assert.ok(backendTools.some((tool) => tool.tool_key === 'vault.search'));
+assert.ok(backendTools.some((tool) => tool.tool_key === 'vault.read'));
 assert.equal(backendTools.find((tool) => tool.tool_key === 'memory.write_candidate').display_name, '放入待确认区');
 
 const selection = resolveToolSelection({ permission: 'owner', surface: 'main_chat' });
 assert.ok(selection.modelVisibleTools.some((tool) => tool.function.name === 'calendar_list'));
 assert.ok(selection.modelVisibleTools.some((tool) => tool.function.name === 'library_read'));
 assert.ok(selection.modelVisibleTools.some((tool) => tool.function.name === 'memory_search'));
+assert.ok(selection.modelVisibleTools.some((tool) => tool.function.name === 'vault_search_index'));
+assert.ok(selection.modelVisibleTools.some((tool) => tool.function.name === 'vault_read_selected'));
+
 assert.deepEqual(
   selection.modelVisibleToolRecords.map((tool) => tool.model_name),
   selection.modelVisibleTools.map((tool) => tool.function.name),
@@ -45,6 +50,7 @@ assert.deepEqual(mcpTools.map((tool) => tool.name), [
   'create_daily_diary',
   'list_calendar_entries', 'create_calendar_entry', 'update_calendar_entry', 'delete_calendar_entry',
   'create_voice_clip', 'list_library_books', 'read_library_chapter', 'list_library_notes', 'write_library_note',
+  'search_coast_treasures', 'read_coast_treasures',
 ]);
 for (const tool of mcpTools) {
   assert.equal(typeof tool.tool_key, 'string');
