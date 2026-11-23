@@ -93,6 +93,9 @@ assert.match(vaultUi, /data-action="vault:expand"/);
 assert.match(vaultUi, /name === 'copy'/);
 assert.match(vaultUi, /navigator\.clipboard\.writeText\(content\)/);
 assert.match(vaultUi, /coast-vault-note-line/);
+assert.match(vaultUi, /coast-vault-image-dialog/);
+assert.match(vaultUi, /vault:rename-save/);
+assert.match(vaultUi, /vault:note-expand/);
 assert.match(vaultUi, /groupedCards\(mode === 'treasures'\)/);
 assert.match(vaultUi, /if \(name === 'kind'\)/);
 assert.match(vaultUi, /remoteKind = kind === 'writing' \|\| kind === 'other'/);
@@ -110,6 +113,7 @@ const { uploadChatAttachment, bindChatAttachmentsToTurn } = await import('../fun
 const { ensureVoiceSchema } = await import('../functions/voice-clips.js');
 const { searchChatMessages } = await import('../functions/chat-search.js');
 const { listMediaLibrary } = await import('../functions/coast-vault-media.js');
+const { renameVaultImage } = await import('../functions/coast-vault-media-labels.js');
 const {
   saveTreasure, listTreasures, updateTreasure, removeTreasure,
 } = await import('../functions/coast-vault-treasures.js');
@@ -155,6 +159,23 @@ assert.deepEqual(new Set(catalog.items.map(item => item.kind)), new Set(['audio'
 const imageItem = catalog.items.find(item => item.kind === 'image');
 assert.equal(imageItem.message_id, 'user-vault-1');
 assert.equal(imageItem.favorited, false);
+const renamed = await renameVaultImage(db, {
+  kind: 'image', conversation_id: conversation.id,
+  source_id: upload.id, display_name: '相册小照片',
+});
+assert.equal(renamed.display_name, '相册小照片');
+assert.equal(renamed.original_preserved, true);
+const namedCatalog = await listMediaLibrary(db, { kind: 'image', q: '相册小照片' });
+assert.equal(namedCatalog.items[0].name, 'snow.png');
+assert.equal(namedCatalog.items[0].display_name, '相册小照片');
+await assert.rejects(() => renameVaultImage(db, {
+  conversation_id: 'not-owner-conversation', source_id: upload.id,
+  display_name: '不可以修改',
+}), /不存在|不属于/);
+await assert.rejects(() => renameVaultImage(db, {
+  conversation_id: conversation.id, source_id: upload.id,
+  display_name: 'a'.repeat(81),
+}), /最多 80/);
 const audioItem = catalog.items.find(item => item.kind === 'audio');
 assert.equal(audioItem.message_id, 'assistant-vault-1');
 assert.match(audioItem.url, /voice\/clips/);
@@ -169,16 +190,26 @@ const fileFavorite = await saveTreasure(db, {
   notes: '第一次查看文件',
 });
 assert.equal((await listTreasures(db, { q: '第一次查看文件' })).items[0].id, fileFavorite.id);
+assert.equal((await listTreasures(db, { q: '相册小照片' })).items[0].display_name, '相册小照片');
 const scoped = await listTreasures(db, { conversation_id: conversation.id, turn_id: 'turn-vault-1' });
 assert.equal(scoped.items.length, 2, 'scoped message sheet sees only this conversation turn');
 assert.equal((await listTreasures(db, { conversation_id: conversation.id, turn_id: 'missing-turn' })).items.length, 0);
 const afterSave = await listMediaLibrary(db, { kind: 'image' });
 assert.equal(afterSave.items[0].favorited, true);
+assert.equal(afterSave.items[0].notes, '第一次查看文件');
 const modified = await updateTreasure(db, fileFavorite.id, { notes: '更新过的文件备注' });
 assert.equal(modified.notes, '更新过的文件备注');
+assert.equal((await listMediaLibrary(db, { kind: 'image' })).items[0].notes, '更新过的文件备注');
 const afterCancel = await removeTreasure(db, fileFavorite.id);
 assert.equal(afterCancel.media_deleted, false);
 assert.equal((await listMediaLibrary(db, { kind: 'image' })).items[0].favorited, false);
+assert.equal((await listMediaLibrary(db, { kind: 'image' })).items[0].display_name, '相册小照片');
+await renameVaultImage(db, {
+  conversation_id: conversation.id, source_id: upload.id, display_name: '',
+});
+const restored = (await listMediaLibrary(db, { kind: 'image' })).items[0];
+assert.equal(restored.display_name, '');
+assert.equal(restored.name, 'snow.png');
 
 const preview = await inspectLegacyHearts(db);
 assert.equal(preview.dry_run, true);
