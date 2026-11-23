@@ -153,10 +153,10 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
 
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.padding(horizontal = 18.dp)
+        modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 14.dp)
     ) {
         item(key = "controls") {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("basic" to "基本文件库", "treasures" to "拾潮").forEach { (value, title) ->
                         SnowLetterSurface(
@@ -188,17 +188,17 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
                     fallbackShape = RoundedCornerShape(20.dp),
                     fallbackElevation = 1.dp
                 ) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 14.dp),
-                        verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("检索", fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.titleSmall)
                         SnowLetterSurface(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().height(44.dp),
                             role = SnowLetterSurfaceRole.ComposerField,
                             fallbackColor = MaterialTheme.colorScheme.surface,
                             fallbackShape = RoundedCornerShape(16.dp)
                         ) {
-                            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp),
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.weight(1f)) {
                                     BasicTextField(
@@ -227,7 +227,7 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
                             labels.forEach { (value, title) ->
                                 val selected = kind == value
                                 Box(
-                                    modifier = Modifier.weight(1f).height(38.dp)
+                                    modifier = Modifier.weight(1f).height(36.dp)
                                         .background(
                                             if (selected) MaterialTheme.colorScheme.secondaryContainer
                                             else MaterialTheme.colorScheme.surface,
