@@ -27,7 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Slider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -46,6 +46,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -75,6 +78,11 @@ private fun JsonObject.vaultFlag(name: String): Boolean =
 
 private fun JsonObject.vaultItems(name: String): List<JsonObject> =
     (this[name] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+
+private fun vaultTime(millis: Int): String {
+    val seconds = millis.coerceAtLeast(0) / 1000
+    return (seconds / 60).toString() + ":" + (seconds % 60).toString().padStart(2, '0')
+}
 
 private val basicKinds = listOf("all" to "全部", "image" to "影像", "audio" to "声音", "file" to "文件")
 private val treasureKinds = listOf("all" to "全部", "writing" to "文字", "image" to "影像",
@@ -659,33 +667,46 @@ private fun CoastVaultAudio(
     var player by remember(id) { mutableStateOf<MediaPlayer?>(null) }
     var file by remember(id) { mutableStateOf<File?>(null) }
     var playing by remember(id) { mutableStateOf(false) }
+    var durationMs by remember(id) { mutableIntStateOf(0) }
     var progress by remember(id) { mutableStateOf(0f) }
+    var seeking by remember(id) { mutableStateOf(false) }
     DisposableEffect(id) {
         onDispose { player?.release(); file?.delete() }
     }
     LaunchedEffect(id, playing, player) {
         while (playing && isActive) {
-            val active = player
-            progress = if (active != null) runCatching {
-                val duration = active.duration
-                if (duration > 0) (active.currentPosition.toFloat() / duration).coerceIn(0f, 1f)
-                else 0f
-            }.getOrDefault(0f) else 0f
+            if (!seeking) {
+                progress = player?.let { active ->
+                    runCatching {
+                        if (active.duration > 0)
+                            (active.currentPosition.toFloat() / active.duration).coerceIn(0f, 1f)
+                        else 0f
+                    }.getOrDefault(0f)
+                } ?: 0f
+            }
             delay(180)
         }
     }
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = {
-                scope.launch {
-                    try {
-                        if (playing) {
-                            player?.pause()
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        TextButton(onClick = {
+            scope.launch {
+                try {
+                    val active = player
+                    when {
+                        playing -> {
+                            active?.pause()
                             playing = false
-                        } else if (player != null) {
-                            player?.start()
+                        }
+                        active != null -> {
+                            if (progress >= 0.999f) {
+                                active.seekTo(0)
+                                progress = 0f
+                            }
+                            active.start()
                             playing = true
-                        } else {
+                        }
+                        else -> {
                             val bytes = repository.audio(id)
                             val local = File.createTempFile("coast-vault-", ".mp3", context.cacheDir)
                             local.writeBytes(bytes)
@@ -693,6 +714,7 @@ private fun CoastVaultAudio(
                             val next = MediaPlayer()
                             next.setDataSource(local.absolutePath)
                             next.prepare()
+                            durationMs = next.duration
                             next.setOnCompletionListener {
                                 playing = false
                                 progress = 1f
@@ -701,14 +723,32 @@ private fun CoastVaultAudio(
                             next.start()
                             playing = true
                         }
-                    } catch (cancel: CancellationException) {
-                        throw cancel
-                    } catch (error: Exception) { onSnackbar("语音播放失败：" + error.message) }
-                }
-            }) { Text(if (playing) "暂停" else "播放") }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("已生成语音", style = MaterialTheme.typography.labelMedium)
-                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                    }
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } catch (error: Exception) { onSnackbar("语音播放失败：" + error.message) }
+            }
+        }) { Text(if (playing) "暂停" else "播放", style = MaterialTheme.typography.labelSmall) }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+            Slider(
+                value = progress,
+                onValueChange = { seeking = true; progress = it },
+                onValueChangeFinished = {
+                    player?.let { active ->
+                        if (durationMs > 0) active.seekTo((progress * durationMs).toInt())
+                    }
+                    seeking = false
+                },
+                enabled = durationMs > 0,
+                modifier = Modifier.fillMaxWidth().height(32.dp)
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(vaultTime((progress * durationMs).toInt()),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (durationMs > 0) vaultTime(durationMs) else "—:—",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
