@@ -602,11 +602,19 @@ private fun CoastVaultCard(
         onDismissRequest = { showText = false },
         title = { Text(heading) },
         text = {
-            Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
-                Text(sourceText, style = MaterialTheme.typography.bodyMedium)
+            SelectionContainer {
+                Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
+                    Text(sourceText, style = MaterialTheme.typography.bodyMedium)
+                }
             }
         },
-        confirmButton = { TextButton(onClick = { showText = false }) { Text("收起") } }
+        confirmButton = {
+            TextButton(onClick = {
+                clipboard.setText(AnnotatedString(sourceText))
+                onSnackbar("已复制全文。")
+            }) { Text("复制全文") }
+        },
+        dismissButton = { TextButton(onClick = { showText = false }) { Text("收起") } }
     )
     if (showNote) AlertDialog(
         onDismissRequest = { if (!busy) showNote = false },
@@ -647,7 +655,7 @@ private fun CoastVaultCard(
                 scope.launch {
                     busy = true
                     try {
-                        repository.vaultRemove(id)
+                        repository.vaultRemove(if (treasure) id else item.vaultText("treasure_id"))
                         onChanged()
                         onSnackbar("已取消珍藏，原资料仍在。")
                     } catch (error: Exception) { onSnackbar("操作失败：" + error.message) }
