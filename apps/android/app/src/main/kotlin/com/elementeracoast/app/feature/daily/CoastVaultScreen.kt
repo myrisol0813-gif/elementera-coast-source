@@ -7,8 +7,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -161,7 +164,8 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
 
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 14.dp)
+        contentPadding = PaddingValues(top = 22.dp, bottom = 24.dp),
+        modifier = Modifier.fillMaxSize().clipToBounds().padding(horizontal = 18.dp)
     ) {
         item(key = "controls") {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -196,7 +200,7 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
                     fallbackShape = RoundedCornerShape(20.dp),
                     fallbackElevation = 1.dp
                 ) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                    Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 18.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("检索", fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.titleSmall)
@@ -329,19 +333,28 @@ private fun CoastVaultCard(
     val sourceId = if (treasure) item.vaultText("source_id") else id
     val conversation = item.vaultText("conversation_id")
     val sourceText = if (treasure) item.vaultText("excerpt") else item.vaultText("source_text")
-    val originalName = item.vaultText("name")
+    val originalName = if (treasure && kind == "image") item.vaultText("excerpt")
+        else item.vaultText("name")
+    val displayName = item.vaultText("display_name")
     val heading = when (kind) {
         "audio" -> "已保存语音"
         "soil" -> "原位思维壤"
         "text" -> "文字摘抄"
-        else -> originalName.ifBlank { if (kind == "image") "海岸影像" else "海岸附件" }
+        else -> (if (kind == "image") displayName.ifBlank { originalName } else originalName)
+            .ifBlank { if (kind == "image") "海岸影像" else "海岸附件" }
     }
     var note by remember(id) { mutableStateOf(item.vaultText("notes")) }
+    var noteExpanded by remember(id) { mutableStateOf(false) }
+    var noteHasMore by remember(id) { mutableStateOf(false) }
+    var noteEditing by remember(id) { mutableStateOf(false) }
+    var showRename by remember(id) { mutableStateOf(false) }
+    var renameText by remember(id) { mutableStateOf(displayName) }
+    LaunchedEffect(item.vaultText("notes")) { if (!noteEditing) note = item.vaultText("notes") }
+    LaunchedEffect(displayName) { renameText = displayName }
     var busy by remember(id) { mutableStateOf(false) }
     var showActions by remember(id) { mutableStateOf(false) }
     var showCancel by remember(id) { mutableStateOf(false) }
     var showInfo by remember(id) { mutableStateOf(false) }
-    var showNote by remember(id) { mutableStateOf(false) }
     var showText by remember(id) { mutableStateOf(false) }
     var audioExpanded by remember(id) { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
@@ -379,13 +392,19 @@ private fun CoastVaultCard(
     }
 
     fun saveInlineNote() {
-        if (!treasure) return
         scope.launch {
             busy = true
             try {
-                repository.vaultChangeNote(id, note)
+                val favoriteId = if (treasure) id else item.vaultText("treasure_id")
+                if (favoriteId.isNotBlank()) {
+                    repository.vaultChangeNote(favoriteId, note)
+                    onSnackbar("备注已保存。")
+                } else {
+                    repository.vaultSave(kind, conversation, sourceId, note)
+                    onSnackbar("备注已保存，并已拾入潮间。")
+                }
+                noteEditing = false
                 onChanged()
-                onSnackbar("备注已保存。")
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) { onSnackbar("备注保存失败：" + error.message) }
@@ -393,19 +412,28 @@ private fun CoastVaultCard(
         }
     }
 
-    fun favorite() {
-        if (treasure) { showCancel = true; return }
-        val savedId = item.vaultText("treasure_id")
+    fun renameImage() {
         scope.launch {
             busy = true
             try {
-                if (item.vaultFlag("favorited") && savedId.isNotBlank()) {
-                    repository.vaultRemove(savedId)
-                    onSnackbar("已取消珍藏，原媒体仍在。")
-                } else {
-                    repository.vaultSave(kind, conversation, sourceId, note)
-                    onSnackbar("已拾入潮间。")
-                }
+                repository.vaultRenameImage(conversation, sourceId, renameText)
+                showRename = false
+                onChanged()
+                onSnackbar("展示名称已保存，原始文件未修改。")
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) { onSnackbar("重命名失败：" + error.message) }
+            finally { busy = false }
+        }
+    }
+
+    fun favorite() {
+        if (treasure || item.vaultFlag("favorited")) { showCancel = true; return }
+        scope.launch {
+            busy = true
+            try {
+                repository.vaultSave(kind, conversation, sourceId, note)
+                onSnackbar("已拾入潮间。")
                 onChanged()
             } catch (cancel: CancellationException) {
                 throw cancel
@@ -471,28 +499,6 @@ private fun CoastVaultCard(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                            OutlinedTextField(
-                                value = note, onValueChange = { note = it.take(1200) },
-                                modifier = Modifier.weight(1f), singleLine = true,
-                                enabled = treasure || !item.vaultFlag("favorited"),
-                                textStyle = MaterialTheme.typography.bodySmall,
-                                placeholder = {
-                                    Text(if (!treasure && item.vaultFlag("favorited"))
-                                        "请到拾潮修改备注" else "备注，可留空",
-                                        style = MaterialTheme.typography.bodySmall)
-                                }
-                            )
-                            TextButton(enabled = !busy && (treasure || !item.vaultFlag("favorited")), onClick = {
-                                if (treasure) saveInlineNote() else favorite()
-                            }, modifier = Modifier.background(MaterialTheme.colorScheme.surface,
-                                RoundedCornerShape(12.dp))) {
-                                Text(if (treasure) "保存备注" else if (item.vaultFlag("favorited"))
-                                    "已在拾潮" else "拾入潮间",
-                                    style = MaterialTheme.typography.labelMedium)
-                            }
-                        }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                             val actions = listOf("下载语音", "回到来源", "复制全文") +
                                 (if (treasure || item.vaultFlag("favorited")) listOf("取消珍藏") else emptyList())
@@ -535,7 +541,7 @@ private fun CoastVaultCard(
                                 treasure = treasure, alreadySaved = item.vaultFlag("favorited"),
                                 busy = busy, onFavorite = ::favorite, onSave = ::download,
                                 onSource = ::openSource, onInfo = { showInfo = true },
-                                onNote = { showNote = true }, onRead = { showText = true },
+                                onNote = { noteEditing = true; if (kind == "image") imageOpen = null; if (kind == "audio") audioExpanded = true }, onRead = { showText = true },
                                 hasMedia = true, hasText = false)
                         }
                     }
@@ -554,10 +560,51 @@ private fun CoastVaultCard(
                                 treasure = treasure, alreadySaved = item.vaultFlag("favorited"),
                                 busy = busy, onFavorite = ::favorite, onSave = ::download,
                                 onSource = ::openSource, onInfo = { showInfo = true },
-                                onNote = { showNote = true }, onRead = { showText = true },
+                                onNote = { noteEditing = true; if (kind == "image") imageOpen = null; if (kind == "audio") audioExpanded = true }, onRead = { showText = true },
                                 hasMedia = false, hasText = sourceText.isNotBlank())
                         }
                     }
+                }
+            }
+            if (noteEditing && (kind != "audio" || audioExpanded)) {
+                OutlinedTextField(
+                    value = note, onValueChange = { note = it.take(1200) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2, maxLines = 4,
+                    textStyle = MaterialTheme.typography.bodySmall,
+                    placeholder = { Text("写一点想留下的话…") }
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(enabled = !busy, onClick = ::saveInlineNote) {
+                        Text(if (treasure || item.vaultFlag("favorited")) "保存备注"
+                            else "拾入潮间并保存", style = MaterialTheme.typography.labelSmall)
+                    }
+                    TextButton(onClick = {
+                        note = item.vaultText("notes")
+                        noteEditing = false
+                    }) { Text("取消", style = MaterialTheme.typography.labelSmall) }
+                }
+            } else if (note.isNotBlank()) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Column(Modifier.weight(1f).clickable { if (noteHasMore) noteExpanded = !noteExpanded }) {
+                        Text(note, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = if (noteExpanded) Int.MAX_VALUE else 2,
+                            overflow = TextOverflow.Ellipsis,
+                            onTextLayout = { if (!noteExpanded) noteHasMore = it.hasVisualOverflow })
+                        if (noteHasMore) Text(if (noteExpanded) "收起⌃" else "展开⌄",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    TextButton(onClick = { noteEditing = true; if (kind == "audio") audioExpanded = true }) {
+                        Text("修改", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            } else if (kind != "audio" || audioExpanded) {
+                TextButton(onClick = { noteEditing = true; if (kind == "audio") audioExpanded = true }) {
+                    Text("添加备注…", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -575,15 +622,37 @@ private fun CoastVaultCard(
                         treasure = treasure, alreadySaved = item.vaultFlag("favorited"),
                         busy = busy, onFavorite = ::favorite, onSave = ::download,
                         onSource = ::openSource, onInfo = { showInfo = true },
-                        onNote = { showNote = true }, onRead = { showText = true },
-                        hasMedia = true, hasText = false)
+                        onNote = { noteEditing = true; if (kind == "image") imageOpen = null; if (kind == "audio") audioExpanded = true }, onRead = { showText = true },
+                        hasMedia = true, hasText = false, onRename = { showRename = true })
                 }
             }
             Image(imageOpen!!.asImageBitmap(), contentDescription = "海岸影像原图",
                 modifier = Modifier.fillMaxWidth().heightIn(max = 540.dp),
                 contentScale = ContentScale.Fit)
+            Text(heading, style = MaterialTheme.typography.bodyMedium)
+            Text("原文件名：" + originalName, style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+    if (showRename) AlertDialog(
+        onDismissRequest = { if (!busy) showRename = false },
+        title = { Text("修改图片展示名称") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Text("原始文件不会改变。留空会恢复原文件名。",
+                    style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(
+                    value = renameText, onValueChange = { renameText = it.take(80) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    placeholder = { Text("图片展示名称") }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = !busy, onClick = ::renameImage) { Text("保存名称") }
+        },
+        dismissButton = { TextButton(onClick = { showRename = false }) { Text("取消") } }
+    )
     if (showInfo) AlertDialog(
         onDismissRequest = { showInfo = false },
         title = { Text("文件信息") },
@@ -616,35 +685,6 @@ private fun CoastVaultCard(
             }) { Text("复制全文") }
         },
         dismissButton = { TextButton(onClick = { showText = false }) { Text("收起") } }
-    )
-    if (showNote) AlertDialog(
-        onDismissRequest = { if (!busy) showNote = false },
-        title = { Text("珍藏备注") },
-        text = {
-            OutlinedTextField(value = note, onValueChange = { note = it.take(1200) },
-                modifier = Modifier.fillMaxWidth(), maxLines = 5,
-                placeholder = { Text("写一点想留下的话…") })
-        },
-        confirmButton = {
-            TextButton(enabled = !busy, onClick = {
-                if (treasure) {
-                    scope.launch {
-                        busy = true
-                        try {
-                            repository.vaultChangeNote(id, note)
-                            onChanged()
-                            showNote = false
-                            onSnackbar("备注已保存。")
-                        } catch (error: Exception) { onSnackbar("保存失败：" + error.message) }
-                        finally { busy = false }
-                    }
-                } else {
-                    showNote = false
-                    onSnackbar("备注已填写，可从操作菜单拾入潮间时一起保存。")
-                }
-            }) { Text("保存") }
-        },
-        dismissButton = { TextButton(onClick = { showNote = false }) { Text("返回") } }
     )
     if (showCancel) AlertDialog(
         onDismissRequest = { showCancel = false },
@@ -682,9 +722,15 @@ private fun VaultActions(
     onNote: () -> Unit,
     onRead: () -> Unit,
     hasMedia: Boolean,
-    hasText: Boolean
+    hasText: Boolean,
+    onRename: (() -> Unit)? = null
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        if (onRename != null) DropdownMenuItem(
+            text = { Text("修改名称") },
+            enabled = !busy,
+            onClick = { onDismiss(); onRename() }
+        )
         DropdownMenuItem(
             text = { Text(if (treasure || alreadySaved) "取消珍藏" else "拾入潮间") },
             enabled = !busy,

@@ -8,11 +8,6 @@ const SAVED_TYPES = Object.freeze([
   ['all', '全部'], ['writing', '文字'], ['image', '影像'], ['audio', '声音'], ['other', '其他'],
 ]);
 
-function option(value, label, current) {
-  return '<option value="' + escapeAttribute(value) + '"' +
-    (value === current ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
-}
-
 function itemSource(item) {
   if (item.kind === 'audio') return '/api/voice/clips/' + encodeURIComponent(item.source_id || item.id) + '/audio';
   if (item.kind === 'image' || item.kind === 'file') {
@@ -45,60 +40,102 @@ export function createCoastVault({ router, chat, toast }) {
   function itemCard(item, index) {
     const saved = current.mode === 'treasures';
     const audio = item.kind === 'audio';
-    const name = saved
-      ? (item.kind === 'text' ? '文字摘录' : item.kind === 'soil' ? '原位思维壤'
-        : audio ? '语音收藏' : '媒体收藏')
-      : item.name || (audio ? '已生成语音' : '媒体');
+    const image = item.kind === 'image';
+    const originalName = saved ? item.excerpt || '' : item.name || '';
+    const name = image
+      ? (item.display_name || originalName || '海岸影像')
+      : saved ? (item.kind === 'text' ? '文字摘录' : item.kind === 'soil'
+        ? '原位思维壤' : audio ? '语音收藏' : '媒体收藏')
+        : item.name || (audio ? '已生成语音' : '媒体');
     const primary = saved ? item.excerpt || '' : item.source_text || '';
     const favoriteId = saved ? item.id : item.treasure_id;
     const alreadySaved = saved || Boolean(item.favorited);
-    const noteInput = '<input class="coast-vault-note" maxlength="1200" value="'
-      + escapeAttribute(saved ? item.notes || '' : '')
-      + '" aria-label="珍藏备注"'
-      + (!saved && alreadySaved ? ' disabled placeholder="请到拾潮修改备注"' : ' placeholder="备注，可留空"')
-      + '>';
-    const smallAction = saved
-      ? '<button data-action="vault:note" data-index="' + index
-        + '" type="button">保存备注</button>'
-      : alreadySaved
-        ? '<span class="coast-vault-mark">已在拾潮</span>'
-        : '<button data-action="vault:save" data-index="' + index
-          + '" type="button">拾入潮间</button>';
+    const notes = item.notes || '';
+    const noteInput = '<textarea class="coast-vault-note" maxlength="1200" rows="3"'
+      + ' aria-label="珍藏备注" placeholder="写一点想留下的话…">'
+      + escapeHtml(notes) + '</textarea>';
+    const noteAction = alreadySaved ? '保存备注' : '拾入潮间并保存';
+    const noteSummary = notes
+      ? '<div class="coast-vault-note-preview"><button type="button"'
+        + ' class="coast-vault-note-toggle" data-action="vault:note-expand" data-index="' + index
+        + '" aria-expanded="false"><span class="coast-vault-note-text">' + escapeHtml(notes)
+        + '</span>' + (notes.length > 48 || notes.includes('\n')
+          ? '<span class="coast-vault-note-chevron" aria-hidden="true">⌄</span>' : '')
+        + '</button><button type="button" class="coast-vault-note-edit"'
+        + ' data-action="vault:note-edit" data-index="' + index + '">修改</button></div>'
+      : '<button class="coast-vault-add-note" type="button"'
+        + ' data-action="vault:note-edit" data-index="' + index + '">添加备注…</button>';
+    const note = '<div class="coast-vault-annotation">' + noteSummary
+      + '<div class="coast-vault-note-editor coast-vault-note-line" hidden>'
+      + noteInput
+      + '<div class="coast-vault-note-buttons"><button type="button" data-action="vault:note-save"'
+      + ' data-index="' + index + '">' + noteAction + '</button>'
+      + '<button type="button" data-action="vault:note-cancel" data-index="' + index
+      + '">取消</button></div></div></div>';
     const removeAction = alreadySaved && favoriteId
       ? '<button data-action="vault:remove" data-index="' + index
         + '" type="button">取消珍藏</button>' : '';
-    const storageHint = item.kind === 'text' ? ''
-      : '<small class="coast-vault-hint">取消珍藏不会删除原文件或原聊天。</small>';
+    const saveAction = alreadySaved ? '' : '<button data-action="vault:save" data-index="'
+      + index + '" type="button">拾入潮间</button>';
+    if (image) {
+      return '<article class="coast-vault-card coast-vault-image-card" data-vault-index="' + index + '">'
+        + '<button type="button" class="coast-vault-photo" data-action="vault:image-open"'
+        + ' data-index="' + index + '" aria-label="打开图片大图">'
+        + mediaPreview(item) + '</button>'
+        + '<div class="coast-vault-caption"><strong title="' + escapeAttribute(name) + '">'
+        + escapeHtml(name) + '</strong></div>'
+        + note
+        + '<dialog class="coast-vault-image-dialog" aria-label="图片查看器">'
+        + '<div class="coast-vault-image-toolbar"><button type="button"'
+        + ' data-action="vault:image-close" data-index="' + index + '">关闭</button>'
+        + '<details class="coast-vault-image-menu"><summary aria-label="图片操作">···</summary>'
+        + '<div class="coast-vault-image-menu-items">'
+        + '<button type="button" data-action="vault:rename-open" data-index="' + index
+        + '">修改名称</button>' + saveAction + removeAction
+        + '<a download href="' + escapeAttribute(itemSource(item)) + '">下载原图</a>'
+        + '<button type="button" data-action="vault:source" data-index="' + index
+        + '">回到来源</button></div></details></div>'
+        + '<img src="' + escapeAttribute(itemSource(item)) + '" alt="'
+        + escapeAttribute(name) + '" class="coast-vault-large-image">'
+        + '<div class="coast-vault-image-fullname">' + escapeHtml(name) + '</div>'
+        + '<div class="coast-vault-rename-form" hidden><label>展示名称'
+        + '<input class="coast-vault-display-name" maxlength="80" value="'
+        + escapeAttribute(item.display_name || '') + '" placeholder="留空则恢复原文件名"></label>'
+        + '<div class="coast-vault-rename-actions"><button type="button"'
+        + ' data-action="vault:rename-save" data-index="' + index + '">保存名称</button>'
+        + '<button type="button" data-action="vault:rename-cancel" data-index="' + index
+        + '">返回</button></div></div>'
+        + '<small>原文件名：' + escapeHtml(originalName || '未知') + '</small>'
+        + '</dialog></article>';
+    }
     const title = '<div class="coast-vault-meta"><strong>' + escapeHtml(name)
-      + '</strong><small>' + escapeHtml(audio ? '声音' : item.kind === 'image' ? '影像'
-        : item.kind === 'file' ? '文件' : item.kind === 'soil' ? '旧思维壤' : '文字')
-      + '</small></div>';
+      + '</strong><small>' + escapeHtml(audio ? '声音' : item.kind === 'file'
+        ? '文件' : item.kind === 'soil' ? '旧思维壤' : '文字') + '</small></div>';
     if (audio) {
       return '<article class="coast-vault-card coast-vault-audio" data-vault-index="' + index + '">'
         + '<div class="coast-vault-player">' + mediaPreview(item)
         + '<button type="button" class="coast-vault-expand" data-action="vault:expand"'
         + ' data-index="' + index + '" aria-expanded="false" aria-label="展开语音原文">'
         + '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>'
+        + note
         + '<div class="coast-vault-audio-detail" hidden>'
         + '<p class="coast-vault-transcript-label">语音原文</p>'
         + '<div class="coast-vault-transcript">' + (primary
           ? escapeHtml(primary) : '此条语音暂无可读取的原文。') + '</div>'
-        + '<div class="coast-vault-note-line">' + noteInput + smallAction + '</div>'
         + '<div class="coast-vault-tools"><a href="'
         + escapeAttribute(itemSource(item)) + '" download>下载语音</a>'
         + '<button data-action="vault:source" data-index="' + index
         + '" type="button">回到来源</button>'
         + '<button data-action="vault:copy" data-index="' + index
         + '" type="button"' + (primary ? '' : ' disabled') + '>复制全文</button>'
-        + removeAction + '</div>' + storageHint + '</div></article>';
+        + saveAction + removeAction + '</div></div></article>';
     }
-    const note = '<div class="coast-vault-note-line">' + noteInput + smallAction + '</div>';
     return '<article class="coast-vault-card" data-vault-index="' + index + '">'
       + title + mediaPreview(item)
-      + (primary ? '<p class="coast-vault-excerpt">'
+      + (item.kind === 'file' ? '' : primary ? '<p class="coast-vault-excerpt">'
         + escapeHtml(primary.slice(0, 500)) + '</p>' : '')
-      + storageHint + note
-      + '<div class="coast-vault-actions">' + removeAction
+      + note
+      + '<div class="coast-vault-actions">' + saveAction + removeAction
       + '<button data-action="vault:source" data-index="' + index
       + '" type="button">回到来源</button></div></article>';
   }
@@ -254,6 +291,77 @@ export function createCoastVault({ router, chat, toast }) {
     const index = Number(target.dataset.index);
     const item = items[index];
     if (!item) return;
+    if (name === 'image-open' || name === 'image-close') {
+      const dialog = card(index)?.querySelector('.coast-vault-image-dialog');
+      if (!dialog) return;
+      if (name === 'image-open') dialog.showModal();
+      else dialog.close();
+      return;
+    }
+    if (name === 'rename-open' || name === 'rename-cancel') {
+      const root = card(index);
+      const editor = root?.querySelector('.coast-vault-rename-form');
+      if (!editor) return;
+      editor.hidden = name !== 'rename-open';
+      if (!editor.hidden) {
+        root.querySelector('.coast-vault-image-menu')?.removeAttribute('open');
+        root.querySelector('.coast-vault-display-name')?.focus();
+      }
+      return;
+    }
+    if (name === 'rename-save') {
+      const display_name = card(index)?.querySelector('.coast-vault-display-name')?.value || '';
+      try {
+        await requestJson('/api/coast-vault/media-labels', {
+          method: 'PATCH', body: JSON.stringify({
+            kind: 'image', conversation_id: item.conversation_id,
+            source_id: item.source_id || item.id, display_name,
+          }),
+        });
+        toast('图片显示名称已保存，原始文件没有改变。');
+        return router.refresh({ preserveScroll: true });
+      } catch (error) {
+        return toast('修改名称失败：' + (error.message || '请稍后重试'));
+      }
+    }
+    if (name === 'note-expand') {
+      const toggle = card(index)?.querySelector('.coast-vault-note-toggle');
+      if (!toggle) return;
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!expanded));
+      toggle.closest('.coast-vault-note-preview')?.classList.toggle('is-expanded', !expanded);
+      return;
+    }
+    if (name === 'note-edit' || name === 'note-cancel') {
+      const editor = card(index)?.querySelector('.coast-vault-note-editor');
+      if (!editor) return;
+      editor.hidden = name === 'note-cancel';
+      if (!editor.hidden) editor.querySelector('textarea')?.focus();
+      return;
+    }
+    if (name === 'note-save') {
+      const notes = card(index)?.querySelector('.coast-vault-note')?.value || '';
+      try {
+        const favoriteId = current.mode === 'treasures' ? item.id : item.treasure_id;
+        if (favoriteId) {
+          await requestJson(API.vaultTreasures + '/' + encodeURIComponent(favoriteId), {
+            method: 'PATCH', body: JSON.stringify({ notes }),
+          });
+          toast('备注已保存。');
+        } else {
+          await requestJson(API.vaultTreasures, {
+            method: 'POST', body: JSON.stringify({
+              kind: item.kind, conversation_id: item.conversation_id,
+              source_id: item.id, notes,
+            }),
+          });
+          toast('备注已保存，并已拾入潮间。');
+        }
+        return router.refresh({ preserveScroll: true });
+      } catch (error) {
+        return toast('保存备注失败：' + (error.message || '请稍后重试'));
+      }
+    }
     if (name === 'copy') {
       const content = current.mode === 'treasures' ? item.excerpt || '' : item.source_text || '';
       if (!content) return toast('这条语音暂无可复制的原文。');
@@ -285,16 +393,6 @@ export function createCoastVault({ router, chat, toast }) {
       });
       toast('已拾入潮间。');
       return router.refresh({ preserveScroll: true });
-    }
-    if (name === 'note') {
-      const notes = card(index)?.querySelector('.coast-vault-note')?.value || '';
-      const favoriteId = current.mode === 'treasures' ? item.id : item.treasure_id;
-      if (!favoriteId) return toast('未找到对应的珍藏记录，请刷新后再试。');
-      await requestJson(API.vaultTreasures + '/' + encodeURIComponent(favoriteId), {
-        method: 'PATCH', body: JSON.stringify({ notes }),
-      });
-      toast('珍藏备注已保存。');
-      return;
     }
     if (name === 'remove') {
       if (!confirm('取消这条珍藏？原来的语音、图片、文件和聊天不会被删除。')) return;

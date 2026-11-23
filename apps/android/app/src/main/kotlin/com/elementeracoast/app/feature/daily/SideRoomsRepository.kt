@@ -230,6 +230,14 @@ class SideRoomsRepository(private val config: CoastApiConfig, private val client
                 }))
         })
 
+    suspend fun vaultRenameImage(conversationId: String, sourceId: String, displayName: String): JsonObject =
+        request("/api/coast-vault/media-labels", "PATCH", kotlinx.serialization.json.buildJsonObject {
+            put("kind", kotlinx.serialization.json.JsonPrimitive("image"))
+            put("conversation_id", kotlinx.serialization.json.JsonPrimitive(conversationId))
+            put("source_id", kotlinx.serialization.json.JsonPrimitive(sourceId))
+            put("display_name", kotlinx.serialization.json.JsonPrimitive(displayName))
+        })
+
     suspend fun vaultChangeNote(treasureId: String, notes: String): JsonObject =
         request("/api/coast-vault/treasures/" + path(treasureId), "PATCH",
             kotlinx.serialization.json.buildJsonObject {

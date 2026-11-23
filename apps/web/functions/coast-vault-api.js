@@ -2,6 +2,7 @@ import {
   apiError, json, methodNotAllowed, readJson, requestBodyError, unexpectedApiError,
 } from './http.js';
 import { listMediaLibrary, MediaLibraryError } from './coast-vault-media.js';
+import { renameVaultImage, MediaLabelError } from './coast-vault-media-labels.js';
 import { inspectLegacyHearts } from './coast-vault-legacy.js';
 import {
   TreasureError, listTreasures, saveTreasure, updateTreasure, removeTreasure,
@@ -22,6 +23,12 @@ async function route(request, env) {
     return json({ ok: true, ...(await listMediaLibrary(env.COAST_CHAT_DB, {
       kind: params.get('kind'), q: params.get('q'), cursor: params.get('cursor') || 0,
     })) });
+  }
+  if (path === '/media-labels') {
+    if (request.method !== 'PATCH') return methodNotAllowed('PATCH');
+    return json({ ok: true, item: await renameVaultImage(
+      env.COAST_CHAT_DB, await readJson(request, 2000),
+    ) });
   }
   if (path === '/legacy-hearts') {
     if (request.method === 'GET') return json({
@@ -68,7 +75,7 @@ async function route(request, env) {
 export async function routeCoastVaultApi(request, env) {
   try { return await route(request, env); }
   catch (error) {
-    if (error instanceof MediaLibraryError || error instanceof TreasureError) {
+    if (error instanceof MediaLibraryError || error instanceof MediaLabelError || error instanceof TreasureError) {
       return apiError(error.type, error.message, error.status);
     }
     if (['invalid_json', 'body_too_large'].includes(error?.message)) {
