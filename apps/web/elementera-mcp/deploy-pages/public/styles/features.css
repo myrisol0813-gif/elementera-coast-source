@@ -1109,7 +1109,7 @@
   font-weight: 720;
 }
 
-.daily-avatar.is-myri {
+.daily-avatar.is-model_partner {
   background: radial-gradient(circle at 35% 25%, #fff8dc, #f1c7b8 42%, #b7c7dd 100%) center/cover no-repeat;
   color: #4b3b58;
 }
@@ -1567,18 +1567,10 @@
   }
 }
 
-/* Reading choices share the existing rounded feature-row surface. */
-.reading-choice {
-  min-height: 62px;
-  border-radius: 14px;
-}
-.reading-choice[aria-pressed="true"] {
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised));
-}
-.reading-choice[aria-pressed="true"] strong::after {
-  content: "  ✓";
-  color: var(--accent);
-}
+/* Reading choices reuse the original rounded feature-row surface. */
+.reading-choice { min-height: 62px; border-radius: 14px; }
+.reading-choice[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised)); }
+.reading-choice[aria-pressed="true"] strong::after { content: "  ✓"; color: var(--accent); }
 
 /* Inline swatches make the full palette visible without cycling through themes. */
 .theme-choice { min-height: 60px; border-radius: 14px; }
@@ -1608,7 +1600,6 @@
   border: 1px solid color-mix(in srgb,var(--line) 78%, transparent);
   box-shadow: 0 5px 18px rgba(89,119,136,.06);
 }
-
 
 /* Coastal vault: grouped paper shelves, a compact search, and unfolding voice letters. */
 .coast-vault-panel .feature-body {
