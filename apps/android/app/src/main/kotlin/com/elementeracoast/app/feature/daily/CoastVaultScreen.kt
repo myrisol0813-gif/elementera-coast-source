@@ -428,18 +428,12 @@ private fun CoastVaultCard(
     }
 
     fun favorite() {
-        if (treasure) { showCancel = true; return }
-        val savedId = item.vaultText("treasure_id")
+        if (treasure || item.vaultFlag("favorited")) { showCancel = true; return }
         scope.launch {
             busy = true
             try {
-                if (item.vaultFlag("favorited") && savedId.isNotBlank()) {
-                    repository.vaultRemove(savedId)
-                    onSnackbar("已取消珍藏，原媒体仍在。")
-                } else {
-                    repository.vaultSave(kind, conversation, sourceId, note)
-                    onSnackbar("已拾入潮间。")
-                }
+                repository.vaultSave(kind, conversation, sourceId, note)
+                onSnackbar("已拾入潮间。")
                 onChanged()
             } catch (cancel: CancellationException) {
                 throw cancel
