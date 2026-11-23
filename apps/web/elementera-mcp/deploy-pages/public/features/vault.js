@@ -240,10 +240,31 @@ export function createCoastVault({ router, chat, toast }) {
     if (name === 'legacy') return transferLegacyHearts();
     if (name === 'open') return router.open('vault-home', { mode: 'basic' });
     if (name === 'mode') return router.open('vault-home', { mode: target.dataset.mode }, { replace: true });
+    if (name === 'kind') return router.open('vault-home', params({ kind: target.dataset.kind }), { replace: true });
+    if (name === 'expand') {
+      const button = target.closest('.coast-vault-expand');
+      const detail = button?.closest('.coast-vault-audio')?.querySelector('.coast-vault-audio-detail');
+      if (!detail) return;
+      detail.hidden = !detail.hidden;
+      button.setAttribute('aria-expanded', String(!detail.hidden));
+      button.setAttribute('aria-label', detail.hidden ? '展开语音原文' : '收起语音原文');
+      return;
+    }
     if (name === 'more') return router.open('vault-home', params({ cursor: target.dataset.cursor }), { replace: true });
     const index = Number(target.dataset.index);
     const item = items[index];
     if (!item) return;
+    if (name === 'copy') {
+      const content = current.mode === 'treasures' ? item.excerpt || '' : item.source_text || '';
+      if (!content) return toast('这条语音暂无可复制的原文。');
+      try {
+        await navigator.clipboard.writeText(content);
+        toast('已复制语音原文。');
+      } catch {
+        toast('复制失败，请长按原文选择复制。');
+      }
+      return;
+    }
     if (name === 'source') {
       await router.close();
       const hit = {
@@ -267,7 +288,9 @@ export function createCoastVault({ router, chat, toast }) {
     }
     if (name === 'note') {
       const notes = card(index)?.querySelector('.coast-vault-note')?.value || '';
-      await requestJson(API.vaultTreasures + '/' + encodeURIComponent(item.id), {
+      const favoriteId = current.mode === 'treasures' ? item.id : item.treasure_id;
+      if (!favoriteId) return toast('未找到对应的珍藏记录，请刷新后再试。');
+      await requestJson(API.vaultTreasures + '/' + encodeURIComponent(favoriteId), {
         method: 'PATCH', body: JSON.stringify({ notes }),
       });
       toast('珍藏备注已保存。');
@@ -275,7 +298,9 @@ export function createCoastVault({ router, chat, toast }) {
     }
     if (name === 'remove') {
       if (!confirm('取消这条珍藏？原来的语音、图片、文件和聊天不会被删除。')) return;
-      await requestJson(API.vaultTreasures + '/' + encodeURIComponent(item.id), { method: 'DELETE' });
+      const favoriteId = current.mode === 'treasures' ? item.id : item.treasure_id;
+      if (!favoriteId) return toast('未找到对应的珍藏记录，请刷新后再试。');
+      await requestJson(API.vaultTreasures + '/' + encodeURIComponent(favoriteId), { method: 'DELETE' });
       toast('已取消珍藏，原资料仍在。');
       return router.refresh({ preserveScroll: true });
     }
@@ -293,7 +318,7 @@ export function createCoastVault({ router, chat, toast }) {
       if (context.eventType === 'submit' && context.name === 'search') {
         const form = context.target;
         return router.open('vault-home', params({
-          kind: form.elements.namedItem('kind')?.value || 'all',
+          kind: current.kind,
           q: form.elements.namedItem('q')?.value || '',
         }), { replace: true });
       }
