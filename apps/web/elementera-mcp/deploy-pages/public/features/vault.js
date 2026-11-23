@@ -54,12 +54,16 @@ export function createCoastVault({ router, chat, toast }) {
     const alreadySaved = saved || Boolean(item.favorited);
     const noteInput = '<input class="coast-vault-note" maxlength="1200" value="'
       + escapeAttribute(saved ? item.notes || '' : '')
-      + '" aria-label="珍藏备注" placeholder="备注，可留空">';
-    const smallAction = alreadySaved
+      + '" aria-label="珍藏备注"'
+      + (!saved && alreadySaved ? ' disabled placeholder="请到拾潮修改备注"' : ' placeholder="备注，可留空"')
+      + '>';
+    const smallAction = saved
       ? '<button data-action="vault:note" data-index="' + index
-        + '" type="button"' + (favoriteId ? '' : ' disabled') + '>保存备注</button>'
-      : '<button data-action="vault:save" data-index="' + index
-        + '" type="button">拾入潮间</button>';
+        + '" type="button">保存备注</button>'
+      : alreadySaved
+        ? '<span class="coast-vault-mark">已在拾潮</span>'
+        : '<button data-action="vault:save" data-index="' + index
+          + '" type="button">拾入潮间</button>';
     const removeAction = alreadySaved && favoriteId
       ? '<button data-action="vault:remove" data-index="' + index
         + '" type="button">取消珍藏</button>' : '';
@@ -88,11 +92,7 @@ export function createCoastVault({ router, chat, toast }) {
         + '" type="button"' + (primary ? '' : ' disabled') + '>复制全文</button>'
         + removeAction + '</div>' + storageHint + '</div></article>';
     }
-    const note = saved
-      ? '<div class="coast-vault-note-line">' + noteInput + smallAction + '</div>'
-      : '<div class="coast-vault-note-line">' + noteInput
-        + (alreadySaved ? '<span class="coast-vault-mark">已珍藏</span>'
-          : smallAction) + '</div>';
+    const note = '<div class="coast-vault-note-line">' + noteInput + smallAction + '</div>';
     return '<article class="coast-vault-card" data-vault-index="' + index + '">'
       + title + mediaPreview(item)
       + (primary ? '<p class="coast-vault-excerpt">'
