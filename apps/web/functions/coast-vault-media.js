@@ -1,6 +1,7 @@
 import { ensureChatAttachmentSchema } from './chat-attachments.js';
 import { ensureVoiceSchema } from './voice-clips.js';
 import { ensureTreasureSchema } from './coast-vault-treasures.js';
+import { ensureMediaLabelSchema } from './coast-vault-media-labels.js';
 
 export const MEDIA_LIBRARY_LIMITS = Object.freeze({ results_per_page: 40, max_query_chars: 100 });
 
@@ -23,9 +24,10 @@ function source(row) {
     id: row.id, kind: row.kind, source_type: row.kind === 'audio' ? 'voice_clip' : 'chat_attachment',
     conversation_id: row.conversation_id, turn_id: row.turn_id,
     message_id: row.message_id || null,
-    name: row.name, mime: row.mime, size: Number(row.size) || 0,
+    name: row.name, display_name: row.display_name || '', mime: row.mime, size: Number(row.size) || 0,
     source_text: row.source_text || null, created_at: Number(row.created_at) || 0,
     treasure_id: row.treasure_id || null, favorited: Boolean(row.treasure_id),
+    notes: row.notes || '',
     storage_status: 'server_stored',
     url: row.kind === 'audio'
       ? '/api/voice/clips/' + id + '/audio'
@@ -49,11 +51,12 @@ export async function listMediaLibrary(db, { kind = 'all', q = '', cursor = 0 } 
   await ensureChatAttachmentSchema(db);
   await ensureVoiceSchema(db);
   await ensureTreasureSchema(db);
+  await ensureMediaLabelSchema(db);
 
   // The existing tables are the source of truth. No duplicate binary store, no
   // paid regeneration and no destructive historical backfill is required.
   const sql = [
-    'SELECT media.*, saved.id AS treasure_id FROM (',
+    'SELECT media.*, saved.id AS treasure_id, saved.notes AS notes, labels.display_name AS display_name FROM (',
     "SELECT a.id, a.conversation_id, a.turn_id, NULL AS message_id,",
     "a.kind AS kind, a.name, a.mime, a.size, NULL AS source_text, a.created_at",
     'FROM chat_attachments a JOIN conversations c ON c.id = a.conversation_id',
@@ -65,11 +68,12 @@ export async function listMediaLibrary(db, { kind = 'all', q = '', cursor = 0 } 
     'FROM coast_voice_clips v JOIN conversations c ON c.id = v.conversation_id',
     "WHERE c.user_id = 'owner' AND c.deleted_at IS NULL AND c.conversation_kind = 'chat'",
     ') media LEFT JOIN coast_vault_treasures saved ON saved.source_key = (media.kind || \':\' || media.conversation_id || \':\' || media.id)',
-    'WHERE (? = \'all\' OR media.kind = ?) AND (media.name LIKE ? ESCAPE \'!\' OR COALESCE(media.source_text, \'\') LIKE ? ESCAPE \'!\')',
+    'LEFT JOIN coast_vault_media_labels labels ON labels.source_key = (media.kind || \':\' || media.conversation_id || \':\' || media.id)',
+    'WHERE (? = \'all\' OR media.kind = ?) AND (media.name LIKE ? ESCAPE \'!\' OR COALESCE(media.source_text, \'\') LIKE ? ESCAPE \'!\' OR COALESCE(labels.display_name, \'\') LIKE ? ESCAPE \'!\' OR COALESCE(saved.notes, \'\') LIKE ? ESCAPE \'!\')',
     'ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?',
   ].join(' ');
   const result = await db.prepare(sql)
-    .bind(type, type, parameter(search), parameter(search),
+    .bind(type, type, parameter(search), parameter(search), parameter(search), parameter(search),
       MEDIA_LIBRARY_LIMITS.results_per_page + 1, offset).all();
   const rows = result?.results || [];
   const indexed = rows.slice(0, MEDIA_LIBRARY_LIMITS.results_per_page);
