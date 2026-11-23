@@ -296,6 +296,77 @@ export function createCoastVault({ router, chat, toast }) {
     const index = Number(target.dataset.index);
     const item = items[index];
     if (!item) return;
+    if (name === 'image-open' || name === 'image-close') {
+      const dialog = card(index)?.querySelector('.coast-vault-image-dialog');
+      if (!dialog) return;
+      if (name === 'image-open') dialog.showModal();
+      else dialog.close();
+      return;
+    }
+    if (name === 'rename-open' || name === 'rename-cancel') {
+      const root = card(index);
+      const editor = root?.querySelector('.coast-vault-rename-form');
+      if (!editor) return;
+      editor.hidden = name !== 'rename-open';
+      if (!editor.hidden) {
+        root.querySelector('.coast-vault-image-menu')?.removeAttribute('open');
+        root.querySelector('.coast-vault-display-name')?.focus();
+      }
+      return;
+    }
+    if (name === 'rename-save') {
+      const display_name = card(index)?.querySelector('.coast-vault-display-name')?.value || '';
+      try {
+        await requestJson('/api/coast-vault/media-labels', {
+          method: 'PATCH', body: JSON.stringify({
+            kind: 'image', conversation_id: item.conversation_id,
+            source_id: item.source_id || item.id, display_name,
+          }),
+        });
+        toast('图片显示名称已保存，原始文件没有改变。');
+        return router.refresh({ preserveScroll: true });
+      } catch (error) {
+        return toast('修改名称失败：' + (error.message || '请稍后重试'));
+      }
+    }
+    if (name === 'note-expand') {
+      const toggle = card(index)?.querySelector('.coast-vault-note-toggle');
+      if (!toggle) return;
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!expanded));
+      toggle.closest('.coast-vault-note-preview')?.classList.toggle('is-expanded', !expanded);
+      return;
+    }
+    if (name === 'note-edit' || name === 'note-cancel') {
+      const editor = card(index)?.querySelector('.coast-vault-note-editor');
+      if (!editor) return;
+      editor.hidden = name === 'note-cancel';
+      if (!editor.hidden) editor.querySelector('textarea')?.focus();
+      return;
+    }
+    if (name === 'note-save') {
+      const notes = card(index)?.querySelector('.coast-vault-note')?.value || '';
+      try {
+        const favoriteId = current.mode === 'treasures' ? item.id : item.treasure_id;
+        if (favoriteId) {
+          await requestJson(API.vaultTreasures + '/' + encodeURIComponent(favoriteId), {
+            method: 'PATCH', body: JSON.stringify({ notes }),
+          });
+          toast('备注已保存。');
+        } else {
+          await requestJson(API.vaultTreasures, {
+            method: 'POST', body: JSON.stringify({
+              kind: item.kind, conversation_id: item.conversation_id,
+              source_id: item.id, notes,
+            }),
+          });
+          toast('备注已保存，并已拾入潮间。');
+        }
+        return router.refresh({ preserveScroll: true });
+      } catch (error) {
+        return toast('保存备注失败：' + (error.message || '请稍后重试'));
+      }
+    }
     if (name === 'copy') {
       const content = current.mode === 'treasures' ? item.excerpt || '' : item.source_text || '';
       if (!content) return toast('这条语音暂无可复制的原文。');
@@ -327,16 +398,6 @@ export function createCoastVault({ router, chat, toast }) {
       });
       toast('已拾入潮间。');
       return router.refresh({ preserveScroll: true });
-    }
-    if (name === 'note') {
-      const notes = card(index)?.querySelector('.coast-vault-note')?.value || '';
-      const favoriteId = current.mode === 'treasures' ? item.id : item.treasure_id;
-      if (!favoriteId) return toast('未找到对应的珍藏记录，请刷新后再试。');
-      await requestJson(API.vaultTreasures + '/' + encodeURIComponent(favoriteId), {
-        method: 'PATCH', body: JSON.stringify({ notes }),
-      });
-      toast('珍藏备注已保存。');
-      return;
     }
     if (name === 'remove') {
       if (!confirm('取消这条珍藏？原来的语音、图片、文件和聊天不会被删除。')) return;
