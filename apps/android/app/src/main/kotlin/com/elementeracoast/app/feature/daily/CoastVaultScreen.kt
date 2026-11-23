@@ -79,7 +79,7 @@ private fun JsonObject.vaultFlag(name: String): Boolean =
 private fun JsonObject.vaultItems(name: String): List<JsonObject> =
     (this[name] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
 
-private fun vaultTime(millis: Int): String {
+internal fun vaultTime(millis: Int): String {
     val seconds = millis.coerceAtLeast(0) / 1000
     return (seconds / 60).toString() + ":" + (seconds % 60).toString().padStart(2, '0')
 }
