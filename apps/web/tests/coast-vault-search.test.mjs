@@ -85,6 +85,21 @@ assert.match(vaultUi, /transferLegacyHearts/, 'old favorite migration is an expl
 assert.match(vaultUi, /JSON 导出备份/, 'migration UI must request an owner backup');
 assert.match(vaultUi, /confirm: true/, 'migration route must never run silently on page load');
 
+
+// Voice letters must unfold below a stable audio element, never into a dropdown
+// or an inaccessible modal. Keep saving/copying explicit and owner-controlled.
+assert.match(vaultUi, /coast-vault-audio-detail" hidden/);
+assert.match(vaultUi, /data-action="vault:expand"/);
+assert.match(vaultUi, /name === 'copy'/);
+assert.match(vaultUi, /navigator\.clipboard\.writeText\(content\)/);
+assert.match(vaultUi, /coast-vault-note-line/);
+assert.match(vaultUi, /groupedCards\(mode === 'treasures'\)/);
+assert.match(vaultUi, /if \(name === 'kind'\)/);
+assert.match(vaultUi, /remoteKind = kind === 'writing' \|\| kind === 'other'/);
+const vaultStyles = readFileSync(new URL('../elementera-mcp/deploy-pages/public/styles/features.css', import.meta.url), 'utf8');
+assert.match(vaultStyles, /\.coast-vault-grid\.coast-vault-images/);
+assert.match(vaultStyles, /\.coast-vault-transcript \{/);
+
 console.log('coast vault & cross-window message search: ok');
 
 

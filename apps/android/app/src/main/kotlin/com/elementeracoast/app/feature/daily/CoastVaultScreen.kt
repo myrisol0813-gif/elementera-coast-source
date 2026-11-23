@@ -27,7 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Slider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -46,6 +46,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -75,6 +78,11 @@ private fun JsonObject.vaultFlag(name: String): Boolean =
 
 private fun JsonObject.vaultItems(name: String): List<JsonObject> =
     (this[name] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+
+internal fun vaultTime(millis: Int): String {
+    val seconds = millis.coerceAtLeast(0) / 1000
+    return (seconds / 60).toString() + ":" + (seconds % 60).toString().padStart(2, '0')
+}
 
 private val basicKinds = listOf("all" to "全部", "image" to "影像", "audio" to "声音", "file" to "文件")
 private val treasureKinds = listOf("all" to "全部", "writing" to "文字", "image" to "影像",
@@ -153,10 +161,10 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
 
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.padding(horizontal = 18.dp)
+        modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 14.dp)
     ) {
         item(key = "controls") {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("basic" to "基本文件库", "treasures" to "拾潮").forEach { (value, title) ->
                         SnowLetterSurface(
@@ -188,17 +196,17 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
                     fallbackShape = RoundedCornerShape(20.dp),
                     fallbackElevation = 1.dp
                 ) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 14.dp),
-                        verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("检索", fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.titleSmall)
                         SnowLetterSurface(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().height(44.dp),
                             role = SnowLetterSurfaceRole.ComposerField,
                             fallbackColor = MaterialTheme.colorScheme.surface,
                             fallbackShape = RoundedCornerShape(16.dp)
                         ) {
-                            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp),
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.weight(1f)) {
                                     BasicTextField(
@@ -227,7 +235,7 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
                             labels.forEach { (value, title) ->
                                 val selected = kind == value
                                 Box(
-                                    modifier = Modifier.weight(1f).height(38.dp)
+                                    modifier = Modifier.weight(1f).height(36.dp)
                                         .background(
                                             if (selected) MaterialTheme.colorScheme.secondaryContainer
                                             else MaterialTheme.colorScheme.surface,
@@ -335,6 +343,8 @@ private fun CoastVaultCard(
     var showInfo by remember(id) { mutableStateOf(false) }
     var showNote by remember(id) { mutableStateOf(false) }
     var showText by remember(id) { mutableStateOf(false) }
+    var audioExpanded by remember(id) { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
     var imageOpen by remember(id) { mutableStateOf<Bitmap?>(null) }
     var pendingBytes by remember(id) { mutableStateOf<ByteArray?>(null) }
 
@@ -365,6 +375,21 @@ private fun CoastVaultCard(
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) { onSnackbar("下载失败：" + error.message) }
+        }
+    }
+
+    fun saveInlineNote() {
+        if (!treasure) return
+        scope.launch {
+            busy = true
+            try {
+                repository.vaultChangeNote(id, note)
+                onChanged()
+                onSnackbar("备注已保存。")
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) { onSnackbar("备注保存失败：" + error.message) }
+            finally { busy = false }
         }
     }
 
@@ -427,18 +452,71 @@ private fun CoastVaultCard(
                 }
                 "audio" -> {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(Modifier.weight(1f)) {
-                            CoastVaultAudio(repository, sourceId, onSnackbar)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(Modifier.weight(1f)) { CoastVaultAudio(repository, sourceId, onSnackbar) }
+                        TextButton(onClick = { audioExpanded = !audioExpanded }) {
+                            Text(if (audioExpanded) "收起" else "展开",
+                                style = MaterialTheme.typography.labelMedium)
                         }
-                        Box {
-                            TextButton(onClick = { showActions = true }) { Text("展开") }
-                            VaultActions(showActions, onDismiss = { showActions = false },
-                                treasure = treasure, alreadySaved = item.vaultFlag("favorited"),
-                                busy = busy, onFavorite = ::favorite, onSave = ::download,
-                                onSource = ::openSource, onInfo = { showInfo = true },
-                                onNote = { showNote = true }, onRead = { showText = true },
-                                hasMedia = true, hasText = sourceText.isNotBlank())
+                    }
+                    if (audioExpanded) {
+                        if (sourceText.isNotBlank()) {
+                            Text("语音原文", style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            SelectionContainer {
+                                Text(sourceText, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        } else {
+                            Text("此条语音暂无可读取的原文。",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                            OutlinedTextField(
+                                value = note, onValueChange = { note = it.take(1200) },
+                                modifier = Modifier.weight(1f), singleLine = true,
+                                enabled = treasure || !item.vaultFlag("favorited"),
+                                textStyle = MaterialTheme.typography.bodySmall,
+                                placeholder = {
+                                    Text(if (!treasure && item.vaultFlag("favorited"))
+                                        "请到拾潮修改备注" else "备注，可留空",
+                                        style = MaterialTheme.typography.bodySmall)
+                                }
+                            )
+                            TextButton(enabled = !busy && (treasure || !item.vaultFlag("favorited")), onClick = {
+                                if (treasure) saveInlineNote() else favorite()
+                            }, modifier = Modifier.background(MaterialTheme.colorScheme.surface,
+                                RoundedCornerShape(12.dp))) {
+                                Text(if (treasure) "保存备注" else if (item.vaultFlag("favorited"))
+                                    "已在拾潮" else "拾入潮间",
+                                    style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            val actions = listOf("下载语音", "回到来源", "复制全文") +
+                                (if (treasure || item.vaultFlag("favorited")) listOf("取消珍藏") else emptyList())
+                            actions.forEach { action ->
+                                TextButton(
+                                    enabled = !busy && (action != "复制全文" || sourceText.isNotBlank()),
+                                    onClick = {
+                                        when (action) {
+                                            "下载语音" -> download()
+                                            "回到来源" -> openSource()
+                                            "复制全文" -> {
+                                                clipboard.setText(AnnotatedString(sourceText))
+                                                onSnackbar("已复制语音原文。")
+                                            }
+                                            "取消珍藏" -> showCancel = true
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f).background(
+                                        MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+                                ) {
+                                    Text(action, style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1, textAlign = TextAlign.Center)
+                                }
+                            }
                         }
                     }
                 }
@@ -525,11 +603,19 @@ private fun CoastVaultCard(
         onDismissRequest = { showText = false },
         title = { Text(heading) },
         text = {
-            Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
-                Text(sourceText, style = MaterialTheme.typography.bodyMedium)
+            SelectionContainer {
+                Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
+                    Text(sourceText, style = MaterialTheme.typography.bodyMedium)
+                }
             }
         },
-        confirmButton = { TextButton(onClick = { showText = false }) { Text("收起") } }
+        confirmButton = {
+            TextButton(onClick = {
+                clipboard.setText(AnnotatedString(sourceText))
+                onSnackbar("已复制全文。")
+            }) { Text("复制全文") }
+        },
+        dismissButton = { TextButton(onClick = { showText = false }) { Text("收起") } }
     )
     if (showNote) AlertDialog(
         onDismissRequest = { if (!busy) showNote = false },
@@ -570,7 +656,7 @@ private fun CoastVaultCard(
                 scope.launch {
                     busy = true
                     try {
-                        repository.vaultRemove(id)
+                        repository.vaultRemove(if (treasure) id else item.vaultText("treasure_id"))
                         onChanged()
                         onSnackbar("已取消珍藏，原资料仍在。")
                     } catch (error: Exception) { onSnackbar("操作失败：" + error.message) }
@@ -659,33 +745,46 @@ private fun CoastVaultAudio(
     var player by remember(id) { mutableStateOf<MediaPlayer?>(null) }
     var file by remember(id) { mutableStateOf<File?>(null) }
     var playing by remember(id) { mutableStateOf(false) }
+    var durationMs by remember(id) { mutableIntStateOf(0) }
     var progress by remember(id) { mutableStateOf(0f) }
+    var seeking by remember(id) { mutableStateOf(false) }
     DisposableEffect(id) {
         onDispose { player?.release(); file?.delete() }
     }
     LaunchedEffect(id, playing, player) {
         while (playing && isActive) {
-            val active = player
-            progress = if (active != null) runCatching {
-                val duration = active.duration
-                if (duration > 0) (active.currentPosition.toFloat() / duration).coerceIn(0f, 1f)
-                else 0f
-            }.getOrDefault(0f) else 0f
+            if (!seeking) {
+                progress = player?.let { active ->
+                    runCatching {
+                        if (active.duration > 0)
+                            (active.currentPosition.toFloat() / active.duration).coerceIn(0f, 1f)
+                        else 0f
+                    }.getOrDefault(0f)
+                } ?: 0f
+            }
             delay(180)
         }
     }
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = {
-                scope.launch {
-                    try {
-                        if (playing) {
-                            player?.pause()
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        TextButton(onClick = {
+            scope.launch {
+                try {
+                    val active = player
+                    when {
+                        playing -> {
+                            active?.pause()
                             playing = false
-                        } else if (player != null) {
-                            player?.start()
+                        }
+                        active != null -> {
+                            if (progress >= 0.999f) {
+                                active.seekTo(0)
+                                progress = 0f
+                            }
+                            active.start()
                             playing = true
-                        } else {
+                        }
+                        else -> {
                             val bytes = repository.audio(id)
                             val local = File.createTempFile("coast-vault-", ".mp3", context.cacheDir)
                             local.writeBytes(bytes)
@@ -693,6 +792,7 @@ private fun CoastVaultAudio(
                             val next = MediaPlayer()
                             next.setDataSource(local.absolutePath)
                             next.prepare()
+                            durationMs = next.duration
                             next.setOnCompletionListener {
                                 playing = false
                                 progress = 1f
@@ -701,14 +801,32 @@ private fun CoastVaultAudio(
                             next.start()
                             playing = true
                         }
-                    } catch (cancel: CancellationException) {
-                        throw cancel
-                    } catch (error: Exception) { onSnackbar("语音播放失败：" + error.message) }
-                }
-            }) { Text(if (playing) "暂停" else "播放") }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("已生成语音", style = MaterialTheme.typography.labelMedium)
-                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                    }
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } catch (error: Exception) { onSnackbar("语音播放失败：" + error.message) }
+            }
+        }) { Text(if (playing) "暂停" else "播放", style = MaterialTheme.typography.labelSmall) }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+            Slider(
+                value = progress,
+                onValueChange = { seeking = true; progress = it },
+                onValueChangeFinished = {
+                    player?.let { active ->
+                        if (durationMs > 0) active.seekTo((progress * durationMs).toInt())
+                    }
+                    seeking = false
+                },
+                enabled = durationMs > 0,
+                modifier = Modifier.fillMaxWidth().height(32.dp)
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(vaultTime((progress * durationMs).toInt()),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (durationMs > 0) vaultTime(durationMs) else "—:—",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

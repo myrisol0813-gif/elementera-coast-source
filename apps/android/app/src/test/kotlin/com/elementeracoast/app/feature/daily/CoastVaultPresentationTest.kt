@@ -29,4 +29,12 @@ class CoastVaultPresentationTest {
         assertEquals(rows, vaultVisibleRows(rows, "treasures", "all"))
         assertEquals(rows, vaultVisibleRows(rows, "basic", "all"))
     }
+
+    @Test fun audioTimeLabelsRemainLegibleWhenSeeking() {
+        assertEquals("0:00", vaultTime(0))
+        assertEquals("0:07", vaultTime(7_999))
+        assertEquals("1:18", vaultTime(78_400))
+        assertEquals("61:01", vaultTime(3_661_000))
+        assertEquals("0:00", vaultTime(-10))
+    }
 }
