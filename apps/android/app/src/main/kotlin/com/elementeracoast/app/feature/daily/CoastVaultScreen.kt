@@ -379,15 +379,11 @@ private fun CoastVaultCard(
     }
 
     fun saveInlineNote() {
-        val favoriteId = if (treasure) id else item.vaultText("treasure_id")
-        if (favoriteId.isBlank()) {
-            onSnackbar("请先拾入潮间，再保存珍藏备注。")
-            return
-        }
+        if (!treasure) return
         scope.launch {
             busy = true
             try {
-                repository.vaultChangeNote(favoriteId, note)
+                repository.vaultChangeNote(id, note)
                 onChanged()
                 onSnackbar("备注已保存。")
             } catch (cancel: CancellationException) {
@@ -480,15 +476,20 @@ private fun CoastVaultCard(
                             OutlinedTextField(
                                 value = note, onValueChange = { note = it.take(1200) },
                                 modifier = Modifier.weight(1f), singleLine = true,
+                                enabled = treasure || !item.vaultFlag("favorited"),
                                 textStyle = MaterialTheme.typography.bodySmall,
-                                placeholder = { Text("备注，可留空", style = MaterialTheme.typography.bodySmall) }
+                                placeholder = {
+                                    Text(if (!treasure && item.vaultFlag("favorited"))
+                                        "请到拾潮修改备注" else "备注，可留空",
+                                        style = MaterialTheme.typography.bodySmall)
+                                }
                             )
-                            TextButton(enabled = !busy, onClick = {
-                                if (treasure || item.vaultFlag("favorited")) saveInlineNote()
-                                else favorite()
+                            TextButton(enabled = !busy && (treasure || !item.vaultFlag("favorited")), onClick = {
+                                if (treasure) saveInlineNote() else favorite()
                             }, modifier = Modifier.background(MaterialTheme.colorScheme.surface,
                                 RoundedCornerShape(12.dp))) {
-                                Text(if (treasure || item.vaultFlag("favorited")) "保存备注" else "拾入潮间",
+                                Text(if (treasure) "保存备注" else if (item.vaultFlag("favorited"))
+                                    "已在拾潮" else "拾入潮间",
                                     style = MaterialTheme.typography.labelMedium)
                             }
                         }
