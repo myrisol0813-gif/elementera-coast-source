@@ -456,18 +456,66 @@ private fun CoastVaultCard(
                 }
                 "audio" -> {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(Modifier.weight(1f)) {
-                            CoastVaultAudio(repository, sourceId, onSnackbar)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(Modifier.weight(1f)) { CoastVaultAudio(repository, sourceId, onSnackbar) }
+                        TextButton(onClick = { audioExpanded = !audioExpanded }) {
+                            Text(if (audioExpanded) "收起" else "展开",
+                                style = MaterialTheme.typography.labelMedium)
                         }
-                        Box {
-                            TextButton(onClick = { showActions = true }) { Text("展开") }
-                            VaultActions(showActions, onDismiss = { showActions = false },
-                                treasure = treasure, alreadySaved = item.vaultFlag("favorited"),
-                                busy = busy, onFavorite = ::favorite, onSave = ::download,
-                                onSource = ::openSource, onInfo = { showInfo = true },
-                                onNote = { showNote = true }, onRead = { showText = true },
-                                hasMedia = true, hasText = sourceText.isNotBlank())
+                    }
+                    if (audioExpanded) {
+                        if (sourceText.isNotBlank()) {
+                            Text("语音原文", style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            SelectionContainer {
+                                Text(sourceText, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        } else {
+                            Text("此条语音暂无可读取的原文。",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                            OutlinedTextField(
+                                value = note, onValueChange = { note = it.take(1200) },
+                                modifier = Modifier.weight(1f), singleLine = true,
+                                textStyle = MaterialTheme.typography.bodySmall,
+                                placeholder = { Text("备注，可留空", style = MaterialTheme.typography.bodySmall) }
+                            )
+                            TextButton(enabled = !busy, onClick = {
+                                if (treasure || item.vaultFlag("favorited")) saveInlineNote()
+                                else favorite()
+                            }, modifier = Modifier.background(MaterialTheme.colorScheme.surface,
+                                RoundedCornerShape(12.dp))) {
+                                Text(if (treasure || item.vaultFlag("favorited")) "保存备注" else "拾入潮间",
+                                    style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            val actions = listOf("下载语音", "回到来源", "复制全文") +
+                                (if (treasure || item.vaultFlag("favorited")) listOf("取消珍藏") else emptyList())
+                            actions.forEach { action ->
+                                TextButton(
+                                    enabled = !busy && (action != "复制全文" || sourceText.isNotBlank()),
+                                    onClick = {
+                                        when (action) {
+                                            "下载语音" -> download()
+                                            "回到来源" -> openSource()
+                                            "复制全文" -> {
+                                                clipboard.setText(AnnotatedString(sourceText))
+                                                onSnackbar("已复制语音原文。")
+                                            }
+                                            "取消珍藏" -> showCancel = true
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f).background(
+                                        MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+                                ) {
+                                    Text(action, style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1, textAlign = TextAlign.Center)
+                                }
+                            }
                         }
                     }
                 }
