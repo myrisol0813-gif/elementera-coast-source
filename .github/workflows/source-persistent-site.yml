@@ -1,0 +1,96 @@
+name: Deploy persistent Source site
+
+on:
+  workflow_run:
+    workflows: ["Source check"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: persistent-source-site
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      vars.COAST_SOURCE_SITE_ENABLED == 'true' &&
+      (
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_run' &&
+         github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.event == 'push' &&
+         github.event.workflow_run.head_branch == 'main' &&
+         github.event.workflow_run.head_repository.full_name == github.repository)
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'main' }}
+
+      - name: Require dedicated Source site and credentials
+        shell: bash
+        env:
+          PROJECT: ${{ vars.COAST_SOURCE_SITE_PROJECT }}
+          ACCOUNT: ${{ secrets.COAST_SOURCE_SITE_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.COAST_SOURCE_SITE_CF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${ACCOUNT:?Missing Cloudflare account ID secret}"
+          : "${TOKEN:?Missing Cloudflare Pages deployment token secret}"
+          if ! [[ "$PROJECT" =~ ^[a-z0-9-]+-site$ ]]; then
+            echo "A dedicated Cloudflare Pages project ending in -site is required." >&2
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Verify public Source before publishing
+        working-directory: apps/web
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm test
+          node ../../scripts/source-safety-audit.mjs
+
+      - name: Publish Pages assets and Functions
+        id: publish
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.COAST_SOURCE_SITE_CF_API_TOKEN }}
+          accountId: ${{ secrets.COAST_SOURCE_SITE_CF_ACCOUNT_ID }}
+          workingDirectory: apps/web
+          wranglerVersion: '4'
+          command: pages deploy elementera-mcp/deploy-pages --project-name=${{ vars.COAST_SOURCE_SITE_PROJECT }} --branch=main
+
+      - name: Verify persistent site gate
+        shell: bash
+        env:
+          SITE_URL: ${{ steps.publish.outputs.deployment-url }}
+        run: |
+          set -euo pipefail
+          case "$SITE_URL" in
+            https://*.pages.dev*) ;;
+            *) echo "Unexpected Pages deployment URL." >&2; exit 1 ;;
+          esac
+          login_html="$RUNNER_TEMP/source-site-login.html"
+          login_code="$(curl -sS -L --max-time 25 -o "$login_html" -w '%{http_code}' "$SITE_URL/login")"
+          test "$login_code" = "200" || { echo "Login gate HTTP $login_code" >&2; exit 1; }
+          if grep -Fq 'source debug 默认预览密码' "$login_html"; then
+            echo "A public preview password hint must not be enabled on the persistent site." >&2
+            exit 1
+          fi
+          for path in /api/calendar/entries /public/app.js; do
+            code="$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$SITE_URL$path")"
+            test "$code" = "401" || { echo "Private path $path returned HTTP $code, expected 401." >&2; exit 1; }
+          done
+          echo "### Persistent Source site published" >> "$GITHUB_STEP_SUMMARY"
+          echo "URL: $SITE_URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "Anonymous login and private-route gates verified." >> "$GITHUB_STEP_SUMMARY"
