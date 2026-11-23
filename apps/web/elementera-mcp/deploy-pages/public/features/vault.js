@@ -8,11 +8,6 @@ const SAVED_TYPES = Object.freeze([
   ['all', '全部'], ['writing', '文字'], ['image', '影像'], ['audio', '声音'], ['other', '其他'],
 ]);
 
-function option(value, label, current) {
-  return '<option value="' + escapeAttribute(value) + '"' +
-    (value === current ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
-}
-
 function itemSource(item) {
   if (item.kind === 'audio') return '/api/voice/clips/' + encodeURIComponent(item.source_id || item.id) + '/audio';
   if (item.kind === 'image' || item.kind === 'file') {
