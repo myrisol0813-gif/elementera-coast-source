@@ -829,11 +829,13 @@ MIT License.
 
 See `LICENSE`.
 
-## Source Native 0.2.21 · Unfolding Voice Letters
+## Source Native 0.2.21 · Gallery labels and annotations
 
-The Coastal Vault remains one authorized media index and a separate owner-selected treasure layer. In both Source PWA and Native, its first pair of plain-text paper tabs and compact search stay below the existing page title; media is grouped by type, with images in two columns. An audio card initially shows only playback and a right-edge expand control. Expanding reveals the entire selectable transcript on the same paper, plus a note field alongside the treasure action and a tidy row of download, source-jump and copy actions. Closing the text does not intentionally restart audio. Source Native adds seekable playback with elapsed/total time, while the PWA retains the browser's native audio controls.
+The Coast Vault continues to use the canonical owner-authorized media index and a separate user-selected treasure layer. PWA and Native now display image-first two-column cards with single-line titles and attached notes clamped to two lines; tapping expands long notes, and editing takes place inside the card. The original attachment name and bytes remain unchanged. The image viewer's three-dot menu can save a separate display-only name, and that name is searchable in both Basic Library and Treasures. Emptying the display name restores the original title. Notes already saved in Treasures are also shown on the Basic media shelf. Saving a new note on an uncollected item explicitly includes the treasure action; no silent favorites are created.
 
-The Android version is `0.2.21-source` (versionCode 23), Source PWA cache is `coast-source-app-27`. Visitor APKs are signed with disposable QA keys and are offline inspection builds, not in-place upgrades or proof of a configured backend. No automatic legacy-heart migration or automatic paid audio generation was added.
+Native clips the scrolling list to its own content viewport and gives the search paper enough bottom room for its four category pills. The title bar remains unchanged. Audio continues to have a compact player, an expandable full transcript, and an independently persisted note; audio closing does not intentionally restart playback.
+
+Android: `0.2.21-source` (versionCode 23); Source PWA: `coast-source-app-27`. Visitor APKs use disposable QA certificates and are offline-only; they do not validate a self-hosted backend or provide reliable in-place upgrades. No legacy-heart migration or paid audio generation was added.
 
 ## Source Native 0.2.19 · Paper-gallery Vault
 
