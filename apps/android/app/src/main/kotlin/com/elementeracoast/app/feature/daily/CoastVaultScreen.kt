@@ -343,6 +343,8 @@ private fun CoastVaultCard(
     var showInfo by remember(id) { mutableStateOf(false) }
     var showNote by remember(id) { mutableStateOf(false) }
     var showText by remember(id) { mutableStateOf(false) }
+    var audioExpanded by remember(id) { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
     var imageOpen by remember(id) { mutableStateOf<Bitmap?>(null) }
     var pendingBytes by remember(id) { mutableStateOf<ByteArray?>(null) }
 
@@ -373,6 +375,25 @@ private fun CoastVaultCard(
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) { onSnackbar("下载失败：" + error.message) }
+        }
+    }
+
+    fun saveInlineNote() {
+        val favoriteId = if (treasure) id else item.vaultText("treasure_id")
+        if (favoriteId.isBlank()) {
+            onSnackbar("请先拾入潮间，再保存珍藏备注。")
+            return
+        }
+        scope.launch {
+            busy = true
+            try {
+                repository.vaultChangeNote(favoriteId, note)
+                onChanged()
+                onSnackbar("备注已保存。")
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) { onSnackbar("备注保存失败：" + error.message) }
+            finally { busy = false }
         }
     }
 
