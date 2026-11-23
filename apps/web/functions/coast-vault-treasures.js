@@ -2,6 +2,7 @@ import { ensureChatSchema, getConversation, readConversationState } from './chat
 import { ensureChatAttachmentSchema } from './chat-attachments.js';
 import { ensureVoiceSchema } from './voice-clips.js';
 import { ensureMemorySchema } from './memory-store.js';
+import { ensureMediaLabelSchema } from './coast-vault-media-labels.js';
 
 export const TREASURE_LIMITS = Object.freeze({
   note_chars: 1200, result_page: 40, excerpt_chars: 12000, paragraphs_per_item: 40,
@@ -75,12 +76,13 @@ function shape(row) {
     turn_id: row.turn_id, message_id: row.message_id, source_id: row.source_id,
     role: row.role, excerpt: row.excerpt,
     paragraph_indices: JSON.parse(row.selections_json || '[]'),
-    notes: row.notes, created_at: row.created_at, updated_at: row.updated_at,
+    notes: row.notes, display_name: row.display_name || '', created_at: row.created_at, updated_at: row.updated_at,
   };
 }
 
 export async function listTreasures(db, { kind = 'all', q = '', cursor = 0, conversation_id = '', turn_id = '' } = {}) {
   await initialize(db);
+  await ensureMediaLabelSchema(db);
   const type = String(kind || 'all');
   if (!['all', 'text', 'soil', 'audio', 'image', 'file'].includes(type)) {
     throw new TreasureError('invalid_kind', '收藏分类无效。');
@@ -94,14 +96,15 @@ export async function listTreasures(db, { kind = 'all', q = '', cursor = 0, conv
   const conversationId = conversation_id ? validId(conversation_id, 'conversation') : '';
   const turnId = turn_id ? validId(turn_id, 'turn') : '';
   const result = await db.prepare(
-    "SELECT t.* FROM coast_vault_treasures t JOIN conversations c ON c.id = t.conversation_id " +
+    "SELECT t.*, labels.display_name AS display_name FROM coast_vault_treasures t JOIN conversations c ON c.id = t.conversation_id " +
+    "LEFT JOIN coast_vault_media_labels labels ON labels.source_key = t.source_key " +
     "WHERE c.user_id = 'owner' AND c.deleted_at IS NULL AND c.conversation_kind = 'chat' " +
     "AND (? = 'all' OR t.kind = ?) " +
     "AND (? = '' OR t.conversation_id = ?) AND (? = '' OR t.turn_id = ?) " +
-    "AND (t.excerpt LIKE ? ESCAPE '!' OR t.notes LIKE ? ESCAPE '!') " +
+    "AND (t.excerpt LIKE ? ESCAPE '!' OR t.notes LIKE ? ESCAPE '!' OR COALESCE(labels.display_name, '') LIKE ? ESCAPE '!') " +
     "ORDER BY t.updated_at DESC, t.id DESC LIMIT ? OFFSET ?"
   ).bind(type, type, conversationId, conversationId, turnId, turnId,
-    like(query), like(query), TREASURE_LIMITS.result_page + 1, offset).all();
+    like(query), like(query), like(query), TREASURE_LIMITS.result_page + 1, offset).all();
   const rows = result?.results || [];
   return {
     items: rows.slice(0, TREASURE_LIMITS.result_page).map(shape),
