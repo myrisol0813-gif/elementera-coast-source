@@ -66,7 +66,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
         val m=input.manifest;val objects=m.objects.associateBy { it.objectSha256 }
         buildList {
             for(r in m.records){
-                if(!(r.module=="chat"&&m.applicationId==BuildConfig.APPLICATION_ID)&&!(r.module=="library"&&r.id.startsWith("library_books:")))continue
+                if(!(r.module=="chat"&&m.applicationId==BuildConfig.APPLICATION_ID)&&!(r.module=="library"&&r.id.startsWith("library_books:"))&&r.module !in setOf("calendar","worldbook","model_profile"))continue
                 val d=objects.getValue(r.recordObject)
                 if(d.size>1800000)continue
                 val value=Json.parseToJsonElement(input.stage.verify(d,1800000).readText()).jsonObject
@@ -79,6 +79,8 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
                     val id=data.getValue("id").jsonPrimitive.content
                     val identity="library_books:"+ArchiveV2Chunks.digest(JsonArray(listOf(JsonPrimitive(id))).toString().encodeToByteArray())
                     if(r.id==identity&&Regex("[A-Za-z0-9_.:-]{1,160}").matches(id))add(Choice("book",id,data.getValue("title").jsonPrimitive.content))
+                }else if(r.module in setOf("calendar","worldbook","model_profile")&&kind==r.module){
+                    add(Choice(r.module,r.id,data["title"]?.jsonPrimitive?.contentOrNull?:"模型资料"))
                 }
             }
         }
@@ -94,7 +96,8 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
     suspend fun cloudRestore(input:Imported,session:String,choice:Choice,confirm:Boolean):JsonObject {
         require(!local&&choice in cloudChoices(input))
         return if(choice.kind=="book")api.archiveV2RestoreBook(session,input.manifest,choice.id,confirm)
-            else api.archiveV2RestoreChat(session,input.manifest,choice.id,confirm)
+            else if(choice.kind=="chat")api.archiveV2RestoreChat(session,input.manifest,choice.id,confirm)
+            else api.archiveV2RestoreRecord(session,input.manifest,choice.kind,choice.id,confirm)
     }
     suspend fun cancelSession(session:String){require(!local);api.archiveV2CancelSession(session)}
 }
