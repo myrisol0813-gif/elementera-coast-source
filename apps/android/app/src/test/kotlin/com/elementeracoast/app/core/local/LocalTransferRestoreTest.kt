@@ -43,7 +43,7 @@ class LocalTransferRestoreTest {
         val target = MemoryLocalPersistence()
         val decoded = CoastTransferCodec.decode(bytes)
         assertTrue("model_profile" in LocalTransferRestore.availableModules(decoded, app))
-        assertFalse("daily" in LocalTransferRestore.availableModules(decoded, app))
+        assertTrue("daily" in LocalTransferRestore.availableModules(decoded, app))
         LocalTransferRestore.restore(bytes, app, modules, target)
         val cache = RemoteCacheStore(target)
         assertEquals(profile, cache.profile())
@@ -51,6 +51,26 @@ class LocalTransferRestoreTest {
         val repeated = LocalTransferRestore.restore(bytes, app, modules, target)
         assertEquals(1, repeated.counts.getValue("model_profile").conflicts)
         assertEquals("existing-model", cache.profile()?.currentChatModel)
+    }
+    @Test fun dailyIdentityMappingKeepsHistoricalDisplayAndText() {
+        val payload = buildJsonObject {
+            put("applicationId", "com.elementeracoast.app"); put("workspace", "local"); put("exportedAt", time)
+            putJsonArray("includedModules") { add("daily") }
+            put("conversations", JsonArray(emptyList())); put("calendar", JsonArray(emptyList())); put("profile", JsonNull)
+            put("dailyProfile", Json.parseToJsonElement("""{"myri_display_name":"原来的名字"}"""))
+            put("moments", Json.parseToJsonElement("""[{"id":"m1","author":"xiaohan","text":"旧动态","display_author":"原来的署名","comments":[{"id":"c1","author":"myri","text":"旧评论"}]}]"""))
+            put("diaries", Json.parseToJsonElement("""[{"id":"d1","author":"myri","text":"旧日记"}]"""))
+        }
+        val local = MemoryLocalPersistence()
+        LocalTransferRestore.restore(CoastTransferCodec.encode(payload), "com.elementeracoast.source", setOf("daily"), local)
+        val cache = RemoteCacheStore(local)
+        assertEquals("owner", cache.dailyMoments().single().author)
+        assertEquals("model_partner", cache.dailyMoments().single().comments.single().author)
+        assertEquals("原来的署名", cache.dailyMoments().single().displayAuthor)
+        assertEquals("旧日记", cache.dailyDiaries().single().text)
+        assertEquals("model_partner", cache.dailyDiaries().single().author)
+        val encoded = CoastTransferCodec.decode(LocalBackupArchive.encode(LocalBackupArchive.capture(local, "com.elementeracoast.source")))
+        assertEquals("原来的名字", encoded.getValue("dailyProfile").jsonObject.getValue("model_partner_display_name").jsonPrimitive.content)
     }
     @Test fun failedTransactionDoesNotExposePartialRecords() {
         val local = MemoryLocalPersistence()
