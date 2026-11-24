@@ -47,7 +47,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
         }catch(e:Throwable){dir.deleteRecursively();throw e}
     }
     fun localModules(m:ArchiveV2Manifest):Set<String> =
-        if(local&&m.workspace=="local") m.modules.filter { it.coverage!="unavailable" && it.module in CoastTransferCodec.supportedModules }.map { it.module }.toSet() else emptySet()
+        if(local) m.modules.filter { it.coverage!="unavailable" && it.module in (if(m.workspace=="local")CoastTransferCodec.supportedModules else ArchiveV2CloudToLocal.supportedModules) }.map { it.module }.toSet() else emptySet()
     suspend fun localRestore(input:Imported,modules:Set<String>,confirm:Boolean):JsonObject=withContext(Dispatchers.IO){
         require(local&&NativeWorkspace.isLocal)
         val report=ArchiveV2Local.restore(input.manifest,input.stage,modules,BuildConfig.APPLICATION_ID,NativeWorkspace.persistence(context),confirm)
