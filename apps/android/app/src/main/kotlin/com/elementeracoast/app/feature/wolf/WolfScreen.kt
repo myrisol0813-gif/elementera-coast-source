@@ -88,6 +88,7 @@ fun WolfScreen(
                     messages = messages,
                     archive = archive,
                     localMode = shellState.localMode,
+                    nativeSettings = state,
                     onImportMessages = onImportMessages,
                     onActionLogged = onActionLogged,
                     onSnackbar = onSnackbar

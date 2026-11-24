@@ -40,6 +40,8 @@ import com.elementeracoast.app.core.model.CoastShellState
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun ChatRecordsScreen(
@@ -49,7 +51,8 @@ internal fun ChatRecordsScreen(
     onImportMessages: (List<ChatMessage>) -> Unit,
     onActionLogged: (String, String, String) -> Unit,
     onSnackbar: (String) -> Unit,
-    localMode: Boolean = false
+    localMode: Boolean = false,
+    nativeSettings: WolfState? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -57,23 +60,30 @@ internal fun ChatRecordsScreen(
     var pendingText by remember { mutableStateOf("") }
     var pendingOk by remember { mutableStateOf("已导出") }
     var pendingSummary by remember { mutableStateOf("") }
+    var pendingWarnings by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
 
     fun write(uri: Uri?, text: String) {
         if (uri == null) {
+            pendingText = ""
+            pendingWarnings = ""
             busy = false
             return
         }
-        runCatching {
-            context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(text) }
-                ?: error("无法打开目标文件")
-        }
-            .onSuccess {
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(text) }
+                        ?: error("无法打开目标文件")
+                }
+            }.onSuccess {
                 onActionLogged("chat.export", pendingOk, pendingSummary)
-                onSnackbar(pendingOk)
-            }
-            .onFailure { onSnackbar("导出失败：${it.message ?: "无法写入文件"}") }
-        busy = false
+                onSnackbar(if (pendingWarnings.isBlank()) pendingOk else pendingOk + "；" + pendingWarnings)
+            }.onFailure { onSnackbar("导出失败：${it.message ?: "无法写入文件"}") }
+            pendingText = ""
+            pendingWarnings = ""
+            busy = false
+        }
     }
 
     val jsonExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -87,9 +97,20 @@ internal fun ChatRecordsScreen(
         if (busy) return
         busy = true
         scope.launch {
-            runCatching { archive.snapshot() }
-                .onSuccess { snapshot ->
-                    if (format == "html") {
+            runCatching {
+                val raw = if (format == "full") archive.fullArchive() else archive.snapshot()
+                withContext(Dispatchers.Default) { GlobalArchive.withNativeSettings(raw, nativeSettings, localMode) }
+            }.onSuccess { snapshot ->
+                    pendingWarnings = ""
+                    if (format == "full") {
+                        val warnings = GlobalArchive.auditFullArchive(snapshot)
+                        pendingText = withContext(Dispatchers.Default) { snapshot.toString() }
+                        pendingOk = "已导出完整海岸包"
+                        pendingSummary = "与 PWA 同源 · 包含服务器返回的附件及语音原件"
+                        pendingWarnings = if (warnings.isEmpty()) "请核对下载文件，当前 APK 尚不支持完整恢复。"
+                            else "不可视为完整备份：" + warnings.joinToString("；") + "。请保留原资料。"
+                        jsonExport.launch("elementera-coast-full-$stamp.coastpack.json")
+                    } else if (format == "html") {
                         pendingText = GlobalArchive.exportHtml(snapshot)
                         pendingOk = "已导出全局 HTML"
                         pendingSummary = "snapshot-backed · 不含附件二进制"
@@ -110,6 +131,11 @@ internal fun ChatRecordsScreen(
 
     LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("防丢导出", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) }
+        if (!localMode) item {
+            WolfRow("导出完整海岸包", if (busy) "正在导出……" else "与 PWA 同源 · 包含附件及语音原件；大包建议使用 PWA") {
+                launchGlobal("full")
+            }
+        }
         item {
             WolfRow("全局 JSON", if (busy) "正在读取全局快照……" else if (localMode) "本机快照 · 目前仅已实现模块" else "V1 全局快照 · 与 Web 同一数据源") {
                 launchGlobal("json")
@@ -127,6 +153,7 @@ internal fun ChatRecordsScreen(
                     pendingText = ChatArchive.exportJson(profile, messages)
                     pendingOk = "已导出当前窗口 JSON"
                     pendingSummary = "当前窗口 ${messages.size} 条消息"
+                    pendingWarnings = ""
                     jsonExport.launch("elementera-chat-$stamp.json")
                 }
             }

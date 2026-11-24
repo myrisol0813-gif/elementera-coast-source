@@ -173,16 +173,21 @@ class LocalCoastTransport(private val store: LocalPersistence,
             return daily(r, path, method)
         if (path == "/api/export/v1-snapshot" && method == "GET") {
             val snapshot = buildJsonObject {
+                put("format", "elementera-coast-v1-snapshot")
+                put("version", 1)
+                put("scope", "local")
                 put("workspace", "local")
                 put("exported_at", now())
                 put("included_modules", JsonArray(listOf("chat", "daily", "model_profile").map(::JsonPrimitive)))
-                put("excluded_modules", JsonArray(listOf("attachments", "memory", "thinking_soil", "worldbook", "vault", "library", "voice", "local_appearance").map(::JsonPrimitive)))
-                put("chat", buildJsonArray { cache.conversations().forEach { c ->
+                put("excluded_modules", JsonArray(listOf("attachments", "memory", "thinking_soil", "worldbook", "vault", "library", "voice", "local_appearance", "provider_credentials", "oauth_credentials", "full_restore").map(::JsonPrimitive)))
+                put("chat", buildJsonObject {
+                    put("conversations", buildJsonArray { cache.conversations().forEach { c ->
                     add(buildJsonObject {
                         put("conversation", element(RemoteConversation.serializer(), c))
                         put("history", element(RemoteHistory.serializer(), cache.history(c.id) ?: RemoteHistory(conversationId = c.id)))
                     })
                 } })
+                })
                 put("daily", buildJsonObject {
                     put("profile", element(RemoteDailyProfile.serializer(), cache.dailyProfile() ?: RemoteDailyProfile()))
                     put("moments", array(RemoteDailyMoment.serializer(), cache.dailyMoments()))
