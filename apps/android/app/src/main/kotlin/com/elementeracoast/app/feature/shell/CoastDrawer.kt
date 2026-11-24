@@ -39,6 +39,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import com.elementeracoast.app.core.model.ChatSearchHit
 import com.elementeracoast.app.feature.daily.SideRoomsRepository
+import com.elementeracoast.app.feature.daily.CalendarAnniversaryStrip
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
@@ -68,6 +69,8 @@ import com.elementeracoast.app.ui.theme.coastSurfaceBackground
 @Composable
 internal fun CoastDrawer(
     state: CoastShellState,
+    drawerOpen: Boolean,
+    onSnackbar: (String) -> Unit,
     onClose: () -> Unit,
     onOpenRoomType: (RoomType) -> Unit,
     onSelectConversation: (String) -> Unit,
@@ -210,7 +213,7 @@ internal fun CoastDrawer(
                 ),
                 verticalArrangement = Arrangement.spacedBy(CoastChatTokens.DrawerItemGap)
             ) {
-                item { CoastStatusStrip() }
+                item { CalendarAnniversaryStrip(repository, drawerOpen, onSnackbar) }
                 item { DrawerSectionLabel("聊天入口") }
                 item {
                     DrawerEntry(
@@ -440,47 +443,6 @@ fun ConversationList(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun CoastStatusStrip() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = CoastChatTokens.DrawerStatusBottomPadding),
-        horizontalArrangement = Arrangement.spacedBy(CoastChatTokens.DrawerStatusGap)
-    ) {
-        StatusCard("相伴", "0", "天", Modifier.weight(1f))
-        StatusCard("距 xx 日还有", "0", "天", Modifier.weight(1f))
-        StatusCard("距 xx 日还有", "0", "天", Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun StatusCard(label: String, value: String, unit: String, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .heightIn(min = CoastChatTokens.DrawerStatusHeight)
-            .coastSurfaceBackground(
-                MaterialTheme.colorScheme.surfaceVariant,
-                RoundedCornerShape(CoastChatTokens.DrawerStatusRadius)
-            )
-            .padding(vertical = CoastChatTokens.DrawerStatusVerticalPadding),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            label,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelMedium
-        )
-        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Text(
-            unit,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelMedium
-        )
     }
 }
 
