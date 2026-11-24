@@ -72,6 +72,27 @@ class LocalTransferRestoreTest {
         val encoded = CoastTransferCodec.decode(LocalBackupArchive.encode(LocalBackupArchive.capture(local, "com.elementeracoast.source")))
         assertEquals("原来的名字", encoded.getValue("dailyProfile").jsonObject.getValue("model_partner_display_name").jsonPrimitive.content)
     }
+    @Test fun cloudDailyLikeDetailsAndProvenanceSurviveLocalRestore() {
+        val payload = buildJsonObject {
+            put("applicationId", "com.elementeracoast.app"); put("workspace", "backend"); put("exportedAt", time)
+            putJsonArray("includedModules") { add("daily") }
+            put("conversations", JsonArray(emptyList())); put("calendar", JsonArray(emptyList()))
+            put("profile", JsonNull); put("dailyProfile", JsonNull); put("diaries", JsonArray(emptyList()))
+            put("moments", Json.parseToJsonElement("""[{"id":"m-cloud","author":"myri","actor":"myri","text":"旧云端动态","reason":"保留","tool_call_id":"call1","published_at":"2026-11-24T12:00:00Z","liked":true,"like_count":2,"likes":[{"actor":"xiaohan","created_at":"2026-11-24T12:00:00Z"},{"actor":"myri","created_at":"2026-11-24T12:00:01Z"}]}]"""))
+        }
+        val local = MemoryLocalPersistence()
+        val bundle = CoastTransferCodec.encode(payload)
+        LocalTransferRestore.restore(bundle, "com.elementeracoast.source", setOf("daily"), local)
+        val m = RemoteCacheStore(local).dailyMoments().single()
+        assertEquals("model_partner", m.actor)
+        assertEquals("call1", m.toolCallId)
+        assertEquals("保留", m.reason)
+        assertEquals(time, m.publishedAt)
+        assertEquals(setOf("owner", "model_partner"), m.likes!!.map { it.actor }.toSet())
+        assertEquals("2026-11-24T12:00:01Z", m.likes!!.first { it.actor == "model_partner" }.createdAt)
+        assertTrue(m.liked)
+        assertEquals(2, m.likeCount)
+    }
     @Test fun failedTransactionDoesNotExposePartialRecords() {
         val local = MemoryLocalPersistence()
         local.put("original","keep")
