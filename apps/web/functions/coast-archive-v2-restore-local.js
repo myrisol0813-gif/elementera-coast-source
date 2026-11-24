@@ -12,7 +12,7 @@ export async function restoreArchiveLocalRecord(db,session,manifest,module,recor
  await validateArchiveManifest(manifest);
  check(manifest.workspace==='local'&&['com.elementeracoast.app','com.elementeracoast.source'].includes(manifest.application_id),'unknown local archive origin');
  const r=manifest.records.find(x=>x.module===module&&x.id===recordId);
- check(r&&r.media_objects.length===0&&(module==='calendar'||r.dependencies.length===0),'local record is missing or contains unsupported dependencies');
+ check(r&&r.media_objects.length===0&&(['calendar','daily'].includes(module)||r.dependencies.length===0),'local record is missing or contains unsupported dependencies');
  const d=manifest.objects.find(x=>x.object_sha256===r.record_object);
  check(d&&d.size<=1800000,'local record exceeds current cloud size limit');
  const b=new Uint8Array(d.size);let at=0;
@@ -23,7 +23,8 @@ export async function restoreArchiveLocalRecord(db,session,manifest,module,recor
  check(target===module,'local module mismatch');
  const expected=raw.kind==='local_chat'?v.conversation?.id:raw.kind==='local_moment'?'moment:'+v.id:raw.kind==='local_diary'?'diary:'+v.id:raw.kind==='local_daily_profile'?'profile':raw.kind==='local_model_profile'?'owner':v.id;
  check(expected===r.id&&id(expected),'local record identity mismatch');
- if(module==='calendar')check(JSON.stringify(r.dependencies)===JSON.stringify(v.conversation_id==null?[]:['chat/'+v.conversation_id]),'calendar archive dependency mismatch');
+ if(['local_calendar','local_moment','local_diary'].includes(raw.kind))check(JSON.stringify(r.dependencies)===JSON.stringify(v.conversation_id==null?[]:['chat/'+v.conversation_id]),'record archive dependency mismatch');
+ else check(r.dependencies.length===0,'unexpected local record dependencies');
  const payload={applicationId:manifest.application_id,workspace:'local',exportedAt:manifest.exported_at,includedModules:[module],conversations:[],calendar:[],moments:[],diaries:[],profile:null,dailyProfile:null};
  payload[field]=Array.isArray(payload[field])?[v]:v;
  const envelope=await encodeTransfer(payload);

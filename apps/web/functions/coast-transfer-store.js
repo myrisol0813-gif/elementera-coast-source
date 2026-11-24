@@ -204,7 +204,13 @@ async function prepare(db,envelope,selection) {
     }
   }
   if (selection.includes('daily')) {
-    const daily = await prepareDailyTransfer(db,payload,APP_ID);
+    const daily = await prepareDailyTransfer(db,payload,APP_ID,async row=>{
+      require(row.conversation_id!=null||row.source_turn_id==null,'日常来源轮次缺少窗口。');
+      if(row.conversation_id==null)return;
+      const parent=row.conversation_id;
+      const state=stagedChatStates.get(parent)||(activeChats.has(parent)?await readConversationState(db,parent):null);
+      require(!conflictingChatIds.has(parent)&&state&&(!row.source_turn_id||state.turns.some(t=>t.id===row.source_turn_id)),'日常关联原窗口或轮次不存在，或窗口内容冲突。');
+    });
     result.daily=daily.report;
     statements.push(...daily.statements);
   }
