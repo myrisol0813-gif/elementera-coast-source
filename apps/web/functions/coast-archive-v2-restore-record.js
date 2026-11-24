@@ -1,3 +1,4 @@
+import { prepareArchiveVault } from './coast-archive-v2-restore-vault.js';
 import { restoreArchiveDaily } from './coast-archive-v2-restore-daily.js';
 import { PORTRAIT_RESTORE_MODULES,restoreArchivePortrait } from './coast-archive-v2-restore-portrait.js';
 import { MEMORY_RESTORE_MODULES,prepareArchiveMemory } from './coast-archive-v2-restore-memory.js';
@@ -24,7 +25,7 @@ export async function restoreArchiveRecord(db,sessionId,manifest,module,recordId
  if(module==='daily')return restoreArchiveDaily(db,sessionId,manifest,recordId,confirm);
  if(PORTRAIT_RESTORE_MODULES.includes(module))return restoreArchivePortrait(db,sessionId,manifest,module,recordId,confirm);
  await validateArchiveManifest(manifest);
- check(manifest.workspace==='backend'&&(Object.hasOwn(specs,module)||MEMORY_RESTORE_MODULES.includes(module)),'target does not support this record');
+ check(manifest.workspace==='backend'&&(Object.hasOwn(specs,module)||MEMORY_RESTORE_MODULES.includes(module)||module==='vault'),'target does not support this record');
  const r=manifest.records.find(x=>x.module===module&&x.id===recordId);
  check(r&&r.media_objects.length===0,'record missing or media not supported');
  const d=manifest.objects.find(x=>x.object_sha256===r.record_object);
@@ -32,6 +33,11 @@ export async function restoreArchiveRecord(db,sessionId,manifest,module,recordId
  const bytes=new Uint8Array(d.size);let at=0;
  await stageVerifiedObject(d,readStagedArchiveChunks(db,sessionId,d.object_sha256),async b=>{bytes.set(b,at);at+=b.length;},{maxBytes:1800000});
  const raw=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
+ if(module==='vault'){
+   const plan=await prepareArchiveVault(db,r,raw,manifest);
+   if(confirm===true&&plan.statements.length)await db.batch(plan.statements);
+   return {scope:'record_only',module,record_id:r.id,ready:plan.existing?0:1,existing:plan.existing?1:0,can_commit:true,committed:confirm===true};
+ }
  if(MEMORY_RESTORE_MODULES.includes(module)){
    check(exact(raw,['kind','data'])&&raw.kind===module,'invalid memory record envelope');
    const plan=await prepareArchiveMemory(db,r,raw.data,manifest);
