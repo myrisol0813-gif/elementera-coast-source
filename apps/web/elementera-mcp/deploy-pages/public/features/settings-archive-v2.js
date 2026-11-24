@@ -24,7 +24,7 @@ export function createV2Transfer({router,toast,chat}){
     if(previous?.name==='settings-transfer'&&next?.name!=='settings-transfer'){revision++;}
   });
   function render(){
-    let html='<div class="settings-group"><h2>V2 归档 · 试验</h2>'+line('范围说明','支持云端聊天组、书房、日历、世界书、模型资料、同应用记忆、画像、日常和拾潮；其他模块暂不恢复。')+
+    let html='<div class="settings-group"><h2>V2 归档 · 试验</h2>'+line('范围说明','支持云端聊天组、书房、日历、世界书、模型资料、同应用记忆、画像、日常、拾潮、自定义；本机 ZIP 支持四类可兼容记录。')+
       action('export','导出 V2 ZIP',busy)+action('choose','读取 V2 ZIP',busy||!!incoming);
     if(incoming){
       const m=incoming.manifest;
@@ -57,17 +57,23 @@ export function createV2Transfer({router,toast,chat}){
         // Full byte verification precedes preview and any upload.
         for(const d of data.manifest.objects){for await(const b of data.objectChunks(d)){if(token!==revision)throw Error('已离开归档页面');}progress='正在校验原件';}
         const options=[];
-        if(data.manifest.workspace==='backend'){
+        if(['backend','local'].includes(data.manifest.workspace)){
           const objects=new Map(data.manifest.objects.map(d=>[d.object_sha256,d]));
           for(const r of data.manifest.records){
-            if(!(r.module==='chat'&&data.manifest.application_id===APP)&&!(r.module==='library'&&r.id.startsWith('library_books:'))&&!['calendar','worldbook','model_profile'].includes(r.module)&&!(data.manifest.application_id===APP&&['memory_entries','memory_pockets','user_portrait','self_portrait','daily','vault'].includes(r.module)))continue;
+            if(data.manifest.workspace==='local'&&!['chat','calendar','daily','model_profile'].includes(r.module))continue;
+            if(data.manifest.workspace==='backend'&&!(r.module==='chat'&&data.manifest.application_id===APP)&&!(r.module==='library'&&r.id.startsWith('library_books:'))&&!['calendar','worldbook','model_profile'].includes(r.module)&&!(data.manifest.application_id===APP&&['memory_entries','memory_pockets','user_portrait','self_portrait','daily','vault','custom_instructions'].includes(r.module)))continue;
             const d=objects.get(r.record_object);if(!d||d.size>1800000)continue;
             const raw=new Uint8Array(d.size);let at=0;
             for await(const b of data.objectChunks(d)){raw.set(b,at);at+=b.length;}
             const v=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw));
+            if(data.manifest.workspace==='local'){
+              const kinds={local_chat:'chat',local_calendar:'calendar',local_moment:'daily',local_diary:'daily',local_daily_profile:'daily',local_model_profile:'model_profile'};
+              if(kinds[v.kind]===r.module)options.push({key:'local:'+r.module+':'+r.id,kind:r.module,id:r.id,local:true,title:String(v.data?.conversation?.title||v.data?.title||v.data?.text||labels[r.module]).slice(0,100)});
+              continue;
+            }
             if(r.module==='chat'&&v.kind==='chat'&&v.data?.conversation?.id===r.id)options.push({key:'chat:'+r.id,kind:'chat',id:r.id,title:String(v.data.conversation.title||r.id)});
             if(r.module==='library'&&v.kind==='library_books'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(v.data?.id||''))options.push({key:'book:'+v.data.id,kind:'book',id:v.data.id,title:String(v.data.title||v.data.id)});
-            if(['calendar','worldbook','model_profile','memory_entries','memory_pockets','user_portrait','self_portrait'].includes(r.module)&&v.kind===r.module&&v.data?.id)options.push({key:r.module+':'+r.id,kind:r.module,id:r.id,title:String(v.data.title||labels[r.module])});
+            if(['calendar','worldbook','model_profile','memory_entries','memory_pockets','user_portrait','self_portrait','custom_instructions'].includes(r.module)&&v.kind===r.module&&v.data?.id)options.push({key:r.module+':'+r.id,kind:r.module,id:r.id,title:String(v.data.title||labels[r.module])});
             if(data.manifest.application_id===APP&&r.module==='daily'&&['daily_moments','daily_diaries','daily_profile'].includes(v.kind))options.push({key:'daily:'+r.id,kind:'daily',id:r.id,title:v.kind==='daily_profile'?'日常资料':String(v.data.date+' · '+v.data.text).slice(0,80)});
             if(data.manifest.application_id===APP&&r.module==='vault'&&['vault_treasures','vault_media_labels'].includes(v.kind))options.push({key:'vault:'+r.id,kind:'vault',id:r.id,title:String(v.data.display_name||v.data.excerpt||v.data.source_id).slice(0,80)});
           }
@@ -94,7 +100,7 @@ export function createV2Transfer({router,toast,chat}){
       }
       if(token!==revision)return;
       const choice=choices.find(r=>r.key===selected);if(!choice)throw Error('请选择资料');
-      preview=await (choice.kind==='book'?api.restoreBook(session,incoming.manifest,choice.id,false):choice.kind==='chat'?api.restoreChat(session,incoming.manifest,choice.id,false):api.restoreRecord(session,incoming.manifest,choice.kind,choice.id,false));
+      preview=await (choice.kind==='book'?api.restoreBook(session,incoming.manifest,choice.id,false):choice.kind==='chat'&&!choice.local?api.restoreChat(session,incoming.manifest,choice.id,false):api.restoreRecord(session,incoming.manifest,choice.kind,choice.id,false));
     });
     if(name==='v2-commit'&&preview&&!result&&session)return operate(async token=>{
       const choice=choices.find(r=>r.key===selected);if(!choice)throw Error('请选择资料');
