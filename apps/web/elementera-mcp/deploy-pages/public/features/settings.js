@@ -258,7 +258,8 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     toast('正在整理离线海岸 ZIP…', 3000);
     const data = await requestJson(API.fullArchive);
     const archive = { ...(data.archive || {}), local_device: localArchiveState(storage, chat) };
-    const result = buildOfflineArchive(archive, auditFullArchiveCompleteness(archive));
+    const signature = preferences().ownerSignature || preferences().ownerName || '屋主';
+    const result = buildOfflineArchive(archive, auditFullArchiveCompleteness(archive), signature);
     downloadFile(result.blob, `elementera-coast-offline-${timestampLabel()}.zip`, 'application/zip');
     toast('离线海岸已导出 · 原件 '+result.mediaCount+' 个'+(result.warnings.length?' · 有缺失，请查看 manifest.json':' · 解压后打开 index.html'), 6500);
   }
