@@ -23,23 +23,6 @@ const DAILY_ROUTES = new Set([
   'daily-home', 'moments', 'moments-compose', 'diary', 'diary-compose', 'daily-placeholder',
 ]);
 
-function startOfToday() {
-  const date = new Date();
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function daysSince(year, month, day) {
-  const start = new Date(year, month - 1, day);
-  return Math.max(1, Math.floor((startOfToday() - start) / 86400000) + 1);
-}
-
-function daysUntil(month, day) {
-  const today = startOfToday();
-  let target = new Date(today.getFullYear(), month - 1, day);
-  if (target < today) target = new Date(today.getFullYear() + 1, month - 1, day);
-  return Math.ceil((target - today) / 86400000);
-}
-
 export function createShell({ storage }) {
   let viewportCleanup = null;
 
@@ -56,15 +39,6 @@ export function createShell({ storage }) {
     if (label) label.textContent = THEME_LABELS[theme];
     const themeMeta = q('meta[name="theme-color"]');
     if (themeMeta) themeMeta.content = THEME_BACKGROUNDS[theme];
-  }
-
-  function updateStatus() {
-    const orbit = q('#orbitDays');
-    const sampleMilestone = q('#sampleMilestoneDays');
-    const projectDate = q('#projectDateDays');
-    if (orbit) orbit.textContent = String(daysSince(2026, 1, 1));
-    if (sampleMilestone) sampleMilestone.textContent = String(daysUntil(1, 1));
-    if (projectDate) projectDate.textContent = String(daysUntil(7, 1));
   }
 
   function syncViewportHeight() {
@@ -154,7 +128,6 @@ export function createShell({ storage }) {
   function mount(context = {}) {
     bindViewportHeight();
     applyPreferences();
-    updateStatus();
     updateActiveNavigation(context.router?.current?.());
   }
 

@@ -1,4 +1,4 @@
-/* Source calendar inherits accessible Coast UI surfaces. */
+/* Lightweight calendar inherits Coast colors, spacing, and rounded surfaces. */
 .coast-calendar-panel .feature-body { padding-top: 14px; }
 .coast-calendar-shell { max-width: 650px; margin: 0 auto; }
 .coast-calendar-month { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 18px; }
@@ -29,3 +29,9 @@
 .coast-calendar-editor textarea { resize: vertical; min-height: 105px; line-height: 1.6; }
 .coast-calendar-submit { border: 0; border-radius: 14px; padding: 13px 16px; background: var(--accent); color: white; font: inherit; font-weight: 650; cursor: pointer; min-height: 44px; }
 .coast-calendar-remove { justify-self: center; }
+
+.coast-anniversary-fields { display: grid; gap: 13px; }
+.coast-anniversary-fields[hidden], .coast-calendar-editor [hidden] { display: none; }
+.coast-anniversary-fields small { color: var(--muted); line-height: 1.6; }
+.coast-calendar-editor .coast-calendar-check { display: flex; align-items: center; gap: 8px; }
+.coast-calendar-check input { width: auto; accent-color: var(--accent); }

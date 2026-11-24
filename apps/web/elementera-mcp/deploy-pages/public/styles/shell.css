@@ -322,31 +322,32 @@
 }
 
 .coast-status-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
   gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
-
-.coast-status-grid span {
+.coast-status-card {
+  flex: 0 0 calc((100% - 12px) / 3);
+  min-width: 0;
+  min-height: 58px;
   display: grid;
   place-items: center;
-  min-height: 48px;
+  align-content: center;
   padding: 7px 3px;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 12px;
   background: var(--surface-soft);
   color: var(--text-soft);
+  font: inherit;
   font-size: 10px;
   line-height: 1.25;
+  cursor: pointer;
   text-align: center;
 }
-
-.coast-status-grid b {
-  display: inline;
-  color: var(--text);
-  font-size: 15px;
-}
-
+.coast-status-card span { max-width: 100%; overflow-wrap: anywhere; }
+.coast-status-card b { color: var(--text); font-size: 15px; }
+.coast-status-add { color: var(--muted); }
 .sidebar-section {
   padding: 7px 0;
 }

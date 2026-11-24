@@ -1,3 +1,4 @@
+import { anniversaryStatus } from './calendar-anniversary.js';
 import { CalendarError, createCalendarEntry, deleteCalendarEntry, listCalendarEntries, updateCalendarEntry } from './calendar-store.js';
 import { apiError, json, methodNotAllowed, readJson, requestBodyError, unexpectedApiError } from './http.js';
 import { requireOwnerSession, OwnerAccessError } from './owner-access.js';
@@ -15,7 +16,20 @@ async function route(request, env, session) {
   const rest = url.pathname.slice(PREFIX.length);
   if (!rest) {
     if (request.method === 'GET') {
-      return json({ ok: true, entries: await listCalendarEntries(env.COAST_CHAT_DB, { month: url.searchParams.get('month') || '' }) });
+      const pinned = url.searchParams.get('pinned') === '1';
+      const entries = await listCalendarEntries(env.COAST_CHAT_DB, { month: url.searchParams.get('month') || '', pinned });
+      const today = url.searchParams.get('today');
+      if (pinned && today) {
+        try {
+          // Validate even an empty pinned list.
+          anniversaryStatus({ startDay: '2000-01-01', mode: 'elapsed' }, today);
+          return json({ ok: true, entries: entries.map(entry => ({ ...entry, status: anniversaryStatus(entry.anniversary, today) })) });
+        } catch (error) {
+          if (error instanceof RangeError) throw new CalendarError('invalid_day', '请填写有效的公历日期（1900—2200）。');
+          throw error;
+        }
+      }
+      return json({ ok: true, entries });
     }
     if (request.method === 'POST') {
       const entry = await createCalendarEntry(env.COAST_CHAT_DB, await readJson(request, BODY_MAX_BYTES), { author: 'owner' });

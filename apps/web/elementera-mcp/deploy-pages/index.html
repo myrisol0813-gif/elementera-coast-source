@@ -16,16 +16,16 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai:wght@400&family=Noto+Serif+SC:wght@400;500;600&display=swap">
-  <link rel="stylesheet" href="/public/styles/tokens.css?v=coast-source-app-27">
-  <link rel="stylesheet" href="/public/styles/shell.css?v=coast-source-app-27">
-  <link rel="stylesheet" href="/public/styles/chat.css?v=coast-source-app-27">
-  <link rel="stylesheet" href="/public/styles/calendar.css?v=coast-source-app-27">
-  <link rel="stylesheet" href="/public/styles/library.css?v=coast-source-app-27">
-  <link rel="stylesheet" href="/public/styles/mcp-letter.css?v=coast-source-app-27">
-  <link rel="stylesheet" href="/public/styles/rikkahub.css?v=coast-source-app-27">
-  <link rel="stylesheet" href="/public/styles/features.css?v=coast-source-app-27">
-  <link rel="stylesheet" href="/public/styles/desk.css?v=coast-source-app-27">
-  <link rel="stylesheet" href="/public/styles/dev-hands.css?v=coast-source-app-27">
+  <link rel="stylesheet" href="/public/styles/tokens.css?v=coast-source-app-28">
+  <link rel="stylesheet" href="/public/styles/shell.css?v=coast-source-app-28">
+  <link rel="stylesheet" href="/public/styles/chat.css?v=coast-source-app-28">
+  <link rel="stylesheet" href="/public/styles/calendar.css?v=coast-source-app-28">
+  <link rel="stylesheet" href="/public/styles/library.css?v=coast-source-app-28">
+  <link rel="stylesheet" href="/public/styles/mcp-letter.css?v=coast-source-app-28">
+  <link rel="stylesheet" href="/public/styles/rikkahub.css?v=coast-source-app-28">
+  <link rel="stylesheet" href="/public/styles/features.css?v=coast-source-app-28">
+  <link rel="stylesheet" href="/public/styles/desk.css?v=coast-source-app-28">
+  <link rel="stylesheet" href="/public/styles/dev-hands.css?v=coast-source-app-28">
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -40,11 +40,7 @@
 
       <nav class="sidebar-content" aria-label="前端入口">
         <section id="coastStatus" class="coast-status" aria-label="日期">
-          <div class="coast-status-grid">
-            <span>Project age <b id="orbitDays">—</b> 天</span>
-            <span>Sample milestone <b id="sampleMilestoneDays">—</b> 天</span>
-            <span>Project date <b id="projectDateDays">—</b> 天</span>
-          </div>
+          <div id="coastAnniversaryCards" class="coast-status-grid"><button class="coast-status-card coast-status-add" type="button" data-action="calendar:anniversary-new">＋<span>纪念日</span></button></div>
         </section>
 
         <section id="mainRooms" class="sidebar-section">
@@ -138,6 +134,6 @@
     <div id="toastRoot" class="toast" role="status" aria-live="polite" hidden></div>
   </div>
 
-  <script type="module" src="/public/app.js?v=coast-source-app-27"></script>
+  <script type="module" src="/public/app.js?v=coast-source-app-28"></script>
 </body>
 </html>
