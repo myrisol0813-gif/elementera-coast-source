@@ -27,6 +27,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
     private val knowledge = LocalKnowledgeStore(store)
     private val memory = LocalMemoryStore(store)
     private val portraits = LocalPortraitStore(store)
+    private val soil = LocalSoilStore(store)
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
     private val media = "application/json; charset=utf-8".toMediaType()
 
@@ -183,6 +184,12 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 if(method=="DELETE")return ok(r,"deleted" to JsonPrimitive(portraits.discard(portraitModule,parts[4])))
             }
             return unsupported(r)
+        }
+        if(path=="/api/memory/soil"){
+            val cid=r.url.queryParameter("conversation_id").orEmpty()
+            if(!conversationExists(cid))return missing(r)
+            if(method=="GET")return response(r,200,soil.response(cid))
+            if(method=="PUT")return response(r,200,soil.patch(cid,body(r)))
         }
         if(path=="/api/memory/custom-instructions"){
             val value=when(method){

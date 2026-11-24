@@ -1,6 +1,7 @@
 package com.elementeracoast.app.core.local
 
 import com.elementeracoast.app.core.remote.*
+import kotlinx.serialization.json.*
 import java.time.Instant
 import java.util.UUID
 
@@ -10,6 +11,7 @@ internal class LocalKnowledgeStore(store:LocalPersistence) {
     private val cache=RemoteCacheStore(store,strictReads=true)
     private val memory=LocalMemoryStore(store)
     private val portraits=LocalPortraitStore(store)
+    private val soil=LocalSoilStore(store)
     fun instructions()=cache.customInstructions()
     fun saveInstructions(request:RemoteCustomInstructionsPutRequest):RemoteCustomInstructions {
         require(request.content.length<=32000&&request.updatedBy.length in 1..80&&request.source.length in 1..80){"自定义指令或来源字段超限。"}
@@ -68,14 +70,20 @@ internal class LocalKnowledgeStore(store:LocalPersistence) {
         val memories=memory.recall(current,conversationId)
         val memoryText=memories.map{e->listOf("记忆 · "+e.title,"生命核："+e.lifeCore,e.content,e.usageHint.takeIf{it.isNotBlank()}?.let{"使用时机："+it}.orEmpty(),e.avoidHint.takeIf{it.isNotBlank()}?.let{"勿误用："+it}.orEmpty()).filter{it.isNotBlank()}.joinToString("\n")}
         memoryText.forEach{delivered.add(RemoteChatMessage("system",it))}
+        val soilRow=soil.current(conversationId)
+        val soilText=soilRow?.get("current_text")?.jsonPrimitive?.contentOrNull.orEmpty()
+        val after=soilRow?.get("afterthoughts_json")?.jsonPrimitive?.contentOrNull?.let{Json.parseToJsonElement(it).jsonArray.map{v->v.jsonPrimitive.content}}.orEmpty()
+        val soilContext=(listOf(soilText)+after).filter{it.isNotBlank()}.joinToString("\n")
+        if(soilContext.isNotEmpty())delivered.add(RemoteChatMessage("system","思维壤\n"+soilContext))
         delivered.addAll(messages)
         val chars=delivered.sumOf{it.content.length.toLong()}
         require(chars<=maxChars){"本机上下文、完整画像、世界书与记忆超过预算，未截断、未发送。"}
         return Context(delivered,RemoteDeskSlip(
-            summary="本机自定义指令、完整画像、世界书、已确认记忆（关键词检索）与近期文字；附件尚未接入",
+            summary="本机自定义指令、完整画像、世界书、已确认记忆（关键词检索）、思维壤与近期文字；附件尚未接入",
             customInstructions=RemoteDeskCustomInstructions(status=if(instructions.isEmpty())"未设置" else "已递给",delivered=instructions.isNotEmpty(),empty=instructions.isEmpty(),length=instructions.length,content=instructions),
             userPortrait=portraitReceipt("用户画像",userPortrait),
             globalExcerpt=portraitReceipt("自我画像",selfPortrait),
+            thinkingSoil=RemoteDeskThinkingSoil(status=if(soilContext.isEmpty())"未设置" else "已递给",enabled=soilRow?.get("auto_refresh_enabled")?.jsonPrimitive?.int==1,delivered=soilContext.isNotEmpty(),empty=soilContext.isEmpty(),context=soilContext,currentText=soilText,afterthoughts=after,afterthoughtsCount=after.size),
             worldbook=RemoteDeskWorldbook(status=if(matches.isEmpty())"未命中" else "已递给",matchedCount=matches.size,deliveredCount=matches.size,matchedTitles=matches.map{it.entry.title},deliveredTitles=matches.map{it.entry.title},
                 entries=matches.map{RemoteDeskWorldbookItem(title=it.entry.title,id=it.entry.id,matchedKeywords=it.keywords,content=it.entry.content,scope=it.entry.scope,matchedBy=it.by,delivered=true,deliveredText=it.entry.content)}),
             relatedMemory=RemoteDeskMemory(status=if(memories.isEmpty())"未命中" else "已递给",confirmationStatus="仅已确认的 active 记录",count=memories.size,
