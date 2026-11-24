@@ -53,7 +53,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
         val report=ArchiveV2Local.restore(input.manifest,input.stage,modules,BuildConfig.APPLICATION_ID,NativeWorkspace.persistence(context),confirm,context.filesDir)
         buildJsonObject{
             put("committed",confirm)
-            report.counts.forEach { (key,value)->putJsonObject(key){put("ready",value.ready);put("existing",value.existing);put("conflicts",value.conflicts)} }
+            report.counts.forEach { (key,value)->putJsonObject(key){put("ready",value.ready);put("existing",value.existing);put("conflicts",value.conflicts);if(value.archivedOnly>0)put("archived_only",value.archivedOnly)} }
         }
     }
     fun cloudChats(m:ArchiveV2Manifest):List<String> =
