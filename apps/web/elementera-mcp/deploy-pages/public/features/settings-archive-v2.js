@@ -24,16 +24,16 @@ export function createV2Transfer({router,toast,chat}){
     if(previous?.name==='settings-transfer'&&next?.name!=='settings-transfer'){revision++;}
   });
   function render(){
-    let html='<div class="settings-group"><h2>V2 归档 · 试验</h2>'+line('范围说明','支持同应用云端聊天组，以及两版云端书房逐本恢复；其他模块暂不恢复。')+
+    let html='<div class="settings-group"><h2>V2 归档 · 试验</h2>'+line('范围说明','支持同应用云端聊天组、书房、日历、世界书与模型资料；其他模块暂不恢复。')+
       action('export','导出 V2 ZIP',busy)+action('choose','读取 V2 ZIP',busy||!!incoming);
     if(incoming){
       const m=incoming.manifest;
       html+=line('归档来源',m.workspace+' · '+m.records.length+' 项记录')+
         m.modules.map(v=>line(labels[v.module]||v.module,v.count+' 项 · '+(v.coverage==='unavailable'?'未采集':'已列入清单'))).join('');
-      html+=choices.map(r=>'<button class="feature-row" type="button" data-action="settings:transfer-v2-select" data-id="'+escapeHtml(r.key)+'" aria-pressed="'+(selected===r.key)+'" '+(busy||preview||result?'disabled':'')+'><span><strong>'+escapeHtml(r.title)+'</strong><small>'+escapeHtml(r.kind==='chat'?'聊天窗口':'书房')+'</small></span></button>').join('');
+      html+=choices.map(r=>'<button class="feature-row" type="button" data-action="settings:transfer-v2-select" data-id="'+escapeHtml(r.key)+'" aria-pressed="'+(selected===r.key)+'" '+(busy||preview||result?'disabled':'')+'><span><strong>'+escapeHtml(r.title)+'</strong><small>'+escapeHtml(r.kind==='chat'?'聊天窗口':r.kind==='book'?'书房':labels[r.kind])+'</small></span></button>').join('');
       html+=line('上传范围','预览将把此归档的全部对象暂存在已登录云端；仅确认后才写入所选资料。');
       if(!choices.length)html+=line('目标暂不支持','请保留原始归档。');
-      if(preview||result){const p=result||preview;html+=line(result?'已恢复资料':'预览通过',p.scope==='book_only'?'章节 '+p.chapters+' · 批注 '+p.notes:'轮次 '+p.turns+' · 附件 '+p.attachments+' · 语音 '+p.voices+' · 思维壤 '+p.soils+' · 快照 '+p.snapshots);}
+      if(preview||result){const p=result||preview;html+=line(result?'已恢复资料':'预览通过',p.scope==='record_only'?'新增 '+p.ready+' · 已有 '+p.existing:p.scope==='book_only'?'章节 '+p.chapters+' · 批注 '+p.notes:'轮次 '+p.turns+' · 附件 '+p.attachments+' · 语音 '+p.voices+' · 思维壤 '+p.soils+' · 快照 '+p.snapshots);}
       if(!result)html+=action(preview?'commit':'preview',preview?'确认恢复所选资料':'上传并预览',busy||!selected);
       if(preview&&!result)html+=action('back','返回选择',busy);
       if(result)html+=action('next','继续恢复其他资料',busy);
@@ -60,13 +60,14 @@ export function createV2Transfer({router,toast,chat}){
         if(data.manifest.workspace==='backend'){
           const objects=new Map(data.manifest.objects.map(d=>[d.object_sha256,d]));
           for(const r of data.manifest.records){
-            if(!(r.module==='chat'&&data.manifest.application_id===APP)&&!(r.module==='library'&&r.id.startsWith('library_books:')))continue;
+            if(!(r.module==='chat'&&data.manifest.application_id===APP)&&!(r.module==='library'&&r.id.startsWith('library_books:'))&&!['calendar','worldbook','model_profile'].includes(r.module))continue;
             const d=objects.get(r.record_object);if(!d||d.size>1800000)continue;
             const raw=new Uint8Array(d.size);let at=0;
             for await(const b of data.objectChunks(d)){raw.set(b,at);at+=b.length;}
             const v=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw));
             if(r.module==='chat'&&v.kind==='chat'&&v.data?.conversation?.id===r.id)options.push({key:'chat:'+r.id,kind:'chat',id:r.id,title:String(v.data.conversation.title||r.id)});
             if(r.module==='library'&&v.kind==='library_books'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(v.data?.id||''))options.push({key:'book:'+v.data.id,kind:'book',id:v.data.id,title:String(v.data.title||v.data.id)});
+            if(['calendar','worldbook','model_profile'].includes(r.module)&&v.kind===r.module&&v.data?.id)options.push({key:r.module+':'+r.id,kind:r.module,id:r.id,title:String(v.data.title||labels[r.module])});
           }
         }
         if(token!==revision)return;
@@ -91,11 +92,11 @@ export function createV2Transfer({router,toast,chat}){
       }
       if(token!==revision)return;
       const choice=choices.find(r=>r.key===selected);if(!choice)throw Error('请选择资料');
-      preview=await (choice.kind==='book'?api.restoreBook:api.restoreChat)(session,incoming.manifest,choice.id,false);
+      preview=await (choice.kind==='book'?api.restoreBook(session,incoming.manifest,choice.id,false):choice.kind==='chat'?api.restoreChat(session,incoming.manifest,choice.id,false):api.restoreRecord(session,incoming.manifest,choice.kind,choice.id,false));
     });
     if(name==='v2-commit'&&preview&&!result&&session)return operate(async token=>{
       const choice=choices.find(r=>r.key===selected);if(!choice)throw Error('请选择资料');
-      result=await (choice.kind==='book'?api.restoreBook:api.restoreChat)(session,incoming.manifest,choice.id,true);
+      result=await (choice.kind==='book'?api.restoreBook(session,incoming.manifest,choice.id,true):choice.kind==='chat'?api.restoreChat(session,incoming.manifest,choice.id,true):api.restoreRecord(session,incoming.manifest,choice.kind,choice.id,true));
       await chat.refreshFromCoast();toast('已确认恢复所选资料。');
     });
   }
