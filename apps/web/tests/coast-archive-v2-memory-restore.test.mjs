@@ -25,10 +25,11 @@ test('owner memory and pocket exact restore, target vector indexes reset, confli
  for(const o of objects){await registerArchiveObject(dst,s.id,o.descriptor);for(let i=0;i<o.chunks.length;i++)await putArchiveChunk(dst,s.id,o.descriptor.object_sha256,i,o.chunks[i]);}
  await assert.rejects(()=>restoreArchiveRecord(dst,s.id,m,'memory_pockets',pocket.id,true),/restore related owner chat first/);
  await restoreArchiveChatGroup(dst,s.id,m,c.id,true);
+ const local={...m,workspace:'local'};
  for(const r of records.slice(1)){
-   assert.equal((await restoreArchiveRecord(dst,s.id,m,r.module,r.id,false)).ready,1);
+   assert.equal((await restoreArchiveRecord(dst,s.id,local,r.module,r.id,false)).ready,1);
    assert.equal((await archiveRecordPage(dst,r.module)).items.length,0);
-   await restoreArchiveRecord(dst,s.id,m,r.module,r.id,true);
+   await restoreArchiveRecord(dst,s.id,local,r.module,r.id,true);
    assert.deepEqual((await archiveRecordPage(dst,r.module)).items,(await archiveRecordPage(src,r.module)).items);
    assert.equal((await restoreArchiveRecord(dst,s.id,m,r.module,r.id,false)).existing,1);
  }
