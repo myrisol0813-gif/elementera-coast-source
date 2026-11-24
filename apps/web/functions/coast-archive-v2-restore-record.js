@@ -1,3 +1,4 @@
+import { MEMORY_RESTORE_MODULES,prepareArchiveMemory } from './coast-archive-v2-restore-memory.js';
 import { ensureChatSchema, normalizeProfile } from './chat-store.js';
 import { ensureCalendarSchema, CALENDAR_LIMITS } from './calendar-store.js';
 import { anniversaryCalendarDay } from './calendar-anniversary.js';
@@ -19,7 +20,7 @@ const specs={
 const roles={owner:'owner',assistant:'assistant'};
 export async function restoreArchiveRecord(db,sessionId,manifest,module,recordId,confirm=false){
  await validateArchiveManifest(manifest);
- check(manifest.workspace==='backend'&&Object.hasOwn(specs,module),'target does not support this record');
+ check(manifest.workspace==='backend'&&(Object.hasOwn(specs,module)||MEMORY_RESTORE_MODULES.includes(module)),'target does not support this record');
  const r=manifest.records.find(x=>x.module===module&&x.id===recordId);
  check(r&&r.media_objects.length===0,'record missing or media not supported');
  const d=manifest.objects.find(x=>x.object_sha256===r.record_object);
@@ -27,6 +28,12 @@ export async function restoreArchiveRecord(db,sessionId,manifest,module,recordId
  const bytes=new Uint8Array(d.size);let at=0;
  await stageVerifiedObject(d,readStagedArchiveChunks(db,sessionId,d.object_sha256),async b=>{bytes.set(b,at);at+=b.length;},{maxBytes:1800000});
  const raw=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
+ if(MEMORY_RESTORE_MODULES.includes(module)){
+   check(exact(raw,['kind','data'])&&raw.kind===module,'invalid memory record envelope');
+   const plan=await prepareArchiveMemory(db,r,raw.data,manifest);
+   if(confirm===true&&plan.statements.length)await db.batch(plan.statements);
+   return {scope:'record_only',module,record_id:r.id,ready:plan.existing?0:1,existing:plan.existing?1:0,can_commit:true,committed:confirm===true};
+ }
  const [table,names,ensure]=specs[module],fields=names.split(','),v=raw?.data;
  check(exact(raw,['kind','data'])&&raw.kind===module&&exact(v,fields)&&id(v.id),'invalid record fields');
  const expected=module==='worldbook'?'worldbook:'+await digestBytes(new TextEncoder().encode(JSON.stringify([v.id]))):v.id;
