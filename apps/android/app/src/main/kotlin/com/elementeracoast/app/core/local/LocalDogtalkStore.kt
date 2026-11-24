@@ -142,14 +142,39 @@ internal object ArchiveV2Dogtalk{
         val store=LocalDogtalkStore(target);val old=store.read();val byId=old.associateBy{it.id}
         require(rows.all{byId[it.id]==null||byId[it.id]==it}){"目标狗话内容冲突，不覆盖。"}
         val next=old+rows.filter{it.id !in byId};LocalDogtalkStore.validateRows(next)
+        var detached=0
+        // A snapshot is immutable history, not an active draft. Legacy room IDs and
+        // pruned turn IDs can outlive their original messages. Preserve the exact
+        // record without fabricating a new message link or changing its source ID.
+        val references=histories.flatMap{(cid,h)->h.turns.flatMap{t->
+            (t.user.variants+t.assistant.variantsByUserVariant.values.flatten()).mapNotNull{v->
+                v.dogtalkSnapshotId?.takeIf{it.isNotBlank()}?.let{Triple(it,cid,t.id)}
+            }
+        }}.groupBy{it.first}
+        val snapshotData=next.filter{it.module=="dogtalk_snapshots"}.associate{it.id to it.data}
         for(r in rows){
             val cid=r.data["conversation_id"]?.jsonPrimitive?.contentOrNull
             if(cid!=null)require(cid in histories&&cid !in conflicts){"狗话原窗口缺失或冲突。"}
             if(r.module=="dogtalk_snapshots"){
-                require(r.data["source_type"]==JsonPrimitive("turn")&&cid!=null&&histories.getValue(cid).turns.any{it.id==r.data["source_id"]?.jsonPrimitive?.content}){"快照原始消息不存在；电波和灯塔独立消息快照暂不能恢复。"}
+                val refs=references[r.id].orEmpty()
+                // A live explicit reference must still match exactly. Detached
+                // snapshots are never allowed to satisfy a mismatched live link.
+                for(ref in refs){
+                    require(ref.second !in conflicts){"狗话原窗口缺失或冲突。"}
+                    LocalDogtalkStore.checkReference(ref.second,ref.third,r.id,snapshotData)
+                }
+                val linked=r.data["source_type"]==JsonPrimitive("turn")&&cid!=null&&
+                    histories.getValue(cid).turns.any{it.id==r.data["source_id"]?.jsonPrimitive?.content}
+                if(!linked){
+                    require(refs.isEmpty()){"狗话历史快照与原轮次不一致。"}
+                    detached++
+                }
             }
         }
         if(write)store.write(next)
-        return selection.intersect(LocalDogtalkStore.modules).associateWith{module->val group=rows.filter{it.module==module};val existing=group.count{it.id in byId};LocalRestoreCount(group.size-existing,existing,0)}
+        return selection.intersect(LocalDogtalkStore.modules).associateWith{module->
+            val group=rows.filter{it.module==module};val existing=group.count{it.id in byId}
+            LocalRestoreCount(group.size-existing,existing,0,if(module=="dogtalk_snapshots")detached else 0)
+        }
     }
 }

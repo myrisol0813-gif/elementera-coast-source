@@ -122,7 +122,10 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchive
                 }
                 preview?.let { p->
                     Text(if(committed)"已确认写入；请重新打开海岸刷新资料及外观。" else "预检通过。只写入所选记录；外观为明确选择后的设置替换，其他记录不覆盖。")
-                    if(localMode)p.forEach { (k,v)->if(v is JsonObject)Text((v2Labels[k]?:k)+" · 新增 "+v["ready"]+" · 已有 "+v["existing"]+" · 冲突 "+v["conflicts"]) }
+                    if(localMode)p.forEach { (k,v)->if(v is JsonObject){
+                        Text((v2Labels[k]?:k)+" · 新增 "+v["ready"]+" · 已有 "+v["existing"]+" · 冲突 "+v["conflicts"])
+                        v["archived_only"]?.let{Text("其中 "+it+" 条旧快照仅保留历史原件，不重新关联消息或注入上下文。")}
+                    } }
                     else if(p["scope"]?.jsonPrimitive?.contentOrNull=="daily_group")Text("评论 "+p["comments"]+" · 点赞 "+p["likes"])
                     else if(p["scope"]?.jsonPrimitive?.contentOrNull=="portrait_group")Text("候选 "+p["candidates"]+" · 历史 "+p["revisions"])
                     else if(p["scope"]?.jsonPrimitive?.contentOrNull=="record_only")Text("新增 "+p["ready"]+" · 已有 "+p["existing"])
