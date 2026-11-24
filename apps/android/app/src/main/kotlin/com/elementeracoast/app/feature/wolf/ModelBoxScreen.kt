@@ -60,6 +60,7 @@ internal fun ModelBoxScreen(
     var expandedModel by remember { mutableStateOf<String?>(null) }
     val grouped = remember(models, current) { groupedUnselectedModels(models, current) }
     var query by remember { mutableStateOf("") }
+    var channel by remember { mutableStateOf(if (current.startsWith("local:") || !chatGpt.connected) LocalModelChannel.Provider else LocalModelChannel.Codex) }
     var openGroups by remember { mutableStateOf<Set<ModelSeries>>(emptySet()) }
     val context = LocalContext.current.applicationContext
     var providerNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -69,7 +70,9 @@ internal fun ModelBoxScreen(
         }
     }
     val catalogModels = models + chatGpt.availableModels.map { "chatgpt-plan:" + it.slug }
-    val localGrouped = remember(catalogModels, query, providerNames) { groupedLocalModels(catalogModels, query, providerNames) }
+    val localGrouped = remember(catalogModels, query, providerNames, channel, chatGpt.connected) {
+        groupedLocalModels(localChannelModels(catalogModels, channel, chatGpt.connected), query, providerNames)
+    }
     if (localMode && localPage != LocalModelPage.Catalog) {
         LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
@@ -118,16 +121,35 @@ internal fun ModelBoxScreen(
         if (localMode) {
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    LocalModelEntry("Codex 额度", if (chatGpt.connected) "已授权 · 账户与模型" else "账户与授权", Modifier.weight(1f)) { onLocalPage(LocalModelPage.Codex) }
-                    LocalModelEntry("自有供应商", "API · URL · 额度", Modifier.weight(1f)) { onLocalPage(LocalModelPage.Providers) }
+                    LocalModelEntry("Codex 额度", if (chatGpt.connected) "已授权 · 账户与模型" else "账户与授权", Modifier.weight(1f), channel == LocalModelChannel.Codex) {
+                        channel = LocalModelChannel.Codex
+                        expandedModel = null
+                        query = ""
+                        openGroups = emptySet()
+                    }
+                    LocalModelEntry("自有供应商", "API · URL · 额度", Modifier.weight(1f), channel == LocalModelChannel.Provider) {
+                        channel = LocalModelChannel.Provider
+                        expandedModel = null
+                        query = ""
+                        openGroups = emptySet()
+                    }
+                }
+            }
+            item {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (channel == LocalModelChannel.Codex) "ChatGPT 套餐模型" else "自有 API 模型",
+                        Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                    TextButton(onClick = { onLocalPage(if (channel == LocalModelChannel.Codex) LocalModelPage.Codex else LocalModelPage.Providers) }) {
+                        Text(if (channel == LocalModelChannel.Codex) "账户管理" else "供应商管理")
+                    }
                 }
             }
             item {
                 OutlinedTextField(value = query, onValueChange = { query = it }, singleLine = true,
                     modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
-                    placeholder = { Text("搜索模型、供应商或 ID") })
+                    placeholder = { Text("搜索此通道的模型") })
             }
-            val sections = listOf(ModelSeries.Free) + ModelSeries.entries.filter { it != ModelSeries.Free }
+            val sections = if (channel == LocalModelChannel.Codex) ModelSeries.entries.filter { localGrouped[it].orEmpty().isNotEmpty() } else listOf(ModelSeries.Free) + ModelSeries.entries.filter { it != ModelSeries.Free }
             sections.forEach { series ->
                 val entries = localGrouped[series].orEmpty()
                 if (entries.isNotEmpty() || query.isBlank()) {
@@ -152,7 +174,9 @@ internal fun ModelBoxScreen(
                     }
                 }
             }
-            if (localGrouped.values.all { it.isEmpty() } && query.isNotBlank()) item { Text("未找到匹配模型。", style = MaterialTheme.typography.bodySmall) }
+            if (localGrouped.values.all { it.isEmpty() }) item {
+                Text(if (query.isNotBlank()) "未找到匹配模型。" else if (channel == LocalModelChannel.Codex) "暂无套餐模型，请在账户管理授权或刷新。" else "暂无供应商模型，请添加供应商并获取模型。", style = MaterialTheme.typography.bodySmall)
+            }
         } else {
         item {
             ChatGptPlanCard(chatGpt, onChatGptConnect, onChatGptDisconnect, onChatGptRefresh, onSelect, onChatGptProbe)
@@ -212,8 +236,8 @@ internal fun ModelBoxScreen(
 }
 
 @Composable
-private fun LocalModelEntry(title: String, subtitle: String, modifier: Modifier, onClick: () -> Unit) {
-    Surface(modifier = modifier.clickable(onClick = onClick), shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .55f)) {
+private fun LocalModelEntry(title: String, subtitle: String, modifier: Modifier, selected: Boolean, onClick: () -> Unit) {
+    Surface(modifier = modifier.clickable(onClick = onClick), shape = RoundedCornerShape(20.dp), color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .55f)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
