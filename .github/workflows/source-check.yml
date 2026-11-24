@@ -45,8 +45,11 @@ jobs:
         run: |
           set -euo pipefail
           grep -Fq 'applicationId = "com.elementeracoast.source"' app/build.gradle.kts
-          grep -Fq 'versionCode = 31' app/build.gradle.kts
-          grep -Fq 'versionName = "0.2.29-source' app/build.gradle.kts
+          version_code="$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+)$/\1/p' app/build.gradle.kts)"
+          version_name="$(sed -nE 's/^[[:space:]]*versionName = "(0\.[0-9]+\.[0-9]+-source)"$/\1/p' app/build.gradle.kts)"
+          [[ "$version_code" =~ ^[1-9][0-9]*$ ]]
+          [[ "$version_name" =~ ^0\.[0-9]+\.[0-9]+-source$ ]]
+          printf 'SOURCE_VERSION_CODE=%s\nSOURCE_VERSION_NAME=%s\n' "$version_code" "$version_name" >> "$GITHUB_ENV"
           ! grep -Eiq 'app[.]elementeracoast[.]com' app/build.gradle.kts
       - name: Verify stable Source release version plumbing
         shell: bash
@@ -91,7 +94,7 @@ jobs:
           "$build_tools/apksigner" verify --verbose --min-sdk-version 23 "$signed_apk" >/dev/null
           badging="$("$build_tools/aapt" dump badging "$signed_apk" | sed -n '1p')"
           [[ "$badging" == *"name='com.elementeracoast.source'"* ]]
-          [[ "$badging" == *"versionCode='31'"* ]]
-          [[ "$badging" == *"versionName='0.2.29-source'"* ]]
+          [[ "$badging" == *"versionCode='$SOURCE_VERSION_CODE'"* ]]
+          [[ "$badging" == *"versionName='$SOURCE_VERSION_NAME'"* ]]
       - name: Show build-only result
         run: echo "Android Source checks passed; Debug and disposable-signed Release packaging both verified."
