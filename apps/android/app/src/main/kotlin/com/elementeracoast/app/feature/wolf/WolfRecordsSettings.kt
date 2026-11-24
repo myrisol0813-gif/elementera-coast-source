@@ -1,11 +1,5 @@
 package com.elementeracoast.app.feature.wolf
 
-import android.net.Uri
-import java.io.File
-import java.util.UUID
-import com.elementeracoast.app.BuildConfig
-import com.elementeracoast.app.core.local.ArchiveV2Local
-import com.elementeracoast.app.core.local.NativeWorkspace
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -64,43 +58,9 @@ internal fun ChatRecordsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val stamp = remember { DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").format(LocalDateTime.now()) }
-    var pendingText by remember { mutableStateOf("") }
-    var pendingOk by remember { mutableStateOf("已导出") }
-    var pendingSummary by remember { mutableStateOf("") }
-    var pendingWarnings by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var pendingArchive by remember { mutableStateOf<JsonElement?>(null) }
-    var transferOpen by remember { mutableStateOf(false) }
-    var v2Open by remember { mutableStateOf(false) }
-    var pendingV2 by remember { mutableStateOf<File?>(null) }
-    var v2Progress by remember { mutableStateOf("") }
-
-    fun write(uri: Uri?, text: String) {
-        if (uri == null) {
-            pendingText = ""
-            pendingWarnings = ""
-            busy = false
-            return
-        }
-        scope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(text) }
-                        ?: error("无法打开目标文件")
-                }
-            }.onSuccess {
-                onActionLogged("chat.export", pendingOk, pendingSummary)
-                onSnackbar(if (pendingWarnings.isBlank()) pendingOk else pendingOk + "；" + pendingWarnings)
-            }.onFailure { onSnackbar("导出失败：${it.message ?: "无法写入文件"}") }
-            pendingText = ""
-            pendingWarnings = ""
-            busy = false
-        }
-    }
-
-    val jsonExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        write(uri, pendingText)
-    }
+    val operations = remember(archive, localMode, context) { (archive as? DefaultGlobalArchiveRepository)?.archiveV2(context, localMode) }
     val htmlExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         val snapshot = pendingArchive
         pendingArchive = null
@@ -120,102 +80,24 @@ internal fun ChatRecordsScreen(
     }
 
 
-    val v2Export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
-        val file=pendingV2
-        pendingV2=null
-        if(uri==null||file==null){file?.parentFile?.deleteRecursively();busy=false;return@rememberLauncherForActivityResult}
-        scope.launch {
-            try {
-                withContext(Dispatchers.IO){
-                    context.contentResolver.openOutputStream(uri,"wt")?.use { out->file.inputStream().use { it.copyTo(out) } }
-                        ?:error("无法打开目标文件")
-                }
-                onSnackbar("V2 归档已写入；覆盖范围详见 manifest.json，尚非全量可恢复包。")
-            }catch(e:Exception){onSnackbar("V2 导出失败："+(e.message?:"写入未完成"))}
-            finally {file.parentFile?.deleteRecursively();busy=false;v2Progress=""}
-        }
-    }
-    fun launchV2(){
+    fun launchHtml(){
         if(busy)return
-        busy=true;v2Progress="正在采集资料"
-        scope.launch {
-            val dir=File(context.cacheDir,"archive-v2-"+UUID.randomUUID())
-            val file=File(dir,"archive.zip")
-            try {
-                withContext(Dispatchers.IO){
-                    check(dir.mkdir())
-                    if(localMode){
-                        check(NativeWorkspace.isLocal){"工作空间已切换"}
-                        ArchiveV2Local.export(NativeWorkspace.persistence(context),BuildConfig.APPLICATION_ID,file)
-                    }else archive.exportCloudV2(file){_,_->}
-                }
-                pendingV2=file;v2Progress="归档已生成，选择保存位置"
-                v2Export.launch("elementera-coast-v2-$stamp.zip")
-            }catch(e:Exception){dir.deleteRecursively();pendingV2=null;busy=false;v2Progress="";onSnackbar("V2 导出失败："+(e.message?:"未完成"))}
-        }
-    }
-
-    fun launchGlobal(format: String) {
-        if (busy) return
-        busy = true
+        busy=true
         scope.launch {
             runCatching {
                 val raw = if (localMode) archive.snapshot() else archive.fullArchive()
                 withContext(Dispatchers.Default) { GlobalArchive.withNativeSettings(raw, nativeSettings, localMode) }
             }.onSuccess { snapshot ->
-                    pendingWarnings = ""
-                    if (format == "html") {
-                        pendingArchive = snapshot
-                        htmlExport.launch("elementera-coast-offline-$stamp.zip")
-                    } else {
-                        val warnings = if (localMode) listOf("本机仅含已实现模块") else GlobalArchive.auditFullArchive(snapshot)
-                        pendingText = withContext(Dispatchers.Default) { snapshot.toString() }
-                        pendingOk = "已导出海岸归档"
-                        pendingSummary = "当前可归档资料"
-                        pendingWarnings = "完整恢复尚未接通。" + warnings.joinToString("；")
-                        jsonExport.launch("elementera-coast-full-$stamp.coastpack.json")
-                    }
-                }
-                .onFailure {
-                    busy = false
-                    onSnackbar("全局导出失败：${it.message ?: "无法读取后端快照"}")
-                }
+                pendingArchive=snapshot
+                htmlExport.launch("elementera-coast-offline-$stamp.zip")
+            }.onFailure { busy=false;onSnackbar("离线导出失败："+(it.message?:"无法读取海岸快照")) }
         }
     }
-
     LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("海岸归档", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) }
         item {
-            WolfRow("导出完整海岸包", if (busy) "正在导出……" else if (localMode) "本机已实现模块 · 完整恢复尚未接通" else "当前可归档资料与原件 · 完整恢复尚未接通") {
-                if (!busy) v2Open = !v2Open
-            }
-        }
-        if (v2Open) item {
-            SettingGroup("归档格式") {
-                WolfRow("V2 分块 ZIP", if (busy) v2Progress.ifBlank { "正在处理" } else "试验归档 · 逐对象校验 · 部分模块恢复") { launchV2() }
-                WolfRow("旧版 JSON 完整归档", "保留已有导出范围 · 暂不移除") { launchGlobal("full") }
-            }
-        }
-        item {
-            WolfRow("导出离线 HTML ZIP", "解压 index.html · 全局记录、已归档图片与语音") {
-                launchGlobal("html")
-            }
-        }
-        item {
-            WolfRow("导入海岸包", "V2 试验归档 · V1 兼容导入与导出") {
-                if (!busy) transferOpen = !transferOpen
-            }
-        }
-        if (transferOpen) item {
-            val operations = remember(archive, localMode, context) { (archive as? DefaultGlobalArchiveRepository)?.archiveV2(context, localMode) }
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (operations != null) ArchiveV2Panel(operations, localMode, transferAllowed && !busy, onSnackbar)
-                TransferPanel(archive, localMode, transferAllowed && !busy, onSnackbar)
-            }
-        }
-        item {
-            Text(if (localMode) "本机只读取设备已有模块，不访问后端。完整归档和大容量恢复仍在建设。" else "两种全局归档共用服务器完整包；离线 ZIP 只读。完整恢复和大容量传输仍在建设。访客隐私与凭据不进入归档。",
-                color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            if(operations!=null) ArchiveV2Panel(operations,archive,localMode,transferAllowed&&!busy,onSnackbar,htmlBusy=busy,onExportHtml=::launchHtml)
+            else Text("归档暂不可用，请重新进入海岸。",color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

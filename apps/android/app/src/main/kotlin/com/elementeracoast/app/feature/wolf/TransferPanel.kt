@@ -1,8 +1,6 @@
 package com.elementeracoast.app.feature.wolf
 
 import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -22,19 +20,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import java.io.ByteArrayOutputStream
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 
 private val labels = mapOf("chat" to "聊天窗口", "calendar" to "日历与纪念日", "daily" to "日记与动态",
     "model_profile" to "模型资料", "daily_profile" to "日常资料", "moments" to "动态", "diaries" to "日记")
 
 @Composable
-internal fun TransferPanel(archive: GlobalArchiveRepository, localMode: Boolean, operationsAllowed: Boolean, onSnackbar: (String) -> Unit) {
+internal fun TransferPanel(archive: GlobalArchiveRepository, localMode: Boolean, operationsAllowed: Boolean, onSnackbar: (String) -> Unit, uri: android.net.Uri, onClose: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val destination = if (localMode) "本机" else "当前云端"
     var busy by remember { mutableStateOf(false) }
-    var pendingExport by remember { mutableStateOf<ByteArray?>(null) }
     var payload by remember { mutableStateOf<JsonObject?>(null) }
     var allowed by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -44,27 +39,11 @@ internal fun TransferPanel(archive: GlobalArchiveRepository, localMode: Boolean,
     var failure by remember { mutableStateOf("") }
 
     fun clear() {
-        payload = null; preview = null; result = null; selectedBundle = null; failure = ""; selected = emptySet(); allowed = emptySet()
+        payload = null; preview = null; result = null; selectedBundle = null; failure = ""; selected = emptySet(); allowed = emptySet(); onClose()
     }
 
-    val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        val bytes = pendingExport
-        pendingExport = null
-        if (uri == null || bytes == null) { busy = false; return@rememberLauncherForActivityResult }
-        scope.launch {
-            try {
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } ?: error("无法写入文件。")
-                }
-                onSnackbar("可迁移数据包已导出，请妥善保存。")
-            } catch (cancelled: CancellationException) { throw cancelled }
-            catch (e: Exception) { onSnackbar("导出失败：${e.message}") }
-            finally { busy = false }
-        }
-    }
-    val open = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri == null) { busy = false; return@rememberLauncherForActivityResult }
-        scope.launch {
+    LaunchedEffect(uri) {
+        busy=true
             try {
                 val decoded = withContext(Dispatchers.IO) {
                     val raw = context.contentResolver.openInputStream(uri)?.use { input ->
@@ -87,34 +66,8 @@ internal fun TransferPanel(archive: GlobalArchiveRepository, localMode: Boolean,
                 payload = decoded
                 failure = ""
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { onSnackbar("无法打开数据包：格式、大小或完整性校验未通过。旧 JSON / HTML 尚不能直接恢复。") }
+            catch (_: Exception) { onSnackbar("无法打开数据包：格式、大小或完整性校验未通过。旧完整 JSON / HTML 尚不能直接恢复。");clear() }
             finally { busy = false }
-        }
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        WolfRow("导出可迁移数据包", if (localMode) "本机聊天、日历、日常与模型资料 · 不含凭据" else "云端聊天、日历、日常与模型资料 · 不含媒体原件与凭据") {
-            if (busy || !operationsAllowed) { onSnackbar("请等待当前操作完成。"); return@WolfRow }
-            busy = true
-            scope.launch {
-                try {
-                    val bundle = archive.transferExport()
-                    val bytes = withContext(Dispatchers.Default) {
-                        bundle.toString().encodeToByteArray().also { CoastTransferCodec.decode(it) }
-                    }
-                    pendingExport = bytes
-                    val stamp = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").format(LocalDateTime.now())
-                    save.launch("elementera-transfer-$stamp.coastpack.json")
-                } catch (cancelled: CancellationException) { throw cancelled }
-                catch (e: Exception) { busy = false; onSnackbar("导出失败：${e.message}") }
-            }
-        }
-        WolfRow("导入可迁移数据包", "校验与预览后写入$destination · 已存在记录不覆盖") {
-            if (busy || !operationsAllowed) { onSnackbar("请等待当前操作完成。"); return@WolfRow }
-            clear(); busy = true; open.launch(arrayOf("application/json","text/plain","application/octet-stream"))
-        }
-        Text("单文件最多 64 MiB；云端单次导入最多 8 MiB、90 条原子写入。附件、语音、长期记忆等暂不恢复；凭据需重新配置。原 JSON / HTML 仍可用于阅读和防丢。",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 
     val raw = payload ?: return
