@@ -10,12 +10,15 @@ import kotlinx.serialization.json.*
 internal object ArchiveV2Local {
     private val json=Json { ignoreUnknownKeys=false }
     private val modules=CoastTransferCodec.supportedModules
+    val localModules=modules+ArchiveV2Knowledge.modules
+    val cloudModules get()=ArchiveV2CloudToLocal.supportedModules+ArchiveV2Knowledge.modules
     private fun describe(bytes:ByteArray):ArchiveV2Object {
         val chunk=ArchiveV2Chunks.CHUNK_BYTES
         val hashes=(bytes.indices step chunk).map { ArchiveV2Chunks.digest(bytes.copyOfRange(it,minOf(it+chunk,bytes.size))) }
         return ArchiveV2Object(bytes.size.toLong(),hashes,ArchiveV2Chunks.fingerprint(bytes.size.toLong(),hashes))
     }
-    fun export(store:LocalPersistence,applicationId:String,output:File):ArchiveV2Manifest {
+    fun export(store:LocalPersistence,applicationId:String,output:File):ArchiveV2Manifest = store.readConsistent { stable -> exportStable(stable,applicationId,output) }
+    private fun exportStable(store:LocalPersistence,applicationId:String,output:File):ArchiveV2Manifest {
         require(!output.exists()&&output.parentFile?.isDirectory==true)
         val payload=CoastTransferCodec.decode(LocalBackupArchive.encode(LocalBackupArchive.capture(store,applicationId)))
         val records=mutableListOf<ArchiveV2Record>();val objects=linkedMapOf<String,ArchiveV2Object>()
@@ -38,9 +41,10 @@ internal object ArchiveV2Local {
                 list("daily","diaries","local_diary"){"diary:"+it.getValue("id").jsonPrimitive.content}
                 payload["profile"]?.takeIf { it!=JsonNull }?.let { add("model_profile","owner","local_model_profile",it) }
                 payload["dailyProfile"]?.takeIf { it!=JsonNull }?.let { add("daily","profile","local_daily_profile",it) }
+                ArchiveV2Knowledge.export(store).forEach{add(it.module,it.id,it.module,it.data)}
                 val counts=records.groupingBy { it.module }.eachCount()
                 val manifest=ArchiveV2Manifest("elementera-coast-archive",2,"local",applicationId,payload.getValue("exportedAt").jsonPrimitive.content,
-                    ArchiveV2Manifests.modules.map { ArchiveV2Coverage(it,if(it in modules)"partial" else "unavailable",counts[it]?:0) },records,objects.values.toList())
+                    ArchiveV2Manifests.modules.map { ArchiveV2Coverage(it,if(it in localModules)"partial" else "unavailable",counts[it]?:0) },records,objects.values.toList())
                 ArchiveV2Manifests.validate(manifest);writer.finish(manifest);return manifest
             }
         }catch(e:Throwable){output.delete();throw e}
@@ -88,7 +92,20 @@ internal object ArchiveV2Local {
     }
     fun restore(manifest:ArchiveV2Manifest,stage:ArchiveV2Stage,selection:Set<String>,applicationId:String,store:LocalPersistence,confirm:Boolean):LocalRestorePreview {
         require(manifest.workspace!="backend"||"daily" !in selection||manifest.applicationId==applicationId){"日常云端原始记录暂需同版本恢复；本机便携归档仍可跨版本。"}
-        val bytes=if(manifest.workspace=="backend")ArchiveV2CloudToLocal.convert(manifest,stage,selection) else bundle(manifest,stage,selection)
-        return if(confirm)LocalTransferRestore.restore(bytes,applicationId,selection,store) else LocalTransferRestore.preview(bytes,applicationId,selection,store)
+        ArchiveV2Manifests.validate(manifest)
+        require(selection.isNotEmpty()&&(if(manifest.workspace=="local")localModules else cloudModules).containsAll(selection))
+        require(selection.all { name->manifest.modules.any { it.module==name&&it.coverage!="unavailable" } })
+        val objects=manifest.objects.associateBy{it.objectSha256}
+        require(manifest.records.filter{it.module in selection}.sumOf{objects.getValue(it.recordObject).size}<=CoastTransferCodec.MAX_BYTES){"本机恢复事务最多64 MiB。"}
+        val extra=selection.intersect(ArchiveV2Knowledge.modules)
+        val base=selection-extra
+        val rows=ArchiveV2Knowledge.read(manifest,stage,extra,applicationId)
+        val bytes=if(base.isEmpty())null else if(manifest.workspace=="backend")ArchiveV2CloudToLocal.convert(manifest,stage,base) else bundle(manifest,stage,base)
+        fun run(target:LocalPersistence,write:Boolean):LocalRestorePreview{
+            val extras=ArchiveV2Knowledge.apply(rows,extra,target,write)
+            val report=bytes?.let{if(write)LocalTransferRestore.restoreStaged(it,applicationId,base,target) else LocalTransferRestore.preview(it,applicationId,base,target)}
+            return LocalRestorePreview(manifest.workspace,report?.counts.orEmpty()+extras,report?.unsupportedModules.orEmpty())
+        }
+        return if(confirm)store.atomic{run(it,true)}else store.readConsistent{run(it,false)}
     }
 }

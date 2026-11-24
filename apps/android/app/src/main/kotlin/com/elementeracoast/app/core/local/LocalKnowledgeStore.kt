@@ -48,6 +48,7 @@ internal class LocalKnowledgeStore(store:LocalPersistence) {
         }
         return matches.filter{it.by=="constant"}+matches.filter{it.by!="constant"}.take(limit.coerceIn(0,6))
     }
+    fun surfaceFor(conversationId:String):String=cache.conversations().firstOrNull{it.id==conversationId}?.roomType?.let{if(it=="main")"main_chat" else it}?:error("本机窗口不存在。")
     data class Context(val messages:List<RemoteChatMessage>,val receipt:RemoteDeskSlip)
     fun context(messages:List<RemoteChatMessage>,budget:Int,surface:String):Context {
         val instructions=instructions()?.content.orEmpty()

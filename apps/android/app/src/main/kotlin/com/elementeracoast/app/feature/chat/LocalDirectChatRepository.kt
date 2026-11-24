@@ -27,7 +27,7 @@ internal class LocalDirectChatRepository(
         if (ChatSyncMapper.activeAttachmentIds(historyWithUser, turnId).isNotEmpty())
             throw CoastApiException(CoastApiErrorKind.Request, "local_attachment_pending", "本机附件推理尚未接入。")
         val messages = ChatSyncMapper.contextMessages(historyWithUser, turnId, recentTurns)
-        val prepared=try{knowledge.context(messages,contextBudget,"main_chat")}catch(e:IllegalArgumentException){
+        val prepared=try{knowledge.context(messages,contextBudget,knowledge.surfaceFor(conversationId))}catch(e:IllegalArgumentException){
             throw CoastApiException(CoastApiErrorKind.Request,"local_context_budget",e.message.orEmpty())
         }
         var content = ""

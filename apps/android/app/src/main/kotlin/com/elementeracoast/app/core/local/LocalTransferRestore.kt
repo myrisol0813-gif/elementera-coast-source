@@ -146,8 +146,11 @@ internal object LocalTransferRestore {
     }
 
     fun restore(bytes: ByteArray, applicationId: String, modules: Set<String>, store: LocalPersistence): LocalRestorePreview {
-        val payload = CoastTransferCodec.decode(bytes)
-        return store.atomic { staged ->
+        return store.atomic { staged -> restoreStaged(bytes,applicationId,modules,staged) }
+    }
+
+    internal fun restoreStaged(bytes:ByteArray,applicationId:String,modules:Set<String>,staged:LocalPersistence):LocalRestorePreview {
+            val payload=CoastTransferCodec.decode(bytes)
             val p = plan(payload, applicationId, modules, staged)
             val data = p.merged
             val cache = RemoteCacheStore(staged, strictReads = true)
@@ -165,7 +168,6 @@ internal object LocalTransferRestore {
             // Re-open the staged typed data before publishing the generation.
             val check = LocalBackupArchive.capture(staged, applicationId)
             require(check.copy(exportedAt = data.exportedAt) == data) { "恢复结果与预览不一致；原资料未切换。" }
-            p.preview
-        }
+            return p.preview
     }
 }
