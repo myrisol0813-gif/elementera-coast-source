@@ -82,7 +82,7 @@ internal fun TransferPanel(archive: GlobalArchiveRepository, localMode: Boolean,
                 }
                 val declared = decoded.getValue("includedModules").jsonArray.map { it.jsonPrimitive.content }.toSet()
                 allowed = if (localMode) LocalTransferRestore.availableModules(decoded, BuildConfig.APPLICATION_ID)
-                    else declared.intersect(setOf("chat", "calendar"))
+                    else declared.intersect(setOf("chat", "calendar", "model_profile"))
                 selected = allowed
                 payload = decoded
                 failure = ""
@@ -93,7 +93,7 @@ internal fun TransferPanel(archive: GlobalArchiveRepository, localMode: Boolean,
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        WolfRow("导出可迁移数据包", if (localMode) "本机聊天、日历、日常与模型资料 · 不含凭据" else "云端聊天及日历 · 不含媒体原件与凭据") {
+        WolfRow("导出可迁移数据包", if (localMode) "本机聊天、日历、日常与模型资料 · 不含凭据" else "云端聊天、日历及模型资料 · 不含媒体原件与凭据") {
             if (busy || !operationsAllowed) { onSnackbar("请等待当前操作完成。"); return@WolfRow }
             busy = true
             scope.launch {
