@@ -49,12 +49,14 @@ assert.equal((await routeApi(req('/import',{bundle,modules:['chat'],confirm:true
 const modelProfile={assistant_avatar_dataurl:'',current_chat_model:'portable-model',current_image_model:'',model_box:{chat:['portable-model'],free:[],image:[]}};
 await writeProfile(origin,modelProfile);
 const profileBundle=await exportCloudTransfer(origin);
-assert.deepEqual((await decodeTransfer(profileBundle)).profile,modelProfile);
+const originalProfileTime=(await origin.prepare("SELECT updated_at FROM chat_profiles WHERE user_id='owner'").first()).updated_at;
+assert.deepEqual((await decodeTransfer(profileBundle)).profile,{...modelProfile,updated_at:originalProfileTime});
 const profileReport=await previewCloudTransfer(target,profileBundle,['model_profile']);
 assert.equal(profileReport.model_profile.ready,1);
 assert.equal((await readProfile(target)).current_chat_model,'');
 await importCloudTransfer(target,profileBundle,['model_profile']);
 assert.deepEqual(await readProfile(target),modelProfile);
+assert.equal((await target.prepare("SELECT updated_at FROM chat_profiles WHERE user_id='owner'").first()).updated_at,originalProfileTime);
 await writeProfile(target,{...modelProfile,current_chat_model:'existing-model'});
 const conflictProfile=await importCloudTransfer(target,profileBundle,['model_profile']);
 assert.equal(conflictProfile.model_profile.conflicts,1);

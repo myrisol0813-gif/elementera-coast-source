@@ -113,7 +113,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
         if (path == "/api/chat/profile") {
             val profile = when (method) {
                 "GET" -> cache.profile() ?: RemoteProfile()
-                "PUT" -> json.decodeFromJsonElement(RemoteProfile.serializer(), body(r)).also(cache::putProfile)
+                "PUT" -> json.decodeFromJsonElement(RemoteProfile.serializer(), body(r)).copy(updatedAt = System.currentTimeMillis()).also(cache::putProfile)
                 else -> return unsupported(r)
             }
             return ok(r, "profile" to element(RemoteProfile.serializer(), profile))

@@ -6,7 +6,7 @@ import java.time.Instant
 /** Only cloud rows that the current local store can represent without loss.
  * A related media/soil/collection row must not silently disappear. */
 internal object ArchiveV2CloudToLocal {
-    val supportedModules=setOf("chat","calendar")
+    val supportedModules=setOf("chat","calendar","model_profile")
     private fun JsonObject.string(key:String)=getValue(key).jsonPrimitive.content
     private fun iso(v:JsonElement):JsonElement=if(v==JsonNull)JsonNull else JsonPrimitive(Instant.ofEpochMilli(v.jsonPrimitive.long).toString())
     private fun verifyKeys(v:JsonObject,keys:Set<String>){require(v.keys==keys){"云端记录字段不兼容，未恢复。"}}
@@ -18,6 +18,7 @@ internal object ArchiveV2CloudToLocal {
         val chosen=manifest.records.filter { it.module in selection }
         require(chosen.sumOf { objects.getValue(it.recordObject).size }<=CoastTransferCodec.MAX_BYTES)
         val chats=mutableListOf<JsonElement>();val calendar=mutableListOf<JsonElement>()
+        var profile:JsonElement=JsonNull
         for(r in chosen){
             require(r.mediaObjects.isEmpty()&&(r.module=="calendar"||r.dependencies.isEmpty())){"此记录关联目标本机暂不能恢复的资料。"}
             if(r.module=="chat")require(manifest.records.none { it.module !in selection&&"chat/"+r.id in it.dependencies }){"窗口有关联原件、思维壤或其他资料，本机暂不能完整恢复。"}
@@ -40,6 +41,23 @@ internal object ArchiveV2CloudToLocal {
                     val historyTime=Instant.parse(h.string("updated_at")).toEpochMilli()
                     require(historyTime==data.getValue("history_updated_at").jsonPrimitive.long){"历史时间字段不能无损对应。"}
                     chats.add(buildJsonObject { put("conversation",JsonObject(fields));put("history",JsonObject(h+("conversation_id" to JsonPrimitive(r.id)))) })
+                }
+                "model_profile"->{
+                    verifyKeys(data,setOf("id","assistant_avatar_dataurl","current_chat_model","current_image_model","model_box_json","updated_at"))
+                    require(r.id=="owner"&&data.string("id")=="owner"&&profile==JsonNull)
+                    val box=Json.parseToJsonElement(data.string("model_box_json")).jsonObject
+                    verifyKeys(box,setOf("chat","free","image"))
+                    require(box.values.all { it is JsonArray && it.size<=60 && it.all { v->v is JsonPrimitive&&v.isString&&v.content.length<=180 } })
+                    val stamp=data.getValue("updated_at").jsonPrimitive.long
+                    require(stamp>=0)
+                    profile=buildJsonObject {
+                        for(k in listOf("assistant_avatar_dataurl","current_chat_model","current_image_model")){
+                            val value=data.getValue(k)
+                            require(value==JsonNull||value is JsonPrimitive&&value.isString)
+                            put(k,if(value==JsonNull)JsonPrimitive("") else value)
+                        }
+                        put("model_box",box);put("updated_at",stamp)
+                    }
                 }
                 "calendar"->{
                     verifyKeys(data,setOf("id","day","kind","title","body","recurrence","author","source","conversation_id","source_turn_id","tool_call_id","model_label","created_at","updated_at","anniversary_start_day","anniversary_mode","anniversary_target_days","anniversary_pinned"))
@@ -64,7 +82,7 @@ internal object ArchiveV2CloudToLocal {
         return CoastTransferCodec.encode(buildJsonObject {
             put("applicationId",manifest.applicationId);put("workspace","backend");put("exportedAt",manifest.exportedAt)
             put("includedModules",JsonArray(selection.sorted().map(::JsonPrimitive)))
-            put("conversations",JsonArray(chats));put("calendar",JsonArray(calendar));put("moments",JsonArray(emptyList()));put("diaries",JsonArray(emptyList()));put("profile",JsonNull);put("dailyProfile",JsonNull)
+            put("conversations",JsonArray(chats));put("calendar",JsonArray(calendar));put("moments",JsonArray(emptyList()));put("diaries",JsonArray(emptyList()));put("profile",profile);put("dailyProfile",JsonNull)
         })
     }
 }

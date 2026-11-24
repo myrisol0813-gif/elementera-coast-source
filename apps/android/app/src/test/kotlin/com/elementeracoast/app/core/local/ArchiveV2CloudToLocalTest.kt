@@ -8,6 +8,37 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ArchiveV2CloudToLocalTest {
+    @Test fun cloudModelProfileTimestampSurvivesLocalZipRoundtrip() {
+        val root=Files.createTempDirectory("profile-v2").toFile()
+        try {
+            val raw=buildJsonObject {
+                put("kind","model_profile");putJsonObject("data"){
+                    put("id","owner");put("assistant_avatar_dataurl",JsonNull)
+                    put("current_chat_model","fixture-model");put("current_image_model",JsonNull)
+                    put("model_box_json","""{"chat":["fixture-model"],"free":[],"image":[]}""")
+                    put("updated_at",123456789L)
+                }
+            }.toString().encodeToByteArray()
+            val chunks=listOf(ArchiveV2Chunks.digest(raw))
+            val d=ArchiveV2Object(raw.size.toLong(),chunks,ArchiveV2Chunks.fingerprint(raw.size.toLong(),chunks))
+            val m=ArchiveV2Manifest("elementera-coast-archive",2,"backend","com.elementeracoast.source","2026-11-24T00:00:00Z",
+                ArchiveV2Manifests.modules.map{ArchiveV2Coverage(it,if(it=="model_profile")"partial" else "unavailable",if(it=="model_profile")1 else 0)},
+                listOf(ArchiveV2Record("model_profile","owner",d.objectSha256,emptyList(),emptyList())),listOf(d))
+            val file=File(root,"cloud.zip")
+            ArchiveV2ZipWriter(file.outputStream()).use{it.objectEntry(d,ByteArrayInputStream(raw));it.finish(m)}
+            val stage=ArchiveV2Stage(root,"verified")
+            assertEquals(m,ArchiveV2ZipReader.stage(file,stage))
+            val app="com.elementeracoast.source";val modules=setOf("model_profile");val target=MemoryLocalPersistence()
+            ArchiveV2Local.restore(m,stage,modules,app,target,true)
+            val profile=com.elementeracoast.app.core.remote.RemoteCacheStore(target).profile()!!
+            assertEquals("fixture-model",profile.currentChatModel);assertEquals(123456789L,profile.updatedAt!!)
+            val local=File(root,"local.zip");val lm=ArchiveV2Local.export(target,app,local);val ls=ArchiveV2Stage(root,"local")
+            assertEquals(lm,ArchiveV2ZipReader.stage(local,ls))
+            val again=MemoryLocalPersistence()
+            ArchiveV2Local.restore(lm,ls,modules,app,again,true)
+            assertEquals(profile,com.elementeracoast.app.core.remote.RemoteCacheStore(again).profile())
+        } finally {root.deleteRecursively()}
+    }
     @Test fun cloudCalendarRetainsStandaloneProvenanceAcrossLocalArchive(){
         val root=Files.createTempDirectory("coast-cloud-local").toFile()
         try{

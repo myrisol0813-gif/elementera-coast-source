@@ -46,10 +46,10 @@ export async function exportCloudTransfer(db) {
   for (const c of await listConversations(db)) {
     conversations.push({ conversation: c, history: portableHistory(await readConversationState(db,c.id),c.id) });
   }
-  const profileRow = await db.prepare("SELECT user_id FROM chat_profiles WHERE user_id = 'owner'").first();
+  const profileRow = await db.prepare("SELECT user_id,updated_at FROM chat_profiles WHERE user_id = 'owner'").first();
   return encodeTransfer({ applicationId: APP_ID, workspace:'backend', exportedAt:new Date().toISOString(),
     includedModules:SUPPORTED, conversations, calendar:(await listCalendarEntries(db,{all:true})).map(portableCalendar),
-    profile:profileRow ? await readProfile(db) : null, ...await exportDailyTransfer(db,APP_ID) });
+    profile:profileRow ? {...await readProfile(db),updated_at:profileRow.updated_at} : null, ...await exportDailyTransfer(db,APP_ID) });
 }
 
 // Keep the original content and branch positions. Never rely on normalizeState's
@@ -187,17 +187,18 @@ async function prepare(db,envelope,selection) {
   }
   if (selection.includes('model_profile') && payload.profile !== null) {
     const row=payload.profile, report=result.model_profile;
+    const {updated_at:profileTime,...body}=row;
     let normalized;
-    try { normalized=normalizeProfile(row); } catch { normalized=null; }
-    if (!normalized || !identical(row,normalized)) {
+    try { normalized=normalizeProfile(body); } catch { normalized=null; }
+    if (!normalized || !identical(body,normalized) || (profileTime!=null&&(!Number.isSafeInteger(profileTime)||profileTime<0))) {
       report.blocked.push({id:'model_profile',reason:'模型资料字段或长度不兼容，未截断或删除字段。'});
     } else {
-      const current=await db.prepare("SELECT user_id FROM chat_profiles WHERE user_id = 'owner'").first();
+      const current=await db.prepare("SELECT user_id,updated_at FROM chat_profiles WHERE user_id = 'owner'").first();
       if (current) {
         report.existing++;
-        if (!identical(await readProfile(db),normalized)) report.conflicts++;
+        if (!identical(await readProfile(db),normalized)||(profileTime!=null&&profileTime!==current.updated_at)) report.conflicts++;
       } else {
-        statements.push(db.prepare("INSERT INTO chat_profiles (user_id,assistant_avatar_dataurl,current_chat_model,current_image_model,model_box_json,updated_at) VALUES ('owner',?,?,?,?,?)").bind(normalized.assistant_avatar_dataurl||null,normalized.current_chat_model||null,normalized.current_image_model||null,JSON.stringify(normalized.model_box),Date.now()));
+        statements.push(db.prepare("INSERT INTO chat_profiles (user_id,assistant_avatar_dataurl,current_chat_model,current_image_model,model_box_json,updated_at) VALUES ('owner',?,?,?,?,?)").bind(normalized.assistant_avatar_dataurl||null,normalized.current_chat_model||null,normalized.current_image_model||null,JSON.stringify(normalized.model_box),profileTime??Date.now()));
         report.ready++;
       }
     }

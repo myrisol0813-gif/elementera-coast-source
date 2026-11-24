@@ -42,7 +42,10 @@ data class RemoteProfile(
     @SerialName("assistant_avatar_dataurl") val assistantAvatarDataUrl: String = "",
     @SerialName("current_chat_model") val currentChatModel: String = "",
     @SerialName("current_image_model") val currentImageModel: String = "",
-    @SerialName("model_box") val modelBox: RemoteModelBox = RemoteModelBox()
+    @SerialName("model_box") val modelBox: RemoteModelBox = RemoteModelBox(),
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("updated_at") val updatedAt: Long? = null
 )
 
 @Serializable
