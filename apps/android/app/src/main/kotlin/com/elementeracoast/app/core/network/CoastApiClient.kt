@@ -171,6 +171,10 @@ class CoastApiClient(
         archiveV2ReadChunk("/library-cover/"+encodePath(id),descriptor,index)
     suspend fun archiveV2ValidateManifest(manifest: com.elementeracoast.app.core.local.ArchiveV2Manifest): JsonObject =
         jsonRequestElement(archiveV2Request("/manifest/validate").post(jsonBody(json.encodeToString(manifest))).build()).jsonObject
+    suspend fun archiveV2RestoreRecord(id: String,manifest: com.elementeracoast.app.core.local.ArchiveV2Manifest,module: String,recordId: String,confirm: Boolean): JsonObject {
+        val payload=buildJsonObject { put("manifest",json.encodeToJsonElement(manifest));put("confirm",confirm) }
+        return jsonRequestElement(archiveV2Request("/sessions/"+encodePath(id)+"/record-restore/"+encodePath(module)+"/"+encodePath(recordId)).post(jsonBody(payload.toString())).build()).jsonObject
+    }
     suspend fun archiveV2RestoreBook(id: String,manifest: com.elementeracoast.app.core.local.ArchiveV2Manifest,bookId: String,confirm: Boolean): JsonObject {
         val payload=buildJsonObject { put("manifest",json.encodeToJsonElement(manifest));put("confirm",confirm) }
         return jsonRequestElement(archiveV2Request("/sessions/"+encodePath(id)+"/book-restore/"+encodePath(bookId)).post(jsonBody(payload.toString())).build()).jsonObject
