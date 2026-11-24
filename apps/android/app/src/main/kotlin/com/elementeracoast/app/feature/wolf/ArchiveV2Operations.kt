@@ -66,7 +66,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
         val m=input.manifest;val objects=m.objects.associateBy { it.objectSha256 }
         buildList {
             for(r in m.records){
-                if(!(r.module=="chat"&&m.applicationId==BuildConfig.APPLICATION_ID)&&!(r.module=="library"&&r.id.startsWith("library_books:"))&&r.module !in setOf("calendar","worldbook","model_profile")&&!(m.applicationId==BuildConfig.APPLICATION_ID&&r.module in setOf("memory_entries","memory_pockets","user_portrait","self_portrait")))continue
+                if(!(r.module=="chat"&&m.applicationId==BuildConfig.APPLICATION_ID)&&!(r.module=="library"&&r.id.startsWith("library_books:"))&&r.module !in setOf("calendar","worldbook","model_profile")&&!(m.applicationId==BuildConfig.APPLICATION_ID&&r.module in setOf("memory_entries","memory_pockets","user_portrait","self_portrait","daily","vault")))continue
                 val d=objects.getValue(r.recordObject)
                 if(d.size>1800000)continue
                 val value=Json.parseToJsonElement(input.stage.verify(d,1800000).readText()).jsonObject
@@ -81,6 +81,12 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
                     if(r.id==identity&&Regex("[A-Za-z0-9_.:-]{1,160}").matches(id))add(Choice("book",id,data.getValue("title").jsonPrimitive.content))
                 }else if(r.module in setOf("calendar","worldbook","model_profile","memory_entries","memory_pockets","user_portrait","self_portrait")&&kind==r.module){
                     add(Choice(r.module,r.id,data["title"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }?:when(r.module){"user_portrait"->"用户画像及历史";"self_portrait"->"自我画像及历史";"memory_pockets"->"待确认候选";"memory_entries"->"记忆";else->"模型资料"}))
+                }else if(m.applicationId==BuildConfig.APPLICATION_ID&&r.module=="daily"&&kind in setOf("daily_moments","daily_diaries","daily_profile")){
+                    val title=if(kind=="daily_profile")"日常资料" else (data["date"]?.jsonPrimitive?.contentOrNull.orEmpty()+" · "+data["text"]?.jsonPrimitive?.contentOrNull.orEmpty()).take(80)
+                    add(Choice("daily",r.id,title))
+                }else if(m.applicationId==BuildConfig.APPLICATION_ID&&r.module=="vault"&&kind in setOf("vault_treasures","vault_media_labels")){
+                    val title=(data["display_name"]?.jsonPrimitive?.contentOrNull?:data["excerpt"]?.jsonPrimitive?.contentOrNull?:data["source_id"]?.jsonPrimitive?.contentOrNull?:"拾潮").take(80)
+                    add(Choice("vault",r.id,title))
                 }
             }
         }
