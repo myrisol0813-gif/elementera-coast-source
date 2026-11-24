@@ -3,6 +3,8 @@ package com.elementeracoast.app.feature.shell
 import android.content.Context
 import com.elementeracoast.app.core.auth.AndroidKeystoreAuthStore
 import com.elementeracoast.app.core.auth.AuthRepository
+import com.elementeracoast.app.core.auth.AuthStore
+import com.elementeracoast.app.core.auth.MemoryAuthStore
 import com.elementeracoast.app.core.auth.DefaultAuthRepository
 import com.elementeracoast.app.core.local.LocalPersistence
 import com.elementeracoast.app.core.network.CoastApiClient
@@ -50,8 +52,8 @@ data class CoastBackendGraph(
             context: Context, persistence: LocalPersistence,
             chatGptPlan: ChatGptPlanRepository? = null
         ): CoastBackendGraph {
-            val authStore = AndroidKeystoreAuthStore(context.applicationContext)
             val config = CoastApiConfig.production()
+            val authStore: AuthStore = if (config.localTransport != null) MemoryAuthStore() else AndroidKeystoreAuthStore(context.applicationContext)
             val http = CoastHttpClient(config, authStore).client
             val api = CoastApiClient(config, http)
             val cache = RemoteCacheStore(persistence)
