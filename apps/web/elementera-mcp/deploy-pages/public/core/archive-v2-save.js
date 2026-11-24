@@ -24,7 +24,8 @@ export async function saveArchiveV2({applicationId,filename,onProgress}){
       const url=URL.createObjectURL(file),a=document.createElement('a');
       a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
       // Keep the backing file while the browser starts the download.
-      const cleanup=()=>{URL.revokeObjectURL(url);root.removeEntry(tempName).catch(()=>{});};
+      const downloadedName=tempName;
+      const cleanup=()=>{URL.revokeObjectURL(url);root.removeEntry(downloadedName).catch(()=>{});};
       setTimeout(cleanup,120000);
       tempName=null;
     }
