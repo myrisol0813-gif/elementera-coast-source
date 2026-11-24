@@ -78,7 +78,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,all
             busy=true;open.launch(arrayOf("application/zip","application/octet-stream"))
         }
         if(busy)Text(status.ifBlank { "处理中…" },style=MaterialTheme.typography.bodySmall)
-        Text(if(localMode)"本机与云端 ZIP 支持聊天、日历、模型资料、日常、世界书、自定义指令、记忆、待确认袋、画像历史及思维壤；原始身份资料需同版本。其他原件请保留。" else "支持云端聊天组、书房、日历、世界书、模型资料、同应用记忆、画像、日常、拾潮和自定义；本机 ZIP 可恢复兼容记录，不会恢复整个包。上传会暂存所有归档对象。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(if(localMode)"本机与云端 ZIP 支持聊天、附件原件、语音、拾潮、书房、日历、模型资料、日常、世界书、自定义指令、记忆、画像、思维壤及脱敏工具历史。原始身份资料需同版本；未采集模块请保留原件。" else "支持云端聊天组、书房、日历、世界书、模型资料、同应用记忆、画像、日常、拾潮和自定义；本机 ZIP 支持兼容聊天及原件组、书房和拾潮；单窗口最多80条记录、16 MiB、90条语句，单书最多89条记录、16 MiB。上传会暂存所有归档对象。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
     val input=incoming?:return
     val available=operations.localModules(input.manifest)

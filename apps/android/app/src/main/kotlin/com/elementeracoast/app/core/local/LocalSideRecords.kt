@@ -81,7 +81,7 @@ internal class LocalSideRecords(private val store:LocalPersistence) {
         book(id);return rows().filter{it.kind=="library_notes"&&it.data.str("book_id")==id}.sortedBy{it.data.number("created_at")}.map{wireNote(it.data)}
     }
     fun progress(id:String,chapter:Int,paragraph:Int):JsonObject{
-        val selected=chapter(id,chapter,paragraph,1).getValue("paragraphs").jsonArray;require(selected.isNotEmpty()){"阅读进度必须指向原文。"}
+        val selected=this.chapter(id,chapter,paragraph,1).getValue("paragraphs").jsonArray;require(selected.isNotEmpty()){"阅读进度必须指向原文。"}
         val now=System.currentTimeMillis()
         val value=buildJsonObject{put("book_id",id);put("author","owner");put("chapter_index",chapter);put("paragraph_index",paragraph);put("updated_at",now)}
         val date=Instant.ofEpochMilli(now).toString().take(10)
@@ -95,7 +95,7 @@ internal class LocalSideRecords(private val store:LocalPersistence) {
         val book=Row("library_books",buildJsonObject{put("id",id);put("title",payload.str("title").trim());put("format",payload.str("format").lowercase());put("created_at",now);put("updated_at",now)})
         val chapters=payload.getValue("chapters").jsonArray.mapIndexed{i,v->val c=v.jsonObject;Row("library_chapters",buildJsonObject{put("book_id",id);put("chapter_index",i);put("title",c.str("title").trim());put("body",c.str("body").trim())})}
         val all=old+book+chapters;validateLibrary(all,emptyMap());save(all)
-        return book(id)
+        return this.book(id)
     }
     fun saveCover(id:String,data:ByteArray,mime:String):JsonObject{
         book(id);val row=Row("library_covers",buildJsonObject{put("book_id",id);put("mime",mime);put("size",data.size);put("updated_at",System.currentTimeMillis())},ArchiveV2Chunks.digest(data))
@@ -141,7 +141,7 @@ internal class LocalSideRecords(private val store:LocalPersistence) {
     }
     fun saveTreasure(input:JsonObject):JsonObject{
         val kind=input.str("kind");val cid=input.str("conversation_id");val sid=input.str("source_id")
-        val h=requireNotNull(RemoteCacheStore(store,true).history(cid)){"原窗口不存在。"}
+        val h=requireNotNull(RemoteCacheStore(store,strictReads=true).history(cid)){"原窗口不存在。"}
         val source=source(kind,cid,sid,h,rows(),LocalAttachmentStore(store).entries().map{it.metadata},LocalSoilStore(store).read().history)
         val text=source.text;val indices=(input["paragraph_indices"] as? JsonArray)?.map{it.jsonPrimitive.int}?.distinct()?.sorted().orEmpty()
         require(indices.size<=40&&indices.all{it>=0});val parts=paragraphs(text)

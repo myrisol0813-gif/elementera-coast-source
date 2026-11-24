@@ -96,7 +96,7 @@ fun ChatWindow(
     var treasureLoaded by remember(state.activeConversationId) { mutableStateOf(false) }
     LaunchedEffect(state.activeConversationId, treasureRevision) {
         val conversationId = state.activeConversationId
-        if (state.localMode || conversationId.isBlank()) return@LaunchedEffect
+        if (conversationId.isBlank()) return@LaunchedEffect
         treasureLoaded = false
         try {
             val all = mutableListOf<JsonObject>()
@@ -131,7 +131,7 @@ fun ChatWindow(
     val latestAssistantVariant = state.messages.lastOrNull { it.role == MessageRole.Assistant }?.remoteVariantId
     LaunchedEffect(state.activeConversationId, latestAssistantVariant, state.isStreaming) {
         val conversationId = state.activeConversationId
-        if (state.localMode || conversationId.isBlank() || state.isStreaming) return@LaunchedEffect
+        if (conversationId.isBlank() || state.isStreaming) return@LaunchedEffect
         try { voiceClips = decodeVoiceClips(sideRooms.voiceClips(conversationId)) }
         catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch (error: Exception) { onPlaceholder("语音读取失败：${error.message}") }

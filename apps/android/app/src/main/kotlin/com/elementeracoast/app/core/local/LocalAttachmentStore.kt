@@ -34,7 +34,25 @@ internal class LocalAttachmentStore(private val store:LocalPersistence){
         val kind=if(normalizedMime in setOf("image/png","image/jpeg","image/webp"))"image" else "file"
         val meta=buildJsonObject{put("id",id);put("conversation_id",cid);put("turn_id",JsonNull);put("kind",kind);put("name",name.trim().ifBlank{"附件"});put("mime",normalizedMime);put("size",data.size);put("created_at",now);put("updated_at",now)}
         publish(Original(meta,ArchiveV2Chunks.digest(data)),data)
-        return RemoteAttachment(id=id,type=kind,name=meta.str("name"),mime=normalizedMime,size=data.size.toLong(),storageKey="local:"+id,createdAt=java.time.Instant.ofEpochMilli(now).toString())
+        return RemoteAttachment(id=id,type=kind,name=meta.str("name"),mime=normalizedMime,size=data.size.toLong(),storageKey="chat-attachment:"+id,createdAt=java.time.Instant.ofEpochMilli(now).toString())
+    }
+    fun linkHistory(cid:String,history:RemoteHistory){
+        val rows=entries();val lookup=rows.associateBy{it.metadata.str("id")}
+        val turnMap=mutableMapOf<String,String>()
+        for(t in history.turns){
+            for(v in t.user.variants+t.assistant.variantsByUserVariant.values.flatten()){
+                require(v.attachments.size<=12)
+                for(a in v.attachments){
+                    checkReference(cid,t.id,a,lookup.mapValues{it.value.metadata})
+                    val previous=turnMap.put(a.id,t.id);require(previous==null||previous==t.id){"附件不能同时绑定不同轮次。"}
+                }
+            }
+        }
+        val now=System.currentTimeMillis()
+        val next=rows.map{r->val id=r.metadata.str("id");val turn=turnMap[id]
+            if(turn!=null&&r.metadata["turn_id"]==JsonNull)r.copy(metadata=JsonObject(r.metadata+mapOf("turn_id" to JsonPrimitive(turn),"updated_at" to JsonPrimitive(now))))else r
+        }
+        if(next!=rows)writeIndex(next)
     }
     fun remove(cid:String,id:String):Boolean{
         val rows=entries();val row=rows.firstOrNull{it.metadata.str("conversation_id")==cid&&it.metadata.str("id")==id}?:return false

@@ -103,12 +103,15 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 return ok(r, "conversation" to element(RemoteConversation.serializer(), next))
             }
             if (method == "DELETE") {
-                cache.putConversations(all.filterNot { it.id == cid })
-                LocalSideRecords(store).removeConversation(cid)
-                cache.removeHistory(cid)
-                LocalAttachmentStore(store).deleteConversation(cid)
-                val oldSoil=soil.read()
-                soil.write(LocalSoilStore.Rows(oldSoil.current.filterNot{it["conversation_id"]?.jsonPrimitive?.content==cid},oldSoil.history.filterNot{it["conversation_id"]?.jsonPrimitive?.content==cid}))
+                store.atomic{staged->
+                    LocalSideRecords(staged).removeConversation(cid)
+                    val c=RemoteCacheStore(staged,strictReads=true)
+                    c.putConversations(all.filterNot{it.id==cid});c.removeHistory(cid)
+                    LocalAttachmentStore(staged).deleteConversation(cid)
+                    val s=LocalSoilStore(staged);val old=s.read()
+                    s.write(LocalSoilStore.Rows(old.current.filterNot{it["conversation_id"]?.jsonPrimitive?.content==cid},old.history.filterNot{it["conversation_id"]?.jsonPrimitive?.content==cid}))
+                    val audit=LocalToolAudit(staged);audit.write(audit.read().filterNot{it["conversation_id"]?.jsonPrimitive?.content==cid})
+                }
                 return ok(r)
             }
         }
@@ -120,7 +123,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if (method == "PUT") {
                 val h = json.decodeFromJsonElement(RemoteHistory.serializer(), body(r))
                     .copy(conversationId = cid, updatedAt = now())
-                cache.putHistory(cid, h)
+                store.atomic{staged->LocalAttachmentStore(staged).linkHistory(cid,h);RemoteCacheStore(staged).putHistory(cid,h)}
                 return ok(r, "source" to JsonPrimitive("local"), "history" to element(RemoteHistory.serializer(), h))
             }
         }
@@ -165,6 +168,11 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if(parts.size==4&&method=="DELETE"){store.atomic{LocalSideRecords(it).deleteBook(id)};return ok(r)}
             if(parts.size==5&&parts[4]=="cover"){
                 if(method=="GET"){val row=side.cover(id)?:return missing(r);return binary(row,row.data.getValue("mime").jsonPrimitive.content)}
+                if(method=="PUT"){
+                    val content=r.body?:return unsupported(r);require(content.contentLength() in 1..600L*1024L){"封面最大600 KB。"}
+                    val buf=Buffer();content.writeTo(buf);val bytes=buf.readByteArray()
+                    return ok(r,"cover" to store.atomic{LocalSideRecords(it).saveCover(id,bytes,content.contentType().toString())})
+                }
             }
             if(parts.size==5&&parts[4]=="notes"){
                 if(method=="GET")return rows("notes",side.notes(id))
