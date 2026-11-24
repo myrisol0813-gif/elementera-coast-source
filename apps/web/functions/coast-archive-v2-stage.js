@@ -1,3 +1,4 @@
+import { validateArchiveManifest } from './coast-archive-v2-manifest.js';
 import { ARCHIVE_CHUNK_BYTES, digestBytes, validateObjectDescriptor, stageVerifiedObject } from './coast-archive-v2-chunks.js';
 const GIB=1024**3;
 export const STAGING_LIMITS=Object.freeze({sessionBytes:3*GIB,totalBytes:4*GIB,sessions:3,objects:8192,ttlMs:86400000,chunkBytes:ARCHIVE_CHUNK_BYTES});
@@ -84,4 +85,29 @@ export async function* readStagedArchiveChunks(db,id,hash){
 export async function verifyStagedArchiveObject(db,id,hash){
   const d=await object(db,id,hash);
   return stageVerifiedObject(d,readStagedArchiveChunks(db,id,hash),async()=>{},{maxBytes:STAGING_LIMITS.sessionBytes,maxChunks:3072});
+}
+
+// Read-only preflight: every registered object must match the manifest and every
+// chunk index must exist. This is not a substitute for byte re-verification at restore.
+export async function preflightArchiveSession(db,id,manifest){
+  await session(db,id);
+  const summary=await validateArchiveManifest(manifest,{maxBytes:STAGING_LIMITS.sessionBytes,maxObjects:STAGING_LIMITS.objects});
+  const expected=new Map(manifest.objects.map(o=>[o.object_sha256,o]));
+  const rows=(await db.prepare('SELECT object_hash,size,descriptor FROM coast_archive_objects WHERE session_id=? ORDER BY object_hash').bind(id).all()).results||[];
+  const unexpected=rows.filter(r=>!expected.has(r.object_hash)).map(r=>r.object_hash);
+  const known=new Set(),incomplete=[];
+  for(const row of rows){
+    const d=expected.get(row.object_hash);if(!d)continue;
+    known.add(row.object_hash);
+    const actual=JSON.parse(row.descriptor);
+    check(actual.size===d.size&&actual.object_sha256===d.object_sha256&&JSON.stringify(actual.chunks)===JSON.stringify(d.chunks),'staged descriptor mismatch',409);
+  }
+  // Aggregate received chunk counts without pulling original bytes into memory.
+  const counts=(await db.prepare('SELECT object_hash,COUNT(*) AS n,COALESCE(SUM(length(data)),0) AS bytes,MIN(chunk_index) AS first_index,MAX(chunk_index) AS last_index FROM coast_archive_chunks WHERE session_id=? GROUP BY object_hash').bind(id).all()).results||[];
+  const byHash=new Map(counts.map(r=>[r.object_hash,r]));
+  for(const d of manifest.objects){
+    const n=byHash.get(d.object_sha256);
+    if(!known.has(d.object_sha256)||(d.chunks.length===0?Boolean(n):!n||n.n!==d.chunks.length||n.bytes!==d.size||n.first_index!==0||n.last_index!==d.chunks.length-1))incomplete.push(d.object_sha256);
+  }
+  return {...summary,ready_for_byte_verification:incomplete.length===0&&unexpected.length===0,incomplete,unexpected,restore_supported:false,byte_verification_pending:true};
 }
