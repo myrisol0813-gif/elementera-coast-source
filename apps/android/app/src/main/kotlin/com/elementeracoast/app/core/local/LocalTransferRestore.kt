@@ -119,6 +119,19 @@ internal object LocalTransferRestore {
         }
         val moments = if ("daily" in modules) combine("moments", current.moments, incoming.moments) { it.id } else current.moments
         val diaries = if ("daily" in modules) combine("diaries", current.diaries, incoming.diaries) { it.id } else current.diaries
+        if("daily" in modules){
+            fun checkLink(parent:String?,turn:String?){
+                require(parent!=null||turn==null){"日常来源轮次缺少窗口。"}
+                if(parent!=null){
+                    val target=requireNotNull(targetChats[parent]){"请先恢复日常关联的原窗口。"}
+                    require(sourceChats[parent]?.let { it==target }!=false){"日常关联窗口存在内容冲突。"}
+                    require(turn==null||target.history.turns.any { it.id==turn }){"日常关联原轮次不存在。"}
+                }
+            }
+            val oldMoments=current.moments.map{it.id}.toSet();val oldDiaries=current.diaries.map{it.id}.toSet()
+            incoming.moments.filter{it.id !in oldMoments}.forEach{checkLink(it.conversationId,it.sourceTurnId)}
+            incoming.diaries.filter{it.id !in oldDiaries}.forEach{checkLink(it.conversationId,it.sourceTurnId)}
+        }
         val merged = current.copy(conversations = conversations, calendar = JsonArray(calendar), moments = moments, diaries = diaries,
             profile = profile("model_profile",current.profile,incoming.profile), dailyProfile = profile("daily_profile",current.dailyProfile,incoming.dailyProfile))
         LocalBackupArchive.validate(merged)

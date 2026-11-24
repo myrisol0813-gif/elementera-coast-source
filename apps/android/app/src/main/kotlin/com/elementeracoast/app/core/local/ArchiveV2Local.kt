@@ -26,7 +26,7 @@ internal object ArchiveV2Local {
                     val raw=buildJsonObject { put("kind",kind);put("data",data) }.toString().encodeToByteArray()
                     val d=describe(raw)
                     ByteArrayInputStream(raw).use { writer.objectEntry(d,it) }
-                    val dependencies=if(module=="calendar")data.jsonObject["conversation_id"]?.jsonPrimitive?.contentOrNull?.let { listOf("chat/"+it) }?:emptyList() else emptyList()
+                    val dependencies=if(module in setOf("calendar","daily"))data.jsonObject["conversation_id"]?.jsonPrimitive?.contentOrNull?.let { listOf("chat/"+it) }?:emptyList() else emptyList()
                     objects[d.objectSha256]=d;records.add(ArchiveV2Record(module,id,d.objectSha256,emptyList(),dependencies))
                 }
                 fun list(module:String,field:String,kind:String,id:(JsonObject)->String) {
@@ -56,18 +56,21 @@ internal object ArchiveV2Local {
         var profile:JsonElement=JsonNull;var daily:JsonElement=JsonNull
         fun id(v:JsonElement)=v.jsonObject.getValue("id").jsonPrimitive.content
         for(r in chosen){
-            require(r.mediaObjects.isEmpty()&&(r.module=="calendar"||r.dependencies.isEmpty()))
+            require(r.mediaObjects.isEmpty()&&(r.module in setOf("calendar","daily")||r.dependencies.isEmpty()))
             val d=byHash.getValue(r.recordObject)
             val raw=stage.verify(d,CoastTransferCodec.MAX_BYTES.toLong()).readBytes().decodeToString(throwOnInvalidSequence=true)
             val value=json.parseToJsonElement(raw).jsonObject
             require(value.keys==setOf("kind","data"))
             val data=value.getValue("data");require(data is JsonObject)
-            when(value.getValue("kind").jsonPrimitive.content){
+            val kind=value.getValue("kind").jsonPrimitive.content
+            if(kind in setOf("local_calendar","local_moment","local_diary")){
+                val parent=data["conversation_id"]?.jsonPrimitive?.contentOrNull
+                require(r.dependencies==if(parent==null)emptyList() else listOf("chat/"+parent))
+            }else require(r.dependencies.isEmpty())
+            when(kind){
                 "local_chat"->{require(r.module=="chat"&&id(data.getValue("conversation"))==r.id);chat.add(data)}
                 "local_calendar"->{
                     require(r.module=="calendar"&&id(data)==r.id)
-                    val parent=data["conversation_id"]?.jsonPrimitive?.contentOrNull
-                    require(r.dependencies==if(parent==null)emptyList() else listOf("chat/"+parent))
                     calendar.add(data)
                 }
                 "local_moment"->{require(r.module=="daily"&&"moment:"+id(data)==r.id);moments.add(data)}
@@ -84,6 +87,7 @@ internal object ArchiveV2Local {
         })
     }
     fun restore(manifest:ArchiveV2Manifest,stage:ArchiveV2Stage,selection:Set<String>,applicationId:String,store:LocalPersistence,confirm:Boolean):LocalRestorePreview {
+        require(manifest.workspace!="backend"||"daily" !in selection||manifest.applicationId==applicationId){"日常云端原始记录暂需同版本恢复；本机便携归档仍可跨版本。"}
         val bytes=if(manifest.workspace=="backend")ArchiveV2CloudToLocal.convert(manifest,stage,selection) else bundle(manifest,stage,selection)
         return if(confirm)LocalTransferRestore.restore(bytes,applicationId,selection,store) else LocalTransferRestore.preview(bytes,applicationId,selection,store)
     }

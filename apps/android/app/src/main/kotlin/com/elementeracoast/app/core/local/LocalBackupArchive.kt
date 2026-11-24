@@ -121,6 +121,7 @@ internal object LocalBackupArchive {
         }
         unique(data.moments.map { it.id }); unique(data.diaries.map { it.id })
         unique(data.moments.flatMap { it.comments }.map { it.id })
+        unique(data.moments.mapNotNull { it.toolCallId }); unique(data.diaries.mapNotNull { it.toolCallId })
         val owner = if (data.applicationId == "com.elementeracoast.source") "owner" else "xiaohan"
         data.moments.forEach { moment ->
             require(moment.likeCount >= 0)

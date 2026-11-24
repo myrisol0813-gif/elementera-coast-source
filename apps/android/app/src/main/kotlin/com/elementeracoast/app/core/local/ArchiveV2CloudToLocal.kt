@@ -6,7 +6,7 @@ import java.time.Instant
 /** Only cloud rows that the current local store can represent without loss.
  * A related media/soil/collection row must not silently disappear. */
 internal object ArchiveV2CloudToLocal {
-    val supportedModules=setOf("chat","calendar","model_profile")
+    val supportedModules=setOf("chat","calendar","model_profile","daily")
     private fun JsonObject.string(key:String)=getValue(key).jsonPrimitive.content
     private fun iso(v:JsonElement):JsonElement=if(v==JsonNull)JsonNull else JsonPrimitive(Instant.ofEpochMilli(v.jsonPrimitive.long).toString())
     private fun verifyKeys(v:JsonObject,keys:Set<String>){require(v.keys==keys){"云端记录字段不兼容，未恢复。"}}
@@ -19,14 +19,16 @@ internal object ArchiveV2CloudToLocal {
         require(chosen.sumOf { objects.getValue(it.recordObject).size }<=CoastTransferCodec.MAX_BYTES)
         val chats=mutableListOf<JsonElement>();val calendar=mutableListOf<JsonElement>()
         var profile:JsonElement=JsonNull
+        val dailyRows=mutableListOf<ArchiveV2Daily.Row>()
         for(r in chosen){
-            require(r.mediaObjects.isEmpty()&&(r.module=="calendar"||r.dependencies.isEmpty())){"此记录关联目标本机暂不能恢复的资料。"}
+            require(r.mediaObjects.isEmpty()&&(r.module in setOf("calendar","daily")||r.dependencies.isEmpty())){"此记录关联目标本机暂不能恢复的资料。"}
             if(r.module=="chat")require(manifest.records.none { it.module !in selection&&"chat/"+r.id in it.dependencies }){"窗口有关联原件、思维壤或其他资料，本机暂不能完整恢复。"}
             val d=objects.getValue(r.recordObject)
             val raw=Json.parseToJsonElement(stage.verify(d,CoastTransferCodec.MAX_BYTES.toLong()).readBytes().decodeToString(throwOnInvalidSequence=true)).jsonObject
-            verifyKeys(raw,setOf("kind","data"));require(raw.string("kind")==r.module)
+            verifyKeys(raw,setOf("kind","data"));require(r.module=="daily"||raw.string("kind")==r.module)
             val data=raw.getValue("data").jsonObject
             when(r.module){
+                "daily"->dailyRows.add(ArchiveV2Daily.Row(r,raw.string("kind"),data))
                 "chat"->{
                     verifyKeys(data,setOf("conversation","history_json","history_updated_at"))
                     val c=data.getValue("conversation").jsonObject
@@ -79,10 +81,11 @@ internal object ArchiveV2CloudToLocal {
                 }
             }
         }
+        val daily=ArchiveV2Daily.convert(dailyRows)
         return CoastTransferCodec.encode(buildJsonObject {
             put("applicationId",manifest.applicationId);put("workspace","backend");put("exportedAt",manifest.exportedAt)
             put("includedModules",JsonArray(selection.sorted().map(::JsonPrimitive)))
-            put("conversations",JsonArray(chats));put("calendar",JsonArray(calendar));put("moments",JsonArray(emptyList()));put("diaries",JsonArray(emptyList()));put("profile",profile);put("dailyProfile",JsonNull)
+            put("conversations",JsonArray(chats));put("calendar",JsonArray(calendar));put("moments",daily.moments);put("diaries",daily.diaries);put("profile",profile);put("dailyProfile",daily.profile)
         })
     }
 }
