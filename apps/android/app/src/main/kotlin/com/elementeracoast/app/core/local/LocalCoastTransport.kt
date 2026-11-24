@@ -105,6 +105,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if (method == "DELETE") {
                 store.atomic{staged->
                     LocalSideRecords(staged).removeConversation(cid)
+                    LocalDogtalkStore(staged).deleteConversation(cid)
                     val c=RemoteCacheStore(staged,strictReads=true)
                     c.putConversations(all.filterNot{it.id==cid});c.removeHistory(cid)
                     LocalAttachmentStore(staged).deleteConversation(cid)
@@ -143,6 +144,10 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if(method!="GET")return unsupported(r)
             val bytes=originals.bytes(original)
             return Response.Builder().request(r).protocol(Protocol.HTTP_1_1).code(200).message("OK").body(bytes.toResponseBody(original.metadata.getValue("mime").jsonPrimitive.content.toMediaType())).build()
+        }
+        if(path=="/api/dogtalk"){
+            if(method=="GET")return ok(r,"dogtalk" to LocalDogtalkStore(store).public(r.url.queryParameter("room_scope").orEmpty(),r.url.queryParameter("conversation_id")))
+            if(method=="PUT")return ok(r,"dogtalk" to store.atomic{LocalDogtalkStore(it).save(body(r))})
         }
         val side=LocalSideRecords(store)
         val parts=r.url.pathSegments
@@ -205,7 +210,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if (!conversationExists(request.conversationId)) return missing(r)
             val budget = request.settings["contextBudget"]?.toLongOrNull()?.coerceAtLeast(1800) ?: 18000
             val room=cache.conversations().first { it.id==request.conversationId }.roomType
-            val prepared=knowledge.context(request.messages,budget.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),if(room=="main")"main_chat" else room,request.conversationId,request.attachmentIds)
+            val prepared=knowledge.context(request.messages,budget.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),if(room=="main")"main_chat" else room,request.conversationId,request.attachmentIds,request.sourceTurnId.orEmpty())
             return response(r, 200, element(RemoteNativeChatContext.serializer(), RemoteNativeChatContext(
                 ok = true,
                 modelMessages = localMultimodalMessages(prepared.messages,prepared.imageParts),

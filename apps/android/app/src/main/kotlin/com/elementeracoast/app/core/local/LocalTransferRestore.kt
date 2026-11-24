@@ -52,7 +52,7 @@ internal object LocalTransferRestore {
         }
     }
 
-    private fun decodeSelected(payload: JsonObject, applicationId: String, modules: Set<String>, attachments:Map<String,JsonObject> = emptyMap()): LocalBackupPayload {
+    private fun decodeSelected(payload: JsonObject, applicationId: String, modules: Set<String>, attachments:Map<String,JsonObject> = emptyMap(),snapshots:Map<String,JsonObject> = emptyMap()): LocalBackupPayload {
         require(modules.isNotEmpty() && availableModules(payload, applicationId).containsAll(modules)) {
             "请选择目标已支持且数据包中包含的模块。"
         }
@@ -72,7 +72,7 @@ internal object LocalTransferRestore {
             require(row.conversation.deletedAt == null) { "已删除窗口不能直接恢复为活动窗口。" }
             row.history.turns.forEach { t ->
                 (t.user.variants + t.assistant.variantsByUserVariant.values.flatten()).forEach { v ->
-                    require(v.dogtalkSnapshotId.isNullOrBlank()) { "跨窗快照暂不支持迁移；原件未被修改。" }
+                    v.dogtalkSnapshotId?.takeIf{it.isNotBlank()}?.let{LocalDogtalkStore.checkReference(row.conversation.id,t.id,it,snapshots)}
                     v.attachments.forEach{LocalAttachmentStore.checkReference(row.conversation.id,t.id,it,attachments)}
                 }
             }
@@ -83,8 +83,8 @@ internal object LocalTransferRestore {
 
     private data class Plan(val preview: LocalRestorePreview, val merged: LocalBackupPayload)
 
-    private fun plan(payload: JsonObject, applicationId: String, modules: Set<String>, store: LocalPersistence,attachments:Map<String,JsonObject> = emptyMap()): Plan {
-        val incoming = decodeSelected(payload, applicationId, modules,attachments)
+    private fun plan(payload: JsonObject, applicationId: String, modules: Set<String>, store: LocalPersistence,attachments:Map<String,JsonObject> = emptyMap(),snapshots:Map<String,JsonObject> = emptyMap()): Plan {
+        val incoming = decodeSelected(payload, applicationId, modules,attachments,snapshots)
         val current = LocalBackupArchive.capture(store, applicationId)
         val counts = linkedMapOf<String, LocalRestoreCount>()
         fun <T> combine(key: String, old: List<T>, added: List<T>, id: (T) -> String): List<T> {
@@ -141,33 +141,33 @@ internal object LocalTransferRestore {
             declared - availableModules(payload, applicationId)), merged)
     }
 
-    internal fun plannedHistories(bytes:ByteArray,applicationId:String,modules:Set<String>,store:LocalPersistence,attachments:Map<String,JsonObject> = emptyMap()):Map<String,RemoteHistory>{
-        val incoming=decodeSelected(CoastTransferCodec.decode(bytes),applicationId,modules,attachments).conversations
+    internal fun plannedHistories(bytes:ByteArray,applicationId:String,modules:Set<String>,store:LocalPersistence,attachments:Map<String,JsonObject> = emptyMap(),snapshots:Map<String,JsonObject> = emptyMap()):Map<String,RemoteHistory>{
+        val incoming=decodeSelected(CoastTransferCodec.decode(bytes),applicationId,modules,attachments,snapshots).conversations
         val existing=LocalBackupArchive.capture(store,applicationId).conversations
         return (incoming+existing).associate{it.conversation.id to it.history}
     }
 
-    internal fun plannedParents(bytes:ByteArray,applicationId:String,modules:Set<String>,store:LocalPersistence,attachments:Map<String,JsonObject> = emptyMap()):Pair<Set<String>,Set<String>>{
+    internal fun plannedParents(bytes:ByteArray,applicationId:String,modules:Set<String>,store:LocalPersistence,attachments:Map<String,JsonObject> = emptyMap(),snapshots:Map<String,JsonObject> = emptyMap()):Pair<Set<String>,Set<String>>{
         val payload=CoastTransferCodec.decode(bytes)
-        val incoming=decodeSelected(payload,applicationId,modules,attachments).conversations
+        val incoming=decodeSelected(payload,applicationId,modules,attachments,snapshots).conversations
         val existing=LocalBackupArchive.capture(store,applicationId).conversations.associateBy{it.conversation.id}
         val ids=incoming.map{it.conversation.id}.toSet()
         val conflicts=incoming.filter{existing[it.conversation.id]?.let{old->old!=it}==true}.map{it.conversation.id}.toSet()
         return (existing.keys+ids) to conflicts
     }
 
-    fun preview(bytes: ByteArray, applicationId: String, modules: Set<String>, store: LocalPersistence,attachments:Map<String,JsonObject> = emptyMap()): LocalRestorePreview {
+    fun preview(bytes: ByteArray, applicationId: String, modules: Set<String>, store: LocalPersistence,attachments:Map<String,JsonObject> = emptyMap(),snapshots:Map<String,JsonObject> = emptyMap()): LocalRestorePreview {
         val payload = CoastTransferCodec.decode(bytes)
-        return store.readConsistent { plan(payload, applicationId, modules, it,attachments).preview }
+        return store.readConsistent { plan(payload, applicationId, modules, it,attachments,snapshots).preview }
     }
 
     fun restore(bytes: ByteArray, applicationId: String, modules: Set<String>, store: LocalPersistence): LocalRestorePreview {
         return store.atomic { staged -> restoreStaged(bytes,applicationId,modules,staged) }
     }
 
-    internal fun restoreStaged(bytes:ByteArray,applicationId:String,modules:Set<String>,staged:LocalPersistence,attachments:Map<String,JsonObject> = emptyMap()):LocalRestorePreview {
+    internal fun restoreStaged(bytes:ByteArray,applicationId:String,modules:Set<String>,staged:LocalPersistence,attachments:Map<String,JsonObject> = emptyMap(),snapshots:Map<String,JsonObject> = emptyMap()):LocalRestorePreview {
             val payload=CoastTransferCodec.decode(bytes)
-            val p = plan(payload, applicationId, modules, staged,attachments)
+            val p = plan(payload, applicationId, modules, staged,attachments,snapshots)
             val data = p.merged
             val cache = RemoteCacheStore(staged, strictReads = true)
             val known = cache.conversations().map { it.id }.toSet()

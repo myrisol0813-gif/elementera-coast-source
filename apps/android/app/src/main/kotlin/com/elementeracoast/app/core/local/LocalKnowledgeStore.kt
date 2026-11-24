@@ -7,7 +7,7 @@ import java.util.UUID
 
 /** Local owner knowledge uses the same typed store as the existing memory UI.
  * Both inference transports use the same assembly and record only delivered text. */
-internal class LocalKnowledgeStore(store:LocalPersistence) {
+internal class LocalKnowledgeStore(private val store:LocalPersistence) {
     private val cache=RemoteCacheStore(store,strictReads=true)
     private val memory=LocalMemoryStore(store)
     private val portraits=LocalPortraitStore(store)
@@ -55,7 +55,7 @@ internal class LocalKnowledgeStore(store:LocalPersistence) {
     }
     fun surfaceFor(conversationId:String):String=cache.conversations().firstOrNull{it.id==conversationId}?.roomType?.let{if(it=="main")"main_chat" else it}?:error("本机窗口不存在。")
     data class Context(val messages:List<RemoteChatMessage>,val receipt:RemoteDeskSlip,val imageParts:List<JsonObject> = emptyList())
-    fun context(input:List<RemoteChatMessage>,budget:Int,surface:String,conversationId:String="",attachmentIds:List<String> = emptyList()):Context {
+    fun context(input:List<RemoteChatMessage>,budget:Int,surface:String,conversationId:String="",attachmentIds:List<String> = emptyList(),turnId:String=""):Context {
         val attachmentContext=attachments.attachmentContext(conversationId,attachmentIds,input)
         val messages=attachmentContext.messages
         val instructions=instructions()?.content.orEmpty()
@@ -78,11 +78,16 @@ internal class LocalKnowledgeStore(store:LocalPersistence) {
         val after=soilRow?.get("afterthoughts_json")?.jsonPrimitive?.contentOrNull?.let{Json.parseToJsonElement(it).jsonArray.map{v->v.jsonPrimitive.content}}.orEmpty()
         val soilContext=(listOf(soilText)+after).filter{it.isNotBlank()}.joinToString("\n")
         if(soilContext.isNotEmpty())delivered.add(RemoteChatMessage("system","思维壤\n"+soilContext))
-        delivered.addAll(messages)
+        val dogtalk=LocalDogtalkStore(store).pending(conversationId,surface,turnId)
+        val contextMessages=messages.toMutableList()
+        if(dogtalk!=null){val at=contextMessages.indexOfLast{it.role=="user"};require(at>=0);contextMessages[at]=contextMessages[at].copy(content=contextMessages[at].content+"\n\n"+dogtalk.text)}
+        delivered.addAll(contextMessages)
         // Reserve a conservative estimate per image, not the base64 byte length.
         val chars=delivered.sumOf{it.content.length.toLong()}+attachmentContext.imageParts.size*2048L*3
         require(chars<=maxChars){"本机上下文、完整画像、世界书与记忆超过预算，未截断、未发送。"}
+        if(dogtalk!=null)store.atomic{LocalDogtalkStore(it).consume(dogtalk)}
         return Context(delivered,RemoteDeskSlip(
+            dogtalk=RemoteDeskDogtalk(status=if(dogtalk==null)"未递给" else "已递给",delivered=dogtalk!=null,context=dogtalk?.text.orEmpty()),
             summary="本机自定义指令、完整画像、世界书、已确认记忆（关键词检索）、思维壤与近期文字；附件按本轮回执递入",
             attachments=attachmentContext.receipt.takeIf{attachmentIds.isNotEmpty()},
             customInstructions=RemoteDeskCustomInstructions(status=if(instructions.isEmpty())"未设置" else "已递给",delivered=instructions.isNotEmpty(),empty=instructions.isEmpty(),length=instructions.length,content=instructions),

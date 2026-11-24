@@ -11,8 +11,8 @@ import kotlinx.serialization.json.*
 internal object ArchiveV2Local {
     private val json=Json { ignoreUnknownKeys=false }
     private val modules=CoastTransferCodec.supportedModules
-    val localModules=modules+ArchiveV2Knowledge.modules+setOf("attachments","appearance")+LocalSideRecords.modules
-    val cloudModules get()=ArchiveV2CloudToLocal.supportedModules+ArchiveV2Knowledge.modules+setOf("attachments")+LocalSideRecords.modules
+    val localModules=modules+ArchiveV2Knowledge.modules+setOf("attachments","appearance")+LocalSideRecords.modules+LocalDogtalkStore.modules
+    val cloudModules get()=ArchiveV2CloudToLocal.supportedModules+ArchiveV2Knowledge.modules+setOf("attachments")+LocalSideRecords.modules+LocalDogtalkStore.modules
     private fun describe(bytes:ByteArray):ArchiveV2Object {
         val chunk=ArchiveV2Chunks.CHUNK_BYTES
         val hashes=(bytes.indices step chunk).map { ArchiveV2Chunks.digest(bytes.copyOfRange(it,minOf(it+chunk,bytes.size))) }
@@ -53,6 +53,8 @@ internal object ArchiveV2Local {
                     objects[d.objectSha256]=d
                     add("attachments",original.metadata.getValue("id").jsonPrimitive.content,"attachment",original.metadata,listOf(d.objectSha256))
                 }
+                val dogtalk=LocalDogtalkStore(store).read()
+                for(row in dogtalk)add(row.module,row.id,row.module,row.data,links=row.dependencies)
                 val side=LocalSideRecords(store)
                 for(row in side.rows()){
                     val media=if(row.digest==null)emptyList()else{
@@ -126,7 +128,9 @@ internal object ArchiveV2Local {
         val objects=manifest.objects.associateBy{it.objectSha256}
         require(manifest.records.filter{it.module in selection}.sumOf{objects.getValue(it.recordObject).size}<=CoastTransferCodec.MAX_BYTES){"本机恢复事务最多64 MiB。"}
         val extra=selection.intersect(ArchiveV2Knowledge.modules)
-        val base=selection-extra-setOf("attachments","appearance")-LocalSideRecords.modules
+        val base=selection-extra-setOf("attachments","appearance")-LocalSideRecords.modules-LocalDogtalkStore.modules
+        val dogtalk=ArchiveV2Dogtalk.read(manifest,stage,selection,applicationId)
+        val snapshots=dogtalk.filter{it.module=="dogtalk_snapshots"}.associate{it.id to it.data}
         require("appearance" !in selection||appearanceRoot!=null){"外观恢复缺少设备文件目录。"}
         val appearance=ArchiveV2Appearance.read(manifest,stage,selection)
         val side=ArchiveV2SideRecords.read(manifest,stage,selection,applicationId)
@@ -135,11 +139,11 @@ internal object ArchiveV2Local {
         val rows=ArchiveV2Knowledge.read(manifest,stage,extra,applicationId)
         val bytes=if(base.isEmpty())null else if(manifest.workspace=="backend")ArchiveV2CloudToLocal.convert(manifest,stage,base,selection) else bundle(manifest,stage,base)
         fun run(target:LocalPersistence,write:Boolean):LocalRestorePreview{
-            val parents=bytes?.let{LocalTransferRestore.plannedParents(it,applicationId,base,target,attachmentMeta)}
+            val parents=bytes?.let{LocalTransferRestore.plannedParents(it,applicationId,base,target,attachmentMeta,snapshots)}
             val cache=RemoteCacheStore(target,strictReads=true)
             val existing=cache.conversations().map{it.id}.toSet()
-            val histories=if(extra.any{it in LocalSoilStore.modules}||"attachments" in selection||selection.any{it in LocalSideRecords.modules})bytes?.let{LocalTransferRestore.plannedHistories(it,applicationId,base,target,attachmentMeta)}?:existing.associateWith{requireNotNull(cache.history(it))} else emptyMap()
-            val report=bytes?.let{if(write)LocalTransferRestore.restoreStaged(it,applicationId,base,target,attachmentMeta) else LocalTransferRestore.preview(it,applicationId,base,target,attachmentMeta)}
+            val histories=if(extra.any{it in LocalSoilStore.modules}||"attachments" in selection||selection.any{it in LocalSideRecords.modules||it in LocalDogtalkStore.modules})bytes?.let{LocalTransferRestore.plannedHistories(it,applicationId,base,target,attachmentMeta,snapshots)}?:existing.associateWith{requireNotNull(cache.history(it))} else emptyMap()
+            val report=bytes?.let{if(write)LocalTransferRestore.restoreStaged(it,applicationId,base,target,attachmentMeta,snapshots) else LocalTransferRestore.preview(it,applicationId,base,target,attachmentMeta,snapshots)}
             val extras=ArchiveV2Knowledge.apply(rows,extra,target,write,parents?.first?:existing,parents?.second.orEmpty(),histories)
             val files=if("attachments" in selection)mapOf("attachments" to ArchiveV2Attachments.apply(attachments,target,histories,parents?.second.orEmpty(),write))else emptyMap()
             val sideCounts=if(selection.any{it in LocalSideRecords.modules}){
@@ -147,8 +151,9 @@ internal object ArchiveV2Local {
                 val soil=(LocalSoilStore(target).read().history+rows.filter{it.kind=="thinking_soil_history"}.map{it.data}).distinctBy{it["conversation_id"] to it["assistant_message_id"]}
                 ArchiveV2SideRecords.apply(side,selection,target,histories,parents?.second.orEmpty(),media,soil,write)
             }else emptyMap()
+            val dogtalkCounts=if(selection.any{it in LocalDogtalkStore.modules})ArchiveV2Dogtalk.apply(dogtalk,selection,target,histories,parents?.second.orEmpty(),write)else emptyMap()
             val appearanceCounts=if("appearance" in selection)mapOf("appearance" to ArchiveV2Appearance.apply(appearance,target,requireNotNull(appearanceRoot),write))else emptyMap()
-            return LocalRestorePreview(manifest.workspace,report?.counts.orEmpty()+extras+files+sideCounts+appearanceCounts,report?.unsupportedModules.orEmpty())
+            return LocalRestorePreview(manifest.workspace,report?.counts.orEmpty()+extras+files+sideCounts+dogtalkCounts+appearanceCounts,report?.unsupportedModules.orEmpty())
         }
         return if(confirm)store.atomic{run(it,true)}else store.readConsistent{run(it,false)}
     }
