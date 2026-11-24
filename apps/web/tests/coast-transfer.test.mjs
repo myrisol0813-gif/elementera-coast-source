@@ -22,6 +22,17 @@ assert.deepEqual(await readConversationState(target,c.id),await readConversation
 assert.equal((await listCalendarEntries(target,{pinned:true}))[0].id,cal.id);
 const second=await importCloudTransfer(target,bundle,['chat','calendar']);assert.equal(second.chat.existing,1);assert.equal(second.calendar.existing,1);
 assert.equal((await listConversations(target)).length,1);
+assert.equal(second.chat.conflicts,0);assert.equal(second.calendar.conflicts,0);
+assert.deepEqual((await listConversations(target))[0],(await listConversations(origin))[0]);
+const changed=structuredClone(payload);
+changed.conversations[0].conversation.title='另一个标题';
+changed.calendar[0].title='另一个纪念日';
+const changedBundle=await encodeTransfer(changed);
+const changedReport=await previewCloudTransfer(target,changedBundle,['chat','calendar']);
+assert.equal(changedReport.chat.conflicts,1);assert.equal(changedReport.calendar.conflicts,1);
+await importCloudTransfer(target,changedBundle,['chat','calendar']);
+assert.equal((await listConversations(target))[0].title,'原始窗口');
+assert.equal((await listCalendarEntries(target,{all:true}))[0].title,'百日');
 await assert.rejects(()=>decodeTransfer({...bundle,payload_json:bundle.payload_json.replace('新回答','损坏')}));
 const invalid=structuredClone(payload);invalid.conversations[0].history.turns[0].user.active=8;
 const broken=await encodeTransfer(invalid), empty=new D1Database();
