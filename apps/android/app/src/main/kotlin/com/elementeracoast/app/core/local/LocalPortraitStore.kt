@@ -26,7 +26,7 @@ internal class LocalPortraitStore(private val store:LocalPersistence) {
         val d=read(module)
         val root=d?.root?.let{wire(it)}?:buildJsonObject{put("body","");put("revision",1);put("write_enabled",true)}
         return buildJsonObject{
-            put("ok",true);put(if(module=="user_portrait")"portrait" else "excerpt",JsonObject(root+("write_guidance" to JsonPrimitive("仅在有值得长期保留的认识时提出完整正文候选，由屋主确认。")))))
+            put("ok",true);put(if(module=="user_portrait")"portrait" else "excerpt",JsonObject(root+("write_guidance" to JsonPrimitive("仅在有值得长期保留的认识时提出完整正文候选，由屋主确认。"))))
             put("candidates",JsonArray(d?.candidates.orEmpty().sortedByDescending{it.getValue("created_at").jsonPrimitive.long}.map(::wire)))
             put("revisions",JsonArray(d?.revisions.orEmpty().sortedByDescending{it.getValue("revision").jsonPrimitive.int}.map(::wire)))
         }
