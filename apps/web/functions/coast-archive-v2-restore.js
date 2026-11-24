@@ -49,14 +49,14 @@ export async function prepareArchiveChatGroup(db,sessionId,manifest,conversation
   // Raw persisted history is retained byte-for-byte. Refuse records whose visible
   // representation would change under the target's normalizer.
   check(equal(history,normalizeState(history)),'target would normalize or lose original chat fields');
-  const turns=new Set(),variants=new Set(),variantTurns=new Map(),assistantTurns=new Map(),attachmentRefs=new Map(),attachmentTurns=new Map(),snapshotRefs=new Set();
+  const turns=new Set(),variants=new Set(),variantTurns=new Map(),assistantTurns=new Map(),attachmentRefs=new Map(),attachmentTurns=new Map(),snapshotRefs=new Map();
   for(const t of history.turns){
     check(id(t.id)&&!turns.has(t.id),'duplicate turn id');turns.add(t.id);
     for(const v of Object.values(t.assistant.variantsByUserVariant).flat())assistantTurns.set(v.id,t.id);
     for(const v of [...t.user.variants,...Object.values(t.assistant.variantsByUserVariant).flat()]){
       check(id(v.id)&&!variants.has(v.id),'duplicate variant id');variants.add(v.id);variantTurns.set(v.id,t.id);
       for(const a of v.attachments||[]){check(id(a.id),'invalid attachment ref');const old=attachmentRefs.get(a.id);check(!old||equal(old,a),'inconsistent attachment references');attachmentRefs.set(a.id,a);const linked=attachmentTurns.get(a.id)||new Set();linked.add(t.id);attachmentTurns.set(a.id,linked);}
-      if(v.dogtalk_snapshot_id){check(id(v.dogtalk_snapshot_id),'invalid snapshot reference');snapshotRefs.add(v.dogtalk_snapshot_id);}
+      if(v.dogtalk_snapshot_id){check(id(v.dogtalk_snapshot_id),'invalid snapshot reference');const old=snapshotRefs.get(v.dogtalk_snapshot_id);check(!old||old===t.id,'snapshot references different turns');snapshotRefs.set(v.dogtalk_snapshot_id,t.id);}
     }
   }
   await ensureChatSchema(db);
@@ -83,10 +83,11 @@ export async function prepareArchiveChatGroup(db,sessionId,manifest,conversation
       statements.push(...await prepareArchiveSoil(db,r.id,kind,data,{conversationId:c.id,turns,variantTurns:assistantTurns}));soils++;
     }else{
       check(kind===r.module&&r.media_objects.length===0,'invalid snapshot record kind');
+      check(r.module==='dogtalk_records'?r.dependencies.length===1&&r.dependencies[0]==='chat/'+c.id:r.dependencies.length===2&&r.dependencies.includes('dogtalk_records/'+data.dogtalk_id),'dogtalk dependency mismatch');
       (r.module==='dogtalk_records'?parents:snapshots).push(data);
     }
   }
-  check([...attachmentRefs.keys()].every(k=>foundAttachments.has(k))&&[...snapshotRefs].every(k=>snapshots.some(s=>s.id===k)),'chat original or historical snapshot missing');
+  check([...attachmentRefs.keys()].every(k=>foundAttachments.has(k))&&[...snapshotRefs].every(([k,t])=>snapshots.some(s=>s.id===k&&s.source_type==='turn'&&s.source_id===t)),'chat original or historical snapshot missing');
   if(parents.length||snapshots.length)statements.push(...await prepareArchiveDogtalk(db,{records:parents,snapshots},{conversationIds,sourceIds:new Set([...turns].map(t=>'turn:'+t))}));
   check(statements.length<=90,'chat restore exceeds atomic statement budget');
   return {statements,report:{conversation_id:c.id,turns:turns.size,variants:variants.size,attachments:foundAttachments.size,snapshots:snapshots.length,voices,soils,statement_count:statements.length,can_commit:true,scope:'chat_group_only'}};

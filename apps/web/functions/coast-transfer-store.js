@@ -86,7 +86,7 @@ export function validatedChat(row,{verifiedMediaGroup=false}={}) {
       require(validId(v?.id) && !variantIds.has(v.id) && typeof v.content === 'string', '消息 ID 或正文无效。'); variantIds.add(v.id);
       require(typeof v.created_at === 'string' && validStamp(v.created_at), '消息时间无效。');
       require(verifiedMediaGroup||!v.attachments?.length, '含附件的窗口暂不支持迁移原件，请保留原窗口。');
-      require(!v.dogtalk_snapshot_id, '该窗口关联尚不可迁移的跨窗快照，请保留原窗口。');
+      require(verifiedMediaGroup||!v.dogtalk_snapshot_id, '该窗口关联尚不可迁移的跨窗快照，请保留原窗口。');
     }
   }
   const h2 = structuredClone(h);

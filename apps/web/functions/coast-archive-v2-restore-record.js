@@ -1,3 +1,4 @@
+import { prepareArchiveDogtalk } from './coast-archive-v2-media.js';
 import { restoreSafeTool } from './coast-archive-v2-tool-audit.js';
 import { SOIL_MODULES,restoreArchiveSoil } from './coast-archive-v2-restore-soil.js';
 import { restoreArchiveLocalRecord } from './coast-archive-v2-restore-local.js';
@@ -30,12 +31,12 @@ const roles={owner:'owner',assistant:'assistant'};
 export async function restoreArchiveRecord(db,sessionId,manifest,module,recordId,confirm=false){
  if(module==='tools')return restoreSafeTool(db,sessionId,manifest,recordId,confirm);
  if(SOIL_MODULES.includes(module))return restoreArchiveSoil(db,sessionId,manifest,module,recordId,confirm);
- const localKnowledge=manifest?.workspace==='local'&&['worldbook','custom_instructions','vault',...MEMORY_RESTORE_MODULES,...PORTRAIT_RESTORE_MODULES].includes(module);
+ const localKnowledge=manifest?.workspace==='local'&&['worldbook','custom_instructions','vault','dogtalk_records',...MEMORY_RESTORE_MODULES,...PORTRAIT_RESTORE_MODULES].includes(module);
  if(manifest?.workspace==='local'&&!localKnowledge)return restoreArchiveLocalRecord(db,sessionId,manifest,module,recordId,confirm);
  if(module==='daily')return restoreArchiveDaily(db,sessionId,manifest,recordId,confirm);
  if(PORTRAIT_RESTORE_MODULES.includes(module))return restoreArchivePortrait(db,sessionId,manifest,module,recordId,confirm);
  await validateArchiveManifest(manifest);
- check((manifest.workspace==='backend'||localKnowledge)&&(Object.hasOwn(specs,module)||MEMORY_RESTORE_MODULES.includes(module)||module==='vault'),'target does not support this record');
+ check((manifest.workspace==='backend'||localKnowledge)&&(Object.hasOwn(specs,module)||MEMORY_RESTORE_MODULES.includes(module)||module==='vault'||module==='dogtalk_records'),'target does not support this record');
  const r=manifest.records.find(x=>x.module===module&&x.id===recordId);
  check(r&&r.media_objects.length===0,'record missing or media not supported');
  const d=manifest.objects.find(x=>x.object_sha256===r.record_object);
@@ -43,6 +44,12 @@ export async function restoreArchiveRecord(db,sessionId,manifest,module,recordId
  const bytes=new Uint8Array(d.size);let at=0;
  await stageVerifiedObject(d,readStagedArchiveChunks(db,sessionId,d.object_sha256),async b=>{bytes.set(b,at);at+=b.length;},{maxBytes:1800000});
  const raw=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
+ if(module==='dogtalk_records'){
+   check(manifest.application_id==='com.elementeracoast.source'&&exact(raw,['kind','data'])&&raw.kind===module&&raw.data?.id===r.id&&raw.data.conversation_id===null&&['radio','lighthouse'].includes(raw.data.room_scope)&&r.dependencies.length===0,'only same-edition room-wide drafts can restore separately');
+   const statements=await prepareArchiveDogtalk(db,{records:[raw.data],snapshots:[]},{conversationIds:new Set(),sourceIds:new Set()});
+   if(confirm===true)await db.batch(statements);
+   return {scope:'record_only',module,record_id:r.id,ready:1,existing:0,can_commit:true,committed:confirm===true};
+ }
  if(module==='vault'){
    const plan=await prepareArchiveVault(db,r,raw,manifest);
    if(confirm===true&&plan.statements.length)await db.batch(plan.statements);
