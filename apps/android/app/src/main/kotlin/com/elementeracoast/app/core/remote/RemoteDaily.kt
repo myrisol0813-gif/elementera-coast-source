@@ -32,7 +32,18 @@ data class RemoteDailyMoment(
     @SerialName("updated_at") val updatedAt: String = "",
     val liked: Boolean = false,
     @SerialName("like_count") val likeCount: Int = 0,
-    val comments: List<RemoteDailyComment> = emptyList()
+    val comments: List<RemoteDailyComment> = emptyList(),
+    val actor: String? = null,
+    @SerialName("tool_call_id") val toolCallId: String? = null,
+    val reason: String? = null,
+    @SerialName("published_at") val publishedAt: String? = null,
+    val likes: List<RemoteDailyLike>? = null
+)
+
+@Serializable
+data class RemoteDailyLike(
+    val actor: String,
+    @SerialName("created_at") val createdAt: String
 )
 
 @Serializable
@@ -85,7 +96,9 @@ data class RemoteDailyDiary(
     val symbol: String = "",
     @SerialName("display_author") val displayAuthor: String = "",
     @SerialName("created_at") val createdAt: String = "",
-    @SerialName("updated_at") val updatedAt: String = ""
+    @SerialName("updated_at") val updatedAt: String = "",
+    val actor: String? = null,
+    @SerialName("tool_call_id") val toolCallId: String? = null
 )
 
 @Serializable
