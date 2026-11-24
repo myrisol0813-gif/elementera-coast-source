@@ -15,6 +15,7 @@ const modules={
   memory_entries:{ensure:ensureMemorySchema,sql:"SELECT "+memColumns+" FROM memory_entries WHERE user_id=? AND deleted_at IS NULL AND ((scope='global' AND conversation_id IS NULL) OR (scope='conversation' AND conversation_id IN ("+active+")))",params:[MEMORY_OWNER_ID]},
   memory_pockets:{ensure:ensureMemorySchema,sql:"SELECT "+pocketColumns+" FROM memory_pockets WHERE user_id=? AND deleted_at IS NULL AND conversation_id IN ("+active+")",params:[MEMORY_OWNER_ID]},
   calendar:{ensure:ensureCalendarSchema,sql:"SELECT * FROM coast_calendar_entries_v2 WHERE 1=1"},
+  model_profile:{ensure:ensureChatSchema,sql:"SELECT user_id AS id,assistant_avatar_dataurl,current_chat_model,current_image_model,model_box_json,updated_at FROM chat_profiles WHERE user_id='owner'",key:"user_id"},
   voice:{ensure:ensureVoiceSchema,sql:"SELECT v.id,v.conversation_id,v.turn_id,v.message_id,v.source,v.model_label,v.voice_id,v.text,v.audio_bytes,v.created_at FROM coast_voice_clips v WHERE v.conversation_id IN ("+active+")"}
 };
 export const RECORD_MODULES=Object.freeze(Object.keys(modules));
@@ -24,7 +25,7 @@ export async function archiveRecordPage(db,module,{cursor='',limit=20}={}){
   check(Number.isInteger(limit)&&limit>=1&&limit<=100,'invalid archive page size');
   const m=modules[module];await m.ensure(db);
   // Chat list is metadata only: history is fetched individually, never truncated to a UI preview.
-  const rows=(await db.prepare(m.sql+' AND id>? ORDER BY id LIMIT ?').bind(...(m.params||[]),cursor,limit+1).all()).results||[];
+  const rows=(await db.prepare(m.sql+' AND '+(m.key||'id')+'>? ORDER BY '+(m.key||'id')+' LIMIT ?').bind(...(m.params||[]),cursor,limit+1).all()).results||[];
   const items=rows.slice(0,limit);
   return {items,next_cursor:rows.length>limit?items.at(-1).id:null};
 }
