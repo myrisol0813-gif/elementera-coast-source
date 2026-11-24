@@ -46,6 +46,42 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
             else -> "模型供应商请求失败（HTTP $code）。"
         }, code)
 
+    /** Only fixed diagnostic phrases, never raw upstream bodies or credentials. */
+    private fun authReason(response: okhttp3.Response): String {
+        val detail = runCatching {
+            val obj = json.parseToJsonElement(response.peekBody(4096).string()).jsonObject
+            (obj["error"] as? JsonObject)?.get("message")?.jsonPrimitive?.contentOrNull.orEmpty().lowercase()
+        }.getOrDefault("")
+        return when {
+            "no auth credentials" in detail -> "供应商报告未收到授权凭据"
+            "user not found" in detail -> "供应商报告 User not found"
+            "invalid api key" in detail || "invalid key" in detail -> "供应商报告 Key 无效"
+            "disabled" in detail || "revoked" in detail -> "供应商报告凭据已禁用或撤销"
+            else -> "供应商未返回可安全展示的具体原因"
+        }
+    }
+
+    suspend fun authorizationCheck(p: LocalProviderConfig): String = withContext(Dispatchers.IO) {
+        val url = normalizeLocalProviderUrl(p.baseUrl).toHttpUrl()
+        require(url.host == "openrouter.ai" && url.port == 443 && url.encodedPath.trimEnd('/') == "/api/v1") {
+            "当前授权自检仅支持 OpenRouter 官方地址。"
+        }
+        val key = p.apiKey
+        val format = if (key.startsWith("sk-or-v1-") && key.length == 73 && key.none { it.isWhitespace() }) "常见格式"
+            else "非典型格式（不代表一定无效）"
+        val prefix = "Key 长度 ${key.length} · $format · GET /api/v1/key"
+        try {
+            val req = request(p, "/key").get().build()
+            val headerOk = req.headers.values("Authorization").size == 1 && req.header("Authorization") == "Bearer " + key
+            if (!headerOk) return@withContext "$prefix · 本机请求头校验失败"
+            http.newCall(req).execute().use { response ->
+                "$prefix · 请求头构造一致 · HTTP ${response.code} · " +
+                    (if (response.isSuccessful) "授权通过" else authReason(response))
+            }
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) { "$prefix · 请求未完成，请检查网络或 Key 中的非法字符" }
+    }
+
     private suspend fun get(p: LocalProviderConfig, suffix: String): JsonObject = withContext(Dispatchers.IO) {
         try {
             http.newCall(request(p, suffix).get().build()).execute().use { response ->

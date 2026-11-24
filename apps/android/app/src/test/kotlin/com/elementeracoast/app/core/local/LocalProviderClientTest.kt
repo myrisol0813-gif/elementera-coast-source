@@ -63,6 +63,18 @@ class LocalProviderClientTest {
         assertFalse(error.message.contains(p.apiKey))
     }
 
+    @Test fun authorizationDiagnosticNeverEchoesSecret() = runBlocking {
+        val c = client { r ->
+            assertEquals("/api/v1/key", r.url.encodedPath)
+            assertEquals("Bearer test-key", r.header("Authorization"))
+            401 to """{"error":{"message":"User not found test-key"}}"""
+        }
+        val result = c.authorizationCheck(p.copy(baseUrl = "https://openrouter.ai/api/v1"))
+        assertTrue(result.contains("HTTP 401"))
+        assertTrue(result.contains("User not found"))
+        assertFalse(result.contains("test-key"))
+    }
+
     @Test fun interruptedStreamDoesNotFabricateDone() = runBlocking {
         val c = client { 200 to "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n" }
         assertTrue(runCatching { c.stream(p, "test/model", listOf(RemoteChatMessage("user", "hi")), 128).toList() }.isFailure)
