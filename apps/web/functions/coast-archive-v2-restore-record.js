@@ -1,3 +1,4 @@
+import { restoreArchiveLocalRecord } from './coast-archive-v2-restore-local.js';
 import { prepareArchiveVault } from './coast-archive-v2-restore-vault.js';
 import { restoreArchiveDaily } from './coast-archive-v2-restore-daily.js';
 import { PORTRAIT_RESTORE_MODULES,restoreArchivePortrait } from './coast-archive-v2-restore-portrait.js';
@@ -25,6 +26,7 @@ const specs={
 };
 const roles={owner:'owner',assistant:'assistant'};
 export async function restoreArchiveRecord(db,sessionId,manifest,module,recordId,confirm=false){
+ if(manifest?.workspace==='local')return restoreArchiveLocalRecord(db,sessionId,manifest,module,recordId,confirm);
  if(module==='daily')return restoreArchiveDaily(db,sessionId,manifest,recordId,confirm);
  if(PORTRAIT_RESTORE_MODULES.includes(module))return restoreArchivePortrait(db,sessionId,manifest,module,recordId,confirm);
  await validateArchiveManifest(manifest);
