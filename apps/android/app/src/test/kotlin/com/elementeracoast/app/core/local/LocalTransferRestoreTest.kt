@@ -34,6 +34,24 @@ class LocalTransferRestoreTest {
         assertEquals(1,repeated.counts.getValue("chat").conflicts)
         assertTrue(cache.history("cloud1")!!.turns.isEmpty())
     }
+    @Test fun crossEditionLocalModelProfileRetainsExistingSelection() {
+        val original = MemoryLocalPersistence()
+        val profile = RemoteProfile(currentChatModel = "portable-model", modelBox = RemoteModelBox(chat = listOf("portable-model")))
+        RemoteCacheStore(original).putProfile(profile)
+        val bytes = LocalBackupArchive.encode(LocalBackupArchive.capture(original, "com.elementeracoast.app"))
+        val modules = setOf("model_profile")
+        val target = MemoryLocalPersistence()
+        val decoded = CoastTransferCodec.decode(bytes)
+        assertTrue("model_profile" in LocalTransferRestore.availableModules(decoded, app))
+        assertFalse("daily" in LocalTransferRestore.availableModules(decoded, app))
+        LocalTransferRestore.restore(bytes, app, modules, target)
+        val cache = RemoteCacheStore(target)
+        assertEquals(profile, cache.profile())
+        cache.putProfile(profile.copy(currentChatModel = "existing-model"))
+        val repeated = LocalTransferRestore.restore(bytes, app, modules, target)
+        assertEquals(1, repeated.counts.getValue("model_profile").conflicts)
+        assertEquals("existing-model", cache.profile()?.currentChatModel)
+    }
     @Test fun failedTransactionDoesNotExposePartialRecords() {
         val local = MemoryLocalPersistence()
         local.put("original","keep")
