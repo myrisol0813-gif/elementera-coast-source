@@ -163,12 +163,26 @@ class CoastApiClient(
         "/attachments/"+encodePath(conversation)+"/"+encodePath(id)
     suspend fun archiveV2Attachment(conversation: String,id: String): JsonObject =
         jsonRequestElement(archiveV2Request(archiveV2AttachmentPath(conversation,id)).get().build()).jsonObject
-    suspend fun archiveV2AttachmentChunk(conversation: String,id: String,descriptor: com.elementeracoast.app.core.local.ArchiveV2Object,index: Int): ByteArray {
+    suspend fun archiveV2AttachmentChunk(conversation: String,id: String,descriptor: com.elementeracoast.app.core.local.ArchiveV2Object,index: Int): ByteArray =
+        archiveV2ReadChunk(archiveV2AttachmentPath(conversation,id),descriptor,index)
+    suspend fun archiveV2VoiceChunk(id: String,descriptor: com.elementeracoast.app.core.local.ArchiveV2Object,index: Int): ByteArray =
+        archiveV2ReadChunk("/voice/"+encodePath(id),descriptor,index)
+    suspend fun archiveV2LibraryCoverChunk(id: String,descriptor: com.elementeracoast.app.core.local.ArchiveV2Object,index: Int): ByteArray =
+        archiveV2ReadChunk("/library-cover/"+encodePath(id),descriptor,index)
+    suspend fun archiveV2ValidateManifest(manifest: com.elementeracoast.app.core.local.ArchiveV2Manifest): JsonObject =
+        jsonRequestElement(archiveV2Request("/manifest/validate").post(jsonBody(json.encodeToString(manifest))).build()).jsonObject
+    suspend fun archiveV2RestoreChat(id: String,manifest: com.elementeracoast.app.core.local.ArchiveV2Manifest,conversationId: String,confirm: Boolean): JsonObject {
+        val payload=buildJsonObject {
+            put("manifest",json.encodeToJsonElement(manifest));put("confirm",confirm)
+        }
+        return jsonRequestElement(archiveV2Request("/sessions/"+encodePath(id)+"/chat-restore/"+encodePath(conversationId)).post(jsonBody(payload.toString())).build()).jsonObject
+    }
+    private suspend fun archiveV2ReadChunk(path: String,descriptor: com.elementeracoast.app.core.local.ArchiveV2Object,index: Int): ByteArray {
         val protocol=com.elementeracoast.app.core.local.ArchiveV2Chunks
         protocol.validate(descriptor)
         require(index in descriptor.chunks.indices)
         val expected=minOf(protocol.CHUNK_BYTES.toLong(),descriptor.size-index.toLong()*protocol.CHUNK_BYTES).toInt()
-        val request=archiveV2Request(archiveV2AttachmentPath(conversation,id)+"/chunks/"+index+"?object_sha256="+descriptor.objectSha256).get().build()
+        val request=archiveV2Request(path+"/chunks/"+index+"?object_sha256="+descriptor.objectSha256).get().build()
         return execute(request) { response ->
             if(!response.isSuccessful)throw responseError(response)
             val input=response.body?.byteStream() ?: error("原件分块缺失。")
