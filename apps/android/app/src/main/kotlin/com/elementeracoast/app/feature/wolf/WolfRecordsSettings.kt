@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import kotlinx.serialization.json.JsonElement
 import com.elementeracoast.app.core.model.ChatMessage
 import com.elementeracoast.app.core.model.CoastShellState
 import java.time.LocalDateTime
@@ -63,6 +64,8 @@ internal fun ChatRecordsScreen(
     var pendingSummary by remember { mutableStateOf("") }
     var pendingWarnings by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var pendingArchive by remember { mutableStateOf<JsonElement?>(null) }
+    var transferOpen by remember { mutableStateOf(false) }
 
     fun write(uri: Uri?, text: String) {
         if (uri == null) {
@@ -90,8 +93,22 @@ internal fun ChatRecordsScreen(
     val jsonExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         write(uri, pendingText)
     }
-    val htmlExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/html")) { uri ->
-        write(uri, pendingText)
+    val htmlExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        val snapshot = pendingArchive
+        pendingArchive = null
+        if (uri == null || snapshot == null) { busy = false; return@rememberLauncherForActivityResult }
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        OfflineHtmlArchive.write(snapshot, output, if (localMode) listOf("本机仅含当前已实现的模块") else GlobalArchive.auditFullArchive(snapshot))
+                    } ?: error("无法打开目标文件")
+                }
+            }.onSuccess { warnings ->
+                onSnackbar(if (warnings.isEmpty()) "离线 HTML ZIP 已导出，解压后打开 index.html" else "离线归档已导出；有缺失或范围限制，详见 manifest.json")
+            }.onFailure { onSnackbar("离线归档失败："+it.message) }
+            busy = false
+        }
     }
 
     fun launchGlobal(format: String) {
@@ -99,28 +116,20 @@ internal fun ChatRecordsScreen(
         busy = true
         scope.launch {
             runCatching {
-                val raw = if (format == "full") archive.fullArchive() else archive.snapshot()
+                val raw = if (localMode) archive.snapshot() else archive.fullArchive()
                 withContext(Dispatchers.Default) { GlobalArchive.withNativeSettings(raw, nativeSettings, localMode) }
             }.onSuccess { snapshot ->
                     pendingWarnings = ""
-                    if (format == "full") {
-                        val warnings = GlobalArchive.auditFullArchive(snapshot)
-                        pendingText = withContext(Dispatchers.Default) { snapshot.toString() }
-                        pendingOk = "已导出完整海岸包"
-                        pendingSummary = "与 PWA 同源 · 包含服务器返回的附件及语音原件"
-                        pendingWarnings = if (warnings.isEmpty()) "请核对下载文件，当前 APK 尚不支持完整恢复。"
-                            else "不可视为完整备份：" + warnings.joinToString("；") + "。请保留原资料。"
-                        jsonExport.launch("elementera-coast-full-$stamp.coastpack.json")
-                    } else if (format == "html") {
-                        pendingText = GlobalArchive.exportHtml(snapshot)
-                        pendingOk = "已导出全局 HTML"
-                        pendingSummary = "snapshot-backed · 不含附件二进制"
-                        htmlExport.launch("elementera-coast-global-$stamp.html")
+                    if (format == "html") {
+                        pendingArchive = snapshot
+                        htmlExport.launch("elementera-coast-offline-$stamp.zip")
                     } else {
-                        pendingText = GlobalArchive.exportJson(snapshot)
-                        pendingOk = "已导出全局 JSON"
-                        pendingSummary = "V1 全局快照 · 已脱敏"
-                        jsonExport.launch("elementera-coast-global-$stamp.json")
+                        val warnings = if (localMode) listOf("本机仅含已实现模块") else GlobalArchive.auditFullArchive(snapshot)
+                        pendingText = withContext(Dispatchers.Default) { snapshot.toString() }
+                        pendingOk = "已导出海岸归档"
+                        pendingSummary = "当前可归档资料"
+                        pendingWarnings = "完整恢复尚未接通。" + warnings.joinToString("；")
+                        jsonExport.launch("elementera-coast-full-$stamp.coastpack.json")
                     }
                 }
                 .onFailure {
@@ -131,48 +140,26 @@ internal fun ChatRecordsScreen(
     }
 
     LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { TransferPanel(archive, localMode, transferAllowed && !busy, onSnackbar) }
-        item { Text("防丢导出", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) }
-        if (!localMode) item {
-            WolfRow("导出完整海岸包", if (busy) "正在导出……" else "与 PWA 同源 · 包含附件及语音原件；大包建议使用 PWA") {
+        item { Text("海岸归档", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) }
+        item {
+            WolfRow("导出完整海岸包", if (busy) "正在导出……" else if (localMode) "本机已实现模块 · 完整恢复尚未接通" else "当前可归档资料与原件 · 完整恢复尚未接通") {
                 launchGlobal("full")
             }
         }
         item {
-            WolfRow("全局 JSON", if (busy) "正在读取全局快照……" else if (localMode) "本机快照 · 目前仅已实现模块" else "V1 全局快照 · 与 Web 同一数据源") {
-                launchGlobal("json")
-            }
-        }
-        item {
-            WolfRow("全局 HTML", "同一全局快照的可读离线文档") {
+            WolfRow("导出离线 HTML ZIP", "解压 index.html · 全局记录、已归档图片与语音") {
                 launchGlobal("html")
             }
         }
         item {
-            WolfRow("当前窗口 JSON", "局部副本 · 保留当前显示消息与资料 metadata") {
-                if (!busy) {
-                    busy = true
-                    pendingText = ChatArchive.exportJson(profile, messages)
-                    pendingOk = "已导出当前窗口 JSON"
-                    pendingSummary = "当前窗口 ${messages.size} 条消息"
-                    pendingWarnings = ""
-                    jsonExport.launch("elementera-chat-$stamp.json")
-                }
+            WolfRow("导入海岸包", "当前兼容 V1 迁移包 · 兼容导出也在此处") {
+                if (!busy) transferOpen = !transferOpen
             }
         }
+        if (transferOpen) item { TransferPanel(archive, localMode, transferAllowed && !busy, onSnackbar) }
         item {
-            WolfRow("导入当前窗口 JSON", "真实 history 写回本轮未接；暂不导入") {
-                @Suppress("UNUSED_EXPRESSION")
-                onImportMessages
-                onSnackbar("聊天记录导入暂未接后端；没有修改当前真实会话。")
-            }
-        }
-        item {
-            Text(
-                if (localMode) "本机导出直接读取设备资料，不访问后端；当前包含聊天、手动日记和资料，不含 API Key、OAuth 凭据、附件原文件及未移植模块；尚不能完整恢复。" else "全局 JSON 与全局 HTML 都直接读取 /api/export/v1-snapshot：聊天窗口、整理当前对话的纸条、记忆、全局摘录与修改记录、世界书、自定义指令、模型后端返回原文、工具摘要、附件索引、搜索摘要和版本信息共用一份来源。附件二进制不会塞进 HTML。",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall
-            )
+            Text(if (localMode) "本机只读取设备已有模块，不访问后端。完整归档和大容量恢复仍在建设。" else "两种全局归档共用服务器完整包；离线 ZIP 只读。完整恢复和大容量传输仍在建设。访客隐私与凭据不进入归档。",
+                color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

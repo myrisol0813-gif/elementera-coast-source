@@ -37,11 +37,13 @@ assert.equal(settings.includes('assistantBubble'), false);
 const profile = between(settings, "router.register('settings-profile'", "router.register('settings-appearance'");
 for (const expected of ['昵称', '聊天署名 / 导出时显示名', '用户气泡颜色', '头像在碳硅圈资料中设置', '不会自动进入模型伙伴']) assert.ok(profile.includes(expected), `profile missing: ${expected}`);
 assert.equal(profile.includes('ownerAvatar'), false, 'Wolf profile must not introduce a second avatar field');
-assert.match(settings, /display_profile: display/);
 assert.match(settings, /ownerSignature/);
-assert.match(settings, /snapshotChatHtml\(snapshot, signature\)/);
-assert.match(settings, /Elementera Coast · 全局 HTML/);
-assert.match(settings, /数据范围与 V1 JSON 快照同源/);
+assert.match(settings, /buildOfflineArchive\(archive, auditFullArchiveCompleteness\(archive\), signature\)/);
+const { buildOfflineArchive } = await import(pathToFileURL(resolve(pages, 'public/features/offline-archive.js')).href);
+const archive = buildOfflineArchive({chat:{conversations:[{conversation:{id:'c'},history:{turns:[{user:{variants:[{content:'署名测试'}]},assistant:{variantsByUserVariant:{}}}]}}]}}, [], '归档署名');
+const archiveText = new TextDecoder().decode(await archive.blob.arrayBuffer());
+assert.ok(archiveText.includes('归档署名') && archiveText.includes('署名测试'), 'offline ZIP preserves the configured signature');
+assert.ok(archiveText.includes('Elementera Coast · 离线海岸'));
 
 const tools = await read(resolve(pages, 'public/features/tools.js'));
 for (const expected of ['最近聊天轮数', '上下文 token budget', '回答长度', '最大输出 token', '表达倾向', '流式输出', '当前对话纸条最多字数', '线索冷却轮数', '世界书 / 词典', '每轮最多词条', '本轮记忆召回上限']) assert.ok(tools.includes(expected), `basic settings missing: ${expected}`);

@@ -2,6 +2,7 @@ import { chooseImage, downloadFile, escapeAttribute, escapeHtml, q, timestampLab
 import { API, requestJson } from '../core/api.js';
 import { shortModelName } from '../core/model-format.js';
 import { createTransferSettings } from './settings-transfer.js';
+import { buildOfflineArchive } from './offline-archive.js';
 
 const LOADED_AT = new Date().toISOString();
 
@@ -157,14 +158,10 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     title: '聊天记录',
     subtitle: '完整前端与当前窗口 · 本机导入导出',
     className: 'settings-panel',
-    body: group('数据迁移', row('可迁移数据包', '本机与云端通用格式 · 预览后导入', 'settings:transfer-open'))
-      + group('完整前端',
-      row('导出完整前端包', '前端完整数据 · 朋友信箱只含隐私摘要，不含访客正文 / 暗号材料', 'settings:export-full-archive')
-      + row('导出 V1 防丢快照', '轻量 JSON · 附件只存索引 · 朋友信箱只含隐私摘要', 'settings:export-v1-snapshot')
-      + row('导出全局 HTML', '与 V1 JSON 同源 · 朋友信箱仅隐私摘要 · 不含访客正文', 'settings:export-html'))
-      + group('当前窗口',
-        row('导出当前窗口 JSON', '只保留当前消息与显示资料 metadata', 'settings:export-json')
-        + row('导入 JSON', '恢复到当前窗口', 'settings:import-json')),
+    body: group('海岸归档',
+      row('导出完整海岸包', '当前可归档资料与原件 · 完整恢复尚未接通', 'settings:export-full-archive')
+      + row('导出离线 HTML ZIP', '解压 index.html · 聊天变体、图片与语音原件', 'settings:export-html')
+      + row('导入海岸包', '当前兼容 V1 迁移包；兼容导出也在此处', 'settings:transfer-open')),
   }));
 
   router.register('settings-theme', () => ({
@@ -257,93 +254,14 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     }
   }
 
-  async function exportV1Snapshot() {
-    toast('正在把 V1 的家收进防丢快照…', 2400);
-    const data = await requestJson(API.v1Snapshot);
-    const snapshot = {
-      ...(data.snapshot || {}),
-      local_device: localArchiveState(storage, chat),
-    };
-    snapshot.included_modules = [
-      ...(Array.isArray(snapshot.included_modules) ? snapshot.included_modules : []),
-      'local_device_settings',
-      'local_letters',
-    ].filter((item, index, list) => list.indexOf(item) === index);
-    const body = JSON.stringify(snapshot, null, 2);
-    const bytes = new Blob([body], { type: 'application/json' }).size;
-    downloadFile(body, `elementera-coast-v1-snapshot-${timestampLabel()}.json`, 'application/json');
-    toast(`V1 防丢快照已生成 · ${sizeLabel(bytes)} · 附件 ${Number(snapshot.attachments?.count || 0)} 个索引`, 4200);
-  }
-
-  function exportJson() {
-    const display = {
-      nickname: preferences().ownerName || '屋主',
-      signature: preferences().ownerSignature || preferences().ownerName || '屋主',
-    };
-    const data = {
-      format: 'elementera-chat-export',
-      version: '4',
-      exported_at: new Date().toISOString(),
-      display_profile: display,
-      messages: chat.getActiveMessages(),
-    };
-    downloadFile(JSON.stringify(data, null, 2), `elementera-chat-export-${timestampLabel()}.json`, 'application/json');
-  }
-
-  function snapshotChatHtml(snapshot, signature) {
-    const records = Array.isArray(snapshot?.chat?.conversations) ? snapshot.chat.conversations : [];
-    return records.map(({ conversation = {}, history = {} }) => {
-      const messages = [];
-      for (const turn of Array.isArray(history?.turns) ? history.turns : []) {
-        const users = turn?.user?.variants || [];
-        const userIndex = Math.min(Math.max(0, Number(turn?.user?.active) || 0), Math.max(0, users.length - 1));
-        const user = users[userIndex];
-        if (user?.content) messages.push({ role: 'user', content: user.content, created_at: user.created_at });
-        const assistants = turn?.assistant?.variantsByUserVariant?.[String(userIndex)] || [];
-        const assistantIndex = Math.min(Math.max(0, Number(turn?.assistant?.activeByUserVariant?.[String(userIndex)]) || 0), Math.max(0, assistants.length - 1));
-        const assistant = assistants[assistantIndex];
-        if (assistant?.content) messages.push({ role: 'assistant', content: assistant.content, created_at: assistant.created_at });
-      }
-      const rows = messages.map((message) => `<article class="m ${message.role}"><b>${escapeHtml(message.role === 'user' ? signature : '模型伙伴')}</b><div>${escapeHtml(message.content).replace(/\\n/g, '<br>')}</div></article>`).join('');
-      return `<section class="window"><h2>${escapeHtml(conversation.room_type || 'main')}｜${escapeHtml(conversation.title || conversation.id || '未命名窗口')}</h2><small>${escapeHtml(conversation.updated_at || '')}</small>${rows || '<p class="empty">没有可读消息。</p>'}</section>`;
-    }).join('');
-  }
-
-  function snapshotDataSection(title, value) {
-    return `<section class="data"><h2>${escapeHtml(title)}</h2><pre>${escapeHtml(JSON.stringify(value ?? null, null, 2))}</pre></section>`;
-  }
-
   async function exportHtml() {
-    toast('正在把完整前端整理成 HTML…', 2600);
+    toast('正在整理离线海岸 ZIP…', 3000);
+    const data = await requestJson(API.fullArchive);
+    const archive = { ...(data.archive || {}), local_device: localArchiveState(storage, chat) };
     const signature = preferences().ownerSignature || preferences().ownerName || '屋主';
-    const data = await requestJson(API.v1Snapshot);
-    const snapshot = {
-      ...(data.snapshot || {}),
-      local_device: localArchiveState(storage, chat),
-    };
-    const chatHtml = snapshotChatHtml(snapshot, signature);
-    const sections = [
-      snapshotDataSection('整理当前对话的纸条', snapshot.thinking_soil),
-      snapshotDataSection('记忆系统 / 用户画像 / 自我画像 / 自定义指令', snapshot.memory),
-      snapshotDataSection('世界书', snapshot.worldbook),
-      snapshotDataSection('访客信箱 / 来信（隐私摘要）', snapshot.mailbox),
-      snapshotDataSection('日记与动态', snapshot.daily),
-      snapshotDataSection('公历日历', snapshot.calendar),
-      snapshotDataSection('书房', snapshot.tidal_library),
-      snapshotDataSection('语音留存索引', snapshot.voice),
-      snapshotDataSection('海岸文件库 · 基本媒体与拾潮珍藏（含备注/来源）', snapshot.coast_vault),
-      snapshotDataSection('模型资料与回波摘要', { model_profile: snapshot.model_profile, model_echo_summaries: snapshot.model_echo_summaries }),
-      snapshotDataSection('工具日志摘要', snapshot.tools),
-      snapshotDataSection('附件索引与元数据', snapshot.attachments),
-      snapshotDataSection('搜索摘要', snapshot.web_search),
-      snapshotDataSection('版本与本机设置', { versions: snapshot.versions, local_device: snapshot.local_device }),
-    ].join('');
-    const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Elementera Coast Global Export</title><style>
-      :root{color-scheme:light dark}body{font-family:system-ui,-apple-system,sans-serif;line-height:1.68;margin:0;background:#f7f5f1;color:#2d2926}.w{max-width:920px;margin:auto;padding:28px 16px 60px}h1{font-size:25px}h2{font-size:16px;margin:0 0 6px}.meta,small{color:#857d76}.window,.data{margin:18px 0;padding:18px;border-radius:18px;background:rgba(255,255,255,.72);box-shadow:0 8px 28px rgba(60,45,35,.05)}.m{margin:14px 0}.m b{display:block;font-size:12px;color:#8c837c}.m div{display:inline-block;max-width:90%;padding:10px 13px;border-radius:15px;background:#f0ece6}.m.user{text-align:right}.m.user div{background:#e8eef3}.m.user b{text-align:right}pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:13px;border-radius:13px;background:rgba(80,70,60,.055);font:12px/1.6 ui-monospace,SFMono-Regular,monospace}.empty{color:#8c837c}@media(prefers-color-scheme:dark){body{background:#171615;color:#e8e1da}.window,.data{background:#211f1d}.m div{background:#2b2926}.m.user div{background:#26303a}pre{background:#191817}}
-    </style></head><body><main class="w"><h1>Elementera Coast · 全局 HTML</h1><p class="meta">导出时间：${escapeHtml(snapshot.exported_at || new Date().toISOString())} · 数据范围与 V1 JSON 快照同源；附件二进制本体不写入 HTML。</p><h1>聊天窗口</h1>${chatHtml}${sections}</main></body></html>`;
-    const bytes = new Blob([html], { type: 'text/html' }).size;
-    downloadFile(html, `elementera-coast-global-${timestampLabel()}.html`, 'text/html');
-    toast(`全局 HTML 已生成 · ${sizeLabel(bytes)} · 窗口 ${Number(snapshot.chat?.conversations?.length || 0)} 个`, 4200);
+    const result = buildOfflineArchive(archive, auditFullArchiveCompleteness(archive), signature);
+    downloadFile(result.blob, `elementera-coast-offline-${timestampLabel()}.zip`, 'application/zip');
+    toast('离线海岸已导出 · 原件 '+result.mediaCount+' 个'+(result.warnings.length?' · 有缺失，请查看 manifest.json':' · 解压后打开 index.html'), 6500);
   }
 
   function importJson() {
@@ -428,11 +346,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     if (name === 'export-full-archive') {
       return exportFullArchive().catch((error) => toast(`完整前端包导出失败：${error.message}`, 5200));
     }
-    if (name === 'export-v1-snapshot') {
-      return exportV1Snapshot().catch((error) => toast(`V1 快照导出失败：${error.message}`, 4200));
-    }
-    if (name === 'export-json') return exportJson();
-    if (name === 'export-html') return exportHtml();
+    if (name === 'export-html') return exportHtml().catch(error => toast('离线归档失败：'+error.message, 5200));
     if (name === 'import-json') return importJson();
   }
 
