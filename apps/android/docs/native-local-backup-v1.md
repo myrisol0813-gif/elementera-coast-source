@@ -1,13 +1,11 @@
-# 本机可恢复备份 v1 · 施工中
+# Unified Coast transfer v1
 
-本阶段仅建立版本化数据契约、严格读取、SHA-256 校验、预览和冲突识别。不是已发布的恢复功能。使用现有独立本机文件存储，不引入第二个数据库，不访问云端。
+One portable envelope for local and cloud workspaces: elementera-coast-transfer v1, SHA-256 of the exact UTF-8 payload_json bytes. Origin edition and workspace describe provenance; the selected destination determines where records are saved. Daily identity fields on the wire are neutral (owner / model_partner); edition-specific conversion happens at the private boundary.
 
-已覆盖：全部窗口与原始 history v4、用户/助手全部变体与活动索引、收藏/点赞/隐藏状态、时间及模型来源、窗口上下文设置、日记、动态/评论、日历及纪念日、模型与日常资料。保留真实 ID。文件上限暂定 64 MiB，超限显式拒绝，不静默截断。两套应用各自恢复，跨应用/跨模式导入另立传输契约。
+Supported modules: chat histories and variants, calendar and anniversaries, daily profile/moments/comments/diaries/individual likes, model profile. Preview is read-only; import preserves existing records and reports duplicate IDs and conflicting contents. Local import uses staged atomic generation switching and cloud import uses a single D1 batch. No implicit replacement or partial write. Select modules before import.
 
-未覆盖：供应商配置、凭据与 OAuth、模型回波、设备外观及设置、字体/背景原件、媒体、记忆、世界书、书房、工具等；下一步扩充安全配置范围并设计原子恢复。不会将未覆盖部分称作完整恢复。SHA-256 是完整性校验而不是身份认证或加密；聊天本身可能含私人信息，备份文件应由屋主妥善保存。
+Limits: 64 MiB archive, 8 MiB cloud import request, 90 SQL statements per atomic cloud import. Larger requests are rejected; record-level splitting is not implemented. Chats containing attachments or cross-window snapshots are blocked; historical aggregate likes without actor/timestamp details cannot be reconstructed on cloud import. Unsupported or non-preservable fields are rejected rather than silently discarded. Earlier readable backups are not this restore format.
 
-下一步：实现无网络的恢复事务与失败回滚、预览并明确冲突策略（不覆盖既有资料）、系统文件选择器及独立恢复入口；空设备、重复导入、冲突、损坏、恢复后继续聊天、隔离及中文大窗口测试。尚未改动 UI 或真实数据。
+Excluded: original media/attachments, credentials, provider configuration, device appearance/settings, memory/worldbook, library, tool logs and other unsupported modules. The checksum detects corruption, not authenticity, and the archive is not encrypted. Keep it private.
 
-## 统一数据包修订
-
-屋主明确要求本机与云端共享可迁移格式。未发行的专用本机 envelope 已改为 elementera-coast-transfer v1：payload_json 为原始 UTF-8 JSON 字符串，SHA-256 校验其精确字节，避免 JS/Kotlin JSON 重排差异。applicationId / workspace 为来源说明，不是权限凭据；includedModules 声明所含模块，顶层类型化记录与云端实现一致。通用解码无应用限制。完整本机恢复的模块映射仍待完成，不能将该阶段当成跨端恢复已实现。单文件 64 MiB，云端初期单请求 8 MiB，超限另做分块传输而非截断。
+Acceptance: use disposable chat/calendar/daily/profile records, export from local or cloud, preview into the other workspace, verify selected modules and destination, import, reimport for duplicate handling, confirm a same-ID conflict leaves destination untouched, and corrupt a copy to verify rejection. Do not test on irreplaceable production records. APK updates must retain the installed signing identity; do not uninstall an app with unexported local data.
