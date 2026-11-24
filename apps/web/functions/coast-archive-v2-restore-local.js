@@ -1,3 +1,4 @@
+import { restoreArchiveChatGroup } from './coast-archive-v2-restore.js';
 import { encodeTransfer } from './coast-transfer.js';
 import { previewCloudTransfer,importCloudTransfer } from './coast-transfer-store.js';
 import { validateArchiveManifest } from './coast-archive-v2-manifest.js';
@@ -11,6 +12,8 @@ const specs={local_chat:['chat','conversations'],local_calendar:['calendar','cal
 export async function restoreArchiveLocalRecord(db,session,manifest,module,recordId,confirm=false){
  await validateArchiveManifest(manifest);
  check(manifest.workspace==='local'&&['com.elementeracoast.app','com.elementeracoast.source'].includes(manifest.application_id),'unknown local archive origin');
+ // A local chat with any dependent original must use the atomic group path.
+ if(module==='chat'&&manifest.records.some(x=>['attachments','voice','dogtalk_records','dogtalk_snapshots','thinking_soil','thinking_soil_history'].includes(x.module)&&x.dependencies.includes('chat/'+recordId)))return restoreArchiveChatGroup(db,session,manifest,recordId,confirm);
  const r=manifest.records.find(x=>x.module===module&&x.id===recordId);
  check(r&&r.media_objects.length===0&&(['calendar','daily'].includes(module)||r.dependencies.length===0),'local record is missing or contains unsupported dependencies');
  const d=manifest.objects.find(x=>x.object_sha256===r.record_object);

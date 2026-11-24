@@ -58,7 +58,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
     }
     fun cloudChats(m:ArchiveV2Manifest):List<String> =
         if(!local&&m.workspace=="backend"&&m.applicationId==BuildConfig.APPLICATION_ID) m.records.filter { it.module=="chat" }.map { it.id } else emptyList()
-    data class Choice(val kind:String,val id:String,val title:String,val fromLocal:Boolean=false){
+    data class Choice(val kind:String,val id:String,val title:String,val fromLocal:Boolean=false,val grouped:Boolean=false){
         val key get()=kind+":"+id
     }
     suspend fun cloudChoices(input:Imported):List<Choice> = withContext(Dispatchers.IO) {
@@ -75,7 +75,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
                 val data=value.getValue("data").jsonObject
                 if(m.workspace=="local"){
                     val kinds=mapOf("local_chat" to "chat","local_calendar" to "calendar","local_moment" to "daily","local_diary" to "daily","local_daily_profile" to "daily","local_model_profile" to "model_profile","worldbook" to "worldbook","custom_instructions" to "custom_instructions","memory_entries" to "memory_entries","memory_pockets" to "memory_pockets","user_portrait" to "user_portrait","self_portrait" to "self_portrait","thinking_soil" to "thinking_soil","thinking_soil_history" to "thinking_soil_history","tools" to "tools")
-                    if(kinds[kind]==r.module){val title=((data["conversation"] as? JsonObject)?.get("title")?.jsonPrimitive?.contentOrNull?:data["title"]?.jsonPrimitive?.contentOrNull?:data["text"]?.jsonPrimitive?.contentOrNull?:when(r.module){"user_portrait"->"用户画像及历史";"self_portrait"->"自我画像及历史";else->r.module}).take(100);add(Choice(r.module,r.id,title,true))}
+                    if(kinds[kind]==r.module){val grouped=r.module=="chat"&&m.records.any{it.module in setOf("attachments","voice","dogtalk_records","dogtalk_snapshots","thinking_soil","thinking_soil_history")&&"chat/"+r.id in it.dependencies};if(grouped&&m.applicationId!=BuildConfig.APPLICATION_ID)continue;val title=((data["conversation"] as? JsonObject)?.get("title")?.jsonPrimitive?.contentOrNull?:data["title"]?.jsonPrimitive?.contentOrNull?:data["text"]?.jsonPrimitive?.contentOrNull?:when(r.module){"user_portrait"->"用户画像及历史";"self_portrait"->"自我画像及历史";else->r.module}).take(100);add(Choice(r.module,r.id,title,true,grouped))}
                     continue
                 }
                 if(r.module=="chat"&&kind=="chat"){
@@ -108,7 +108,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
     suspend fun cloudRestore(input:Imported,session:String,choice:Choice,confirm:Boolean):JsonObject {
         require(!local&&choice in cloudChoices(input))
         return if(choice.kind=="book")api.archiveV2RestoreBook(session,input.manifest,choice.id,confirm)
-            else if(choice.kind=="chat"&&!choice.fromLocal)api.archiveV2RestoreChat(session,input.manifest,choice.id,confirm)
+            else if(choice.kind=="chat"&&(!choice.fromLocal||choice.grouped))api.archiveV2RestoreChat(session,input.manifest,choice.id,confirm)
             else api.archiveV2RestoreRecord(session,input.manifest,choice.kind,choice.id,confirm)
     }
     suspend fun cancelSession(session:String){require(!local);api.archiveV2CancelSession(session)}

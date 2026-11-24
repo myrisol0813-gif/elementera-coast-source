@@ -54,7 +54,7 @@ export async function exportCloudTransfer(db) {
 
 // Keep the original content and branch positions. Never rely on normalizeState's
 // truncation or clamping as validation. Unsupported media must block that window.
-function validatedChat(row) {
+export function validatedChat(row,{verifiedMediaGroup=false}={}) {
   require(object(row?.conversation) && object(row?.history), '聊天记录结构无效。');
   const c = row.conversation, h = row.history;
   require(validId(c.id) && typeof c.title === 'string' && c.title.trim() && c.title.length <= 1000, '窗口名称或 ID 无效。');
@@ -85,7 +85,7 @@ function validatedChat(row) {
     for (const v of variants) {
       require(validId(v?.id) && !variantIds.has(v.id) && typeof v.content === 'string', '消息 ID 或正文无效。'); variantIds.add(v.id);
       require(typeof v.created_at === 'string' && validStamp(v.created_at), '消息时间无效。');
-      require(!v.attachments?.length, '含附件的窗口暂不支持迁移原件，请保留原窗口。');
+      require(verifiedMediaGroup||!v.attachments?.length, '含附件的窗口暂不支持迁移原件，请保留原窗口。');
       require(!v.dogtalk_snapshot_id, '该窗口关联尚不可迁移的跨窗快照，请保留原窗口。');
     }
   }
