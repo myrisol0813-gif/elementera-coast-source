@@ -30,7 +30,7 @@ internal object ArchiveV2Local {
                     val raw=buildJsonObject { put("kind",kind);put("data",data) }.toString().encodeToByteArray()
                     val d=describe(raw)
                     ByteArrayInputStream(raw).use { writer.objectEntry(d,it) }
-                    val dependencies=if(module in setOf("calendar","daily")+LocalMemoryStore.modules+LocalSoilStore.modules)data.jsonObject["conversation_id"]?.jsonPrimitive?.contentOrNull?.let { listOf("chat/"+it) }?:emptyList() else emptyList()
+                    val dependencies=if(module in setOf("calendar","daily")+LocalMemoryStore.modules+LocalSoilStore.modules+setOf("tools"))data.jsonObject["conversation_id"]?.jsonPrimitive?.contentOrNull?.let { listOf("chat/"+it) }?:emptyList() else emptyList()
                     objects[d.objectSha256]=d;records.add(ArchiveV2Record(module,id,d.objectSha256,emptyList(),dependencies))
                 }
                 fun list(module:String,field:String,kind:String,id:(JsonObject)->String) {

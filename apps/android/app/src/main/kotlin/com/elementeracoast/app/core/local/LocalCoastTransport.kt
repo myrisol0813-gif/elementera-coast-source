@@ -288,8 +288,8 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 put("scope", "local")
                 put("workspace", "local")
                 put("exported_at", now())
-                put("included_modules", JsonArray(listOf("chat", "daily", "model_profile", "calendar").map(::JsonPrimitive)))
-                put("excluded_modules", JsonArray(listOf("attachments", "memory", "thinking_soil", "worldbook", "vault", "library", "voice", "local_appearance", "provider_credentials", "oauth_credentials", "full_restore").map(::JsonPrimitive)))
+                put("included_modules", JsonArray(listOf("chat", "daily", "model_profile", "calendar","memory","worldbook","custom_instructions","user_portrait","self_portrait","thinking_soil","thinking_soil_history","tools").map(::JsonPrimitive)))
+                put("excluded_modules", JsonArray(listOf("attachments", "vault", "library", "voice", "local_appearance", "provider_credentials", "oauth_credentials", "raw_tool_payloads","full_restore").map(::JsonPrimitive)))
                 put("chat", buildJsonObject {
                     put("conversations", buildJsonArray { cache.conversations().forEach { c ->
                     add(buildJsonObject {
@@ -304,6 +304,8 @@ class LocalCoastTransport(private val store: LocalPersistence,
                     put("diaries", array(RemoteDailyDiary.serializer(), cache.dailyDiaries()))
                 })
                 put("calendar", buildJsonObject { put("entries", calendar.snapshot()) })
+                val records=ArchiveV2Knowledge.export(store).groupBy{it.kind}
+                for((kind,rows) in records)put(kind,JsonArray(rows.map{it.data}))
                 put("model_profile", element(RemoteProfile.serializer(), cache.profile() ?: RemoteProfile()))
             }
             return ok(r, "snapshot" to snapshot)

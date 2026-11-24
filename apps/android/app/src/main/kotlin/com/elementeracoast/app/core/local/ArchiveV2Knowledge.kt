@@ -7,7 +7,7 @@ import java.time.Instant
 /** These modules already have a real editable local store. Use the cloud's
  * canonical V2 record shape in both directions, not a parallel backup schema. */
 internal object ArchiveV2Knowledge {
-    val modules=setOf("custom_instructions","worldbook")+LocalMemoryStore.modules+LocalPortraitStore.modules+LocalSoilStore.modules
+    val modules=setOf("custom_instructions","worldbook")+LocalMemoryStore.modules+LocalPortraitStore.modules+LocalSoilStore.modules+setOf("tools")
     data class Row(val module:String,val id:String,val data:JsonObject,val kind:String=module)
     private fun identity(module:String,id:String)=module+":"+ArchiveV2Chunks.digest(JsonArray(listOf(JsonPrimitive(id))).toString().encodeToByteArray())
     private fun stamp(value:String?)=Instant.parse(requireNotNull(value)).toEpochMilli().also{require(it>=0)}
@@ -46,10 +46,11 @@ internal object ArchiveV2Knowledge {
         for((module,items) in listOf("thinking_soil" to soils.current,"thinking_soil_history" to soils.history)){
             items.forEach{result.add(Row(module,LocalSoilStore.identity(module,it),it))}
         }
+        LocalToolAudit(store).read().forEach{result.add(Row("tools",it.str("id"),it))}
         return result
     }
     fun read(manifest:ArchiveV2Manifest,stage:ArchiveV2Stage,selection:Set<String>,app:String):List<Row>{
-        require(selection.intersect(LocalMemoryStore.modules+LocalPortraitStore.modules+LocalSoilStore.modules+setOf("custom_instructions")).isEmpty()||manifest.applicationId==app){"记忆及自定义指令原始身份暂需同版本恢复。"}
+        require(selection.intersect(LocalMemoryStore.modules+LocalPortraitStore.modules+LocalSoilStore.modules+setOf("custom_instructions","tools")).isEmpty()||manifest.applicationId==app){"记忆及自定义指令原始身份暂需同版本恢复。"}
         val objects=manifest.objects.associateBy{it.objectSha256}
         return manifest.records.filter{it.module in selection}.map{r->
             require(r.mediaObjects.isEmpty())
@@ -65,6 +66,8 @@ internal object ArchiveV2Knowledge {
                 require(v["deleted_at"]==JsonNull&&r.id==v.str("id"))
                 val cid=v["conversation_id"]?.jsonPrimitive?.contentOrNull
                 require(r.dependencies==if(cid==null)emptyList() else listOf("chat/"+cid))
+            }else if(r.module=="tools"){
+                LocalToolAudit.validateRow(v);require(r.id==v.str("id")&&r.dependencies==listOf("chat/"+v.str("conversation_id")))
             }else if(r.module in LocalSoilStore.modules){
                 LocalSoilStore.validateRow(v,r.module=="thinking_soil_history")
                 require(r.id==LocalSoilStore.identity(r.module,v)&&r.dependencies==listOf("chat/"+v.str("conversation_id")))
@@ -160,6 +163,15 @@ internal object ArchiveV2Knowledge {
             val next=LocalSoilStore.Rows(merge("thinking_soil",old.current),merge("thinking_soil_history",old.history))
             LocalSoilStore.validate(next)
             if(write)soil.write(next)
+        }
+        if("tools" in selection){
+            val audit=LocalToolAudit(store);val old=audit.read();val byId=old.associateBy{it.str("id")}
+            val incoming=rows.filter{it.module=="tools"}.map{it.data}
+            val fresh=incoming.filter{it.str("id") !in byId};val matched=incoming.filter{it.str("id") in byId}
+            require(fresh.all{it.str("conversation_id") in parents&&it.str("conversation_id") !in conflictingParents}){"工具历史关联原窗口缺失或存在冲突。"}
+            val next=old+fresh;LocalToolAudit.validate(next)
+            counts["tools"]=LocalRestoreCount(fresh.size,matched.size,matched.count{byId[it.str("id")]!=it})
+            if(write)audit.write(next)
         }
         return counts
     }
