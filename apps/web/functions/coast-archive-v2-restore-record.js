@@ -26,11 +26,12 @@ const specs={
 };
 const roles={owner:'owner',assistant:'assistant'};
 export async function restoreArchiveRecord(db,sessionId,manifest,module,recordId,confirm=false){
- if(manifest?.workspace==='local')return restoreArchiveLocalRecord(db,sessionId,manifest,module,recordId,confirm);
+ const localKnowledge=manifest?.workspace==='local'&&['worldbook','custom_instructions'].includes(module);
+ if(manifest?.workspace==='local'&&!localKnowledge)return restoreArchiveLocalRecord(db,sessionId,manifest,module,recordId,confirm);
  if(module==='daily')return restoreArchiveDaily(db,sessionId,manifest,recordId,confirm);
  if(PORTRAIT_RESTORE_MODULES.includes(module))return restoreArchivePortrait(db,sessionId,manifest,module,recordId,confirm);
  await validateArchiveManifest(manifest);
- check(manifest.workspace==='backend'&&(Object.hasOwn(specs,module)||MEMORY_RESTORE_MODULES.includes(module)||module==='vault'),'target does not support this record');
+ check((manifest.workspace==='backend'||localKnowledge)&&(Object.hasOwn(specs,module)||MEMORY_RESTORE_MODULES.includes(module)||module==='vault'),'target does not support this record');
  const r=manifest.records.find(x=>x.module===module&&x.id===recordId);
  check(r&&r.media_objects.length===0,'record missing or media not supported');
  const d=manifest.objects.find(x=>x.object_sha256===r.record_object);
@@ -75,7 +76,7 @@ export async function restoreArchiveRecord(db,sessionId,manifest,module,recordId
    check(['use_regex','case_sensitive','constant_active','enabled','visitor_safe'].every(k=>[0,1].includes(v[k]))&&Number.isInteger(v.priority)&&v.priority>=-1000&&v.priority<=1000&&Number.isInteger(v.scan_depth)&&v.scan_depth>=1&&v.scan_depth<=20&&v.inject_position==='before_memory'&&['owner','visitor','both','mailbox','lighthouse','radio','official_mcp','daily'].includes(v.scope),'invalid worldbook settings');
    const keywords=JSON.parse(v.keywords_json);check(Array.isArray(keywords)&&keywords.length<=30&&keywords.every(k=>text(k,160)&&k.trim())&&new Set(keywords).size===keywords.length,'invalid worldbook keywords');
    if(v.use_regex)for(const k of keywords)new RegExp(k,v.case_sensitive?'':'i');
-   if(v.enabled&&v.constant_active)check((await db.prepare('SELECT COUNT(*) AS n FROM coast_worldbook_entries WHERE enabled=1 AND constant_active=1').first()).n<3,'constant worldbook capacity reached');
+
  }else{
    check(r.dependencies.length===0&&v.id==='owner'&&stamp(v.updated_at),'invalid profile identity');
    const box=JSON.parse(v.model_box_json||'{}');
@@ -88,6 +89,7 @@ export async function restoreArchiveRecord(db,sessionId,manifest,module,recordId
  const prior=await db.prepare('SELECT '+keys.join(',')+' FROM '+table+' WHERE '+keys[0]+'=?').bind(v.id).first();
  const same=prior&&keys.every((k,i)=>prior[k]===v[fields[i]]);
  check(!prior||same,'target record exists with different content; never overwrite');
+ if(module==='worldbook'&&!prior&&v.enabled&&v.constant_active)check((await db.prepare('SELECT COUNT(*) AS n FROM coast_worldbook_entries WHERE enabled=1 AND constant_active=1').first()).n<3,'constant worldbook capacity reached');
  if(confirm===true&&!prior)await db.batch([db.prepare('INSERT INTO '+table+' ('+keys.join(',')+') VALUES ('+keys.map(()=>'?').join(',')+')').bind(...fields.map(k=>v[k]))]);
  return {scope:'record_only',module,record_id:r.id,ready:prior?0:1,existing:prior?1:0,can_commit:true,committed:confirm===true};
 }

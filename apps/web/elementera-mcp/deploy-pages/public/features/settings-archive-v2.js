@@ -60,14 +60,14 @@ export function createV2Transfer({router,toast,chat}){
         if(['backend','local'].includes(data.manifest.workspace)){
           const objects=new Map(data.manifest.objects.map(d=>[d.object_sha256,d]));
           for(const r of data.manifest.records){
-            if(data.manifest.workspace==='local'&&!['chat','calendar','daily','model_profile'].includes(r.module))continue;
+            if(data.manifest.workspace==='local'&&(!['chat','calendar','daily','model_profile','worldbook','custom_instructions'].includes(r.module)||(r.module==='custom_instructions'&&data.manifest.application_id!==APP)))continue;
             if(data.manifest.workspace==='backend'&&!(r.module==='chat'&&data.manifest.application_id===APP)&&!(r.module==='library'&&r.id.startsWith('library_books:'))&&!['calendar','worldbook','model_profile'].includes(r.module)&&!(data.manifest.application_id===APP&&['memory_entries','memory_pockets','user_portrait','self_portrait','daily','vault','custom_instructions'].includes(r.module)))continue;
             const d=objects.get(r.record_object);if(!d||d.size>1800000)continue;
             const raw=new Uint8Array(d.size);let at=0;
             for await(const b of data.objectChunks(d)){raw.set(b,at);at+=b.length;}
             const v=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw));
             if(data.manifest.workspace==='local'){
-              const kinds={local_chat:'chat',local_calendar:'calendar',local_moment:'daily',local_diary:'daily',local_daily_profile:'daily',local_model_profile:'model_profile'};
+              const kinds={local_chat:'chat',local_calendar:'calendar',local_moment:'daily',local_diary:'daily',local_daily_profile:'daily',local_model_profile:'model_profile',worldbook:'worldbook',custom_instructions:'custom_instructions'};
               if(kinds[v.kind]===r.module)options.push({key:'local:'+r.module+':'+r.id,kind:r.module,id:r.id,local:true,title:String(v.data?.conversation?.title||v.data?.title||v.data?.text||labels[r.module]).slice(0,100)});
               continue;
             }
@@ -104,7 +104,7 @@ export function createV2Transfer({router,toast,chat}){
     });
     if(name==='v2-commit'&&preview&&!result&&session)return operate(async token=>{
       const choice=choices.find(r=>r.key===selected);if(!choice)throw Error('请选择资料');
-      result=await (choice.kind==='book'?api.restoreBook(session,incoming.manifest,choice.id,true):choice.kind==='chat'?api.restoreChat(session,incoming.manifest,choice.id,true):api.restoreRecord(session,incoming.manifest,choice.kind,choice.id,true));
+      result=await (choice.kind==='book'?api.restoreBook(session,incoming.manifest,choice.id,true):choice.kind==='chat'&&!choice.local?api.restoreChat(session,incoming.manifest,choice.id,true):api.restoreRecord(session,incoming.manifest,choice.kind,choice.id,true));
       await chat.refreshFromCoast();toast('已确认恢复所选资料。');
     });
   }
