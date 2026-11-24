@@ -37,6 +37,30 @@ test('calendar, worldbook and model profile restore exact portable records; prev
  const w=records.find(r=>r.module==='worldbook');await assert.rejects(()=>restoreArchiveRecord(dst,s.id,m,w.module,w.id,true),/never overwrite/);
 });
 
+test('local canonical knowledge restores through the same verified cloud record path',async()=>{
+ const src=new D1Database(),dst=new D1Database();
+ await writeCustomInstructions(src,{content:'Exact instructions\nSecond line'});
+ for(let i=0;i<3;i++)await createWorldbookEntry(src,{title:'Word '+i,content:'Original text',keywords:['wave'],constant_active:true});
+ const rows=[...((await archiveDetailPage(src,'custom_instructions')).items.map(row=>['custom_instructions',row])),...((await archiveDetailPage(src,'worldbook')).items.map(row=>['worldbook',row]))];
+ const records=[],objects=[];
+ for(const [module,row] of rows){
+   const o=await encodeRecordObject({kind:module,data:row});objects.push(o);
+   records.push({module,id:module+':'+await digestBytes(new TextEncoder().encode(JSON.stringify([row.id]))),record_object:o.descriptor.object_sha256,media_objects:[],dependencies:[]});
+ }
+ const m={format:'elementera-coast-archive',version:2,workspace:'local',application_id:'com.elementeracoast.source',exported_at:'2026-01-01T00:00:00Z',modules:MODULES.map(module=>({module,coverage:records.some(r=>r.module===module)?'partial':'unavailable',count:records.filter(r=>r.module===module).length})),records,objects:objects.map(o=>o.descriptor)};
+ const session=await createArchiveSession(dst);
+ for(const o of objects){await registerArchiveObject(dst,session.id,o.descriptor);for(let i=0;i<o.chunks.length;i++)await putArchiveChunk(dst,session.id,o.descriptor.object_sha256,i,o.chunks[i]);}
+ for(const r of records){
+   assert.equal((await restoreArchiveRecord(dst,session.id,m,r.module,r.id,false)).ready,1);
+   assert.equal((await restoreArchiveRecord(dst,session.id,m,r.module,r.id,true)).committed,true);
+ }
+ for(const r of records)assert.equal((await restoreArchiveRecord(dst,session.id,m,r.module,r.id,false)).existing,1);
+ assert.deepEqual((await archiveDetailPage(dst,'custom_instructions')).items,(await archiveDetailPage(src,'custom_instructions')).items);
+ assert.deepEqual((await archiveDetailPage(dst,'worldbook')).items,(await archiveDetailPage(src,'worldbook')).items);
+ const instructions=records.find(r=>r.module==='custom_instructions');
+ await assert.rejects(()=>restoreArchiveRecord(dst,session.id,{...m,application_id:'com.elementeracoast.app'},instructions.module,instructions.id,true),/incompatible edition/);
+});
+
 test('local V2 calendar record restores through existing portable cloud migration',async()=>{
  const dst=new D1Database();
  const data={id:'local-calendar',day:'2026-11-24',occurrence_day:'2026-11-24',kind:'event',title:'本机纪念',body:'原文',recurrence:'none',author:'owner',source:'manual',created_at:'2026-11-24T00:00:00Z',updated_at:'2026-11-24T00:00:00Z'};
