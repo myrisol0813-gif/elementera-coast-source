@@ -20,6 +20,7 @@ interface GlobalArchiveRepository {
 class DefaultGlobalArchiveRepository(
     private val api: CoastApiClient
 ) : GlobalArchiveRepository {
+    internal fun archiveV2(context: android.content.Context, local: Boolean) = ArchiveV2Operations(api,context,local)
     override suspend fun snapshot(): JsonElement = api.getGlobalSnapshot()
     override suspend fun fullArchive(): JsonElement = api.getFullArchive()
     override suspend fun transferExport(): JsonObject = api.transferExport()
