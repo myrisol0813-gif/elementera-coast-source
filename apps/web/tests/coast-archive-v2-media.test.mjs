@@ -4,7 +4,7 @@ import { D1Database } from './d1-helper.mjs';
 import { createConversation } from '../functions/chat-store.js';
 import { uploadChatAttachment, getChatAttachmentRecord } from '../functions/chat-attachments.js';
 import { ensureDogtalkSchema } from '../functions/dogtalk-store.js';
-import { listArchiveAttachments, readArchiveAttachment, prepareArchiveAttachment, listArchiveDogtalk } from '../functions/coast-archive-v2-media.js';
+import { listArchiveAttachments, readArchiveAttachment, prepareArchiveAttachment, listArchiveDogtalk, prepareArchiveDogtalk } from '../functions/coast-archive-v2-media.js';
 test('archive inventory includes unbound attachments and restores original bytes and ids in a transaction',async()=>{
   const db=new D1Database(),target=new D1Database();
   const c=await createConversation(db,'archive test','main');
@@ -38,4 +38,25 @@ test('historical snapshot export retains parent records, owner isolation and pag
   const p=await listArchiveDogtalk(db,{kind:'records'});assert.deepEqual(p.items.map(x=>x.id),['p']);
   const a=await listArchiveDogtalk(db,{limit:1});const b=await listArchiveDogtalk(db,{limit:1,cursor:a.next_cursor});
   assert.deepEqual([a.items[0].id,b.items[0].id],['s1','s2']);assert.equal(b.next_cursor,null);assert.equal(a.items[0].owner,'owner');assert.equal(a.items[0].dogtalk_id,'p');assert.equal(a.items[0].body,'history');
+});
+
+test('snapshot restore verifies parent, source and original body before a transaction',async()=>{
+ const db=new D1Database(),target=new D1Database();
+ const c=await createConversation(db,'archive snapshot','main');
+ const tc=await createConversation(target,'restore snapshot','main');
+ await ensureDogtalkSchema(db);
+ const parent="INSERT INTO coast_mystic_dogtalk (id,type,owner,room_scope,scope_key,conversation_id,body,created_at,updated_at) VALUES (?,'owner_mystic_dogtalk',?,'conversation',?,?,'parent body',1,1)";
+ const snap="INSERT INTO coast_mystic_dogtalk_snapshots (id,dogtalk_id,owner,room_scope,scope_key,conversation_id,source_type,source_id,body,created_at) VALUES (?,?,?,'conversation',?,?,'turn',?,'historical body',1)";
+ await db.prepare(parent).bind('parent','owner','conversation:'+c.id,c.id).run();
+ await db.prepare(snap).bind('snapshot','parent','owner','conversation:'+c.id,c.id,'turn-a').run();
+ const remap=r=>({...r,conversation_id:tc.id,scope_key:'conversation:'+tc.id});
+ const records=(await listArchiveDogtalk(db,{kind:'records'})).items.map(remap),snapshots=(await listArchiveDogtalk(db)).items.map(remap);
+ const plan={conversationIds:new Set([tc.id]),sourceIds:new Set(['turn:turn-a'])};
+ await assert.rejects(()=>prepareArchiveDogtalk(target,{records,snapshots},{...plan,sourceIds:new Set()}));
+ const statements=await prepareArchiveDogtalk(target,{records,snapshots},plan);
+ assert.equal((await listArchiveDogtalk(target)).items.length,0);
+ await target.batch(statements);
+ assert.deepEqual((await listArchiveDogtalk(target)).items,snapshots);
+ assert.deepEqual((await listArchiveDogtalk(target,{kind:'records'})).items,records);
+ await assert.rejects(()=>prepareArchiveDogtalk(target,{records,snapshots},plan));
 });
