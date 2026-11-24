@@ -78,7 +78,7 @@ internal object ArchiveV2Local {
         })
     }
     fun restore(manifest:ArchiveV2Manifest,stage:ArchiveV2Stage,selection:Set<String>,applicationId:String,store:LocalPersistence,confirm:Boolean):LocalRestorePreview {
-        val bytes=bundle(manifest,stage,selection)
+        val bytes=if(manifest.workspace=="backend")ArchiveV2CloudToLocal.convert(manifest,stage,selection) else bundle(manifest,stage,selection)
         return if(confirm)LocalTransferRestore.restore(bytes,applicationId,selection,store) else LocalTransferRestore.preview(bytes,applicationId,selection,store)
     }
 }
