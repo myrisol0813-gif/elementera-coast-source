@@ -120,6 +120,23 @@ class CoastApiClient(
         require(config.localTransport == null) { "本机模式不访问云端归档暂存。" }
         return Request.Builder().url(config.url("/api/archive/v2"+path))
     }
+
+    suspend fun archiveV2RecordPage(module: String,cursor: String="",limit: Int=20): JsonObject =
+        jsonRequestElement(archiveV2Request("/records/"+encodePath(module)+"?cursor="+encodeQuery(cursor)+"&limit="+limit).get().build()).jsonObject
+    suspend fun archiveV2DetailPage(kind: String,cursor: String="",limit: Int=20): JsonObject =
+        jsonRequestElement(archiveV2Request("/details/"+encodePath(kind)+"?cursor="+encodeQuery(cursor)+"&limit="+limit).get().build()).jsonObject
+    suspend fun archiveV2Chat(id: String): JsonObject =
+        jsonRequestElement(archiveV2Request("/records/chat/"+encodePath(id)).get().build()).jsonObject
+    suspend fun archiveV2Voice(id: String): JsonObject =
+        jsonRequestElement(archiveV2Request("/voice/"+encodePath(id)).get().build()).jsonObject
+    suspend fun archiveV2LibraryCover(id: String): JsonObject =
+        jsonRequestElement(archiveV2Request("/library-cover/"+encodePath(id)).get().build()).jsonObject
+    suspend fun archiveV2Preflight(id: String,manifest: com.elementeracoast.app.core.local.ArchiveV2Manifest): JsonObject {
+        com.elementeracoast.app.core.local.ArchiveV2Manifests.validate(manifest)
+        return jsonRequestElement(archiveV2Request("/sessions/"+encodePath(id)+"/preflight")
+            .post(jsonBody(json.encodeToString(manifest))).build()).jsonObject
+    }
+
     suspend fun archiveV2Capabilities(): JsonObject = jsonRequestElement(archiveV2Request("").get().build()).jsonObject
     suspend fun archiveV2CreateSession(): JsonObject = jsonRequestElement(archiveV2Request("/sessions").post(jsonBody("{}")).build()).jsonObject
     suspend fun archiveV2Sessions(): JsonObject = jsonRequestElement(archiveV2Request("/sessions").get().build()).jsonObject
