@@ -14,7 +14,14 @@ class RemoteCacheStore(
     fun putConversations(value: List<RemoteConversation>) = put(KEY_CONVERSATIONS, ListSerializer(RemoteConversation.serializer()), value)
 
     fun history(id: String): RemoteHistory? = decode(historyKey(id), RemoteHistory.serializer())
-    fun putHistory(id: String, value: RemoteHistory) = put(historyKey(id), RemoteHistory.serializer(), value)
+    fun putHistory(id: String, value: RemoteHistory) {
+        val previous=history(id)
+        // An edited local state has a new write clock; retain the imported clock
+        // only while storing the same history revision (or its initial restore).
+        val next=if(previous!=null&&previous!=value&&previous.archiveStorageUpdatedAt==value.archiveStorageUpdatedAt)
+            value.copy(archiveStorageUpdatedAt=null) else value
+        put(historyKey(id), RemoteHistory.serializer(), next)
+    }
     fun removeHistory(id: String) = persistence.remove(historyKey(id))
 
     fun profile(): RemoteProfile? = decode(KEY_PROFILE, RemoteProfile.serializer())
