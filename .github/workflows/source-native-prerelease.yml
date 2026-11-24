@@ -1,4 +1,4 @@
-name: Publish Source Native visitor QA APK
+name: Publish stable Source Native APK
 
 on:
   workflow_dispatch:
@@ -10,15 +10,14 @@ permissions:
   contents: write
 
 concurrency:
-  group: source-native-visitor-${{ github.event.workflow_run.head_sha || github.sha }}
+  group: source-native-stable-release
   cancel-in-progress: false
 
 jobs:
   publish:
-    # The visitor APK is offline-only. No external demo backend, production secrets,
-    # stable signing keys, or administrator release flag are needed.
+    # Only trusted main builds may access the Source-only release signing secrets.
     if: >-
-      ${{ github.event_name == 'workflow_dispatch' ||
+      ${{ (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
           (github.event.workflow_run.conclusion == 'success' &&
            github.event.workflow_run.head_branch == 'main' &&
            github.event.workflow_run.head_repository.full_name == github.repository) }}
@@ -45,14 +44,14 @@ jobs:
           : "${version_code:?Source Android versionCode is missing}"
           [[ "$version" == *-source ]] || { echo "Unexpected Source version: $version" >&2; exit 1; }
           base_version="${version%-source}"
-          release_prefix="source-visitor-v${base_version}-"
+          release_prefix="source-native-v${base_version}-"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "base_version=$base_version" >> "$GITHUB_OUTPUT"
           echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
           tags="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName')"
           if [[ "$tags" == *"$release_prefix"* ]]; then
             echo 'skip=true' >> "$GITHUB_OUTPUT"
-            echo "Existing ${version} visitor APK kept; workflow-only edits will not publish another copy." >> "$GITHUB_STEP_SUMMARY"
+            echo "Existing ${version} stable APK kept; workflow-only edits will not publish another copy." >> "$GITHUB_STEP_SUMMARY"
           else
             echo 'skip=false' >> "$GITHUB_OUTPUT"
           fi
@@ -67,7 +66,7 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Verify visitor-only source build identity
+      - name: Verify isolated Source build identity
         if: steps.version_gate.outputs.skip != 'true'
         shell: bash
         run: |
@@ -75,10 +74,10 @@ jobs:
           grep -Fq 'applicationId = "com.elementeracoast.source"' app/build.gradle.kts
           grep -Fq "versionCode = ${{ steps.version_gate.outputs.version_code }}" app/build.gradle.kts
           grep -Fq "versionName = \"${{ steps.version_gate.outputs.version }}\"" app/build.gradle.kts
-          test -f scripts/sign-disposable-qa.sh
+          test -f scripts/sign-source-release.sh
           ! grep -Eiq 'app[.]elementeracoast[.]com' app/build.gradle.kts
 
-      - name: Build visitor APK and run unit tests
+      - name: Build Source APK and run unit tests
         if: steps.version_gate.outputs.skip != 'true'
         shell: bash
         run: |
@@ -88,17 +87,22 @@ jobs:
             -PCOAST_API_BASE_URL=https://elementera-coast-source.invalid
           test -s app/build/outputs/apk/release/app-release-unsigned.apk
 
-      - name: Sign with a disposable Source-only QA certificate
+      - name: Sign with the pinned Source release certificate
         if: steps.version_gate.outputs.skip != 'true'
         id: signing
         shell: bash
+        env:
+          SOURCE_ANDROID_KEYSTORE_B64: ${{ secrets.SOURCE_ANDROID_KEYSTORE_B64 }}
+          SOURCE_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.SOURCE_ANDROID_KEYSTORE_PASSWORD }}
+          SOURCE_ANDROID_KEY_ALIAS: ${{ secrets.SOURCE_ANDROID_KEY_ALIAS }}
+          SOURCE_ANDROID_KEY_PASSWORD: ${{ secrets.SOURCE_ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           unsigned_apk=app/build/outputs/apk/release/app-release-unsigned.apk
           mkdir -p source-release
-          apk=source-release/elementera-coast-source-v${{ steps.version_gate.outputs.base_version }}-visitor-qa.apk
+          apk=source-release/elementera-coast-source-v${{ steps.version_gate.outputs.base_version }}-release.apk
           # Sign original unsigned Release exactly once, never double-sign Debug.
-          bash scripts/sign-disposable-qa.sh "$unsigned_apk" "$apk"
+          bash scripts/sign-source-release.sh "$unsigned_apk" "$apk"
           build_tools="$(find "${ANDROID_HOME}/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           badging="$("${build_tools}/aapt" dump badging "$apk")"
           line="$(printf '%s\n' "$badging" | sed -n '1p')"
@@ -108,35 +112,38 @@ jobs:
           "${build_tools}/apksigner" verify --verbose --print-certs "$apk" > "${RUNNER_TEMP}/source-visitor-apk-certs.txt"
           fingerprint="$(grep -m1 'certificate SHA-256 digest:' "${RUNNER_TEMP}/source-visitor-apk-certs.txt" | awk '{print $NF}')"
           : "${fingerprint:?Missing source certificate fingerprint}"
+          [[ "${fingerprint,,}" == "3e021e11f05b619d603543929e07edd32a037323478a9abfdfe5b405ce6fca59" ]] || { echo "Unexpected Source certificate" >&2; exit 1; }
           echo "fingerprint=$fingerprint" >> "${GITHUB_OUTPUT}"
-          (cd source-release && sha256sum elementera-coast-source-v${{ steps.version_gate.outputs.base_version }}-visitor-qa.apk > SHA256SUMS.txt)
+          printf 'versionName=%s\nversionCode=%s\napplicationId=com.elementeracoast.source\ncertificateSha256=%s\n' "${{ steps.version_gate.outputs.version }}" "${{ steps.version_gate.outputs.version_code }}" "$fingerprint" > source-release/BUILD_INFO.txt
+          (cd source-release && sha256sum elementera-coast-source-v${{ steps.version_gate.outputs.base_version }}-release.apk > SHA256SUMS.txt)
           unzip -t "$apk" >/dev/null
 
-      - name: Publish visitor APK directly to Releases
+      - name: Publish stable APK directly to Releases
         if: steps.version_gate.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          tag="source-visitor-v${{ steps.version_gate.outputs.base_version }}-${{ github.event.workflow_run.head_sha || github.sha }}"
+          tag="source-native-v${{ steps.version_gate.outputs.base_version }}-${{ github.event.workflow_run.head_sha || github.sha }}"
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release already exists: $tag" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           gh release create "$tag" \
-            source-release/elementera-coast-source-v${{ steps.version_gate.outputs.base_version }}-visitor-qa.apk \
+            source-release/elementera-coast-source-v${{ steps.version_gate.outputs.base_version }}-release.apk \
             source-release/SHA256SUMS.txt \
+            source-release/BUILD_INFO.txt \
             --repo "$GITHUB_REPOSITORY" \
             --target "${{ github.event.workflow_run.head_sha || github.sha }}" \
-            --title "Elementera Coast Source Native ${{ steps.version_gate.outputs.base_version }} · Visitor QA" \
+            --title "Elementera Coast Source Native ${{ steps.version_gate.outputs.base_version }} · Stable signed" \
             --latest \
-            --notes "Public visitor-only Source Native APK, password 123456. Original Native pages and appearance are retained; remote operations are blocked while visiting. Built against a non-routable .invalid API host; no real account, production backend or model budget is included. QA uses a NEW disposable signing certificate for each build, so it cannot upgrade prior Source APKs with different signing keys. If necessary uninstall ONLY com.elementeracoast.source before installing. Source code and private production app are separate. This is the latest public visitor build, QA-signed with a disposable certificate, not a stable-signed production app."
-          echo "### Source visitor APK published" >> "$GITHUB_STEP_SUMMARY"
+            --notes "First stable-signed Source Native release series. Local mode uses your own provider credentials; the visitor doorway remains isolated from private production services. No API keys, private backend or model budget included. Previous disposable-signed QA APKs cannot be upgraded in place: do not uninstall if you have local data without a verified migration or backup. Future releases signed by this same Source certificate support in-place Android updates. Package: com.elementeracoast.source."
+          echo "### Source stable APK published" >> "$GITHUB_STEP_SUMMARY"
           echo "Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"
-          echo "APK: https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/elementera-coast-source-v${{ steps.version_gate.outputs.base_version }}-visitor-qa.apk" >> "$GITHUB_STEP_SUMMARY"
+          echo "APK: https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/elementera-coast-source-v${{ steps.version_gate.outputs.base_version }}-release.apk" >> "$GITHUB_STEP_SUMMARY"
           echo "SHA256: $(cut -d' ' -f1 source-release/SHA256SUMS.txt)" >> "$GITHUB_STEP_SUMMARY"
-          echo "QA signing cert SHA256: ${{ steps.signing.outputs.fingerprint }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Source signing cert SHA256: ${{ steps.signing.outputs.fingerprint }}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify published APK after downloading it from GitHub
         if: steps.version_gate.outputs.skip != 'true'
@@ -145,8 +152,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tag="source-visitor-v${{ steps.version_gate.outputs.base_version }}-${{ github.event.workflow_run.head_sha || github.sha }}"
-          apk_name=elementera-coast-source-v${{ steps.version_gate.outputs.base_version }}-visitor-qa.apk
+          tag="source-native-v${{ steps.version_gate.outputs.base_version }}-${{ github.event.workflow_run.head_sha || github.sha }}"
+          apk_name=elementera-coast-source-v${{ steps.version_gate.outputs.base_version }}-release.apk
           downloaded="$RUNNER_TEMP/verified-release"
           mkdir -p "$downloaded"
           gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "$apk_name" --dir "$downloaded"
@@ -154,6 +161,7 @@ jobs:
           (cd "$downloaded" && sha256sum --check "$GITHUB_WORKSPACE/apps/android/source-release/SHA256SUMS.txt")
           build_tools="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           "$build_tools/apksigner" verify --verbose --min-sdk-version 23 --print-certs "$downloaded/$apk_name" | tee "$RUNNER_TEMP/published-signature-check.txt"
+          grep -Fi "certificate SHA-256 digest: 3e021e11f05b619d603543929e07edd32a037323478a9abfdfe5b405ce6fca59" "$RUNNER_TEMP/published-signature-check.txt"
           grep -F 'Verified using v1 scheme (JAR signing): true' "$RUNNER_TEMP/published-signature-check.txt"
           grep -F 'Verified using v2 scheme (APK Signature Scheme v2): true' "$RUNNER_TEMP/published-signature-check.txt"
           unzip -Z1 "$downloaded/$apk_name" | grep -Fx 'META-INF/CERT.RSA'

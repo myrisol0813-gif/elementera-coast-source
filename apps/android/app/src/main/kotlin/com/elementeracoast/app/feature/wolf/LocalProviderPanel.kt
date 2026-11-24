@@ -33,6 +33,7 @@ internal fun LocalProviderPanel(current: String, onRefresh: () -> Unit) {
     var key by remember { mutableStateOf("") }
     var manual by remember { mutableStateOf("") }
     var remove by remember { mutableStateOf<LocalProviderConfig?>(null) }
+    var diagnostic by remember { mutableStateOf("") }
 
     fun run(action: String, block: suspend () -> String) {
         if (busy) return
@@ -56,6 +57,7 @@ internal fun LocalProviderPanel(current: String, onRefresh: () -> Unit) {
         url = value?.baseUrl ?: "https://openrouter.ai/api/v1"
         key = ""
         manual = value?.models?.joinToString("\n").orEmpty()
+        diagnostic = ""
         editing = true
     }
 
@@ -87,6 +89,7 @@ internal fun LocalProviderPanel(current: String, onRefresh: () -> Unit) {
                             }
                             if (reply.isBlank()) "连接成功但没有文字回复。" else "真实回复测试成功（可能消耗额度；未写入聊天）。"
                         } }) { Text("测试回复") }
+                        TextButton(enabled = !busy, onClick = { run("授权自检") { client.authorizationCheck(p) } }) { Text("授权自检") }
                         TextButton(enabled = !busy, onClick = { remove = p }) { Text("移除") }
                     }
                     Text("先在模型目录设为当前，才能测试此供应商的回复。测试可能消耗额度。",
@@ -109,6 +112,28 @@ internal fun LocalProviderPanel(current: String, onRefresh: () -> Unit) {
                     visualTransformation = PasswordVisualTransformation())
                 OutlinedTextField(manual, { manual = it }, label = { Text("模型 ID · 每行一个，可稍后获取") }, maxLines = 4)
                 Text("只允许 HTTPS。更改服务地址必须重新输入 Key；不会将旧 Key 自动发送给新地址。", style = MaterialTheme.typography.bodySmall)
+                TextButton(enabled = !busy && key.isNotBlank(), onClick = {
+                    val entered = key.trim()
+                    val previous = providers.firstOrNull { it.id == editId }
+                    val normalized = runCatching { normalizeLocalProviderUrl(url) }.getOrNull()
+                    if (normalized != "https://openrouter.ai/api/v1") {
+                        diagnostic = "授权自检仅支持 OpenRouter 官方地址。"
+                        return@TextButton
+                    }
+                    val value = LocalProviderConfig(editId, name, normalized, entered)
+                    busy = true
+                    diagnostic = "正在验证输入的 Key（未保存）…"
+                    scope.launch {
+                        try {
+                            val saved = withContext(Dispatchers.IO) { store.load().firstOrNull { it.id == editId } }
+                            val comparison = if (saved == null) "无已保存凭据" else if (saved.apiKey == entered) "与已保存 Key 完全一致" else "与已保存 Key 不同"
+                            diagnostic = "$comparison；" + client.authorizationCheck(value)
+                        } catch (e: CancellationException) { throw e }
+                        catch (_: Exception) { diagnostic = "自检未完成，未修改原配置。" }
+                        finally { busy = false }
+                    }
+                }) { Text("验证输入的 Key（不保存）") }
+                if (diagnostic.isNotBlank()) Text(diagnostic, style = MaterialTheme.typography.bodySmall)
             }
         },
         confirmButton = { TextButton(enabled = !busy, onClick = {
@@ -119,7 +144,15 @@ internal fun LocalProviderPanel(current: String, onRefresh: () -> Unit) {
             if (normalized == null || effective.isBlank() || name.isBlank()) { message = "请填写有效 HTTPS URL、名称及 Key。"; return@TextButton }
             val value = LocalProviderConfig(editId, name.trim(), normalized, effective, manual.lines())
             editing = false; key = ""
-            run("保存供应商") { withContext(Dispatchers.IO) { store.upsert(value) }; reload(); "供应商已加密保存。" }
+            run("保存供应商") {
+                val matches = withContext(Dispatchers.IO) {
+                    store.upsert(value)
+                    val saved = store.load().firstOrNull { it.id == value.id }
+                    saved?.apiKey == value.apiKey && saved.baseUrl == value.baseUrl
+                }
+                reload()
+                if (matches) "供应商已加密保存，读回校验一致。" else "保存后读回校验不一致，请勿使用该凭据。"
+            }
         }) { Text("保存") } },
         dismissButton = { TextButton(onClick = { editing = false; key = "" }) { Text("取消") } }
     )

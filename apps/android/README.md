@@ -71,11 +71,13 @@ The PWA shares the same conversation settings and backend semantics, but it does
 
 ## Source-build boundaries
 
-The source build does not include private production credentials, production signing keys, production API origin, or private data. Its QA APK delivery is a separate, ephemeral-signed GitHub Release workflow, not the production APK updater. The existing “版本与更新” surface remains part of the copied UI, but does not download or install private production APKs.
+The source build does not include private production credentials, production signing keys, production API origin, or private data. Official Source APK delivery uses [stable Source-only signing](../../docs/release-notes/source-stable-signing.md) from 0.2.26; QA builds retain disposable signatures. Neither uses the private production signing key. The existing “版本与更新” surface remains part of the copied UI, but does not download or install private production APKs.
 
 No WebView, React Native, TypeScript, or embedded PWA source is used by the Native client.
 
-## Public Native visitor QA · Latest GitHub Release
+## Public Native · Latest GitHub Release
+
+Current official releases use the pinned Source-only certificate. The following notes describe the historical visitor QA packaging and diagnostic workflows. See [stable signing and migration](../../docs/release-notes/source-stable-signing.md).
 
 **0.2.13-source restores the optional Cream Paper Native theme on top of the 0.2.12 Reality Context work:** the theme wardrobe and appearance screen again expose 奶油纸牌, with cream/blush cards, cocoa outlines and hard offset shadows across chat chrome and common settings surfaces. Conversation Reality Context, short reply mode, thought-soil behavior and the public visitor/offline boundary remain unchanged.
 
