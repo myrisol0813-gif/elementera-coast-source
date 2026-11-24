@@ -1,4 +1,5 @@
 import { ensureChatSchema, listConversations, readConversationState, normalizeState, normalizeProfile, readProfile } from './chat-store.js';
+import { exportDailyTransfer, prepareDailyTransfer } from './coast-transfer-daily.js';
 import { ensureCalendarSchema, listCalendarEntries } from './calendar-store.js';
 import { anniversaryCalendarDay } from './calendar-anniversary.js';
 import { encodeTransfer, decodeTransfer, byteLength, CLOUD_IMPORT_LIMIT, TransferError } from './coast-transfer.js';
@@ -7,7 +8,7 @@ const OWNER_AUTHOR = 'owner';
 const ASSISTANT_AUTHOR = 'assistant';
 const WEB_MESSAGE_SOURCE = 'owner_web';
 const APP_ID = 'com.elementeracoast.source';
-const SUPPORTED = ['chat', 'calendar', 'model_profile'];
+const SUPPORTED = ['chat', 'calendar', 'daily', 'model_profile'];
 const validId = value => typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,160}$/.test(value);
 const object = value => value && typeof value === 'object' && !Array.isArray(value);
 const validDate = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && (() => { try { return anniversaryCalendarDay({startDay:value,mode:'elapsed'}) === value; } catch { return false; } })();
@@ -47,7 +48,7 @@ export async function exportCloudTransfer(db) {
   const profileRow = await db.prepare("SELECT user_id FROM chat_profiles WHERE user_id = 'owner'").first();
   return encodeTransfer({ applicationId: APP_ID, workspace:'backend', exportedAt:new Date().toISOString(),
     includedModules:SUPPORTED, conversations, calendar:(await listCalendarEntries(db,{all:true})).map(portableCalendar),
-    profile:profileRow ? await readProfile(db) : null, dailyProfile:null, moments:[], diaries:[] });
+    profile:profileRow ? await readProfile(db) : null, ...await exportDailyTransfer(db,APP_ID) });
 }
 
 // Keep the original content and branch positions. Never rely on normalizeState's
@@ -134,7 +135,7 @@ async function prepare(db,envelope,selection) {
   const existingCalendar = new Set((await db.prepare('SELECT id FROM coast_calendar_entries_v2').all()).results.map(r=>r.id));
   const activeChats = new Map((await listConversations(db)).map(c=>[c.id,c]));
   const activeCalendar = new Map((await listCalendarEntries(db,{all:true})).map(c=>[c.id,portableCalendar(c)]));
-  const result = { source:payload.workspace, target:'backend', unsupported_modules:payload.includedModules.filter(k=>!SUPPORTED.includes(k)), chat:{ready:0,existing:0,conflicts:0,blocked:[]},calendar:{ready:0,existing:0,conflicts:0,blocked:[]},model_profile:{ready:0,existing:0,conflicts:0,blocked:[]} };
+  const result = { source:payload.workspace, target:'backend', unsupported_modules:payload.includedModules.filter(k=>!SUPPORTED.includes(k)), chat:{ready:0,existing:0,conflicts:0,blocked:[]},calendar:{ready:0,existing:0,conflicts:0,blocked:[]},model_profile:{ready:0,existing:0,conflicts:0,blocked:[]},daily:{ready:0,existing:0,conflicts:0,blocked:[]} };
   const statements = [];
   const seen = new Set();
   for (const row of selection.includes('chat')?payload.conversations:[]) {
@@ -184,8 +185,13 @@ async function prepare(db,envelope,selection) {
       }
     }
   }
+  if (selection.includes('daily')) {
+    const daily = await prepareDailyTransfer(db,payload,APP_ID);
+    result.daily=daily.report;
+    statements.push(...daily.statements);
+  }
   result.statement_count=statements.length;
-  result.can_commit=statements.length<=90 && !result.chat.blocked.length && !result.calendar.blocked.length && !result.model_profile.blocked.length;
+  result.can_commit=statements.length<=90 && !result.chat.blocked.length && !result.calendar.blocked.length && !result.model_profile.blocked.length && !result.daily.blocked.length;
   return { result, statements };
 }
 export async function previewCloudTransfer(db,envelope,selection) { return (await prepare(db,envelope,selection)).result; }
