@@ -17,7 +17,9 @@ class CoastHttpClient(
         .followRedirects(false)
         .build()
 ) {
-    val client: OkHttpClient = baseClient.newBuilder()
+    val client: OkHttpClient = if (config.localTransport != null) {
+        OkHttpClient.Builder().addInterceptor(config.localTransport).build()
+    } else baseClient.newBuilder()
         .addInterceptor(Interceptor { chain ->
             // The Source tour never sends requests or cookies to any server.
             if (SourceVisitGate.shouldBlockRemoteRequest()) {

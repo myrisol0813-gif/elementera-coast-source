@@ -7,7 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.elementeracoast.app.core.auth.SessionRestoreResult
 import com.elementeracoast.app.core.tour.SourceVisitGate
 import com.elementeracoast.app.core.local.LocalPersistence
-import com.elementeracoast.app.core.local.SharedPreferencesLocalPersistence
+import com.elementeracoast.app.core.local.NativeWorkspace
 import com.elementeracoast.app.core.model.ChatAttachment
 import com.elementeracoast.app.core.model.ChatMessage
 import com.elementeracoast.app.core.model.ChatSearchFocus
@@ -58,10 +58,12 @@ class CoastShellViewModel(
     private val persistence: LocalPersistence,
     private val backend: CoastBackendGraph,
     private val workDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
-    private val chatGpt: ChatGptPlanRepository? = null
+    private val chatGpt: ChatGptPlanRepository? = null,
+    private val localMode: Boolean = false
 ) : ViewModel() {
     private val _state = MutableStateFlow(CoastShellState(
-        currentModel = chatGpt?.preferredModel()?.let { CHATGPT_PLAN_PREFIX + it }.orEmpty()
+        currentModel = chatGpt?.preferredModel()?.let { CHATGPT_PLAN_PREFIX + it }.orEmpty(),
+        localMode = localMode
     ))
     val state: StateFlow<CoastShellState> = _state.asStateFlow()
     private val _crossWindow = MutableStateFlow(CrossWindowUiState())
@@ -89,7 +91,10 @@ class CoastShellViewModel(
 
     init {
         syncAppearance()
-        restoreSession()
+        if (localMode) {
+            _state.update { it.copy(authenticated = true, authBusy = false, sessionPersistence = "local") }
+            viewModelScope.launch(workDispatcher) { bootstrapAuthenticated() }
+        } else restoreSession()
     }
 
     fun setPassword(value: String) {
@@ -315,6 +320,7 @@ class CoastShellViewModel(
     }
 
     fun openModelPicker() {
+        if (localMode) { showPlaceholder("本机模式第一阶段：模型 API 尚未接入，目前可独立保存记录。"); return }
         if (_state.value.activeFeature == null) _state.update { it.copy(showModelPicker = true) }
     }
 
@@ -368,6 +374,7 @@ class CoastShellViewModel(
     }
 
     fun connectChatGpt(openBrowser: (String) -> Unit) {
+        if (localMode) { showPlaceholder("本机模型连接尚未接入。"); return }
         if (tourBlocksCloudAction()) return
         val client = chatGpt ?: return
         if (_chatGptState.value.busy) return
@@ -537,7 +544,7 @@ class CoastShellViewModel(
         val clean = text.trim()
         val pendingAttachments = _state.value.pendingAttachments
         if ((clean.isBlank() && pendingAttachments.isEmpty()) || generationJob?.isActive == true || _state.value.isStreaming || _state.value.attachmentUploading) return
-        if (_state.value.currentModel.isBlank() && _state.value.activeRoomType != RoomType.Lighthouse) {
+        if (!localMode && _state.value.currentModel.isBlank() && _state.value.activeRoomType != RoomType.Lighthouse) {
             showPlaceholder("当前模型还没有从后端载入，暂时不能发送。")
             return
         }
@@ -572,10 +579,10 @@ class CoastShellViewModel(
 
                 _state.update { it.copy(pendingAttachments = emptyList(), attachmentUploading = false) }
 
-                if (conversation.roomType == RoomType.Lighthouse) {
+                if (conversation.roomType == RoomType.Lighthouse || (localMode && _state.value.currentModel.isBlank())) {
                     resetCrossWindow()
                     showHistory(conversationId, persistedUser)
-                    _state.update { it.copy(snackbarMessage = "MCP 对话区已写入后端；这里按房间规则不触发模型回复") }
+                    _state.update { it.copy(snackbarMessage = if (localMode) "记录已保存在本机；当前不触发模型回复。" else "MCP 对话区已写入后端；这里按房间规则不触发模型回复") }
                     return@launch
                 }
                 generateTurn(
@@ -1466,10 +1473,11 @@ class CoastShellViewModel(
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 val appContext = context.applicationContext
-                val persistence = SharedPreferencesLocalPersistence(appContext)
-                val chatGpt = ChatGptPlanRepository(ChatGptSecureStore(appContext))
+                val isLocal = NativeWorkspace.isLocal
+                val persistence = NativeWorkspace.persistence(appContext)
+                val chatGpt = if (isLocal) null else ChatGptPlanRepository(ChatGptSecureStore(appContext))
                 val backend = CoastBackendGraph.production(appContext, persistence, chatGpt)
-                return CoastShellViewModel(persistence, backend, chatGpt = chatGpt) as T
+                return CoastShellViewModel(persistence, backend, chatGpt = chatGpt, localMode = isLocal) as T
             }
         }
     }

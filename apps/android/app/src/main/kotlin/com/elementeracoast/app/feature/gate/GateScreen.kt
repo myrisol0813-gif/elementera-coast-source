@@ -1,9 +1,11 @@
 package com.elementeracoast.app.feature.gate
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +18,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,8 +43,10 @@ fun GateScreen(
     authMessage: String?,
     onPasswordChange: (String) -> Unit,
     onEnter: () -> Unit,
-    onOpenMailbox: () -> Unit
+    onOpenMailbox: () -> Unit,
+    onEnterLocal: (() -> Unit)? = null
 ) {
+    var localSelected by rememberSaveable { mutableStateOf(false) }
     val motion = rememberCoastGateMotion()
     val density = LocalDensity.current
 
@@ -97,7 +105,18 @@ fun GateScreen(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(Modifier.height(passwordGap))
+            Spacer(Modifier.height(if (onEnterLocal == null) passwordGap else 16.dp))
+            if (onEnterLocal != null) {
+                Row(
+                    modifier = Modifier.graphicsLayer { alpha = motion.form.coerceIn(0f, 1f) },
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    GateModeBubble("本机模式", localSelected, gateEnabled) { localSelected = true }
+                    GateModeBubble("前后端模式", !localSelected, gateEnabled) { localSelected = false }
+                }
+                Spacer(Modifier.height(18.dp))
+            }
             Column(
                 modifier = Modifier.graphicsLayer {
                     alpha = motion.form.coerceIn(0f, 1f)
@@ -105,6 +124,21 @@ fun GateScreen(
                 },
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                if (localSelected && onEnterLocal != null) {
+                    Text(
+                        text = "进入本机空间  →",
+                        modifier = Modifier.width(GateVisualTokens.PasswordWidth)
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .65f))
+                            .clickable(enabled = gateEnabled, onClick = onEnterLocal)
+                            .padding(vertical = 18.dp),
+                        color = MaterialTheme.colorScheme.onBackground,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text("无需密码 · 数据保存在本机", color = CoastMuted, style = MaterialTheme.typography.bodySmall)
+                } else {
                 GatePasswordField(
                     password = password,
                     onPasswordChange = onPasswordChange,
@@ -146,6 +180,7 @@ fun GateScreen(
 
                 Spacer(Modifier.height(GateVisualTokens.PasswordToMailbox))
                 GateSmallEntry("访客信箱", gateEnabled, onOpenMailbox)
+                }
             }
         }
 
@@ -163,5 +198,21 @@ private fun GateSmallEntry(label: String, enabled: Boolean, onClick: () -> Unit)
         color = CoastMuted.copy(alpha = if (enabled) 1f else .45f),
         fontSize = GateVisualTokens.MailboxEntrySize,
         letterSpacing = GateVisualTokens.MailboxEntryLetterSpacing
+    )
+}
+
+@Composable
+private fun GateModeBubble(label: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    Text(
+        text = label,
+        modifier = Modifier.clip(RoundedCornerShape(999.dp))
+            .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = .17f)
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .48f))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 19.dp, vertical = 9.dp),
+        color = (if (selected) MaterialTheme.colorScheme.primary else CoastMuted)
+            .copy(alpha = if (enabled) 1f else .6f),
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
     )
 }

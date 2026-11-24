@@ -37,5 +37,6 @@ data class CoastShellState(
     val streamingMessageId: Long? = null,
     val streamingVariantIndex: Int? = null,
     val showModelPicker: Boolean = false,
-    val snackbarMessage: String? = null
+    val snackbarMessage: String? = null,
+    val localMode: Boolean = false
 )
