@@ -11,6 +11,8 @@ import { readArchiveAttachment } from '../functions/coast-archive-v2-media.js';
 import { readArchiveChat,readArchiveVoice } from '../functions/coast-archive-v2-records.js';
 import { MODULES,encodeRecordObject } from '../functions/coast-archive-v2-manifest.js';
 import { createArchiveSession,registerArchiveObject,putArchiveChunk } from '../functions/coast-archive-v2-stage.js';
+import { saveTreasure } from '../functions/coast-vault-treasures.js';
+import { restoreArchiveRecord } from '../functions/coast-archive-v2-restore-record.js';
 import { restoreArchiveChatGroup } from '../functions/coast-archive-v2-restore.js';
 test('staged chat group preview and atomic restoration retain raw history and media',async()=>{
  const db=new D1Database(),target=new D1Database(),c=await createConversation(db,'Archive chat group','main');
@@ -29,9 +31,16 @@ test('staged chat group preview and atomic restoration retain raw history and me
  await db.prepare('INSERT INTO conversation_soils (conversation_id,current_text,created_at,updated_at) VALUES (?,?,?,?)').bind(c.id,'原始思维壤',1,1).run();
  const soil=(await archiveDetailPage(db,'thinking_soil')).items[0],soilRecord=await encodeRecordObject({kind:'thinking_soil',data:soil});
  objects.push(soilRecord);records.push({module:'thinking_soil',id:'thinking_soil:'+await digestBytes(new TextEncoder().encode(JSON.stringify([c.id]))),record_object:soilRecord.descriptor.object_sha256,media_objects:[],dependencies:['chat/'+c.id]});
+ await saveTreasure(db,{kind:'audio',conversation_id:c.id,source_id:'voice-fixture',notes:'保留备注'});
+ for(const data of (await archiveDetailPage(db,'vault_treasures')).items){
+   const o=await encodeRecordObject({kind:'vault_treasures',data});objects.push(o);
+   records.push({module:'vault',id:'vault_treasures:'+await digestBytes(new TextEncoder().encode(JSON.stringify([data.id]))),record_object:o.descriptor.object_sha256,media_objects:[],dependencies:['chat/'+c.id]});
+ }
  manifest.objects=objects.map(o=>o.descriptor);for(const m of manifest.modules){m.count=records.filter(r=>r.module===m.module).length;if(m.count)m.coverage='partial';}
  const session=await createArchiveSession(target);
  for(const o of objects){await registerArchiveObject(target,session.id,o.descriptor);for(let i=0;i<o.chunks.length;i++)await putArchiveChunk(target,session.id,o.descriptor.object_sha256,i,o.chunks[i]);}
+ const treasure=records.find(r=>r.module==='vault');
+ await assert.rejects(()=>restoreArchiveRecord(target,session.id,manifest,'vault',treasure.id,true),/restore owner chat first/);
  const preview=await restoreArchiveChatGroup(target,session.id,manifest,c.id,false);
  assert.equal(preview.committed,false);assert.equal(preview.attachments,1);
  await assert.rejects(()=>readArchiveChat(target,c.id));
@@ -40,6 +49,10 @@ test('staged chat group preview and atomic restoration retain raw history and me
  assert.deepEqual([...await voiceClipAudio(target,'voice-fixture')],[4,5,6]);
  assert.deepEqual((await archiveDetailPage(target,'thinking_soil')).items,[soil]);
  assert.deepEqual(await readArchiveChat(target,c.id),chat);
+ assert.equal((await restoreArchiveRecord(target,session.id,manifest,'vault',treasure.id,false)).ready,1);
+ assert.equal((await archiveDetailPage(target,'vault_treasures')).items.length,0);
+ await restoreArchiveRecord(target,session.id,manifest,'vault',treasure.id,true);
+ assert.deepEqual((await archiveDetailPage(target,'vault_treasures')).items,(await archiveDetailPage(db,'vault_treasures')).items);
  assert.deepEqual([...new Uint8Array((await getChatAttachmentRecord(target,c.id,a.id)).data)],[1,2,3]);
  await assert.rejects(()=>restoreArchiveChatGroup(target,session.id,manifest,c.id,true),/already exists/);
 });
