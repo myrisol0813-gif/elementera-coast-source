@@ -25,6 +25,7 @@ export const archiveV2Transport=Object.freeze({
   attachmentPage:(cursor='',limit=50)=>requestJson(base+'/inventory/attachments?'+new URLSearchParams({cursor,limit})),
   dogtalkPage:(kind='snapshots',cursor='',limit=50)=>requestJson(base+'/inventory/dogtalk?'+new URLSearchParams({kind,cursor,limit})),
   attachment:(conversation,id)=>requestJson(base+'/attachments/'+segment(conversation)+'/'+segment(id)),
+  restoreChat:(id,manifest,conversation,confirm)=>requestJson(sessions+'/'+segment(id)+'/chat-restore/'+segment(conversation),{method:'POST',body:JSON.stringify({manifest,confirm})}),
   validateManifest:manifest=>requestJson(base+'/manifest/validate',{method:'POST',body:JSON.stringify(manifest)}),
   attachmentChunk:(conversation,id,descriptor,index)=>readChunk('/attachments/'+segment(conversation)+'/'+segment(id),descriptor,index),
   voiceChunk:(id,descriptor,index)=>readChunk('/voice/'+segment(id),descriptor,index),
