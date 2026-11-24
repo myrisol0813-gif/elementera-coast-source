@@ -28,6 +28,7 @@ internal fun FeatureLandingScreen(
     devHands: DevHandsRepository,
     archive: GlobalArchiveRepository,
     openMemoryPending: Boolean,
+    openModelBoxInitially: Boolean = false,
     onMemoryPendingConsumed: () -> Unit,
     messages: List<ChatMessage>,
     onBackToChat: () -> Unit,
@@ -68,6 +69,7 @@ internal fun FeatureLandingScreen(
             )
             FeatureDestination.Wolf -> WolfScreen(
                 store = services.wolf,
+                openModelBoxInitially = openModelBoxInitially,
                 shellState = shellState,
                 chatGpt = chatGpt,
                 messages = messages,

@@ -62,14 +62,15 @@ fun WolfScreen(
     onImportMessages: (List<ChatMessage>) -> Unit,
     onActionLogged: (String, String, String) -> Unit,
     onSnackbar: (String) -> Unit,
-    onBackToChat: () -> Unit
+    onBackToChat: () -> Unit,
+    openModelBoxInitially: Boolean = false
 ) {
     val state by store.state.collectAsState()
-    var page by remember { mutableStateOf<WolfDestination?>(null) }
+    var page by remember { mutableStateOf<WolfDestination?>(if (openModelBoxInitially) WolfDestination.ModelBox else null) }
     val current = page
     var modelPage by remember { mutableStateOf(LocalModelPage.Catalog) }
     val homeTitle = "屋主设置"
-    fun back() { if (current == WolfDestination.ModelBox && modelPage != LocalModelPage.Catalog) modelPage = LocalModelPage.Catalog else if (current != null) { page = null; modelPage = LocalModelPage.Catalog } else onBackToChat() }
+    fun back() { if (current == WolfDestination.ModelBox && modelPage != LocalModelPage.Catalog) modelPage = LocalModelPage.Catalog else if (openModelBoxInitially && current == WolfDestination.ModelBox) onBackToChat() else if (current != null) { page = null; modelPage = LocalModelPage.Catalog } else onBackToChat() }
     BackHandler(enabled = current != null) { back() }
 
     if (current == null) {
