@@ -42,7 +42,7 @@ internal object ArchiveV2Local {
                 list("daily","diaries","local_diary"){"diary:"+it.getValue("id").jsonPrimitive.content}
                 payload["profile"]?.takeIf { it!=JsonNull }?.let { add("model_profile","owner","local_model_profile",it) }
                 payload["dailyProfile"]?.takeIf { it!=JsonNull }?.let { add("daily","profile","local_daily_profile",it) }
-                ArchiveV2Knowledge.export(store).forEach{add(it.module,it.id,it.module,it.data)}
+                ArchiveV2Knowledge.export(store).forEach{add(it.module,it.id,it.kind,it.data)}
                 val counts=records.groupingBy { it.module }.eachCount()
                 val manifest=ArchiveV2Manifest("elementera-coast-archive",2,"local",applicationId,payload.getValue("exportedAt").jsonPrimitive.content,
                     ArchiveV2Manifests.modules.map { ArchiveV2Coverage(it,if(it in localModules)"partial" else "unavailable",counts[it]?:0) },records,objects.values.toList())

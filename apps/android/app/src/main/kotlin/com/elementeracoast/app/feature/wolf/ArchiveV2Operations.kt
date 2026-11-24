@@ -47,7 +47,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
         }catch(e:Throwable){dir.deleteRecursively();throw e}
     }
     fun localModules(m:ArchiveV2Manifest):Set<String> =
-        if(local) m.modules.filter { it.coverage!="unavailable" && it.module in (if(m.workspace=="local")ArchiveV2Local.localModules else ArchiveV2Local.cloudModules) && (it.module!="daily"||m.workspace=="local"||m.applicationId==BuildConfig.APPLICATION_ID) && (it.module !in setOf("custom_instructions","memory_entries","memory_pockets")||m.applicationId==BuildConfig.APPLICATION_ID) }.map { it.module }.toSet() else emptySet()
+        if(local) m.modules.filter { it.coverage!="unavailable" && it.module in (if(m.workspace=="local")ArchiveV2Local.localModules else ArchiveV2Local.cloudModules) && (it.module!="daily"||m.workspace=="local"||m.applicationId==BuildConfig.APPLICATION_ID) && (it.module !in setOf("custom_instructions","memory_entries","memory_pockets","user_portrait","self_portrait")||m.applicationId==BuildConfig.APPLICATION_ID) }.map { it.module }.toSet() else emptySet()
     suspend fun localRestore(input:Imported,modules:Set<String>,confirm:Boolean):JsonObject=withContext(Dispatchers.IO){
         require(local&&NativeWorkspace.isLocal)
         val report=ArchiveV2Local.restore(input.manifest,input.stage,modules,BuildConfig.APPLICATION_ID,NativeWorkspace.persistence(context),confirm)
@@ -66,7 +66,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
         val m=input.manifest;val objects=m.objects.associateBy { it.objectSha256 }
         buildList {
             for(r in m.records){
-                if(m.workspace=="local"&&(r.module !in ArchiveV2Local.localModules||r.module in setOf("custom_instructions","memory_entries","memory_pockets")&&m.applicationId!=BuildConfig.APPLICATION_ID))continue
+                if(m.workspace=="local"&&(r.module !in ArchiveV2Local.localModules||r.module in setOf("custom_instructions","memory_entries","memory_pockets","user_portrait","self_portrait")&&m.applicationId!=BuildConfig.APPLICATION_ID))continue
                 if(m.workspace=="backend"&&!(r.module=="chat"&&m.applicationId==BuildConfig.APPLICATION_ID)&&!(r.module=="library"&&r.id.startsWith("library_books:"))&&r.module !in setOf("calendar","worldbook","model_profile")&&!(m.applicationId==BuildConfig.APPLICATION_ID&&r.module in setOf("memory_entries","memory_pockets","user_portrait","self_portrait","daily","vault","custom_instructions")))continue
                 val d=objects.getValue(r.recordObject)
                 if(d.size>1800000)continue
@@ -74,8 +74,8 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
                 val kind=value.getValue("kind").jsonPrimitive.content
                 val data=value.getValue("data").jsonObject
                 if(m.workspace=="local"){
-                    val kinds=mapOf("local_chat" to "chat","local_calendar" to "calendar","local_moment" to "daily","local_diary" to "daily","local_daily_profile" to "daily","local_model_profile" to "model_profile","worldbook" to "worldbook","custom_instructions" to "custom_instructions","memory_entries" to "memory_entries","memory_pockets" to "memory_pockets")
-                    if(kinds[kind]==r.module){val title=((data["conversation"] as? JsonObject)?.get("title")?.jsonPrimitive?.contentOrNull?:data["title"]?.jsonPrimitive?.contentOrNull?:data["text"]?.jsonPrimitive?.contentOrNull?:r.module).take(100);add(Choice(r.module,r.id,title,true))}
+                    val kinds=mapOf("local_chat" to "chat","local_calendar" to "calendar","local_moment" to "daily","local_diary" to "daily","local_daily_profile" to "daily","local_model_profile" to "model_profile","worldbook" to "worldbook","custom_instructions" to "custom_instructions","memory_entries" to "memory_entries","memory_pockets" to "memory_pockets","user_portrait" to "user_portrait","self_portrait" to "self_portrait")
+                    if(kinds[kind]==r.module){val title=((data["conversation"] as? JsonObject)?.get("title")?.jsonPrimitive?.contentOrNull?:data["title"]?.jsonPrimitive?.contentOrNull?:data["text"]?.jsonPrimitive?.contentOrNull?:when(r.module){"user_portrait"->"用户画像及历史";"self_portrait"->"自我画像及历史";else->r.module}).take(100);add(Choice(r.module,r.id,title,true))}
                     continue
                 }
                 if(r.module=="chat"&&kind=="chat"){

@@ -7,8 +7,8 @@ import java.time.Instant
 /** These modules already have a real editable local store. Use the cloud's
  * canonical V2 record shape in both directions, not a parallel backup schema. */
 internal object ArchiveV2Knowledge {
-    val modules=setOf("custom_instructions","worldbook")+LocalMemoryStore.modules
-    data class Row(val module:String,val id:String,val data:JsonObject)
+    val modules=setOf("custom_instructions","worldbook")+LocalMemoryStore.modules+LocalPortraitStore.modules
+    data class Row(val module:String,val id:String,val data:JsonObject,val kind:String=module)
     private fun identity(module:String,id:String)=module+":"+ArchiveV2Chunks.digest(JsonArray(listOf(JsonPrimitive(id))).toString().encodeToByteArray())
     private fun stamp(value:String?)=Instant.parse(requireNotNull(value)).toEpochMilli().also{require(it>=0)}
     private fun iso(v:JsonElement):String {require(v is JsonPrimitive&&!v.isString&&v.long>=0);return Instant.ofEpochMilli(v.long).toString()}
@@ -35,25 +35,34 @@ internal object ArchiveV2Knowledge {
         for((module,records) in listOf("memory_entries" to memory.entries,"memory_pockets" to memory.pockets)){
             records.filter{it["deleted_at"]==JsonNull}.forEach{result.add(Row(module,it.str("id"),it))}
         }
+        val portraits=LocalPortraitStore(store)
+        for(module in LocalPortraitStore.modules){
+            val d=portraits.read(module)?:continue
+            for((kind,items) in listOf(module to listOf(d.root),module+"_candidates" to d.candidates,module+"_revisions" to d.revisions)){
+                items.forEach{result.add(Row(module,identity(kind,it.str("id")),it,kind))}
+            }
+        }
         return result
     }
     fun read(manifest:ArchiveV2Manifest,stage:ArchiveV2Stage,selection:Set<String>,app:String):List<Row>{
-        require(selection.intersect(LocalMemoryStore.modules+setOf("custom_instructions")).isEmpty()||manifest.applicationId==app){"记忆及自定义指令原始身份暂需同版本恢复。"}
+        require(selection.intersect(LocalMemoryStore.modules+LocalPortraitStore.modules+setOf("custom_instructions")).isEmpty()||manifest.applicationId==app){"记忆及自定义指令原始身份暂需同版本恢复。"}
         val objects=manifest.objects.associateBy{it.objectSha256}
         return manifest.records.filter{it.module in selection}.map{r->
             require(r.mediaObjects.isEmpty())
             val d=objects.getValue(r.recordObject)
             require(d.size<=1800000)
             val raw=Json.parseToJsonElement(stage.verify(d,1800000).readBytes().decodeToString(throwOnInvalidSequence=true)).jsonObject
-            require(raw.keys==setOf("kind","data")&&raw.str("kind")==r.module)
+            require(raw.keys==setOf("kind","data"))
+            val kind=raw.str("kind")
+            require(kind==r.module||r.module in LocalPortraitStore.modules&&kind in setOf(r.module+"_candidates",r.module+"_revisions"))
             val v=raw.getValue("data").jsonObject
             if(r.module in LocalMemoryStore.modules){
                 LocalMemoryStore.validateRow(v,r.module=="memory_pockets")
                 require(v["deleted_at"]==JsonNull&&r.id==v.str("id"))
                 val cid=v["conversation_id"]?.jsonPrimitive?.contentOrNull
                 require(r.dependencies==if(cid==null)emptyList() else listOf("chat/"+cid))
-            }else require(r.dependencies.isEmpty()&&r.id==identity(r.module,v.str("id")))
-            Row(r.module,r.id,v)
+            }else require(r.dependencies.isEmpty()&&r.id==identity(kind,v.str("id")))
+            Row(r.module,r.id,v,kind)
         }
     }
     fun apply(rows:List<Row>,selection:Set<String>,store:LocalPersistence,write:Boolean,parents:Set<String>,conflictingParents:Set<String>):Map<String,LocalRestoreCount>{
@@ -106,6 +115,20 @@ internal object ArchiveV2Knowledge {
             val next=LocalMemoryStore.Snapshot(merge("memory_entries",old.entries),merge("memory_pockets",old.pockets))
             LocalMemoryStore.validate(next)
             if(write)memory.write(next)
+        }
+        val portraits=LocalPortraitStore(store)
+        for(module in selection.intersect(LocalPortraitStore.modules)){
+            val group=rows.filter{it.module==module}
+            if(group.isEmpty())continue
+            val root=group.single{it.kind==module}.data
+            val document=LocalPortraitStore.Document(root,group.filter{it.kind==module+"_candidates"}.map{it.data}.sortedBy{it.str("id")},group.filter{it.kind==module+"_revisions"}.map{it.data}.sortedBy{it.getValue("revision").jsonPrimitive.int})
+            LocalPortraitStore.validate(document)
+            val old=portraits.read(module)
+            val same=old!=null&&old.root==document.root&&old.candidates.sortedBy{it.str("id")}==document.candidates&&old.revisions.sortedBy{it.getValue("revision").jsonPrimitive.int}==document.revisions
+            val blank=old==null||old.root.str("body").isEmpty()&&old.root.getValue("revision").jsonPrimitive.int==1&&old.root.getValue("write_enabled").jsonPrimitive.int==1&&old.root["created_at"]==old.root["updated_at"]&&old.candidates.isEmpty()&&old.revisions.isEmpty()
+            require(same||blank){"目标画像已有正文或历史，不覆盖。"}
+            counts[module]=LocalRestoreCount(if(same)0 else group.size,if(same)group.size else 0,0)
+            if(write&&!same)portraits.write(module,document)
         }
         return counts
     }
