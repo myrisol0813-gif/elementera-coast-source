@@ -2,6 +2,8 @@ import { prepareArchiveVault } from './coast-archive-v2-restore-vault.js';
 import { restoreArchiveDaily } from './coast-archive-v2-restore-daily.js';
 import { PORTRAIT_RESTORE_MODULES,restoreArchivePortrait } from './coast-archive-v2-restore-portrait.js';
 import { MEMORY_RESTORE_MODULES,prepareArchiveMemory } from './coast-archive-v2-restore-memory.js';
+import { ensureMemorySchema } from './memory-store/memory-schema.js';
+import { MAX_CUSTOM_INSTRUCTIONS } from './memory-store/memory-normalize.js';
 import { ensureChatSchema, normalizeProfile } from './chat-store.js';
 import { ensureCalendarSchema, CALENDAR_LIMITS } from './calendar-store.js';
 import { anniversaryCalendarDay } from './calendar-anniversary.js';
@@ -17,6 +19,7 @@ const day=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite
 const exact=(row,fields)=>row&&typeof row==='object'&&!Array.isArray(row)&&Object.keys(row).length===fields.length&&fields.every(k=>Object.hasOwn(row,k));
 const specs={
  calendar:['coast_calendar_entries_v2','id,day,kind,title,body,recurrence,author,source,conversation_id,source_turn_id,tool_call_id,model_label,created_at,updated_at,anniversary_start_day,anniversary_mode,anniversary_target_days,anniversary_pinned',ensureCalendarSchema],
+ custom_instructions:['memory_custom_instructions','id,content,updated_at,updated_by,source',ensureMemorySchema],
  worldbook:['coast_worldbook_entries','id,title,content,keywords_json,use_regex,case_sensitive,constant_active,priority,scan_depth,inject_position,enabled,scope,visitor_safe,created_at,updated_at',ensureWorldbookSchema],
  model_profile:['chat_profiles','id,assistant_avatar_dataurl,current_chat_model,current_image_model,model_box_json,updated_at',ensureChatSchema]
 };
@@ -46,7 +49,7 @@ export async function restoreArchiveRecord(db,sessionId,manifest,module,recordId
  }
  const [table,names,ensure]=specs[module],fields=names.split(','),v=raw?.data;
  check(exact(raw,['kind','data'])&&raw.kind===module&&exact(v,fields)&&id(v.id),'invalid record fields');
- const expected=module==='worldbook'?'worldbook:'+await digestBytes(new TextEncoder().encode(JSON.stringify([v.id]))):v.id;
+ const expected=['worldbook','custom_instructions'].includes(module)?module+':'+await digestBytes(new TextEncoder().encode(JSON.stringify([v.id]))):v.id;
  check(expected===r.id,'record identity mismatch');
  await ensure(db);
  if(module==='calendar'){
@@ -63,6 +66,8 @@ export async function restoreArchiveRecord(db,sessionId,manifest,module,recordId
      check(c&&(!v.source_turn_id||JSON.parse(c.state_json).turns.some(t=>t.id===v.source_turn_id)),'restore related chat first');
    }else check(r.dependencies.length===0&&!v.source_turn_id,'calendar dependency missing');
    v.author=roles[v.author];
+ }else if(module==='custom_instructions'){
+   check(manifest.application_id==='com.elementeracoast.source'&&v.id==='active'&&r.dependencies.length===0&&text(v.content,MAX_CUSTOM_INSTRUCTIONS)&&stamp(v.updated_at)&&text(v.updated_by,80)&&text(v.source,80),'invalid custom instructions or incompatible edition');
  }else if(module==='worldbook'){
    check(r.dependencies.length===0&&text(v.title,160)&&v.title.trim()&&text(v.content,12000)&&v.content.trim()&&stamp(v.created_at)&&stamp(v.updated_at),'invalid worldbook text');
    check(['use_regex','case_sensitive','constant_active','enabled','visitor_safe'].every(k=>[0,1].includes(v[k]))&&Number.isInteger(v.priority)&&v.priority>=-1000&&v.priority<=1000&&Number.isInteger(v.scan_depth)&&v.scan_depth>=1&&v.scan_depth<=20&&v.inject_position==='before_memory'&&['owner','visitor','both','mailbox','lighthouse','radio','official_mcp','daily'].includes(v.scope),'invalid worldbook settings');
