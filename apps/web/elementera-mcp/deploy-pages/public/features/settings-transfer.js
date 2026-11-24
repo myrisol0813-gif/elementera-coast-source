@@ -1,3 +1,4 @@
+import { createV2Transfer } from './settings-archive-v2.js';
 import { requestJson } from '../core/api.js';
 import { escapeHtml, downloadFile, timestampLabel } from '../core/dom.js';
 
@@ -34,13 +35,14 @@ function section(title,body){return '<div class="settings-group"><h2>'+escapeHtm
 function line(title,description){return '<div class="feature-row static"><span><strong>'+escapeHtml(title)+'</strong><small>'+escapeHtml(description)+'</small></span></div>';}
 
 export function createTransferSettings({router,toast,chat}){
+  const v2=createV2Transfer({router,toast,chat});
   let payload=null, selection=new Set(), preview=null, result=null, busy=false, failure='',revision=0;
   const current=()=>router.current()?.name==='settings-transfer';
   const refresh=()=>current()?router.refresh():Promise.resolve();
   function reset(){revision++;payload=null;selection=new Set();preview=null;result=null;busy=false;failure='';}
   router.subscribe(({current:next,previous})=>{if(previous?.name==='settings-transfer'&&next?.name!=='settings-transfer')reset();});
   router.register('settings-transfer',()=>{
-    let content=section('可迁移数据包',line('当前目的地：在线海岸','导入写入已登录的云端。不会覆盖已有记录；原文件保留。')+
+    let content=v2.render()+section('可迁移数据包',line('当前目的地：在线海岸','导入写入已登录的云端。不会覆盖已有记录；原文件保留。')+
       action('export','导出云端可迁移资料',busy)+action('choose','选择数据包',busy));
     if(payload){
       content+=section('选择模块',line('来源',payload.workspace==='local'?'本机海岸':'在线海岸')+payload.includedModules.map(k=>{
@@ -67,6 +69,7 @@ export function createTransferSettings({router,toast,chat}){
     finally{if(token===revision){busy=false;await refresh();}}
   }
   async function handle(name,target){
+    if(name.startsWith('transfer-v2-'))return v2.handle(name.slice('transfer-'.length),target);
     if(name==='transfer-open'){reset();return router.open('settings-transfer');}
     if(!current()||busy)return;
     if(name==='transfer-export')return operate(async token=>{

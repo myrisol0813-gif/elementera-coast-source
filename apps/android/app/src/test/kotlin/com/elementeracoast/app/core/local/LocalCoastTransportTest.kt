@@ -46,12 +46,33 @@ class LocalCoastTransportTest {
     @Test fun unsupportedOperationsAndWrongHostsCannotReachNetwork() {
         val a = client(MemoryLocalPersistence())
         assertEquals(501, call(a, "/api/chat", "POST").first)
-        assertEquals(501, call(a, "/api/memory/entries").first)
+        assertEquals(501, call(a, "/api/memory/user-portrait/candidates", "POST").first)
         a.newCall(Request.Builder().url("https://example.com/").build()).execute().use {
             assertEquals(403, it.code)
         }
     }
 
+    @Test fun localKnowledgeIsDurableAndInjectedWithoutNetwork(){
+        val store=MemoryLocalPersistence()
+        val a=client(store)
+        assertEquals(200,call(a,"/api/memory/custom-instructions","PUT","""{"content":"Keep original text"}""").first)
+        assertEquals(200,call(a,"/api/worldbook","POST","""{"title":"Coast","content":"Matched text","keywords":["wave"]}""").first)
+        assertEquals(200,call(a,"/api/worldbook","POST","""{"title":"Visitor","content":"Private visitor text","keywords":["wave"],"scope":"visitor","visitor_safe":true}""").first)
+        val reopened=client(store)
+        assertTrue(call(reopened,"/api/memory/custom-instructions").second.toString().contains("Keep original text"))
+        assertEquals(2,call(reopened,"/api/worldbook").second.getValue("entries").jsonArray.size)
+        val id=call(reopened,"/api/chat/conversations","POST").second.getValue("conversation").jsonObject.getValue("id").jsonPrimitive.content
+        val body=buildJsonObject{
+            put("conversation_id",id);put("source_turn_id","turn1");put("model","fixture");put("local_date","2026-11-24");put("local_datetime","2026-11-24T12:00:00")
+            putJsonArray("messages"){add(buildJsonObject{put("role","user");put("content","wave")})}
+        }
+        val response=call(reopened,"/api/chat/native-context","POST",body.toString())
+        assertEquals(200,response.first)
+        assertTrue(response.second.toString().contains("Keep original text"));assertTrue(response.second.toString().contains("Matched text"))
+        assertFalse(response.second.toString().contains("Private visitor text"))
+        assertTrue(LocalKnowledgeStore(store).context(listOf(com.elementeracoast.app.core.remote.RemoteChatMessage("user","wave")),1800,"main_chat").receipt.customInstructions.delivered)
+        assertTrue(runCatching{LocalKnowledgeStore(store).context(listOf(com.elementeracoast.app.core.remote.RemoteChatMessage("user","x".repeat(6000))),1800,"main_chat")}.isFailure)
+    }
     @Test fun dailyRecordsSurviveReopen() {
         val local = MemoryLocalPersistence()
         val a = client(local)

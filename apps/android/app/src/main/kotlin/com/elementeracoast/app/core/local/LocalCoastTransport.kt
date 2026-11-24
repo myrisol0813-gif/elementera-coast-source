@@ -24,6 +24,10 @@ class LocalCoastTransport(private val store: LocalPersistence,
 ) : Interceptor {
     private val cache = RemoteCacheStore(store)
     private val calendar = LocalCalendarStore(store)
+    private val knowledge = LocalKnowledgeStore(store)
+    private val memory = LocalMemoryStore(store)
+    private val portraits = LocalPortraitStore(store)
+    private val soil = LocalSoilStore(store)
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
     private val media = "application/json; charset=utf-8".toMediaType()
 
@@ -35,11 +39,18 @@ class LocalCoastTransport(private val store: LocalPersistence,
             else route(request)
         } catch (error: LocalCalendarError) {
             failure(request, error.status, error.type, error.message.orEmpty())
+        } catch (error: IllegalArgumentException) {
+            failure(request, 400, "local_validation", error.message?.take(240) ?: "本机资料未通过校验。")
         } catch (_: Exception) {
             failure(request, 500, "local_storage_error", "本机读写失败，原始资料未自动转发到服务器。")
         }
     }
 
+    fun uploadAttachment(cid:String,name:String,mime:String,bytes:ByteArray):RemoteAttachment=synchronized(this){
+        require(conversationExists(cid)){"附件所属窗口不存在。"}
+        store.atomic{LocalAttachmentStore(it).upload(cid,name,mime,bytes)}
+    }
+    internal fun importLocalBook(payload:JsonObject):JsonObject=synchronized(this){store.atomic{LocalSideRecords(it).importBook(payload)}}
     private fun now() = Instant.now().toString()
     private fun id() = UUID.randomUUID().toString()
     private fun body(request: Request): JsonObject {
@@ -92,9 +103,16 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 return ok(r, "conversation" to element(RemoteConversation.serializer(), next))
             }
             if (method == "DELETE") {
-                cache.putConversations(all.filterNot { it.id == cid })
-                cache.removeHistory(cid)
-                store.remove("local.soil." + cid)
+                store.atomic{staged->
+                    LocalSideRecords(staged).removeConversation(cid)
+                    LocalDogtalkStore(staged).deleteConversation(cid)
+                    val c=RemoteCacheStore(staged,strictReads=true)
+                    c.putConversations(all.filterNot{it.id==cid});c.removeHistory(cid)
+                    LocalAttachmentStore(staged).deleteConversation(cid)
+                    val s=LocalSoilStore(staged);val old=s.read()
+                    s.write(LocalSoilStore.Rows(old.current.filterNot{it["conversation_id"]?.jsonPrimitive?.content==cid},old.history.filterNot{it["conversation_id"]?.jsonPrimitive?.content==cid}))
+                    val audit=LocalToolAudit(staged);audit.write(audit.read().filterNot{it["conversation_id"]?.jsonPrimitive?.content==cid})
+                }
                 return ok(r)
             }
         }
@@ -106,14 +124,81 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if (method == "PUT") {
                 val h = json.decodeFromJsonElement(RemoteHistory.serializer(), body(r))
                     .copy(conversationId = cid, updatedAt = now())
-                cache.putHistory(cid, h)
+                val originals=LocalAttachmentStore(store)
+                if(originals.needsHistoryLink(cid,h))store.atomic{staged->LocalAttachmentStore(staged).linkHistory(cid,h);RemoteCacheStore(staged).putHistory(cid,h)}
+                else{originals.linkHistory(cid,h);cache.putHistory(cid,h)}
                 return ok(r, "source" to JsonPrimitive("local"), "history" to element(RemoteHistory.serializer(), h))
             }
+        }
+        if(path.startsWith("/api/chat/attachments/")&&r.url.pathSegments.size==4){
+            val cid=r.url.queryParameter("conversation_id").orEmpty()
+            if(!conversationExists(cid))return missing(r)
+            val id=r.url.pathSegments.last();val originals=LocalAttachmentStore(store)
+            val original=originals.entries().firstOrNull{it.metadata["id"]?.jsonPrimitive?.content==id&&it.metadata["conversation_id"]?.jsonPrimitive?.content==cid}?:return missing(r)
+            if(method=="DELETE"){
+                val used=cache.history(cid)?.turns.orEmpty().any{t->(t.user.variants+t.assistant.variantsByUserVariant.values.flatten()).any{v->v.attachments.any{it.id==id}}}
+                require(!used){"原件仍被历史消息引用，不能删除。"}
+                store.atomic{LocalAttachmentStore(it).remove(cid,id)}
+                return ok(r)
+            }
+            if(method!="GET")return unsupported(r)
+            val bytes=originals.bytes(original)
+            return Response.Builder().request(r).protocol(Protocol.HTTP_1_1).code(200).message("OK").body(bytes.toResponseBody(original.metadata.getValue("mime").jsonPrimitive.content.toMediaType())).build()
+        }
+        if(path=="/api/dogtalk"){
+            if(method=="GET")return ok(r,"dogtalk" to LocalDogtalkStore(store).public(r.url.queryParameter("room_scope").orEmpty(),r.url.queryParameter("conversation_id")))
+            if(method=="PUT")return ok(r,"dogtalk" to store.atomic{LocalDogtalkStore(it).save(body(r))})
+        }
+        val side=LocalSideRecords(store)
+        val parts=r.url.pathSegments
+        fun binary(row:LocalSideRecords.Row,mime:String):Response=Response.Builder().request(r).protocol(Protocol.HTTP_1_1).code(200).message("OK").body(side.bytes(row).toResponseBody(mime.toMediaType())).build()
+        fun rows(key:String,items:List<JsonObject>)=ok(r,key to JsonArray(items))
+        if(path=="/api/voice/clips"&&method=="GET"){
+            val cid=r.url.queryParameter("conversation_id").orEmpty();if(!conversationExists(cid))return missing(r)
+            return rows("clips",side.clips(cid))
+        }
+        if(parts.size==5&&parts.take(3)==listOf("api","voice","clips")&&parts.last()=="audio"&&method=="GET")return binary(side.audio(parts[3])?:return missing(r),"audio/mpeg")
+        if(path=="/api/coast-vault/media"&&method=="GET")return response(r,200,JsonObject(side.media(r.url.queryParameter("kind")?:"all",r.url.queryParameter("q").orEmpty(),r.url.queryParameter("cursor")?.toIntOrNull()?:0)+("ok" to JsonPrimitive(true))))
+        if(path=="/api/coast-vault/treasures"){
+            if(method=="GET")return response(r,200,JsonObject(side.treasureRows(r.url.queryParameter("kind")?:"all",r.url.queryParameter("q").orEmpty(),r.url.queryParameter("conversation_id").orEmpty(),r.url.queryParameter("turn_id").orEmpty(),r.url.queryParameter("cursor")?.toIntOrNull()?:0)+("ok" to JsonPrimitive(true))))
+            if(method=="POST")return ok(r,"treasure" to store.atomic{LocalSideRecords(it).saveTreasure(body(r))})
+        }
+        if(parts.size==4&&parts.take(3)==listOf("api","coast-vault","treasures")){
+            if(method=="PATCH")return ok(r,"treasure" to store.atomic{LocalSideRecords(it).changeTreasure(parts.last(),body(r).str("notes").orEmpty())})
+            if(method=="DELETE"){store.atomic{LocalSideRecords(it).changeTreasure(parts.last(),null)};return ok(r)}
+        }
+        if(path=="/api/coast-vault/media-labels"&&method=="PATCH")return ok(r,"label" to store.atomic{LocalSideRecords(it).renameImage(body(r))})
+        if(path=="/api/library/books"&&method=="GET")return rows("books",side.books())
+        if(parts.size>=4&&parts.take(3)==listOf("api","library","books")){
+            val id=parts[3]
+            if(parts.size==4&&method=="GET")return ok(r,"book" to side.book(id))
+            if(parts.size==4&&method=="DELETE"){store.atomic{LocalSideRecords(it).deleteBook(id)};return ok(r)}
+            if(parts.size==5&&parts[4]=="cover"){
+                if(method=="GET"){val row=side.cover(id)?:return missing(r);return binary(row,row.data.getValue("mime").jsonPrimitive.content)}
+                if(method=="PUT"){
+                    val content=r.body?:return unsupported(r);require(content.contentLength() in 1..600L*1024L){"封面最大600 KB。"}
+                    val buf=Buffer();content.writeTo(buf);val bytes=buf.readByteArray()
+                    return ok(r,"cover" to store.atomic{LocalSideRecords(it).saveCover(id,bytes,content.contentType().toString())})
+                }
+            }
+            if(parts.size==5&&parts[4]=="notes"){
+                if(method=="GET")return rows("notes",side.notes(id))
+                if(method=="POST")return ok(r,"note" to store.atomic{LocalSideRecords(it).writeNote(id,body(r))})
+            }
+            if(parts.size==5&&parts[4]=="progress"&&method=="POST"){val v=body(r);return ok(r,"progress" to store.atomic{LocalSideRecords(it).progress(id,v.getValue("chapter_index").jsonPrimitive.int,v.getValue("paragraph_index").jsonPrimitive.int)})}
+            if(parts.size in 6..7&&parts[4]=="chapters"&&method=="GET"){
+                val index=parts[5].toInt()
+                return ok(r,"chapter" to if(parts.size==7&&parts[6]=="text")side.chapter(id,index)else side.chapter(id,index,r.url.queryParameter("start")?.toIntOrNull()?:0,r.url.queryParameter("limit")?.toIntOrNull()?:12))
+            }
+        }
+        if(parts.size==4&&parts.take(3)==listOf("api","library","notes")){
+            if(method=="PATCH")return ok(r,"note" to store.atomic{LocalSideRecords(it).editNote(parts.last(),body(r).str("body").orEmpty())})
+            if(method=="DELETE"){store.atomic{LocalSideRecords(it).editNote(parts.last(),null)};return ok(r)}
         }
         if (path == "/api/chat/profile") {
             val profile = when (method) {
                 "GET" -> cache.profile() ?: RemoteProfile()
-                "PUT" -> json.decodeFromJsonElement(RemoteProfile.serializer(), body(r)).also(cache::putProfile)
+                "PUT" -> json.decodeFromJsonElement(RemoteProfile.serializer(), body(r)).copy(updatedAt = System.currentTimeMillis()).also(cache::putProfile)
                 else -> return unsupported(r)
             }
             return ok(r, "profile" to element(RemoteProfile.serializer(), profile))
@@ -123,14 +208,13 @@ class LocalCoastTransport(private val store: LocalPersistence,
         if (path == "/api/chat/native-context" && method == "POST") {
             val request = json.decodeFromJsonElement(RemoteChatRequest.serializer(), body(r))
             if (!conversationExists(request.conversationId)) return missing(r)
-            if (request.attachmentIds.isNotEmpty()) return unsupported(r)
             val budget = request.settings["contextBudget"]?.toLongOrNull()?.coerceAtLeast(1800) ?: 18000
-            if (request.messages.sumOf { it.content.length.toLong() } > budget * 3)
-                return failure(r, 400, "local_context_budget", "近期文字超过本机预览的保守上下文预算。")
+            val room=cache.conversations().first { it.id==request.conversationId }.roomType
+            val prepared=knowledge.context(request.messages,budget.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),if(room=="main")"main_chat" else room,request.conversationId,request.attachmentIds,request.sourceTurnId.orEmpty())
             return response(r, 200, element(RemoteNativeChatContext.serializer(), RemoteNativeChatContext(
                 ok = true,
-                modelMessages = array(RemoteChatMessage.serializer(), request.messages),
-                deskSlip = RemoteDeskSlip(summary = "本机近期文字上下文；记忆、附件及工具尚未接入")
+                modelMessages = localMultimodalMessages(prepared.messages,prepared.imageParts),
+                deskSlip = prepared.receipt
             )).jsonObject)
         }
         if (path == "/api/chat/native-echo" && method == "POST") {
@@ -141,6 +225,70 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val snapshot = b["snapshot"] ?: return unsupported(r)
             store.put("local.echo." + cid + "." + mid, snapshot.toString())
             return ok(r)
+        }
+        if(path=="/api/memory/entries"){
+            if(method=="GET"){
+                val type=r.url.queryParameter("entry_type")?:"memory"
+                return ok(r,"entries" to array(RemoteMemoryEntry.serializer(),memory.entries(type)))
+            }
+            if(method=="POST")return ok(r,"entry" to element(RemoteMemoryEntry.serializer(),memory.save(null,json.decodeFromJsonElement(RemoteMemoryEntryWriteRequest.serializer(),body(r)))))
+        }
+        if(path.startsWith("/api/memory/entries/")&&r.url.pathSegments.size==4){
+            val id=r.url.pathSegments.last()
+            if(method=="PATCH")return ok(r,"entry" to element(RemoteMemoryEntry.serializer(),memory.save(id,json.decodeFromJsonElement(RemoteMemoryEntryWriteRequest.serializer(),body(r)))))
+            if(method=="DELETE"){memory.delete(id);return ok(r)}
+        }
+        if(path=="/api/memory/pockets"&&method=="GET"){
+            val cid=r.url.queryParameter("conversation_id").orEmpty()
+            if(!conversationExists(cid))return missing(r)
+            return ok(r,"pockets" to array(RemoteMemoryPocket.serializer(),memory.pockets(cid)))
+        }
+        if(path.startsWith("/api/memory/pockets/")&&r.url.pathSegments.size==5&&r.url.pathSegments.last()=="resolve"&&method=="POST"){
+            return response(r,200,element(RemoteMemoryPocketResolveResponse.serializer(),memory.resolve(r.url.pathSegments[3],json.decodeFromJsonElement(RemoteMemoryPocketResolveRequest.serializer(),body(r)))).jsonObject)
+        }
+        val portraitModule=when(r.url.pathSegments.getOrNull(2)){
+            "user-portrait"->"user_portrait"
+            "global-excerpt"->"self_portrait"
+            else->null
+        }
+        if(path.startsWith("/api/memory/")&&portraitModule!=null){
+            val parts=r.url.pathSegments
+            if(parts.size==3){
+                if(method=="GET")return response(r,200,portraits.response(portraitModule))
+                if(method=="PATCH")return response(r,200,portraits.patch(portraitModule,body(r)))
+            }
+            if(parts.size==5&&parts[3]=="candidates"){
+                if(method=="PATCH")return response(r,200,portraits.confirm(portraitModule,parts[4],json.decodeFromJsonElement(RemoteGlobalExcerptConfirmRequest.serializer(),body(r))))
+                if(method=="DELETE")return ok(r,"deleted" to JsonPrimitive(portraits.discard(portraitModule,parts[4])))
+            }
+            return unsupported(r)
+        }
+        if(path=="/api/memory/soil"){
+            val cid=r.url.queryParameter("conversation_id").orEmpty()
+            if(!conversationExists(cid))return missing(r)
+            if(method=="GET")return response(r,200,soil.response(cid))
+            if(method=="PUT")return response(r,200,soil.patch(cid,body(r)))
+        }
+        if(path=="/api/memory/custom-instructions"){
+            val value=when(method){
+                "GET"->knowledge.instructions()
+                "PUT"->knowledge.saveInstructions(json.decodeFromJsonElement(RemoteCustomInstructionsPutRequest.serializer(),body(r)))
+                else->return unsupported(r)
+            }
+            return ok(r,"instructions" to (value?.let{element(RemoteCustomInstructions.serializer(),it)}?:JsonNull))
+        }
+        if(path=="/api/worldbook"){
+            if(method=="GET")return ok(r,"entries" to array(RemoteWorldbookEntry.serializer(),knowledge.entries()))
+            if(method=="POST")return ok(r,"entry" to element(RemoteWorldbookEntry.serializer(),knowledge.saveWorldbook(null,json.decodeFromJsonElement(RemoteWorldbookEntryWriteRequest.serializer(),body(r)))))
+        }
+        if(path=="/api/worldbook/test-match"&&method=="POST"){
+            val req=json.decodeFromJsonElement(RemoteWorldbookMatchRequest.serializer(),body(r))
+            return ok(r,"matches" to array(RemoteWorldbookEntry.serializer(),knowledge.match(req.input,emptyList(),req.surface,req.limit,req.allowedScopes).map{it.entry}))
+        }
+        if(path.startsWith("/api/worldbook/")&&r.url.pathSegments.size==3){
+            val id=r.url.pathSegments.last()
+            if(method=="PATCH")return ok(r,"entry" to element(RemoteWorldbookEntry.serializer(),knowledge.saveWorldbook(id,json.decodeFromJsonElement(RemoteWorldbookEntryWriteRequest.serializer(),body(r)))))
+            if(method=="DELETE"){knowledge.disableWorldbook(id);return ok(r)}
         }
         if (path == "/api/daily/profile") {
             val old = cache.dailyProfile() ?: RemoteDailyProfile()
@@ -217,8 +365,8 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 put("scope", "local")
                 put("workspace", "local")
                 put("exported_at", now())
-                put("included_modules", JsonArray(listOf("chat", "daily", "model_profile", "calendar").map(::JsonPrimitive)))
-                put("excluded_modules", JsonArray(listOf("attachments", "memory", "thinking_soil", "worldbook", "vault", "library", "voice", "local_appearance", "provider_credentials", "oauth_credentials", "full_restore").map(::JsonPrimitive)))
+                put("included_modules", JsonArray(listOf("chat", "daily", "model_profile", "calendar","memory","worldbook","custom_instructions","user_portrait","self_portrait","thinking_soil","thinking_soil_history","tools").map(::JsonPrimitive)))
+                put("excluded_modules", JsonArray(listOf("attachments", "vault", "library", "voice", "local_appearance", "provider_credentials", "oauth_credentials", "raw_tool_payloads","full_restore").map(::JsonPrimitive)))
                 put("chat", buildJsonObject {
                     put("conversations", buildJsonArray { cache.conversations().forEach { c ->
                     add(buildJsonObject {
@@ -233,6 +381,8 @@ class LocalCoastTransport(private val store: LocalPersistence,
                     put("diaries", array(RemoteDailyDiary.serializer(), cache.dailyDiaries()))
                 })
                 put("calendar", buildJsonObject { put("entries", calendar.snapshot()) })
+                val records=ArchiveV2Knowledge.export(store).groupBy{it.kind}
+                for((kind,rows) in records)put(kind,JsonArray(rows.map{it.data}))
                 put("model_profile", element(RemoteProfile.serializer(), cache.profile() ?: RemoteProfile()))
             }
             return ok(r, "snapshot" to snapshot)

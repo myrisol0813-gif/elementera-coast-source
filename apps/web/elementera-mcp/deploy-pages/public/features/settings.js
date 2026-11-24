@@ -2,6 +2,7 @@ import { chooseImage, downloadFile, escapeAttribute, escapeHtml, q, timestampLab
 import { API, requestJson } from '../core/api.js';
 import { shortModelName } from '../core/model-format.js';
 import { createTransferSettings } from './settings-transfer.js';
+import { saveArchiveV2 } from '../core/archive-v2-save.js';
 import { buildOfflineArchive } from './offline-archive.js';
 
 const LOADED_AT = new Date().toISOString();
@@ -162,6 +163,12 @@ export function createSettings({ storage, shell, chat, router, toast }) {
       row('导出完整海岸包', '当前可归档资料与原件 · 完整恢复尚未接通', 'settings:export-full-archive')
       + row('导出离线 HTML ZIP', '解压 index.html · 聊天变体、图片与语音原件', 'settings:export-html')
       + row('导入海岸包', '当前兼容 V1 迁移包；兼容导出也在此处', 'settings:transfer-open')),
+  }));
+
+  router.register('settings-archive-format', () => ({
+    title: '海岸归档格式', className: 'settings-panel',
+    body: group('归档格式', row('V2 分块 ZIP', '试验归档 · 逐对象校验 · 部分恢复', 'settings:export-v2')
+      + row('旧版 JSON 完整归档', '保留原有导出范围 · 尚不移除', 'settings:export-legacy-full')),
   }));
 
   router.register('settings-theme', () => ({
@@ -343,7 +350,15 @@ export function createSettings({ storage, shell, chat, router, toast }) {
       globalThis.location.assign('/logout');
       return;
     }
-    if (name === 'export-full-archive') {
+    if (name === 'export-full-archive') return router.open('settings-archive-format');
+    if (name === 'export-v2') {
+      try {
+        const manifest=await saveArchiveV2({applicationId:'com.elementeracoast.source',filename:`elementera-coast-v2-${timestampLabel()}.zip`});
+        toast('V2 已生成 · '+manifest.records.length+' 条记录；覆盖范围详见清单，尚非全量恢复包。',6500);
+      } catch(error) { if(error.name!=='AbortError')toast('V2 导出失败：'+error.message,6500); }
+      return;
+    }
+    if (name === 'export-legacy-full') {
       return exportFullArchive().catch((error) => toast(`完整前端包导出失败：${error.message}`, 5200));
     }
     if (name === 'export-html') return exportHtml().catch(error => toast('离线归档失败：'+error.message, 5200));

@@ -52,7 +52,7 @@ internal object LocalTransferRestore {
         }
     }
 
-    private fun decodeSelected(payload: JsonObject, applicationId: String, modules: Set<String>): LocalBackupPayload {
+    private fun decodeSelected(payload: JsonObject, applicationId: String, modules: Set<String>, attachments:Map<String,JsonObject> = emptyMap(),snapshots:Map<String,JsonObject> = emptyMap()): LocalBackupPayload {
         require(modules.isNotEmpty() && availableModules(payload, applicationId).containsAll(modules)) {
             "请选择目标已支持且数据包中包含的模块。"
         }
@@ -72,7 +72,8 @@ internal object LocalTransferRestore {
             require(row.conversation.deletedAt == null) { "已删除窗口不能直接恢复为活动窗口。" }
             row.history.turns.forEach { t ->
                 (t.user.variants + t.assistant.variantsByUserVariant.values.flatten()).forEach { v ->
-                    require(v.attachments.isEmpty() && v.dogtalkSnapshotId.isNullOrBlank()) { "含附件或跨窗快照的窗口暂不支持迁移；原件未被修改。" }
+                    v.dogtalkSnapshotId?.takeIf{it.isNotBlank()}?.let{LocalDogtalkStore.checkReference(row.conversation.id,t.id,it,snapshots)}
+                    v.attachments.forEach{LocalAttachmentStore.checkReference(row.conversation.id,t.id,it,attachments)}
                 }
             }
         }
@@ -82,8 +83,8 @@ internal object LocalTransferRestore {
 
     private data class Plan(val preview: LocalRestorePreview, val merged: LocalBackupPayload)
 
-    private fun plan(payload: JsonObject, applicationId: String, modules: Set<String>, store: LocalPersistence): Plan {
-        val incoming = decodeSelected(payload, applicationId, modules)
+    private fun plan(payload: JsonObject, applicationId: String, modules: Set<String>, store: LocalPersistence,attachments:Map<String,JsonObject> = emptyMap(),snapshots:Map<String,JsonObject> = emptyMap()): Plan {
+        val incoming = decodeSelected(payload, applicationId, modules,attachments,snapshots)
         val current = LocalBackupArchive.capture(store, applicationId)
         val counts = linkedMapOf<String, LocalRestoreCount>()
         fun <T> combine(key: String, old: List<T>, added: List<T>, id: (T) -> String): List<T> {
@@ -101,8 +102,37 @@ internal object LocalTransferRestore {
         }
         val conversations = combine("chat", current.conversations, incoming.conversations) { it.conversation.id }
         val calendar = combine("calendar", current.calendar.toList(), incoming.calendar.toList()) { it.jsonObject.getValue("id").jsonPrimitive.content }
+        // A fresh linked calendar may use a matching existing window or one staged
+        // in this transaction. Never attach it to a conflicting imported window.
+        val targetChats = conversations.associateBy { it.conversation.id }
+        val sourceChats = incoming.conversations.associateBy { it.conversation.id }
+        val oldCalendarIds = current.calendar.map { it.jsonObject.getValue("id").jsonPrimitive.content }.toSet()
+        if ("calendar" in modules) incoming.calendar.forEach { item ->
+            val row = item.jsonObject
+            if (row.getValue("id").jsonPrimitive.content !in oldCalendarIds) {
+                row["conversation_id"]?.jsonPrimitive?.contentOrNull?.let { id ->
+                    val target = requireNotNull(targetChats[id]) { "请先恢复日历关联的原窗口。" }
+                    require(sourceChats[id]?.let { it == target } != false) { "日历关联窗口存在内容冲突，未恢复。" }
+                    val turn = row["source_turn_id"]?.jsonPrimitive?.contentOrNull
+                    require(turn == null || target.history.turns.any { it.id == turn }) { "日历关联的原轮次不存在，未恢复。" }
+                }
+            }
+        }
         val moments = if ("daily" in modules) combine("moments", current.moments, incoming.moments) { it.id } else current.moments
         val diaries = if ("daily" in modules) combine("diaries", current.diaries, incoming.diaries) { it.id } else current.diaries
+        if("daily" in modules){
+            fun checkLink(parent:String?,turn:String?){
+                require(parent!=null||turn==null){"日常来源轮次缺少窗口。"}
+                if(parent!=null){
+                    val target=requireNotNull(targetChats[parent]){"请先恢复日常关联的原窗口。"}
+                    require(sourceChats[parent]?.let { it==target }!=false){"日常关联窗口存在内容冲突。"}
+                    require(turn==null||target.history.turns.any { it.id==turn }){"日常关联原轮次不存在。"}
+                }
+            }
+            val oldMoments=current.moments.map{it.id}.toSet();val oldDiaries=current.diaries.map{it.id}.toSet()
+            incoming.moments.filter{it.id !in oldMoments}.forEach{checkLink(it.conversationId,it.sourceTurnId)}
+            incoming.diaries.filter{it.id !in oldDiaries}.forEach{checkLink(it.conversationId,it.sourceTurnId)}
+        }
         val merged = current.copy(conversations = conversations, calendar = JsonArray(calendar), moments = moments, diaries = diaries,
             profile = profile("model_profile",current.profile,incoming.profile), dailyProfile = profile("daily_profile",current.dailyProfile,incoming.dailyProfile))
         LocalBackupArchive.validate(merged)
@@ -111,15 +141,33 @@ internal object LocalTransferRestore {
             declared - availableModules(payload, applicationId)), merged)
     }
 
-    fun preview(bytes: ByteArray, applicationId: String, modules: Set<String>, store: LocalPersistence): LocalRestorePreview {
+    internal fun plannedHistories(bytes:ByteArray,applicationId:String,modules:Set<String>,store:LocalPersistence,attachments:Map<String,JsonObject> = emptyMap(),snapshots:Map<String,JsonObject> = emptyMap()):Map<String,RemoteHistory>{
+        val incoming=decodeSelected(CoastTransferCodec.decode(bytes),applicationId,modules,attachments,snapshots).conversations
+        val existing=LocalBackupArchive.capture(store,applicationId).conversations
+        return (incoming+existing).associate{it.conversation.id to it.history}
+    }
+
+    internal fun plannedParents(bytes:ByteArray,applicationId:String,modules:Set<String>,store:LocalPersistence,attachments:Map<String,JsonObject> = emptyMap(),snapshots:Map<String,JsonObject> = emptyMap()):Pair<Set<String>,Set<String>>{
+        val payload=CoastTransferCodec.decode(bytes)
+        val incoming=decodeSelected(payload,applicationId,modules,attachments,snapshots).conversations
+        val existing=LocalBackupArchive.capture(store,applicationId).conversations.associateBy{it.conversation.id}
+        val ids=incoming.map{it.conversation.id}.toSet()
+        val conflicts=incoming.filter{existing[it.conversation.id]?.let{old->old!=it}==true}.map{it.conversation.id}.toSet()
+        return (existing.keys+ids) to conflicts
+    }
+
+    fun preview(bytes: ByteArray, applicationId: String, modules: Set<String>, store: LocalPersistence,attachments:Map<String,JsonObject> = emptyMap(),snapshots:Map<String,JsonObject> = emptyMap()): LocalRestorePreview {
         val payload = CoastTransferCodec.decode(bytes)
-        return store.readConsistent { plan(payload, applicationId, modules, it).preview }
+        return store.readConsistent { plan(payload, applicationId, modules, it,attachments,snapshots).preview }
     }
 
     fun restore(bytes: ByteArray, applicationId: String, modules: Set<String>, store: LocalPersistence): LocalRestorePreview {
-        val payload = CoastTransferCodec.decode(bytes)
-        return store.atomic { staged ->
-            val p = plan(payload, applicationId, modules, staged)
+        return store.atomic { staged -> restoreStaged(bytes,applicationId,modules,staged) }
+    }
+
+    internal fun restoreStaged(bytes:ByteArray,applicationId:String,modules:Set<String>,staged:LocalPersistence,attachments:Map<String,JsonObject> = emptyMap(),snapshots:Map<String,JsonObject> = emptyMap()):LocalRestorePreview {
+            val payload=CoastTransferCodec.decode(bytes)
+            val p = plan(payload, applicationId, modules, staged,attachments,snapshots)
             val data = p.merged
             val cache = RemoteCacheStore(staged, strictReads = true)
             val known = cache.conversations().map { it.id }.toSet()
@@ -136,7 +184,6 @@ internal object LocalTransferRestore {
             // Re-open the staged typed data before publishing the generation.
             val check = LocalBackupArchive.capture(staged, applicationId)
             require(check.copy(exportedAt = data.exportedAt) == data) { "恢复结果与预览不一致；原资料未切换。" }
-            p.preview
-        }
+            return p.preview
     }
 }

@@ -124,6 +124,7 @@ class SideRoomsRepository(private val config: CoastApiConfig, private val client
         request("/api/library/books/${path(id)}/chapters/$index?start=$start&limit=12")
     suspend fun notes(id: String): JsonObject = request("/api/library/books/${path(id)}/notes")
     suspend fun importBook(payload: JsonObject, onProgress: (Int, Int) -> Unit = { _, _ -> }): JsonObject {
+        config.localTransport?.let{local->return withContext(Dispatchers.IO){local.importLocalBook(payload)}}
         val chapters = (payload["chapters"] as? kotlinx.serialization.json.JsonArray)?.map {
             it as? JsonObject ?: throw IllegalArgumentException("书籍章节格式错误。")
         } ?: throw IllegalArgumentException("书籍没有正文。")

@@ -24,7 +24,11 @@ function author(v,c){require([c.owner,c.partner,'api','mcp'].includes(v),'日常
 function json(raw,fallback){if(raw==null||raw==='')return fallback;try{return JSON.parse(raw);}catch{throw new TransferError('invalid_daily_transfer','日常原始 JSON 已损坏，未生成不完整记录。');}}
 function usage(v){
   if(v==null)return null;
-  const allowed=['prompt_tokens','completion_tokens','reasoning_tokens','cached_tokens','total_tokens'];keys(v,allowed);
+  const allowed=['prompt_tokens','completion_tokens','reasoning_tokens','cached_tokens','total_tokens'];
+  // Typed Native backups encode these optional chat-only usage fields as null.
+  // A populated value is not representable by the daily database; reject it.
+  const absent=['cache_write_tokens','cache_discount','cost'];
+  keys(v,[...allowed,...absent]);require(absent.every(k=>v[k]==null),'日常评论含目标无法保留的用量字段。');
   const out={};for(const k of allowed){if(v[k]==null)continue;require(Number.isSafeInteger(v[k])&&v[k]>=0,'日常评论用量无效。');out[k]=v[k];}
   return Object.keys(out).length?out:null;
 }
@@ -104,25 +108,26 @@ export async function exportDailyTransfer(db,app){
 const commonColumns=['id','date','author','source','text','conversation_id','source_turn_id','tool_call_id','actor','surface','model_label','model_nickname','symbol','display_author','created_at','updated_at'];
 function insert(db,table,cols,values){return db.prepare('INSERT INTO '+table+' ('+cols.join(',')+') VALUES ('+cols.map(()=>'?').join(',')+')').bind(...values);}
 function commonValues(row){return commonColumns.map(k=>k==='created_at'||k==='updated_at'?time(row[k]):row[k]);}
-export async function prepareDailyTransfer(db,payload,app){
+export async function prepareDailyTransfer(db,payload,app,validateParent){
   require([privateApp,publicApp].includes(payload.applicationId),'未知版本的日常身份结构，未写入。');
   const c=config(app), current=await readDailyTransfer(db,app);
   const report={ready:0,existing:0,conflicts:0,blocked:[]}, statements=[];
   const existingMoments=new Map(current.moments.map(v=>[v.id,v])), existingDiaries=new Map(current.diaries.map(v=>[v.id,v]));
   const commentIds=new Set(current.moments.flatMap(v=>v.comments.map(x=>x.id)));
   const momentTools=new Set(current.moments.map(v=>v.tool_call_id).filter(Boolean)), diaryTools=new Set(current.diaries.map(v=>v.tool_call_id).filter(Boolean));
-  function process(rows,existing,validate,prepare){
+  async function process(rows,existing,validate,prepare){
     const seen=new Set();
     for(const raw of rows){
       require(idOK(raw?.id)&&!seen.has(raw.id),'日常数据包内 ID 重复或无效。');seen.add(raw.id);
       try{
         const row=validate(raw,c);
         if(existing.has(row.id)){report.existing++;if(!equal(existing.get(row.id),row))report.conflicts++;continue;}
+        await validateParent(row);
         const next=prepare(row);statements.push(...next);report.ready++;
       }catch(e){if(!(e instanceof TransferError))throw e;report.blocked.push({id:raw.id,reason:e.message});}
     }
   }
-  process(payload.moments,existingMoments,moment,row=>{
+  await process(payload.moments,existingMoments,moment,row=>{
     require(!row.tool_call_id||!momentTools.has(row.tool_call_id),'动态工具调用 ID 冲突。');
     require(row.comments.every(v=>!commentIds.has(v.id)),'评论 ID 与目标现有记录冲突。');
     if(row.tool_call_id)momentTools.add(row.tool_call_id);row.comments.forEach(v=>commentIds.add(v.id));
@@ -130,7 +135,7 @@ export async function prepareDailyTransfer(db,payload,app){
       ...row.comments.map(v=>insert(db,'daily_moment_comments',['id','moment_id','author','text','model_id','usage_json','created_at'],[v.id,row.id,v.author,v.text,v.model_id,v.usage?JSON.stringify(v.usage):null,time(v.created_at)])),
       ...row.likes.map(v=>insert(db,'daily_moment_likes',['moment_id','actor','created_at'],[row.id,v.actor,time(v.created_at)]))];
   });
-  process(payload.diaries,existingDiaries,diary,row=>{
+  await process(payload.diaries,existingDiaries,diary,row=>{
     require(!row.tool_call_id||!diaryTools.has(row.tool_call_id),'日记工具调用 ID 冲突。');
     if(row.tool_call_id)diaryTools.add(row.tool_call_id);
     return [insert(db,'daily_diaries',[...commonColumns,'weather','mood','tags_json'],[...commonValues(row),row.weather,row.mood,JSON.stringify(row.tags)])];

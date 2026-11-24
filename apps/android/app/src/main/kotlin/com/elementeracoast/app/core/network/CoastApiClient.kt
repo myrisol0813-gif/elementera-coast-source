@@ -114,6 +114,93 @@ class CoastApiClient(
         runCatching { execute(builder.build()) { Unit } }
     }
 
+
+    // V2 cloud staging is explicit: local mode cannot fall through to the network.
+    private fun archiveV2Request(path: String): Request.Builder {
+        require(config.localTransport == null) { "本机模式不访问云端归档暂存。" }
+        return Request.Builder().url(config.url("/api/archive/v2"+path))
+    }
+
+    suspend fun archiveV2RecordPage(module: String,cursor: String="",limit: Int=20): JsonObject =
+        jsonRequestElement(archiveV2Request("/records/"+encodePath(module)+"?cursor="+encodeQuery(cursor)+"&limit="+limit).get().build()).jsonObject
+    suspend fun archiveV2DetailPage(kind: String,cursor: String="",limit: Int=20): JsonObject =
+        jsonRequestElement(archiveV2Request("/details/"+encodePath(kind)+"?cursor="+encodeQuery(cursor)+"&limit="+limit).get().build()).jsonObject
+    suspend fun archiveV2Chat(id: String): JsonObject =
+        jsonRequestElement(archiveV2Request("/records/chat/"+encodePath(id)).get().build()).jsonObject
+    suspend fun archiveV2Voice(id: String): JsonObject =
+        jsonRequestElement(archiveV2Request("/voice/"+encodePath(id)).get().build()).jsonObject
+    suspend fun archiveV2LibraryCover(id: String): JsonObject =
+        jsonRequestElement(archiveV2Request("/library-cover/"+encodePath(id)).get().build()).jsonObject
+    suspend fun archiveV2Preflight(id: String,manifest: com.elementeracoast.app.core.local.ArchiveV2Manifest): JsonObject {
+        com.elementeracoast.app.core.local.ArchiveV2Manifests.validate(manifest)
+        return jsonRequestElement(archiveV2Request("/sessions/"+encodePath(id)+"/preflight")
+            .post(jsonBody(json.encodeToString(manifest))).build()).jsonObject
+    }
+
+    suspend fun archiveV2Capabilities(): JsonObject = jsonRequestElement(archiveV2Request("").get().build()).jsonObject
+    suspend fun archiveV2CreateSession(): JsonObject = jsonRequestElement(archiveV2Request("/sessions").post(jsonBody("{}")).build()).jsonObject
+    suspend fun archiveV2Sessions(): JsonObject = jsonRequestElement(archiveV2Request("/sessions").get().build()).jsonObject
+    suspend fun archiveV2CancelSession(id: String): JsonObject =
+        jsonRequestElement(archiveV2Request("/sessions/"+encodePath(id)).delete().build()).jsonObject
+    private fun archiveV2ObjectPath(id: String, hash: String? = null): String =
+        "/sessions/"+encodePath(id)+"/objects"+(hash?.let { "/"+encodePath(it) } ?: "")
+    suspend fun archiveV2RegisterObject(id: String, descriptor: com.elementeracoast.app.core.local.ArchiveV2Object): JsonObject {
+        com.elementeracoast.app.core.local.ArchiveV2Chunks.validate(descriptor)
+        return jsonRequestElement(archiveV2Request(archiveV2ObjectPath(id)).post(jsonBody(json.encodeToString(descriptor))).build()).jsonObject
+    }
+    suspend fun archiveV2ObjectStatus(id: String, hash: String): JsonObject =
+        jsonRequestElement(archiveV2Request(archiveV2ObjectPath(id,hash)).get().build()).jsonObject
+    suspend fun archiveV2PutChunk(id: String,hash: String,index: Int,bytes: ByteArray): JsonObject {
+        require(index>=0 && bytes.size<=com.elementeracoast.app.core.local.ArchiveV2Chunks.CHUNK_BYTES)
+        return jsonRequestElement(archiveV2Request(archiveV2ObjectPath(id,hash)+"/chunks/"+index)
+            .put(bytes.toRequestBody("application/octet-stream".toMediaType())).build()).jsonObject
+    }
+    suspend fun archiveV2AttachmentPage(cursor: String="",limit: Int=50): JsonObject =
+        jsonRequestElement(archiveV2Request("/inventory/attachments?cursor="+encodeQuery(cursor)+"&limit="+limit).get().build()).jsonObject
+    suspend fun archiveV2DogtalkPage(kind: String="snapshots",cursor: String="",limit: Int=50): JsonObject =
+        jsonRequestElement(archiveV2Request("/inventory/dogtalk?kind="+encodeQuery(kind)+"&cursor="+encodeQuery(cursor)+"&limit="+limit).get().build()).jsonObject
+    private fun archiveV2AttachmentPath(conversation: String,id: String): String =
+        "/attachments/"+encodePath(conversation)+"/"+encodePath(id)
+    suspend fun archiveV2Attachment(conversation: String,id: String): JsonObject =
+        jsonRequestElement(archiveV2Request(archiveV2AttachmentPath(conversation,id)).get().build()).jsonObject
+    suspend fun archiveV2AttachmentChunk(conversation: String,id: String,descriptor: com.elementeracoast.app.core.local.ArchiveV2Object,index: Int): ByteArray =
+        archiveV2ReadChunk(archiveV2AttachmentPath(conversation,id),descriptor,index)
+    suspend fun archiveV2VoiceChunk(id: String,descriptor: com.elementeracoast.app.core.local.ArchiveV2Object,index: Int): ByteArray =
+        archiveV2ReadChunk("/voice/"+encodePath(id),descriptor,index)
+    suspend fun archiveV2LibraryCoverChunk(id: String,descriptor: com.elementeracoast.app.core.local.ArchiveV2Object,index: Int): ByteArray =
+        archiveV2ReadChunk("/library-cover/"+encodePath(id),descriptor,index)
+    suspend fun archiveV2ValidateManifest(manifest: com.elementeracoast.app.core.local.ArchiveV2Manifest): JsonObject =
+        jsonRequestElement(archiveV2Request("/manifest/validate").post(jsonBody(json.encodeToString(manifest))).build()).jsonObject
+    suspend fun archiveV2RestoreRecord(id: String,manifest: com.elementeracoast.app.core.local.ArchiveV2Manifest,module: String,recordId: String,confirm: Boolean): JsonObject {
+        val payload=buildJsonObject { put("manifest",json.encodeToJsonElement(manifest));put("confirm",confirm) }
+        return jsonRequestElement(archiveV2Request("/sessions/"+encodePath(id)+"/record-restore/"+encodePath(module)+"/"+encodePath(recordId)).post(jsonBody(payload.toString())).build()).jsonObject
+    }
+    suspend fun archiveV2RestoreBook(id: String,manifest: com.elementeracoast.app.core.local.ArchiveV2Manifest,bookId: String,confirm: Boolean): JsonObject {
+        val payload=buildJsonObject { put("manifest",json.encodeToJsonElement(manifest));put("confirm",confirm) }
+        return jsonRequestElement(archiveV2Request("/sessions/"+encodePath(id)+"/book-restore/"+encodePath(bookId)).post(jsonBody(payload.toString())).build()).jsonObject
+    }
+    suspend fun archiveV2RestoreChat(id: String,manifest: com.elementeracoast.app.core.local.ArchiveV2Manifest,conversationId: String,confirm: Boolean): JsonObject {
+        val payload=buildJsonObject {
+            put("manifest",json.encodeToJsonElement(manifest));put("confirm",confirm)
+        }
+        return jsonRequestElement(archiveV2Request("/sessions/"+encodePath(id)+"/chat-restore/"+encodePath(conversationId)).post(jsonBody(payload.toString())).build()).jsonObject
+    }
+    private suspend fun archiveV2ReadChunk(path: String,descriptor: com.elementeracoast.app.core.local.ArchiveV2Object,index: Int): ByteArray {
+        val protocol=com.elementeracoast.app.core.local.ArchiveV2Chunks
+        protocol.validate(descriptor)
+        require(index in descriptor.chunks.indices)
+        val expected=minOf(protocol.CHUNK_BYTES.toLong(),descriptor.size-index.toLong()*protocol.CHUNK_BYTES).toInt()
+        val request=archiveV2Request(path+"/chunks/"+index+"?object_sha256="+descriptor.objectSha256).get().build()
+        return execute(request) { response ->
+            if(!response.isSuccessful)throw responseError(response)
+            val input=response.body?.byteStream() ?: error("原件分块缺失。")
+            val bytes=ByteArray(expected);var offset=0
+            while(offset<bytes.size){val n=input.read(bytes,offset,bytes.size-offset);require(n>0){"原件分块不完整。"};offset+=n}
+            require(input.read()==-1 && protocol.digest(bytes)==descriptor.chunks[index]){"原件分块校验失败。"}
+            bytes
+        }
+    }
+
     suspend fun transferExport(): JsonObject = jsonRequestElement(Request.Builder().url(config.url("/api/transfer/v1")).get().build())
         .jsonObject.getValue("bundle").jsonObject
 
@@ -270,6 +357,12 @@ class CoastApiClient(
         if (bytes.isEmpty()) throw CoastApiException(CoastApiErrorKind.Request, "attachment_empty", "附件是空文件。", 400)
         if (bytes.size > 8 * 1024 * 1024) {
             throw CoastApiException(CoastApiErrorKind.Request, "file_too_large", "附件超过当前 8 MB 限制。", 413)
+        }
+        config.localTransport?.let{local->
+            return kotlinx.coroutines.withContext(Dispatchers.IO){
+                try{local.uploadAttachment(conversationId,name,mime,bytes)}
+                catch(e:IllegalArgumentException){throw CoastApiException(CoastApiErrorKind.Request,"local_attachment_invalid",e.message.orEmpty())}
+            }
         }
         val mediaType = runCatching { mime.ifBlank { "application/octet-stream" }.toMediaType() }
             .getOrElse { "application/octet-stream".toMediaType() }

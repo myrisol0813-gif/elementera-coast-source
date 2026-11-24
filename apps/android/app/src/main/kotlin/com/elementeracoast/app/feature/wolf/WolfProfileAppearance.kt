@@ -387,13 +387,12 @@ private fun importLocalFont(context: Context, uri: Uri): ImportedLocalFont {
         extension == "otf" || mime.contains("otf") || mime.contains("opentype") -> "otf"
         else -> throw IllegalArgumentException("请选择 .ttf 或 .otf 字体文件")
     }
-    val directory = File(context.filesDir, "local-fonts").apply { mkdirs() }
-    directory.listFiles()?.forEach { it.delete() }
+    val directory = File(context.filesDir, if(com.elementeracoast.app.core.local.NativeWorkspace.isLocal)"local-fonts-local" else "local-fonts").apply { mkdirs() }
     val temp = File(directory, "reading-font.tmp")
-    val target = File(directory, "reading-font.$targetExtension")
+    val target = File(directory, "reading-font-"+java.util.UUID.randomUUID()+".$targetExtension")
     context.contentResolver.openInputStream(uri)?.use { input -> temp.outputStream().use { output -> input.copyTo(output) } }
         ?: throw IllegalArgumentException("无法读取所选字体文件")
-    check(temp.length() > 0L) { "字体文件为空" }
+    check(temp.length() in 1..16L*1024*1024) { "字体文件为空或超过16 MB" }
     runCatching { Typeface.createFromFile(temp) }
         .getOrElse { throw IllegalArgumentException("字体文件无法被 Android 读取") }
     temp.copyTo(target, overwrite = true)
@@ -412,10 +411,9 @@ private fun importChatBackground(context: Context, uri: Uri): ImportedChatBackgr
         mime.contains("jpeg") || mime.contains("jpg") -> "jpg"
         else -> throw IllegalArgumentException("请选择 PNG、JPG 或 WEBP 图片")
     }
-    val directory = File(context.filesDir, "chat-background").apply { mkdirs() }
-    directory.listFiles()?.forEach { it.delete() }
+    val directory = File(context.filesDir, if(com.elementeracoast.app.core.local.NativeWorkspace.isLocal)"chat-background-local" else "chat-background").apply { mkdirs() }
     val temp = File(directory, "background.tmp")
-    val target = File(directory, "background.$targetExtension")
+    val target = File(directory, "background-"+java.util.UUID.randomUUID()+".$targetExtension")
     context.contentResolver.openInputStream(uri)?.use { input -> temp.outputStream().use { output -> input.copyTo(output) } }
         ?: throw IllegalArgumentException("无法读取所选背景图")
     check(temp.length() > 0L) { "背景图为空" }
@@ -436,10 +434,10 @@ private fun readDisplayName(context: Context, uri: Uri): String {
 
 private fun removeLocalFont(context: Context, path: String) {
     runCatching { File(path).delete() }
-    runCatching { File(context.filesDir, "local-fonts").listFiles()?.forEach { it.delete() } }
+    // Only this workspace path is cleared; other workspace originals are not swept.
 }
 
 private fun removeChatBackground(context: Context, path: String) {
     runCatching { File(path).delete() }
-    runCatching { File(context.filesDir, "chat-background").listFiles()?.forEach { it.delete() } }
+    // Only this workspace path is cleared; other workspace originals are not swept.
 }

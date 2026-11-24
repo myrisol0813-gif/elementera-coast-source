@@ -112,15 +112,13 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
             "；已用：" + (usage?.let { "USD " + it } ?: "未返回") + "。这不是账户总余额。"
     }
 
-    fun stream(p: LocalProviderConfig, model: String, messages: List<RemoteChatMessage>, maxTokens: Int): Flow<LocalProviderEvent> = callbackFlow {
+    fun stream(p: LocalProviderConfig, model: String, messages: List<RemoteChatMessage>, maxTokens: Int,imageParts:List<JsonObject> = emptyList()): Flow<LocalProviderEvent> = callbackFlow {
         val payload = buildJsonObject {
             put("model", model)
             put("stream", true)
             val official = normalizeLocalProviderUrl(p.baseUrl).toHttpUrl().host == "api.openai.com"
             put(if (official) "max_completion_tokens" else "max_tokens", maxTokens.coerceIn(64, 65536))
-            put("messages", buildJsonArray {
-                messages.forEach { m -> add(buildJsonObject { put("role", m.role); put("content", m.content) }) }
-            })
+            put("messages", localMultimodalMessages(messages,imageParts))
         }
         val call = http.newCall(request(p, "/chat/completions").header("Accept", "text/event-stream")
             .post(payload.toString().toRequestBody(media)).build())
@@ -156,4 +154,15 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
         }
         awaitClose { call.cancel(); reader.cancel() }
     }
+}
+
+/** Shared Chat Completions parts contract; the existing Responses normalizer translates it. */
+internal fun localMultimodalMessages(messages:List<RemoteChatMessage>,images:List<JsonObject>):JsonArray{
+    val user=messages.indexOfLast{it.role=="user"}
+    require(images.isEmpty()||user>=0)
+    return JsonArray(messages.mapIndexed{i,m->buildJsonObject{
+        put("role",m.role)
+        if(i==user&&images.isNotEmpty())put("content",JsonArray(listOf(buildJsonObject{put("type","text");put("text",m.content)})+images))
+        else put("content",m.content)
+    }})
 }

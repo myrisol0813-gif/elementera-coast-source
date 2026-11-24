@@ -70,6 +70,8 @@ class FileLocalPersistence(private val root: File, private val allowTransactions
         catch (_: FileNotFoundException) { default }
     @Synchronized override fun put(key: String, value: String) = writeAtomic(file(key), value.toByteArray(Charsets.UTF_8))
     @Synchronized override fun remove(key: String) { file(key).delete() }
+    @Synchronized override fun getBinary(key:String):ByteArray?=try{file(key).readFully()}catch(_:FileNotFoundException){null}
+    @Synchronized override fun putBinary(key:String,value:ByteArray)=writeAtomic(file(key),value)
     @Synchronized override fun <T> readConsistent(block: (LocalPersistence) -> T): T = block(this)
 
     @Synchronized override fun <T> atomic(block: (LocalPersistence) -> T): T {

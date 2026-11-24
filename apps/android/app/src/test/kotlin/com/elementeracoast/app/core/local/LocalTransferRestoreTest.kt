@@ -34,6 +34,45 @@ class LocalTransferRestoreTest {
         assertEquals(1,repeated.counts.getValue("chat").conflicts)
         assertTrue(cache.history("cloud1")!!.turns.isEmpty())
     }
+    @Test fun linkedCalendarRequiresOriginalChatAndTurn() {
+        val raw=CoastTransferCodec.decode(cloudBundle())
+        val row=raw.getValue("calendar").jsonArray.single().jsonObject
+        fun linked(turn:String):ByteArray {
+            val linkedRow=JsonObject(row+mapOf("conversation_id" to JsonPrimitive("cloud1"),"source_turn_id" to JsonPrimitive(turn)))
+            return CoastTransferCodec.encode(JsonObject(raw+("calendar" to JsonArray(listOf(linkedRow)))))
+        }
+        val bytes=linked("turn1")
+        val target=MemoryLocalPersistence()
+        assertTrue(runCatching { LocalTransferRestore.restore(bytes,app,setOf("calendar"),target) }.isFailure)
+        assertTrue(LocalCalendarStore(target).snapshot().isEmpty())
+        assertTrue(runCatching { LocalTransferRestore.restore(linked("missing"),app,setOf("chat","calendar"),target) }.isFailure)
+        assertTrue(RemoteCacheStore(target).conversations().isEmpty())
+        LocalTransferRestore.restore(bytes,app,setOf("chat","calendar"),target)
+        val saved=LocalCalendarStore(target).snapshot().single().jsonObject
+        assertEquals("cloud1",saved.getValue("conversation_id").jsonPrimitive.content)
+        assertEquals("turn1",saved.getValue("source_turn_id").jsonPrimitive.content)
+        val edited=LocalCalendarStore(target).save("calendar1",buildJsonObject { put("title","Edited") })
+        assertEquals(saved["source_turn_id"],edited["source_turn_id"])
+        val root=java.nio.file.Files.createTempDirectory("linked-calendar").toFile()
+        try {
+            val file=java.io.File(root,"archive.zip")
+            val manifest=ArchiveV2Local.export(target,app,file)
+            assertEquals(listOf("chat/cloud1"),manifest.records.single { it.module=="calendar" }.dependencies)
+            val stage=ArchiveV2Stage(root,"verified")
+            assertEquals(manifest,ArchiveV2ZipReader.stage(file,stage))
+            val destination=MemoryLocalPersistence()
+            assertTrue(runCatching { ArchiveV2Local.restore(manifest,stage,setOf("calendar"),app,destination,true) }.isFailure)
+            assertTrue(LocalCalendarStore(destination).snapshot().isEmpty())
+            ArchiveV2Local.restore(manifest,stage,setOf("chat","calendar"),app,destination,true)
+            assertEquals(LocalCalendarStore(target).snapshot(),LocalCalendarStore(destination).snapshot())
+        } finally { root.deleteRecursively() }
+        val other=MemoryLocalPersistence()
+        LocalTransferRestore.restore(bytes,app,setOf("chat"),other)
+        val cache=RemoteCacheStore(other)
+        cache.putHistory("cloud1",cache.history("cloud1")!!.copy(turns=emptyList()))
+        assertTrue(runCatching { LocalTransferRestore.restore(bytes,app,setOf("chat","calendar"),other) }.isFailure)
+        assertTrue(LocalCalendarStore(other).snapshot().isEmpty())
+    }
     @Test fun crossEditionLocalModelProfileRetainsExistingSelection() {
         val original = MemoryLocalPersistence()
         val profile = RemoteProfile(currentChatModel = "portable-model", modelBox = RemoteModelBox(chat = listOf("portable-model")))

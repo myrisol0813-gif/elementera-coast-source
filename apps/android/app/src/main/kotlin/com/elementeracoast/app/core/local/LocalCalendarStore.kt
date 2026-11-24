@@ -96,7 +96,8 @@ internal class LocalCalendarStore(private val persistence: LocalPersistence) {
         val row = buildJsonObject {
             put("id", key); put("day", date.toString()); put("occurrence_day", date.toString())
             put("title", title); put("body", body); put("kind", kind); put("recurrence", recurrence)
-            put("author", "owner"); put("source", "local")
+            put("author", previous?.get("author") ?: JsonPrimitive("owner")); put("source", previous?.get("source") ?: JsonPrimitive("local"))
+            for (field in listOf("model_label", "tool_call_id", "conversation_id", "source_turn_id")) previous?.get(field)?.let { put(field, it) }
             put("created_at", previous?.get("created_at") ?: JsonPrimitive(now)); put("updated_at", now)
             if (ann != null) put("anniversary", ann.toJson())
         }
@@ -117,11 +118,22 @@ internal class LocalCalendarStore(private val persistence: LocalPersistence) {
         fun validateBackup(rows: JsonArray) {
             val validator = LocalCalendarStore(MemoryLocalPersistence())
             val ids = mutableSetOf<String>()
+            val toolIds = mutableSetOf<String>()
             rows.forEach { value ->
                 val row = value.jsonObject
-                require(row.keys.all { it in setOf("id", "day", "occurrence_day", "title", "body", "kind", "recurrence", "author", "source", "created_at", "updated_at", "anniversary") })
+                require(row.keys.all { it in setOf("id", "day", "occurrence_day", "title", "body", "kind", "recurrence", "author", "source", "created_at", "updated_at", "anniversary", "model_label", "tool_call_id", "conversation_id", "source_turn_id") })
                 val id = with(validator) { row.text("id") }
                 require(id.matches(Regex("[A-Za-z0-9_.:-]{1,160}")) && ids.add(id))
+                for (field in listOf("model_label", "tool_call_id")) {
+                    val item = row[field] ?: continue
+                    require(item is JsonPrimitive && item.isString && item.content.length <= 200)
+                    if (field == "tool_call_id") require(toolIds.add(item.content)) { "日历工具调用 ID 重复。" }
+                }
+                for (field in listOf("conversation_id", "source_turn_id")) {
+                    val item = row[field] ?: continue
+                    require(item is JsonPrimitive && item.isString && item.content.matches(Regex("[A-Za-z0-9_.:-]{1,160}")))
+                }
+                require(row["source_turn_id"] == null || row["conversation_id"] != null) { "日历来源轮次缺少窗口 ID。" }
                 val date = validator.day(with(validator) { row.text("day") })
                 val title = with(validator) { row.text("title") }
                 val body = with(validator) { row.text("body") }

@@ -100,6 +100,7 @@ internal object LocalBackupArchive {
     internal fun validate(data: LocalBackupPayload) {
         require(data.applicationId in setOf("com.elementeracoast.app", "com.elementeracoast.source"))
         Instant.parse(data.exportedAt)
+        data.profile?.updatedAt?.let { require(it>=0) { "模型资料更新时间无效。" } }
         unique(data.conversations.map { it.conversation.id })
         data.conversations.forEach { row ->
             require(row.conversation.roomType in setOf("main", "radio", "lighthouse"))
@@ -120,6 +121,7 @@ internal object LocalBackupArchive {
         }
         unique(data.moments.map { it.id }); unique(data.diaries.map { it.id })
         unique(data.moments.flatMap { it.comments }.map { it.id })
+        unique(data.moments.mapNotNull { it.toolCallId }); unique(data.diaries.mapNotNull { it.toolCallId })
         val owner = if (data.applicationId == "com.elementeracoast.source") "owner" else "xiaohan"
         data.moments.forEach { moment ->
             require(moment.likeCount >= 0)
