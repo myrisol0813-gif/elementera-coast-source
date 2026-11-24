@@ -26,6 +26,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
     private val calendar = LocalCalendarStore(store)
     private val knowledge = LocalKnowledgeStore(store)
     private val memory = LocalMemoryStore(store)
+    private val portraits = LocalPortraitStore(store)
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
     private val media = "application/json; charset=utf-8".toMediaType()
 
@@ -165,6 +166,23 @@ class LocalCoastTransport(private val store: LocalPersistence,
         }
         if(path.startsWith("/api/memory/pockets/")&&r.url.pathSegments.size==5&&r.url.pathSegments.last()=="resolve"&&method=="POST"){
             return response(r,200,element(RemoteMemoryPocketResolveResponse.serializer(),memory.resolve(r.url.pathSegments[3],json.decodeFromJsonElement(RemoteMemoryPocketResolveRequest.serializer(),body(r)))).jsonObject)
+        }
+        val portraitModule=when(r.url.pathSegments.getOrNull(2)){
+            "user-portrait"->"user_portrait"
+            "global-excerpt"->"self_portrait"
+            else->null
+        }
+        if(path.startsWith("/api/memory/")&&portraitModule!=null){
+            val parts=r.url.pathSegments
+            if(parts.size==3){
+                if(method=="GET")return response(r,200,portraits.response(portraitModule))
+                if(method=="PATCH")return response(r,200,portraits.patch(portraitModule,body(r)))
+            }
+            if(parts.size==5&&parts[3]=="candidates"){
+                if(method=="PATCH")return response(r,200,portraits.confirm(portraitModule,parts[4],json.decodeFromJsonElement(RemoteGlobalExcerptConfirmRequest.serializer(),body(r))))
+                if(method=="DELETE")return ok(r,"deleted" to JsonPrimitive(portraits.discard(portraitModule,parts[4])))
+            }
+            return unsupported(r)
         }
         if(path=="/api/memory/custom-instructions"){
             val value=when(method){

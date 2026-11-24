@@ -9,6 +9,7 @@ import java.util.UUID
 internal class LocalKnowledgeStore(store:LocalPersistence) {
     private val cache=RemoteCacheStore(store,strictReads=true)
     private val memory=LocalMemoryStore(store)
+    private val portraits=LocalPortraitStore(store)
     fun instructions()=cache.customInstructions()
     fun saveInstructions(request:RemoteCustomInstructionsPutRequest):RemoteCustomInstructions {
         require(request.content.length<=32000&&request.updatedBy.length in 1..80&&request.source.length in 1..80){"自定义指令或来源字段超限。"}
@@ -59,23 +60,30 @@ internal class LocalKnowledgeStore(store:LocalPersistence) {
         val matches=match(current,messages,surface)
         val delivered=mutableListOf<RemoteChatMessage>()
         if(instructions.isNotEmpty())delivered.add(RemoteChatMessage("system",instructions))
+        val userPortrait=portraits.body("user_portrait")
+        val selfPortrait=portraits.body("self_portrait")
+        if(userPortrait.isNotEmpty())delivered.add(RemoteChatMessage("system","用户画像\n"+userPortrait))
+        if(selfPortrait.isNotEmpty())delivered.add(RemoteChatMessage("system","自我画像\n"+selfPortrait))
         matches.forEach{delivered.add(RemoteChatMessage("system","世界书 · "+it.entry.title+"\n"+it.entry.content))}
         val memories=memory.recall(current,conversationId)
         val memoryText=memories.map{e->listOf("记忆 · "+e.title,"生命核："+e.lifeCore,e.content,e.usageHint.takeIf{it.isNotBlank()}?.let{"使用时机："+it}.orEmpty(),e.avoidHint.takeIf{it.isNotBlank()}?.let{"勿误用："+it}.orEmpty()).filter{it.isNotBlank()}.joinToString("\n")}
         memoryText.forEach{delivered.add(RemoteChatMessage("system",it))}
         delivered.addAll(messages)
         val chars=delivered.sumOf{it.content.length.toLong()}
-        require(chars<=maxChars){"本机上下文、世界书与记忆超过预算，未截断、未发送。"}
+        require(chars<=maxChars){"本机上下文、完整画像、世界书与记忆超过预算，未截断、未发送。"}
         return Context(delivered,RemoteDeskSlip(
-            summary="本机自定义指令、世界书、已确认记忆（关键词检索）与近期文字；画像、附件尚未接入",
+            summary="本机自定义指令、完整画像、世界书、已确认记忆（关键词检索）与近期文字；附件尚未接入",
             customInstructions=RemoteDeskCustomInstructions(status=if(instructions.isEmpty())"未设置" else "已递给",delivered=instructions.isNotEmpty(),empty=instructions.isEmpty(),length=instructions.length,content=instructions),
+            userPortrait=portraitReceipt("用户画像",userPortrait),
+            globalExcerpt=portraitReceipt("自我画像",selfPortrait),
             worldbook=RemoteDeskWorldbook(status=if(matches.isEmpty())"未命中" else "已递给",matchedCount=matches.size,deliveredCount=matches.size,matchedTitles=matches.map{it.entry.title},deliveredTitles=matches.map{it.entry.title},
                 entries=matches.map{RemoteDeskWorldbookItem(title=it.entry.title,id=it.entry.id,matchedKeywords=it.keywords,content=it.entry.content,scope=it.entry.scope,matchedBy=it.by,delivered=true,deliveredText=it.entry.content)}),
             relatedMemory=RemoteDeskMemory(status=if(memories.isEmpty())"未命中" else "已递给",confirmationStatus="仅已确认的 active 记录",count=memories.size,
                 items=memories.mapIndexed{i,e->RemoteDeskMemoryItem(title=e.title,id=e.id,entryType=e.entryType,tag=e.tag,sourceModel=e.sourceModel,sourceWindow=e.sourceWindow,sourceDate=e.sourceDate,reason="本机关键词命中",lifeCore=e.lifeCore,usageHint=e.usageHint,avoidHint=e.avoidHint,content=e.content,deliveredText=memoryText[i])}),
-            contextBudget=RemoteDeskContextBudget(estimatedTokens=((chars+2)/3).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),comfortCeiling=budget.coerceAtLeast(1800),sourcesPreserved=listOf("recent_context")+(if(instructions.isEmpty())emptyList()else listOf("custom_instructions"))+(if(matches.isEmpty())emptyList()else listOf("worldbook"))+(if(memories.isEmpty())emptyList()else listOf("related_memory")))
+            contextBudget=RemoteDeskContextBudget(estimatedTokens=((chars+2)/3).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),comfortCeiling=budget.coerceAtLeast(1800),sourcesPreserved=listOf("recent_context")+(if(instructions.isEmpty())emptyList()else listOf("custom_instructions"))+(if(matches.isEmpty())emptyList()else listOf("worldbook"))+(if(memories.isEmpty())emptyList()else listOf("related_memory"))+(if(userPortrait.isEmpty())emptyList()else listOf("user_portrait"))+(if(selfPortrait.isEmpty())emptyList()else listOf("global_excerpt")),userPortrait=if(userPortrait.isEmpty())"empty" else "full",globalExcerpt=if(selfPortrait.isEmpty())"empty" else "full")
         ))
     }
+    private fun portraitReceipt(label:String,body:String)=RemoteDeskGlobalExcerpt(label=label,status=if(body.isEmpty())"未设置" else "已递给",delivered=body.isNotEmpty(),injection=if(body.isEmpty())"none" else "full",estimatedTokens=(body.length+2)/3,length=body.length,content=body)
     companion object {
         fun validateWorldbook(rows:List<RemoteWorldbookEntry>){
             require(rows.map{it.id}.distinct().size==rows.size&&rows.count{it.enabled&&it.constantActive}<=3){"世界书 ID 重复或常驻词条超过三条。"}

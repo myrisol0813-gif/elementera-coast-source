@@ -69,6 +69,8 @@ class DefaultMemoryRepository(
             refreshPockets(cleanConversationId)
             refreshWorldbook()
             refreshInstructions()
+            refreshUserPortrait()
+            refreshGlobalExcerpt()
             return@coroutineScope
         }
 
