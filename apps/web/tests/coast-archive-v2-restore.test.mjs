@@ -51,7 +51,7 @@ test('staged chat group preview and atomic restoration retain raw history and me
  assert.deepEqual(await readArchiveChat(target,c.id),chat);
  assert.equal((await restoreArchiveRecord(target,session.id,manifest,'vault',treasure.id,false)).ready,1);
  assert.equal((await archiveDetailPage(target,'vault_treasures')).items.length,0);
- await restoreArchiveRecord(target,session.id,manifest,'vault',treasure.id,true);
+ await restoreArchiveRecord(target,session.id,{...manifest,workspace:'local'},'vault',treasure.id,true);
  assert.deepEqual((await archiveDetailPage(target,'vault_treasures')).items,(await archiveDetailPage(db,'vault_treasures')).items);
  assert.deepEqual([...new Uint8Array((await getChatAttachmentRecord(target,c.id,a.id)).data)],[1,2,3]);
  await assert.rejects(()=>restoreArchiveChatGroup(target,session.id,manifest,c.id,true),/already exists/);

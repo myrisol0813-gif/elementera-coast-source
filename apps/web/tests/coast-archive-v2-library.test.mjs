@@ -32,4 +32,12 @@ test('book restore retains original annotation offsets, reading history and cove
  for(const kind of Object.keys(kinds))assert.deepEqual((await archiveDetailPage(dst,kind)).items,(await archiveDetailPage(src,kind)).items);
  assert.deepEqual([...(await getLibraryCover(dst,book.id)).bytes],[...cover]);
  await assert.rejects(()=>restoreArchiveBook(dst,session.id,manifest,book.id,true),/already exists/);
+ const second=new D1Database(),localSession=await createArchiveSession(second);
+ for(const o of objects){await registerArchiveObject(second,localSession.id,o.descriptor);for(let i=0;i<o.chunks.length;i++)await putArchiveChunk(second,localSession.id,o.descriptor.object_sha256,i,o.chunks[i]);}
+ const local={...manifest,workspace:'local'};
+ assert.equal((await restoreArchiveBook(second,localSession.id,local,book.id,false)).committed,false);
+ assert.equal((await archiveDetailPage(second,'library_books')).items.length,0);
+ assert.equal((await restoreArchiveBook(second,localSession.id,local,book.id,true)).committed,true);
+ for(const kind of Object.keys(kinds))assert.deepEqual((await archiveDetailPage(second,kind)).items,(await archiveDetailPage(src,kind)).items);
+ assert.deepEqual([...(await getLibraryCover(second,book.id)).bytes],[...cover]);
 });
