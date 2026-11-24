@@ -113,7 +113,7 @@ export async function listTreasures(db, { kind = 'all', q = '', cursor = 0, conv
   };
 }
 
-export async function saveTreasure(db, input = {}) {
+export async function resolveTreasureSource(db, input = {}) {
   await initialize(db);
   const conversationId = validId(input.conversation_id, 'conversation');
   const sourceId = validId(input.source_id || input.message_id, 'source');
@@ -180,6 +180,11 @@ export async function saveTreasure(db, input = {}) {
   // A provider/imported message ID may recur in another conversation.
   // Tie the unique favorite to its owner conversation, not just the message.
   const sourceKey = kind + ':' + conversationId + ':' + sourceId;
+  return {sourceKey,kind,conversationId,turnId,messageId,sourceId,role,excerpt,indices,notes};
+}
+
+export async function saveTreasure(db,input={}){
+  const {sourceKey,kind,conversationId,turnId,messageId,sourceId,role,excerpt,indices,notes}=await resolveTreasureSource(db,input);
   const now = Date.now();
   const id = 'treasure_' + crypto.randomUUID();
   await db.prepare(
