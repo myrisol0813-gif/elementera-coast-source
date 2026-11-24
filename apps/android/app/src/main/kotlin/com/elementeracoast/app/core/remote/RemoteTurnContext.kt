@@ -49,13 +49,13 @@ data class RemoteDeskSlip(
 object RemoteDeskSlipWireSerializer : KSerializer<RemoteDeskSlip> {
     private val typed = RemoteDeskSlip.generatedSerializer()
     private val projection = Json { ignoreUnknownKeys = true; explicitNulls = false; encodeDefaults = false }
-    override val descriptor get() = typed.descriptor
+    override val descriptor get() = JsonObject.serializer().descriptor
 
     override fun deserialize(decoder: Decoder): RemoteDeskSlip {
         val input = decoder as? JsonDecoder ?: throw SerializationException("Desk receipt requires JSON")
         val raw = input.decodeJsonElement() as? JsonObject ?: throw SerializationException("Desk receipt must be an object")
         val view = projection.decodeFromJsonElement(typed, raw)
-        return if (projection.encodeToJsonElement(typed, view) == raw) view else view.copy(archivedJson = raw)
+        return view.copy(archivedJson = raw)
     }
 
     override fun serialize(encoder: Encoder, value: RemoteDeskSlip) {
