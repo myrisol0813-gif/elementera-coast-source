@@ -28,3 +28,17 @@ test('owner API stages, resumes, validates and cancels objects without live writ
  assert.equal((await call(item)).status,404);
  assert.equal(db.database.prepare('SELECT COUNT(*) AS n FROM coast_archive_chunks').get().n,0);
 });
+
+test('legacy memory pocket schema gains provenance columns before archive collection',async()=>{
+ const db=new D1Database();
+ const {ensureMemorySchema}=await import('../functions/memory-store/memory-schema.js');
+ const {archiveRecordPage}=await import('../functions/coast-archive-v2-records.js');
+ await ensureMemorySchema(db);
+ for(const column of ['source_model','source_window','source_time','tag','migration_status'])db.database.exec('ALTER TABLE memory_pockets DROP COLUMN '+column);
+ // A new D1 binding wrapper simulates a cold start against the existing database.
+ const legacy={prepare:db.prepare.bind(db),batch:db.batch.bind(db)};
+ const page=await archiveRecordPage(legacy,'memory_pockets');
+ assert.deepEqual(page.items,[]);
+ const columns=db.database.prepare('PRAGMA table_info(memory_pockets)').all().map(row=>row.name);
+ for(const column of ['source_model','source_window','source_time','tag','migration_status'])assert.ok(columns.includes(column),column);
+});
