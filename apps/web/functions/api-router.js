@@ -12,6 +12,7 @@ import { isOwnerMailboxApiPath, routeOwnerMailboxApi } from './owner-mailbox-api
 import { isRikkaHubApiPath, routeRikkaHubApi } from './rikkahub-api.js';
 import { isWorkbenchApiPath, routeWorkbenchApi } from './workbench-api.js';
 import { isSnapshotApiPath, routeSnapshotApi } from './snapshot-api.js';
+import { isTransferApiPath, routeTransferApi } from './transfer-api.js';
 
 export async function routeApi(request, env, session) {
   const url = new URL(request.url);
@@ -45,6 +46,7 @@ export async function routeApi(request, env, session) {
   if (isOwnerMailboxApiPath(url.pathname)) return routeOwnerMailboxApi(request, env, session);
   if (isRikkaHubApiPath(url.pathname)) return routeRikkaHubApi(request, env, session);
   if (isWorkbenchApiPath(url.pathname)) return routeWorkbenchApi(request, env, session);
+  if (isTransferApiPath(url.pathname)) return routeTransferApi(request, env);
   if (isSnapshotApiPath(url.pathname)) return routeSnapshotApi(request, env, session);
   if (url.pathname === '/api/models') return handleModels(request, env);
   return apiError('not_found', 'Not found.', 404);
