@@ -295,8 +295,10 @@ const vaultSnapshot = await exportCoastVault(db);
 assert.equal(vaultSnapshot.basic_media.count, 2, 'global snapshot includes both persisted media');
 assert.equal(vaultSnapshot.treasures.count, 2, 'global snapshot includes selected text/old hearts');
 assert.equal(vaultSnapshot.treasures.complete, true);
-const settingsExport = readFileSync(new URL('../elementera-mcp/deploy-pages/public/features/settings.js', import.meta.url), 'utf8');
-assert.match(settingsExport, /snapshot\.coast_vault/, 'global HTML must render vault snapshot as well');
+const { buildOfflineArchive } = await import('../elementera-mcp/deploy-pages/public/features/offline-archive.js');
+const vaultZip = buildOfflineArchive({ coast_vault: vaultSnapshot });
+const vaultZipText = new TextDecoder().decode(await vaultZip.blob.arrayBuffer());
+assert.ok(vaultZipText.includes('coast_vault') && vaultZipText.includes(textFavorite.excerpt), 'offline ZIP must render vault snapshot and actual treasure text');
 const { saveSoilSnapshot } = await import('../functions/memory-store.js');
 await saveSoilSnapshot(db, conversation.id, {
   turn_id: 'turn-vault-1',

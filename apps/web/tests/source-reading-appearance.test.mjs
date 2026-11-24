@@ -29,7 +29,7 @@ assert.match(library, /这里是你的书房，可以保存阅读进度与笔记
 for (const privateCopy of ['我们共用一间书房', '挑一本一起读', '与潮水一起翻书', '双方笔记']) {
   assert.ok(!library.includes(privateCopy), 'Old shared-library wording remains');
 }
-assert.match(sw, /elementera-coast-source-app-29/);
+assert.match(sw, /elementera-coast-source-app-30/);
 const toolDescriptions = await readFile(new URL('../functions/tool-registry-core.js', import.meta.url), 'utf8');
 const libraryApi = await readFile(new URL('../functions/tidal-library-api.js', import.meta.url), 'utf8');
 const libraryImport = await readFile(new URL('../../android/app/src/main/kotlin/com/elementeracoast/app/feature/daily/LibraryImport.kt', import.meta.url), 'utf8');
@@ -41,7 +41,10 @@ for (const content of [toolDescriptions, libraryApi, libraryImport, settings, do
 }
 assert.match(toolDescriptions, /查看书架/);
 assert.match(toolDescriptions, /阅读书页/);
-assert.match(settings, /snapshotDataSection\('书房', snapshot\.tidal_library\)/);
+const { buildOfflineArchive } = await import('../elementera-mcp/deploy-pages/public/features/offline-archive.js');
+const libraryZip = buildOfflineArchive({tidal_library:{books:[{title:'离线书房验收',notes:'完整笔记保留'}]}});
+const libraryZipText = new TextDecoder().decode(await libraryZip.blob.arrayBuffer());
+assert.ok(libraryZipText.includes('tidal_library') && libraryZipText.includes('离线书房验收') && libraryZipText.includes('完整笔记保留'), 'offline archive includes library records and notes');
 assert.match(dogtalkDrawer, /跨窗口选取/);
 assert.match(dogtalkDrawer, /历史消息搜索/);
 assert.doesNotMatch(dogtalkDrawer, /旧信关键词|跨窗口取信/);
