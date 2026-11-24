@@ -22,11 +22,12 @@ test('portrait group preserves body, candidate and revision history; refuses exi
  const m={format:'elementera-coast-archive',version:2,workspace:'backend',application_id:'com.elementeracoast.source',exported_at:'2026-01-01T00:00:00Z',modules:MODULES.map(module=>({module,coverage:records.some(r=>r.module===module)?'partial':'unavailable',count:records.filter(r=>r.module===module).length})),records,objects:objects.map(o=>o.descriptor)};
  async function stage(db){const s=await createArchiveSession(db);for(const o of objects){await registerArchiveObject(db,s.id,o.descriptor);for(let i=0;i<o.chunks.length;i++)await putArchiveChunk(db,s.id,o.descriptor.object_sha256,i,o.chunks[i]);}return s.id;}
  const sid=await stage(dst);
+ const local={...m,workspace:'local'};
  for(const [module,read] of [['user_portrait',readUserPortrait],['self_portrait',readGlobalExcerpt]]){
    const root=records.find(r=>r.module===module&&r.id.startsWith(module+':'));
    assert.equal((await restoreArchiveRecord(dst,sid,m,module,root.id,false)).ready,3);
    assert.equal((await read(dst)).body,'');
-   assert.equal((await restoreArchiveRecord(dst,sid,m,module,root.id,true)).committed,true);
+   assert.equal((await restoreArchiveRecord(dst,sid,local,module,root.id,true)).committed,true);
    for(const kind of [module,module+'_candidates',module+'_revisions'])assert.deepEqual((await archiveDetailPage(dst,kind)).items,(await archiveDetailPage(src,kind)).items);
    assert.equal((await restoreArchiveRecord(dst,sid,m,module,root.id,false)).existing,3);
  }

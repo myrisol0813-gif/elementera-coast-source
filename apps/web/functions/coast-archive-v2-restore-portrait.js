@@ -14,7 +14,7 @@ const revisionFields='id,revision,before_body,after_body,source_conversation_id,
 export const PORTRAIT_RESTORE_MODULES=Object.freeze(['user_portrait','self_portrait']);
 export async function restoreArchivePortrait(db,sessionId,manifest,module,recordId,confirm=false){
  await validateArchiveManifest(manifest);
- check(manifest.workspace==='backend'&&manifest.application_id==='com.elementeracoast.source'&&PORTRAIT_RESTORE_MODULES.includes(module),'portrait restore requires same-edition backend archive');
+ check(['backend','local'].includes(manifest.workspace)&&manifest.application_id==='com.elementeracoast.source'&&PORTRAIT_RESTORE_MODULES.includes(module),'portrait restore requires same-edition archive');
  const group=manifest.records.filter(r=>r.module===module),objects=new Map(manifest.objects.map(o=>[o.object_sha256,o]));
  check(group.length>0&&group.length<=88&&group.reduce((n,r)=>n+objects.get(r.record_object).size,0)<=16*1024*1024,'portrait exceeds current transaction budget');
  const table=module==='user_portrait'?'user_portrait':'global_excerpt';
