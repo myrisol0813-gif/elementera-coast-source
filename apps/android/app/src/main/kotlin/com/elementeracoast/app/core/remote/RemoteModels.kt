@@ -110,7 +110,9 @@ data class RemoteHistory(
     @SerialName("updated_at") val updatedAt: String = "",
     @SerialName("context_settings") val contextSettings: ConversationContextSettings = ConversationContextSettings(),
     val turns: List<RemoteTurn> = emptyList(),
-    @SerialName("conversation_id") val conversationId: String? = null
+    @SerialName("conversation_id") val conversationId: String? = null,
+    // Source database write clock, distinct from the history document clock.
+    @SerialName("archive_storage_updated_at") val archiveStorageUpdatedAt: Long? = null
 )
 
 @Serializable
