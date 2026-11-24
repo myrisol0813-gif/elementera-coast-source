@@ -320,7 +320,6 @@ class CoastShellViewModel(
     }
 
     fun openModelPicker() {
-        if (localMode) { showPlaceholder("本机模式第一阶段：模型 API 尚未接入，目前可独立保存记录。"); return }
         if (_state.value.activeFeature == null) _state.update { it.copy(showModelPicker = true) }
     }
 
@@ -363,7 +362,7 @@ class CoastShellViewModel(
                         currentModel = profile.currentChatModel.ifBlank { model },
                         showModelPicker = false,
                         backendOffline = false,
-                        snackbarMessage = "当前模型已同步到后端"
+                        snackbarMessage = if (localMode) "当前模型已保存在本机" else "当前模型已同步到后端"
                     )
                 }
                 logAction("model.switch", "切换模型", "当前：${model.substringAfterLast('/')}")
@@ -374,7 +373,6 @@ class CoastShellViewModel(
     }
 
     fun connectChatGpt(openBrowser: (String) -> Unit) {
-        if (localMode) { showPlaceholder("本机模型连接尚未接入。"); return }
         if (tourBlocksCloudAction()) return
         val client = chatGpt ?: return
         if (_chatGptState.value.busy) return
@@ -481,7 +479,7 @@ class CoastShellViewModel(
             try {
                 val catalog = backend.profile.refreshModels(force = true)
                 applyModels(catalog)
-                _state.update { it.copy(backendOffline = false, snackbarMessage = "模型目录已刷新") }
+                _state.update { it.copy(backendOffline = false, snackbarMessage = if (localMode) "本机模型目录已刷新" else "模型目录已刷新") }
             } catch (error: CoastApiException) {
                 handleBackendError(error, "模型目录刷新失败")
             }
@@ -860,9 +858,9 @@ class CoastShellViewModel(
         val current = _state.value.currentModel
         _state.update {
             it.copy(
-                models = if (current.isNotBlank() && !isChatGptPlanModel(current) && current !in models) listOf(current) + models else models,
+                models = if (!localMode && current.isNotBlank() && !isChatGptPlanModel(current) && current !in models) listOf(current) + models else models,
                 modelReasoningChoices = (catalog.groups.openAiChat + catalog.groups.freeTest).associate { it.id to it.reasoningEfforts },
-                currentModel = current.ifBlank { models.firstOrNull().orEmpty() }
+                currentModel = if (localMode && !isChatGptPlanModel(current) && current !in models) models.firstOrNull().orEmpty() else current.ifBlank { models.firstOrNull().orEmpty() }
             )
         }
     }
@@ -1110,7 +1108,7 @@ class CoastShellViewModel(
                             }
                         }
                         if (!isChatGptPlanModel(progress.modelId)) refreshGeneratedTitle(conversationId, titleUserText, partial)
-                        organizeThoughtSoilAfterReply(conversationId, progress.modelId)
+                        if (!localMode) organizeThoughtSoilAfterReply(conversationId, progress.modelId)
                     }
                 }
             }
@@ -1475,7 +1473,7 @@ class CoastShellViewModel(
                 val appContext = context.applicationContext
                 val isLocal = NativeWorkspace.isLocal
                 val persistence = NativeWorkspace.persistence(appContext)
-                val chatGpt = if (isLocal) null else ChatGptPlanRepository(ChatGptSecureStore(appContext))
+                val chatGpt = ChatGptPlanRepository(ChatGptSecureStore(appContext, localMode = isLocal))
                 val backend = CoastBackendGraph.production(appContext, persistence, chatGpt)
                 return CoastShellViewModel(persistence, backend, chatGpt = chatGpt, localMode = isLocal) as T
             }
