@@ -78,7 +78,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,all
             busy=true;open.launch(arrayOf("application/zip","application/octet-stream"))
         }
         if(busy)Text(status.ifBlank { "处理中…" },style=MaterialTheme.typography.bodySmall)
-        Text(if(localMode)"当前仅支持本机来源 ZIP 的四个已有模块；云端 ZIP 请保留原件。" else "支持云端聊天组、书房、日历、世界书、模型资料、同应用记忆和画像；不会恢复整个包。上传会暂存所有归档对象。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(if(localMode)"当前仅支持本机来源 ZIP 的四个已有模块；云端 ZIP 请保留原件。" else "支持云端聊天组、书房、日历、世界书、模型资料、同应用记忆、画像、日常和拾潮；不会恢复整个包。上传会暂存所有归档对象。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
     val input=incoming?:return
     val available=operations.localModules(input.manifest)
@@ -113,6 +113,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,all
                 preview?.let { p->
                     Text(if(committed)"已确认写入；请重新打开海岸刷新资料。" else "预检通过。只写入所选记录，不覆盖已存在的资料。")
                     if(localMode)p.forEach { (k,v)->if(v is JsonObject)Text((v2Labels[k]?:k)+" · 新增 "+v["ready"]+" · 已有 "+v["existing"]+" · 冲突 "+v["conflicts"]) }
+                    else if(p["scope"]?.jsonPrimitive?.contentOrNull=="daily_group")Text("评论 "+p["comments"]+" · 点赞 "+p["likes"])
                     else if(p["scope"]?.jsonPrimitive?.contentOrNull=="portrait_group")Text("候选 "+p["candidates"]+" · 历史 "+p["revisions"])
                     else if(p["scope"]?.jsonPrimitive?.contentOrNull=="record_only")Text("新增 "+p["ready"]+" · 已有 "+p["existing"])
                     else if(p["scope"]?.jsonPrimitive?.contentOrNull=="book_only")Text("章节 "+p["chapters"]+" · 批注 "+p["notes"])
