@@ -34,12 +34,12 @@ const tables={
   daily_comments:spec('daily',ensureDailySchema,'daily_moment_comments','id,moment_id,author,text,created_at,model_id,usage_json'),
   daily_likes:spec('daily',ensureDailySchema,'daily_moment_likes','moment_id,actor,created_at'),
   daily_profile:spec('daily',ensureDailySchema,'daily_profile','id,owner_avatar_dataurl,model_partner_avatar_dataurl,moment_cover_dataurl,model_partner_display_name,updated_at',"id='owner'"),
-  library_books:spec('library',ensureLibrarySchema,'coast_library_books','id,title,format,created_at,updated_at'),
-  library_chapters:spec('library',ensureLibrarySchema,'coast_library_chapters','book_id,chapter_index,title,body'),
-  library_notes:spec('library',ensureLibrarySchema,'coast_library_notes','id,book_id,chapter_index,paragraph_index,quote,kind,body,author,source,conversation_id,source_turn_id,created_at,updated_at'),
-  library_progress:spec('library',ensureLibrarySchema,'coast_library_progress','book_id,author,chapter_index,paragraph_index,updated_at'),
-  library_reading_logs:spec('library',ensureLibrarySchema,'coast_library_reading_logs','book_id,author,day,chapter_index,paragraph_index,updated_at'),
-  library_covers:spec('library',ensureLibrarySchema,'coast_library_covers','book_id,mime,size,updated_at'),
+  library_books:spec('library',ensureLibrarySchema,'coast_library_books','id,title,format,created_at,updated_at',"import_state='ready'"),
+  library_chapters:spec('library',ensureLibrarySchema,'coast_library_chapters','book_id,chapter_index,title,body',"book_id IN (SELECT id FROM coast_library_books WHERE import_state='ready')"),
+  library_notes:spec('library',ensureLibrarySchema,'coast_library_notes','id,book_id,chapter_index,paragraph_index,quote,kind,body,author,source,conversation_id,source_turn_id,created_at,updated_at,start_offset,end_offset',"book_id IN (SELECT id FROM coast_library_books WHERE import_state='ready')"),
+  library_progress:spec('library',ensureLibrarySchema,'coast_library_progress','book_id,author,chapter_index,paragraph_index,updated_at',"book_id IN (SELECT id FROM coast_library_books WHERE import_state='ready')"),
+  library_reading_logs:spec('library',ensureLibrarySchema,'coast_library_reading_logs','book_id,author,day,chapter_index,paragraph_index,updated_at',"book_id IN (SELECT id FROM coast_library_books WHERE import_state='ready')"),
+  library_covers:spec('library',ensureLibrarySchema,'coast_library_covers','book_id,mime,size,updated_at',"book_id IN (SELECT id FROM coast_library_books WHERE import_state='ready')"),
   vault_treasures:spec('vault',ensureTreasureSchema,'coast_vault_treasures','id,source_key,kind,conversation_id,turn_id,message_id,source_id,role,excerpt,selections_json,notes,created_at,updated_at',scope),
   vault_media_labels:spec('vault',async db=>{await ensureChatAttachmentSchema(db);await ensureMediaLabelSchema(db);},'coast_vault_media_labels','source_key,display_name,updated_at',"source_key IN (SELECT 'image:'||conversation_id||':'||id FROM chat_attachments WHERE kind='image' AND "+scope+")")
 };
@@ -58,7 +58,7 @@ export async function archiveDetailPage(db,kind,{cursor='',limit=20}={}){
 export async function readArchiveLibraryCover(db,id){
   check(typeof id==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(id),'invalid library book id');
   await ensureLibrarySchema(db);
-  const row=await db.prepare('SELECT c.book_id,c.mime,c.size,c.updated_at,c.data FROM coast_library_covers c JOIN coast_library_books b ON b.id=c.book_id WHERE c.book_id=?').bind(id).first();
+  const row=await db.prepare('SELECT c.book_id,c.mime,c.size,c.updated_at,c.data FROM coast_library_covers c JOIN coast_library_books b ON b.id=c.book_id WHERE c.book_id=? AND b.import_state=\'ready\'').bind(id).first();
   if(!row)throw Object.assign(Error('library cover missing'),{status:404});
   const {data,...metadata}=row;
   const bytes=data instanceof ArrayBuffer?new Uint8Array(data):ArrayBuffer.isView(data)?new Uint8Array(data.buffer,data.byteOffset,data.byteLength):Uint8Array.from(data||[]);
