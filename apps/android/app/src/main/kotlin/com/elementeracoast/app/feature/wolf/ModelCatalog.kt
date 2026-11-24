@@ -38,3 +38,17 @@ internal fun groupedUnselectedModels(models: List<String>, current: String): Map
         .toList()
     return ModelSeries.entries.associateWith { series -> items.filter { it.series == series } }
 }
+
+internal fun localProviderId(id: String): String = id.removePrefix("local:").substringBefore('/')
+internal fun localRawModelId(id: String): String = if (id.startsWith("local:")) id.substringAfter('/') else id
+
+internal fun groupedLocalModels(models: List<String>, query: String, names: Map<String, String>): Map<ModelSeries, List<LocalModelCatalogItem>> {
+    val needle = query.trim()
+    val entries = models.asSequence().filter { it.startsWith("local:") && '/' in it }.distinct()
+        .map { id -> LocalModelCatalogItem(id, modelDisplayName(localRawModelId(id)), classifyModelSeries(localRawModelId(id))) }
+        .filter { item -> localRawModelId(item.id).contains(needle, ignoreCase = true) ||
+            item.displayName.contains(needle, ignoreCase = true) ||
+            names[localProviderId(item.id)].orEmpty().contains(needle, ignoreCase = true) }
+        .sortedBy { it.displayName.lowercase() }.toList()
+    return ModelSeries.entries.associateWith { series -> entries.filter { it.series == series } }
+}

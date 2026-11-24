@@ -860,7 +860,7 @@ class CoastShellViewModel(
             it.copy(
                 models = if (!localMode && current.isNotBlank() && !isChatGptPlanModel(current) && current !in models) listOf(current) + models else models,
                 modelReasoningChoices = (catalog.groups.openAiChat + catalog.groups.freeTest).associate { it.id to it.reasoningEfforts },
-                currentModel = if (localMode && !isChatGptPlanModel(current) && current !in models) models.firstOrNull().orEmpty() else current.ifBlank { models.firstOrNull().orEmpty() }
+                currentModel = if (localMode) current.takeIf { isChatGptPlanModel(it) || it in models }.orEmpty() else current.ifBlank { models.firstOrNull().orEmpty() }
             )
         }
     }

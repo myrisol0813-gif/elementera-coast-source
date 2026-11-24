@@ -18,6 +18,19 @@ class ModelCatalogTest {
     }
 
     @Test
+    fun localCatalogFindsFreeModelsBeyondFirstHundredAndKeepsCurrent() {
+        val models = (0..199).map { "local:one/vendor/model-$it" } +
+            listOf("local:one/vendor/z:free", "local:two/vendor/z:free", "local:two/o3")
+        val all = groupedLocalModels(models, "", mapOf("one" to "OpenRouter", "two" to "Custom"))
+        assertEquals(2, all.getValue(ModelSeries.Free).size)
+        assertEquals(203, all.values.flatten().size)
+        assertEquals(1, all.getValue(ModelSeries.O).size)
+        val filtered = groupedLocalModels(models, "free", emptyMap())
+        assertEquals(2, filtered.values.flatten().size)
+        assertEquals(201, groupedLocalModels(models, "OpenRouter", mapOf("one" to "OpenRouter")).values.flatten().size)
+    }
+
+    @Test
     fun groupedCatalogExcludesCurrentModelAndKeepsSeriesOrder() {
         val models = listOf("Free: North Mini", "GPT-5.6 Sol", "GPT-5.5 Thinking", "o3")
         val grouped = groupedUnselectedModels(models, "GPT-5.6 Sol")
