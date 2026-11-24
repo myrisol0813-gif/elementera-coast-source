@@ -60,6 +60,8 @@ internal object ArchiveV2Daily {
             require(row.record.id==identity(row.kind,keys.map(d::getValue))){"日常记录身份校验失败。"}
         }
         val parents=groups["daily_moments"].orEmpty().associateBy { it.data.str("id") }
+        val commentsByMoment=groups["daily_comments"].orEmpty().groupBy{it.data.str("moment_id")}
+        val likesByMoment=groups["daily_likes"].orEmpty().groupBy{it.data.str("moment_id")}
         val children=groups["daily_comments"].orEmpty()+groups["daily_likes"].orEmpty()
         for(child in children){
             val p=requireNotNull(parents[child.data.str("moment_id")]){"日常评论或点赞缺少原动态。"}
@@ -68,7 +70,7 @@ internal object ArchiveV2Daily {
         val moments=groups["daily_moments"].orEmpty().map { row->
             val d=row.data;val id=d.str("id")
             require(d.str("status")=="published"){"暂不恢复未发布动态。"}
-            val comments=groups["daily_comments"].orEmpty().filter{it.data.str("moment_id")==id}.sortedWith(compareBy({it.data.getValue("created_at").jsonPrimitive.long},{it.data.str("id")})).map { child->
+            val comments=commentsByMoment[id].orEmpty().sortedWith(compareBy({it.data.getValue("created_at").jsonPrimitive.long},{it.data.str("id")})).map { child->
                 val c=child.data
                 require(c["author"]!=JsonNull&&c["created_at"]!=JsonNull)
                 val usage=if(c["usage_json"]==JsonNull)JsonNull else Json.parseToJsonElement(c.str("usage_json")).jsonObject.also { u->
@@ -76,7 +78,7 @@ internal object ArchiveV2Daily {
                 }
                 JsonObject(c.filterKeys { it !in setOf("moment_id","usage_json") }+mapOf("author" to role(c.getValue("author")),"created_at" to time(c.getValue("created_at")),"usage" to usage))
             }
-            val likes=groups["daily_likes"].orEmpty().filter{it.data.str("moment_id")==id}.map{child->
+            val likes=likesByMoment[id].orEmpty().map{child->
                 val c=child.data;require(c["created_at"]!=JsonNull)
                 JsonObject(mapOf("actor" to role(c.getValue("actor")),"created_at" to time(c.getValue("created_at"))))
             }.sortedBy { it.str("actor") }
