@@ -115,7 +115,7 @@ data class RemoteDeskMemory(
 data class RemoteDeskMemoryItem(
     val title: String = "",
     val id: String? = null,
-    val score: Double? = null,
+    val score: kotlinx.serialization.json.JsonPrimitive? = null,
     @SerialName("entry_type") val entryType: String = "memory",
     val tag: String = "",
     @SerialName("source_model") val sourceModel: String = "",
