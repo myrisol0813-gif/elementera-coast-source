@@ -1,3 +1,4 @@
+import { PORTRAIT_RESTORE_MODULES,restoreArchivePortrait } from './coast-archive-v2-restore-portrait.js';
 import { MEMORY_RESTORE_MODULES,prepareArchiveMemory } from './coast-archive-v2-restore-memory.js';
 import { ensureChatSchema, normalizeProfile } from './chat-store.js';
 import { ensureCalendarSchema, CALENDAR_LIMITS } from './calendar-store.js';
@@ -19,6 +20,7 @@ const specs={
 };
 const roles={owner:'owner',assistant:'assistant'};
 export async function restoreArchiveRecord(db,sessionId,manifest,module,recordId,confirm=false){
+ if(PORTRAIT_RESTORE_MODULES.includes(module))return restoreArchivePortrait(db,sessionId,manifest,module,recordId,confirm);
  await validateArchiveManifest(manifest);
  check(manifest.workspace==='backend'&&(Object.hasOwn(specs,module)||MEMORY_RESTORE_MODULES.includes(module)),'target does not support this record');
  const r=manifest.records.find(x=>x.module===module&&x.id===recordId);
