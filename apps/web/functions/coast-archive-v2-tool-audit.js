@@ -7,7 +7,7 @@ import { readStagedArchiveChunks } from './coast-archive-v2-stage.js';
 // Only stable, known owner-tool identifiers. Never export input/output/error text,
 // connector payloads, mailbox activity, visitors, or arbitrary identifiers as metadata.
 export const SAFE_TOOL_KEYS=Object.freeze(["coast.status","radio.list","lighthouse.list","daily.create_moment","daily.create_diary","daily.moment_comment","daily.moment_like","dogtalk.read","dogtalk.save","cross_window.search","cross_window.keyword_search","cross_window.read_messages","cross_window.read_recent","memory.global_excerpt_propose","vault.search","vault.read","memory.search","memory.write_candidate","memory.authorized_search","radio.send","lighthouse.write_letter","daily.moments.list","daily.diaries.list","calendar.list","calendar.create","calendar.update","calendar.delete","voice.create","library.books","library.read","library.notes","library.write","worldbook.list","worldbook.create","worldbook.update"]);
-const actors=['api_myri','native_myri','official_mcp','owner','model_partner','api','mcp','assistant'];
+const actors=['api_model_partner','native_model_partner','official_mcp','owner','model_partner','api','mcp','assistant'];
 const rooms=['main_chat','main','conversation','radio','lighthouse','daily','official_mcp'];
 const fields=['id','tool_key','actor','room_scope','conversation_id','status','created_at','finished_at'];
 const validId=v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(v);
