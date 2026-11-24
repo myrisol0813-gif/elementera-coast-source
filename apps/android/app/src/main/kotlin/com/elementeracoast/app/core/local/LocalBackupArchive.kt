@@ -48,15 +48,15 @@ internal object LocalBackupArchive {
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = false }
     private val safeId = Regex("[A-Za-z0-9_.:-]{1,160}")
 
-    fun capture(store: LocalPersistence, applicationId: String, now: Instant = Instant.now()): LocalBackupPayload {
-        val cache = RemoteCacheStore(store, strictReads = true)
+    fun capture(store: LocalPersistence, applicationId: String, now: Instant = Instant.now()): LocalBackupPayload = store.readConsistent { stable ->
+        val cache = RemoteCacheStore(stable, strictReads = true)
         val data = LocalBackupPayload(applicationId, now.toString(),
             cache.conversations().map { c ->
                 LocalBackupConversation(c, cache.history(c.id) ?: error("聊天历史缺失，未生成不完整的备份。"))
             }, cache.profile(), cache.dailyProfile(), cache.dailyMoments(), cache.dailyDiaries(),
-            LocalCalendarStore(store).snapshot())
+            LocalCalendarStore(stable).snapshot())
         validate(data)
-        return data
+        data
     }
 
     fun encode(payload: LocalBackupPayload): ByteArray {
@@ -97,7 +97,7 @@ internal object LocalBackupArchive {
         require(ids.all { safeId.matches(it) } && ids.distinct().size == ids.size) { "存在无效或重复的记录 ID。" }
     }
 
-    private fun validate(data: LocalBackupPayload) {
+    internal fun validate(data: LocalBackupPayload) {
         require(data.applicationId in setOf("com.elementeracoast.app", "com.elementeracoast.source"))
         Instant.parse(data.exportedAt)
         unique(data.conversations.map { it.conversation.id })

@@ -76,7 +76,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 val b = body(r)
                 val room = b.str("room_type").orEmpty().takeIf { it in setOf("main", "radio", "lighthouse") } ?: "main"
                 val c = RemoteConversation(id(), b.str("title").orEmpty().trim().ifBlank { "新聊天" }, room, now(), now())
-                cache.putHistory(c.id, RemoteHistory(conversationId = c.id))
+                cache.putHistory(c.id, RemoteHistory(conversationId = c.id, updatedAt = c.updatedAt ?: now()))
                 cache.putConversations(listOf(c) + cache.conversations())
                 return ok(r, "conversation" to element(RemoteConversation.serializer(), c))
             }

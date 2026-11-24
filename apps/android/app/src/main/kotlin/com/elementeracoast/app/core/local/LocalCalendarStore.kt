@@ -66,6 +66,8 @@ internal class LocalCalendarStore(private val persistence: LocalPersistence) {
 
     fun snapshot(): JsonArray = JsonArray(all())
 
+    internal fun restoreSnapshot(rows: JsonArray) { validateBackup(rows); write(rows.map { it.jsonObject }) }
+
     fun save(id: String?, patch: JsonObject): JsonObject {
         val entries = all()
         val previous = id?.let { key -> entries.firstOrNull { it.text("id") == key }
