@@ -23,7 +23,7 @@ internal object LocalTransferRestore {
         // Daily identity fields differ and require a separate explicit adapter.
         val supported = when {
             sameEdition -> CoastTransferCodec.supportedModules
-            crossEdition -> setOf("chat", "calendar", "model_profile")
+            crossEdition || !localSource -> setOf("chat", "calendar", "model_profile")
             else -> setOf("chat", "calendar")
         }
         return declared.intersect(supported)
