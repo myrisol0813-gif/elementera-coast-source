@@ -28,7 +28,8 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,all
     var pendingFile by remember { mutableStateOf<File?>(null) }
     var incoming by remember { mutableStateOf<ArchiveV2Operations.Imported?>(null) }
     var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var chatId by remember { mutableStateOf<String?>(null) }
+    var choices by remember { mutableStateOf<List<ArchiveV2Operations.Choice>>(emptyList()) }
+    var chosen by remember { mutableStateOf<ArchiveV2Operations.Choice?>(null) }
     var session by remember { mutableStateOf<String?>(null) }
     var uploaded by remember { mutableStateOf(false) }
     var preview by remember { mutableStateOf<JsonObject?>(null) }
@@ -52,7 +53,8 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,all
         scope.launch{
             try{
                 val input=operations.open(uri)
-                incoming=input;selected=operations.localModules(input.manifest);chatId=operations.cloudChats(input.manifest).firstOrNull()
+                choices=operations.cloudChoices(input);chosen=choices.firstOrNull()
+                incoming=input;selected=operations.localModules(input.manifest)
                 session=null;uploaded=false;preview=null;committed=false;failure=""
             }catch(e:CancellationException){throw e}catch(e:Exception){onSnackbar("无法读取 V2 ZIP：格式、空间或完整性校验失败。")}
             finally{busy=false}
@@ -76,16 +78,16 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,all
             busy=true;open.launch(arrayOf("application/zip","application/octet-stream"))
         }
         if(busy)Text(status.ifBlank { "处理中…" },style=MaterialTheme.typography.bodySmall)
-        Text(if(localMode)"当前仅支持本机来源 ZIP 的四个已有模块；云端 ZIP 请保留原件。" else "当前仅支持同应用云端 ZIP 的逐窗口恢复，包含关联附件、语音、思维壤和草稿快照；不会恢复整个包。上传会暂存所有归档对象。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(if(localMode)"当前仅支持本机来源 ZIP 的四个已有模块；云端 ZIP 请保留原件。" else "支持同应用云端聊天组与两版云端书房逐本恢复；不会恢复整个包。上传会暂存所有归档对象。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
     val input=incoming?:return
-    val available=operations.localModules(input.manifest);val chats=operations.cloudChats(input.manifest)
+    val available=operations.localModules(input.manifest)
     fun dismiss(){
         busy=true
         scope.launch {
             try {
                 session?.let { operations.cancelSession(it) }
-                input.close();incoming=null;session=null;preview=null;uploaded=false;failure=""
+                input.close();incoming=null;choices=emptyList();chosen=null;session=null;preview=null;uploaded=false;failure=""
             }catch(e:CancellationException){throw e}catch(e:Exception){failure="暂存清理未完成，请重试。"}
             finally{busy=false}
         }
@@ -100,17 +102,18 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,all
                     val label=v2Labels[m.module]?:m.module
                     if(m.module in available) Row(verticalAlignment=Alignment.CenterVertically){
                         Checkbox(m.module in selected,enabled=!busy&&preview==null,onCheckedChange={selected=if(it)selected+m.module else selected-m.module});Text("$label · "+m.count)
-                    } else Text("$label · "+m.count+" · "+if(m.coverage=="unavailable")"未采集" else if(m.module=="chat"&&chats.isNotEmpty())"可逐窗口恢复" else "本次不恢复")
+                    } else Text("$label · "+m.count+" · "+if(m.coverage=="unavailable")"未采集" else if(m.module=="chat"&&choices.any { it.kind=="chat" })"可逐窗口恢复" else if(m.module=="library"&&choices.any { it.kind=="book" })"可逐本恢复" else "本次不恢复")
                 }
-                if(!localMode&&chats.isNotEmpty()) {
-                    Text("选择一个窗口（仅展示归档 ID）：")
-                    chats.forEach { id->Row(verticalAlignment=Alignment.CenterVertically){
-                        RadioButton(chatId==id,enabled=!busy&&preview==null,onClick={chatId=id});Text(id)
+                if(!localMode&&choices.isNotEmpty()) {
+                    Text("选择一项资料：")
+                    choices.forEach { item->Row(verticalAlignment=Alignment.CenterVertically){
+                        RadioButton(chosen==item,enabled=!busy&&preview==null,onClick={chosen=item});Text((if(item.kind=="book")"书房 · " else "聊天 · ")+item.title)
                     }}
                 }
                 preview?.let { p->
                     Text(if(committed)"已确认写入；请重新打开海岸刷新资料。" else "预检通过。只写入所选记录，不覆盖已存在的资料。")
                     if(localMode)p.forEach { (k,v)->if(v is JsonObject)Text((v2Labels[k]?:k)+" · 新增 "+v["ready"]+" · 已有 "+v["existing"]+" · 冲突 "+v["conflicts"]) }
+                    else if(p["scope"]?.jsonPrimitive?.contentOrNull=="book_only")Text("章节 "+p["chapters"]+" · 批注 "+p["notes"])
                     else Text("聊天："+p["turns"]+" 轮 · 附件 "+p["attachments"]+" · 语音 "+p["voices"]+" · 思维壤 "+p["soils"]+" · 快照 "+p["snapshots"])
                 }
                 if(busy)Text(status.ifBlank { "处理中…" })
@@ -118,7 +121,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,all
             }
         },
         confirmButton={
-            TextButton(enabled=!busy&&(committed||allowed&&(if(localMode)selected.isNotEmpty() else chatId!=null)),onClick={
+            TextButton(enabled=!busy&&(committed||allowed&&(if(localMode)selected.isNotEmpty() else chosen!=null)),onClick={
                 if(committed){dismiss();return@TextButton}
                 busy=true;failure=""
                 scope.launch{
@@ -128,7 +131,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,all
                         else {
                             val sid=session?:operations.createSession().also { session=it }
                             if(!uploaded){val p=operations.upload(input,sid){n->scope.launch { status="已上传 $n 个新分块" }};require(p["ready_for_byte_verification"]?.jsonPrimitive?.booleanOrNull==true);uploaded=true}
-                            preview=operations.cloudRestore(input,sid,requireNotNull(chatId),confirm)
+                            preview=operations.cloudRestore(input,sid,requireNotNull(chosen),confirm)
                         }
                         if(confirm)committed=true
                     }catch(e:CancellationException){throw e}catch(e:Exception){failure="操作未完成："+(e.message?.take(160)?:"资料校验或写入失败。")}
@@ -136,6 +139,6 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,all
                 }
             }){Text(if(committed)"关闭并清理暂存" else if(preview!=null)"确认恢复" else if(localMode)"预览" else "上传并预览")}
         },
-        dismissButton={if(!committed)TextButton(enabled=!busy,onClick={if(preview!=null){preview=null;failure=""}else dismiss()}){Text(if(preview!=null)"返回选择" else "取消并清理")}}
+        dismissButton={if(committed&&!localMode)TextButton(enabled=!busy,onClick={choices=choices.filter { it!=chosen };chosen=choices.firstOrNull();committed=false;preview=null;failure=""}){Text("继续恢复其他资料")} else if(!committed)TextButton(enabled=!busy,onClick={if(preview!=null){preview=null;failure=""}else dismiss()}){Text(if(preview!=null)"返回选择" else "取消并清理")}}
     )
 }
