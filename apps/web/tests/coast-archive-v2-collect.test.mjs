@@ -1,3 +1,4 @@
+import { openArchiveV2 } from '../elementera-mcp/deploy-pages/public/core/archive-v2-read.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { collectArchiveV2 } from '../elementera-mcp/deploy-pages/public/core/archive-v2-collect.js';
@@ -58,4 +59,21 @@ test('damaged originals abort output without finishing an archive',async()=>{
  const f=await fixture({bad:true});
  await assert.rejects(()=>collectArchiveV2({...f,applicationId:'com.elementeracoast.app'}),/corrupt/);
  assert.equal(f.state.aborted,true);assert.equal(f.state.closed,false);assert.equal(f.parts.length,0);
+});
+
+test('browser reopens the streamed archive and verifies all object chunks before upload',async()=>{
+ const f=await fixture(),m=await collectArchiveV2({...f,applicationId:'com.elementeracoast.app'});
+ const zip=new Blob(f.parts),opened=await openArchiveV2(zip,validateArchiveManifest);
+ assert.deepEqual(opened.manifest,m);
+ for(const d of m.objects){let n=0;for await(const chunk of opened.objectChunks(d))n+=chunk.length;assert.equal(n,d.size);}
+ // Mutate an original payload, keeping its central-directory metadata intact.
+ const bytes=new Uint8Array(await zip.arrayBuffer()),d=new DataView(bytes.buffer);
+ let p=d.getUint32(bytes.length-6,true);
+ while(d.getUint32(p,true)===0x02014b50){
+   const len=d.getUint16(p+28,true),name=decoder.decode(bytes.subarray(p+46,p+46+len));
+   if(name==='objects/'+f.descriptor.object_sha256){const local=d.getUint32(p+42,true);bytes[local+30+d.getUint16(local+26,true)+d.getUint16(local+28,true)]^=255;break;}
+   p+=46+len+d.getUint16(p+30,true)+d.getUint16(p+32,true);
+ }
+ const broken=await openArchiveV2(new Blob([bytes]),validateArchiveManifest);
+ await assert.rejects(async()=>{for await(const b of broken.objectChunks(f.descriptor)){}},/digest|CRC/);
 });
