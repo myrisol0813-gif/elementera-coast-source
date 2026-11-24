@@ -43,11 +43,12 @@ internal object ArchiveV2CloudToLocal {
                 }
                 "calendar"->{
                     verifyKeys(data,setOf("id","day","kind","title","body","recurrence","author","source","conversation_id","source_turn_id","tool_call_id","model_label","created_at","updated_at","anniversary_start_day","anniversary_mode","anniversary_target_days","anniversary_pinned"))
-                    require(data.string("id")==r.id&&listOf("conversation_id","source_turn_id","tool_call_id","model_label").all { data[it]==JsonNull }){"本机日历不能保留这条记录的来源字段。"}
+                    require(data.string("id")==r.id&&listOf("conversation_id","source_turn_id").all { data[it]==JsonNull }){"本机日历不能保留这条记录的来源字段。"}
                     require(data.string("author") in setOf("owner","assistant"))
                     val pin=data.getValue("anniversary_pinned").jsonPrimitive.int;require(pin in 0..1)
                     val row=buildJsonObject {
                         for(k in listOf("id","day","kind","title","body","recurrence","author","source","created_at","updated_at"))put(k,data.getValue(k))
+                        for(k in listOf("model_label","tool_call_id"))data.getValue(k).takeIf { it!=JsonNull }?.let { put(k,it) }
                         put("occurrence_day",data.getValue("day"))
                         if(data["anniversary_mode"]!=JsonNull)putJsonObject("anniversary"){
                             put("startDay",data.getValue("anniversary_start_day"));put("mode",data.getValue("anniversary_mode"));put("targetDays",data.getValue("anniversary_target_days"));put("pinned",pin==1)
