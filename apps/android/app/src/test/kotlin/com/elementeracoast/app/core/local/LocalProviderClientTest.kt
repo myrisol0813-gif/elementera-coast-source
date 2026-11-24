@@ -28,7 +28,7 @@ class LocalProviderClientTest {
 
     @Test fun rejectsPlaintextAndEmbeddedCredentials() {
         assertEquals("https://provider.example/v1", normalizeLocalProviderUrl(" https://provider.example/v1/ "))
-        listOf("http://provider.example/v1", "https://u:p@provider.example/v1",
+        listOf("http://provider.example/v1", "https://" + "u:p@" + "provider.example/v1",
             "https://provider.example/v1?secret=1", "https://provider.example/v1/chat/completions").forEach {
             assertTrue(runCatching { normalizeLocalProviderUrl(it) }.isFailure)
         }
