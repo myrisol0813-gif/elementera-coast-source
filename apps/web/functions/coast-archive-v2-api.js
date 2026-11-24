@@ -1,4 +1,4 @@
-import { apiError, json, readJson, securityHeaders, unexpectedApiError } from './http.js';
+import { apiError, json, readJson, securityHeaders, safeLogError } from './http.js';
 import { listArchiveAttachments, readArchiveAttachment, listArchiveDogtalk } from './coast-archive-v2-media.js';
 import { STAGING_LIMITS, createArchiveSession, listArchiveSessions, cancelArchiveSession, registerArchiveObject, putArchiveChunk, archiveObjectStatus, preflightArchiveSession } from './coast-archive-v2-stage.js';
 
@@ -12,6 +12,31 @@ import { restoreArchiveBook } from './coast-archive-v2-restore-library.js';
 import { restoreArchiveRecord } from './coast-archive-v2-restore-record.js';
 const BASE='/api/archive/v2';
 export const isArchiveV2Path=path=>path===BASE||path.startsWith(BASE+'/');
+
+// Diagnostic labels are selected from the fixed route registry, never from record IDs,
+// cursors, request bodies or database error text.
+function archiveStage(parts,url){
+  const [head,kind]=parts;
+  if(head==='records'&&RECORD_MODULES.includes(kind))return 'records:'+kind+(parts.length===3&&kind==='chat'?':detail':':page');
+  if(head==='details'&&Object.hasOwn(DETAIL_MODULES,kind))return 'details:'+kind;
+  if(['voice','attachments','library-cover'].includes(head))return head+(parts.includes('chunks')?':chunk':':original');
+  if(head==='inventory'&&kind==='attachments')return 'inventory:attachments';
+  if(head==='inventory'&&kind==='dogtalk')return 'inventory:dogtalk:'+(url.searchParams.get('kind')==='records'?'records':'snapshots');
+  if(head==='manifest'&&kind==='validate')return 'manifest:validate';
+  if(head==='sessions')return 'sessions';
+  return 'archive';
+}
+function archiveFailureReason(error){
+  const message=String(error?.message||'');
+  const kind=String(error?.type||error?.code||'');
+  if(/no such column|has no column named/i.test(message))return 'schema_column';
+  if(/no such table/i.test(message))return 'schema_table';
+  if(/too many sql variables|too many statements|query limit|exceeded.*limit|SQLITE_TOOBIG/i.test(message))return 'database_limit';
+  if(kind==='clip_corrupt'||kind==='attachment_read_failed'||/original missing or corrupt|original incomplete/i.test(message))return 'original_integrity';
+  if(/database is locked|timeout|timed out|overloaded/i.test(message))return 'database_or_network_timeout';
+  return 'internal';
+}
+
 async function binaryBody(request){
   const reader=request.body?.getReader();const parts=[];let size=0;
   if(!reader)throw Object.assign(Error('missing chunk'),{status:400});
@@ -89,6 +114,8 @@ export async function routeArchiveV2(request,env,session){
     if(e?.message==='invalid_json'||e?.message==='body_too_large')return apiError('archive_request_failed','归档请求格式或长度无效。',e.message==='body_too_large'?413:400);
     // Validation failures without a status are not published, and internal errors
     // must not leak database contents to the client.
-    return unexpectedApiError('archive_v2',e,'archive_failed','归档操作失败；现有资料未恢复或覆盖');
+    const stage=archiveStage(parts,url),reason=archiveFailureReason(e),reference=crypto.randomUUID().slice(0,8);
+    safeLogError('archive_v2',e,{reference,operation:stage});
+    return apiError('archive_failed','归档操作失败 ['+stage+' / '+reason+']；现有资料未恢复或覆盖（'+reference+'）。',500,{stage,reason,reference});
   }
 }
