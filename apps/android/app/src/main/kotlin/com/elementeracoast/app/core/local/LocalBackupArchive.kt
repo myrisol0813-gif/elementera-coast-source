@@ -119,7 +119,16 @@ internal object LocalBackupArchive {
             }
         }
         unique(data.moments.map { it.id }); unique(data.diaries.map { it.id })
-        data.moments.forEach { unique(it.comments.map { comment -> comment.id }) }
+        unique(data.moments.flatMap { it.comments }.map { it.id })
+        val owner = if (data.applicationId == "com.elementeracoast.source") "owner" else "xiaohan"
+        data.moments.forEach { moment ->
+            require(moment.likeCount >= 0)
+            moment.likes?.let { likes ->
+                unique(likes.map { it.actor })
+                require(likes.size == moment.likeCount && moment.liked == likes.any { it.actor == owner }) { "点赞明细与数量不一致。" }
+                likes.forEach { Instant.parse(it.createdAt) }
+            }
+        }
         LocalCalendarStore.validateBackup(data.calendar)
     }
 
