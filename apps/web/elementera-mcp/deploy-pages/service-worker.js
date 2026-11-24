@@ -25,6 +25,7 @@ const CORE = Object.freeze([
   '/public/core/icons.js',
   '/public/core/model-format.js',
   '/public/core/router.js',
+  '/public/core/feature-guide.js',
   '/public/core/stream-format.js',
   '/public/core/storage.js',
   '/public/content/island-letter.js',

@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.elementeracoast.app.feature.shell.FeaturePageTopBar
+import com.elementeracoast.app.feature.shell.FeatureGuides
 
 internal data class MemoryLandingItem(val title: String, val subtitle: String)
 
@@ -50,6 +51,7 @@ fun MemoryLanding(
         Column(Modifier.fillMaxSize()) {
             FeaturePageTopBar(
                 title = "待确认区",
+                guide = FeatureGuides.memory,
                 subtitle = "当前窗口 · 只有确认后才进入记忆库或种子库",
                 onBack = { pendingOpen = false },
                 actionLabel = null,
@@ -83,6 +85,7 @@ fun MemoryLanding(
     Column(Modifier.fillMaxSize()) {
         FeaturePageTopBar(
             title = "记忆",
+            guide = when (tab) { MemoryTab.Worldbook -> FeatureGuides.worldbook; else -> FeatureGuides.memory },
             subtitle = subtitle,
             onBack = {
                 pendingCreate = null

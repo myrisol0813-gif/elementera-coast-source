@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.elementeracoast.app.core.model.ChatSearchHit
 import com.elementeracoast.app.core.network.CoastApiException
 import com.elementeracoast.app.feature.shell.FeaturePageTopBar
+import com.elementeracoast.app.feature.shell.FeatureGuides
 import com.elementeracoast.app.ui.theme.SnowLetterSurface
 import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
 import kotlinx.coroutines.launch
@@ -94,6 +95,7 @@ fun DailyLanding(
         when (page) {
             DailyPage.Home -> FeaturePageTopBar(
                 title = "海岸日报",
+                guide = FeatureGuides.daily,
                 subtitle = "朋友圈与日记",
                 onBack = onBackToChat,
                 actionLabel = "刷新",
@@ -102,6 +104,7 @@ fun DailyLanding(
             )
             DailyPage.Moments -> FeaturePageTopBar(
                 title = "碳硅圈",
+                guide = FeatureGuides.daily,
                 subtitle = "前端默认朋友圈",
                 onBack = { page = DailyPage.Home },
                 actionLabel = "+ 动态",
@@ -118,6 +121,7 @@ fun DailyLanding(
             )
             DailyPage.Diary -> FeaturePageTopBar(
                 title = "日记",
+                guide = FeatureGuides.daily,
                 subtitle = "海岸里的正式纸页",
                 onBack = { page = DailyPage.Home },
                 actionLabel = "+ 日记",
@@ -132,8 +136,8 @@ fun DailyLanding(
                 { page = DailyPage.Diary },
                 compact = true
             )
-            DailyPage.Calendar -> FeaturePageTopBar("日历", "公历 · 日程与随记", { page = DailyPage.Home }, compact = true)
-            DailyPage.Vault -> FeaturePageTopBar("海岸文件库", "基本文件库与拾潮珍藏", { page = DailyPage.Home }, compact = true)
+            DailyPage.Calendar -> FeaturePageTopBar("日历", "公历 · 日程与纪念日", { page = DailyPage.Home }, compact = true, guide = FeatureGuides.calendar)
+            DailyPage.Vault -> FeaturePageTopBar("海岸文件库", "基本文件库与拾潮珍藏", { page = DailyPage.Home }, compact = true, guide = FeatureGuides.vault)
             DailyPage.Library -> Unit
             DailyPage.Pet -> FeaturePageTopBar(
                 "宠物系统",

@@ -39,6 +39,7 @@ import com.elementeracoast.app.core.remote.RemoteDevUpdate
 import com.elementeracoast.app.feature.chatgpt.ChatGptConnectState
 import com.elementeracoast.app.feature.serpentdesk.DevHandsRepository
 import com.elementeracoast.app.feature.shell.FeaturePageTopBar
+import com.elementeracoast.app.feature.shell.FeatureGuides
 import androidx.activity.compose.BackHandler
 import com.elementeracoast.app.ui.theme.SnowLetterSurface
 import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
@@ -75,7 +76,7 @@ fun WolfScreen(
 
     if (current == null) {
         Column(Modifier.fillMaxSize()) {
-        FeaturePageTopBar(homeTitle, "显示资料、外观、聊天与运行设置", onBack = ::back)
+        FeaturePageTopBar(homeTitle, "显示资料、外观、聊天与运行设置", onBack = ::back, guide = FeatureGuides.settings)
         WolfHome(
             state = state,
             model = shellState.currentModel,
@@ -89,6 +90,7 @@ fun WolfScreen(
     Column(Modifier.fillMaxSize()) {
         val sub = if (current == WolfDestination.ModelBox && modelPage != LocalModelPage.Catalog) " — " + modelPage.title else ""
         FeaturePageTopBar("$homeTitle — ${current.title}$sub", if (shellState.localMode) "本机模式" else current.subtitle, onBack = ::back,
+            guide = when (current) { WolfDestination.ModelBox -> FeatureGuides.models; WolfDestination.ChatRecords -> FeatureGuides.backup; else -> FeatureGuides.settings },
             actionLabel = if (current == WolfDestination.ModelBox && shellState.localMode && modelPage == LocalModelPage.Catalog) "刷新" else null,
             onAction = if (current == WolfDestination.ModelBox && shellState.localMode && modelPage == LocalModelPage.Catalog) onRefreshModels else null)
         Box(Modifier.weight(1f)) {

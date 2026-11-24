@@ -40,7 +40,8 @@ fun FeaturePageTopBar(
     onAction: (() -> Unit)? = null,
     secondaryActionLabel: String? = null,
     onSecondaryAction: (() -> Unit)? = null,
-    compact: Boolean = false
+    compact: Boolean = false,
+    guide: FeatureGuide? = null
 ) {
     val minHeight = if (compact) CoastChatTokens.TopBarHeight else 54.dp
     val horizontalPadding = if (compact) CoastChatTokens.TopBarHorizontalPadding else 8.dp
@@ -73,6 +74,7 @@ fun FeaturePageTopBar(
                 )
             }
             PageAction(actionLabel, onAction)
+            if (guide != null) FeatureGuideButton(guide)
             if (!secondaryActionLabel.isNullOrBlank() && onSecondaryAction != null) {
                 Spacer(Modifier.width(6.dp))
                 PageAction(secondaryActionLabel, onSecondaryAction)
