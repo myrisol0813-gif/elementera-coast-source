@@ -12,6 +12,9 @@ import kotlinx.serialization.json.jsonPrimitive
 interface GlobalArchiveRepository {
     suspend fun snapshot(): JsonElement
     suspend fun fullArchive(): JsonElement = error("完整包导出未接入。")
+    suspend fun transferExport(): JsonObject = error("迁移导出未接入。")
+    suspend fun transferPreview(bundle: JsonObject, modules: Set<String>): JsonObject = error("迁移预览未接入。")
+    suspend fun transferImport(bundle: JsonObject, modules: Set<String>): JsonObject = error("迁移导入未接入。")
 }
 
 class DefaultGlobalArchiveRepository(
@@ -19,6 +22,9 @@ class DefaultGlobalArchiveRepository(
 ) : GlobalArchiveRepository {
     override suspend fun snapshot(): JsonElement = api.getGlobalSnapshot()
     override suspend fun fullArchive(): JsonElement = api.getFullArchive()
+    override suspend fun transferExport(): JsonObject = api.transferExport()
+    override suspend fun transferPreview(bundle: JsonObject, modules: Set<String>): JsonObject = api.transferPreview(bundle, modules)
+    override suspend fun transferImport(bundle: JsonObject, modules: Set<String>): JsonObject = api.transferImport(bundle, modules)
 }
 
 object GlobalArchive {

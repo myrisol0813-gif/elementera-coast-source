@@ -34,6 +34,21 @@ internal object CoastTransferCodec {
         return json.parseToJsonElement(envelope.payload_json).jsonObject.also(::validate)
     }
 
+    fun select(payload: JsonObject, selection: Set<String>): ByteArray {
+        validate(payload)
+        require(selection.isNotEmpty() && payload.getValue("includedModules").jsonArray.map { it.jsonPrimitive.content }.containsAll(selection))
+        val filtered = JsonObject(payload + mapOf(
+            "includedModules" to JsonArray(selection.sorted().map(::JsonPrimitive)),
+            "conversations" to if ("chat" in selection) payload.getValue("conversations") else JsonArray(emptyList()),
+            "calendar" to if ("calendar" in selection) payload.getValue("calendar") else JsonArray(emptyList()),
+            "profile" to if ("model_profile" in selection) payload.getValue("profile") else JsonNull,
+            "dailyProfile" to if ("daily" in selection) payload.getValue("dailyProfile") else JsonNull,
+            "moments" to if ("daily" in selection) payload.getValue("moments") else JsonArray(emptyList()),
+            "diaries" to if ("daily" in selection) payload.getValue("diaries") else JsonArray(emptyList())
+        ))
+        return encode(filtered)
+    }
+
     val supportedModules = setOf("chat", "calendar", "daily", "model_profile")
 
     private fun validate(payload: JsonObject) {

@@ -1,6 +1,7 @@
 package com.elementeracoast.app.core.local
 
 import com.elementeracoast.app.core.remote.*
+import com.elementeracoast.app.BuildConfig
 import java.time.Instant
 import java.util.UUID
 import kotlinx.serialization.KSerializer
@@ -183,6 +184,31 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val cid = r.url.pathSegments.last()
             if (method == "PATCH") return ok(r, "entry" to calendar.save(cid, body(r)))
             if (method == "DELETE") { calendar.delete(cid); return ok(r, "deleted" to JsonPrimitive(true), "id" to JsonPrimitive(cid)) }
+        }
+        if (path == "/api/transfer/v1" && method == "GET") {
+            val data = LocalBackupArchive.capture(store, BuildConfig.APPLICATION_ID)
+            return ok(r, "bundle" to json.parseToJsonElement(LocalBackupArchive.encode(data).decodeToString()))
+        }
+        if (path in setOf("/api/transfer/v1/preview", "/api/transfer/v1/import") && method == "POST") {
+            try {
+                val b = body(r)
+                val bundle = b.getValue("bundle").toString().encodeToByteArray()
+                val modules = b.getValue("modules").jsonArray.map { it.jsonPrimitive.content }.toSet()
+                val committing = path.endsWith("/import")
+                if (committing && b["confirm"]?.jsonPrimitive?.booleanOrNull != true)
+                    return failure(r, 400, "confirmation_required", "请确认将资料写入本机。")
+                val report = if (committing) LocalTransferRestore.restore(bundle, BuildConfig.APPLICATION_ID, modules, store)
+                    else LocalTransferRestore.preview(bundle, BuildConfig.APPLICATION_ID, modules, store)
+                return ok(r, (if (committing) "result" else "preview") to buildJsonObject {
+                    put("source", report.source); put("target", "local"); put("can_commit", true)
+                    put("unsupported_modules", JsonArray(report.unsupportedModules.map(::JsonPrimitive)))
+                    report.counts.forEach { (key, value) ->
+                        putJsonObject(key) { put("ready", value.ready); put("existing", value.existing); put("conflicts", value.conflicts); put("blocked", JsonArray(emptyList())) }
+                    }
+                })
+            } catch (error: IllegalArgumentException) {
+                return failure(r, 400, "invalid_transfer", error.message?.take(240) ?: "数据包未通过校验。")
+            }
         }
         if (path == "/api/export/v1-snapshot" && method == "GET") {
             val snapshot = buildJsonObject {
