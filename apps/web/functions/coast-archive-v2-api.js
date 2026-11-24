@@ -1,9 +1,11 @@
 import { apiError, json, readJson, securityHeaders, unexpectedApiError } from './http.js';
 import { listArchiveAttachments, readArchiveAttachment, listArchiveDogtalk } from './coast-archive-v2-media.js';
-import { STAGING_LIMITS, createArchiveSession, listArchiveSessions, cancelArchiveSession, registerArchiveObject, putArchiveChunk, archiveObjectStatus } from './coast-archive-v2-stage.js';
+import { STAGING_LIMITS, createArchiveSession, listArchiveSessions, cancelArchiveSession, registerArchiveObject, putArchiveChunk, archiveObjectStatus, preflightArchiveSession } from './coast-archive-v2-stage.js';
 
 import { archiveRecordPage, readArchiveChat, readArchiveVoice, RECORD_MODULES } from './coast-archive-v2-records.js';
 import { validateArchiveManifest, MODULES } from './coast-archive-v2-manifest.js';
+
+import { archiveDetailPage, readArchiveLibraryCover, DETAIL_MODULES } from './coast-archive-v2-details.js';
 
 const BASE='/api/archive/v2';
 export const isArchiveV2Path=path=>path===BASE||path.startsWith(BASE+'/');
@@ -21,9 +23,18 @@ export async function routeArchiveV2(request,env,session){
   if(!db)return apiError('database_unavailable','海岸数据库不可用。',503);
   const url=new URL(request.url),parts=url.pathname.slice(BASE.length).split('/').filter(Boolean),method=request.method;
   try{
-    if(method==='GET'&&parts.length===0)return json({ok:true,limits:STAGING_LIMITS,record_modules:RECORD_MODULES,manifest_modules:MODULES,restore_supported:false,stage_only:true});
+    if(method==='GET'&&parts.length===0)return json({ok:true,limits:STAGING_LIMITS,record_modules:RECORD_MODULES,manifest_modules:MODULES,detail_modules:DETAIL_MODULES,restore_supported:false,stage_only:true});
     const opts={cursor:url.searchParams.get('cursor')||'',limit:Number(url.searchParams.get('limit')||50)};
     if(method==='POST'&&parts.join('/')==='manifest/validate')return json({ok:true,...await validateArchiveManifest(await readJson(request,2*1024*1024)),restore_supported:false});
+    if(method==='GET'&&parts[0]==='details'&&parts.length===2)return json({ok:true,...await archiveDetailPage(db,parts[1],opts)});
+    if(method==='GET'&&parts[0]==='library-cover'&&(parts.length===2||parts.length===4&&parts[2]==='chunks')){
+      const item=await readArchiveLibraryCover(db,parts[1]);
+      if(parts.length===2)return json({ok:true,metadata:item.metadata,descriptor:item.descriptor});
+      const index=Number(parts[3]);
+      if(!/^(0|[1-9]\d*)$/.test(parts[3])||!item.chunks[index])return apiError('invalid_chunk','封面分块不存在。',404);
+      if(url.searchParams.get('object_sha256')!==item.descriptor.object_sha256)return apiError('source_changed','封面原件已变化。',409);
+      return new Response(item.chunks[index],{headers:securityHeaders({'Content-Type':'application/octet-stream','X-Coast-Chunk-SHA256':item.descriptor.chunks[index]})});
+    }
     if(method==='GET'&&parts[0]==='records'&&parts.length===2)return json({ok:true,...await archiveRecordPage(db,parts[1],opts)});
     if(method==='GET'&&parts[0]==='records'&&parts[1]==='chat'&&parts.length===3)return json({ok:true,...await readArchiveChat(db,parts[2])});
     if(method==='GET'&&parts[0]==='voice'&&(parts.length===2||parts.length===4&&parts[2]==='chunks')){
@@ -48,6 +59,7 @@ export async function routeArchiveV2(request,env,session){
       if(parts.length===1&&method==='GET')return json({ok:true,sessions:await listArchiveSessions(db)});
       if(parts.length===1&&method==='POST')return json({ok:true,session:await createArchiveSession(db)},201);
       if(parts.length===2&&method==='DELETE')return json({ok:true,...await cancelArchiveSession(db,parts[1])});
+      if(parts.length===3&&parts[2]==='preflight'&&method==='POST')return json({ok:true,...await preflightArchiveSession(db,parts[1],await readJson(request,2*1024*1024))});
       if(parts.length===3&&parts[2]==='objects'&&method==='POST')return json({ok:true,...await registerArchiveObject(db,parts[1],await readJson(request,256*1024))});
       if(parts.length===4&&parts[2]==='objects'&&method==='GET')return json({ok:true,...await archiveObjectStatus(db,parts[1],parts[3])});
       if(parts.length===6&&parts[2]==='objects'&&parts[4]==='chunks'&&method==='PUT'&&/^(0|[1-9]\d*)$/.test(parts[5]))return json({ok:true,...await putArchiveChunk(db,parts[1],parts[3],Number(parts[5]),await binaryBody(request))});
