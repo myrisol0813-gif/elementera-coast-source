@@ -56,7 +56,7 @@ internal object LocalTransferRestore {
         require(modules.isNotEmpty() && availableModules(payload, applicationId).containsAll(modules)) {
             "请选择目标已支持且数据包中包含的模块。"
         }
-        val daily = if ("daily" in modules) adaptDaily(payload, toPortable = false) else payload
+        val daily = payload
         val raw = buildJsonObject {
             put("applicationId", applicationId); put("exportedAt", payload.getValue("exportedAt"))
             put("conversations", if ("chat" in modules) payload.getValue("conversations") else JsonArray(emptyList()))
