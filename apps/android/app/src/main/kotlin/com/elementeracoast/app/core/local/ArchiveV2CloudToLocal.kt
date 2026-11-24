@@ -41,8 +41,11 @@ internal object ArchiveV2CloudToLocal {
                     val h=Json.parseToJsonElement(data.string("history_json")).jsonObject
                     require(h["conversation_id"]==null||h["conversation_id"]==JsonNull||h.string("conversation_id")==r.id)
                     val historyTime=Instant.parse(h.string("updated_at")).toEpochMilli()
-                    require(historyTime==data.getValue("history_updated_at").jsonPrimitive.long){"历史时间字段不能无损对应。"}
-                    chats.add(buildJsonObject { put("conversation",JsonObject(fields));put("history",JsonObject(h+("conversation_id" to JsonPrimitive(r.id)))) })
+                    val storageTime=data.getValue("history_updated_at").jsonPrimitive.long
+                    require(storageTime>=0&&"archive_storage_updated_at" !in h){"历史存储时间无效。"}
+                    val historyFields=h+("conversation_id" to JsonPrimitive(r.id))
+                    val preserved=if(storageTime==historyTime)historyFields else historyFields+("archive_storage_updated_at" to JsonPrimitive(storageTime))
+                    chats.add(buildJsonObject { put("conversation",JsonObject(fields));put("history",JsonObject(preserved)) })
                 }
                 "model_profile"->{
                     verifyKeys(data,setOf("id","assistant_avatar_dataurl","current_chat_model","current_image_model","model_box_json","updated_at"))
