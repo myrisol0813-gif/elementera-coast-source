@@ -4,7 +4,6 @@ import { stageVerifiedObject,digestBytes } from './coast-archive-v2-chunks.js';
 import { validateArchiveManifest } from './coast-archive-v2-manifest.js';
 import { readStagedArchiveChunks } from './coast-archive-v2-stage.js';
 import { ensureChatSchema } from './chat-store.js';
-const TARGET='com.elementeracoast.source';
 const check=(ok,msg)=>{if(!ok)throw Object.assign(Error(msg),{status:409});};
 const id=v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(v);
 const integer=v=>Number.isSafeInteger(v)&&v>=0;
@@ -19,10 +18,8 @@ const specs={
  library_covers:['coast_library_covers','book_id,mime,size,updated_at',['book_id']]
 };
 async function identity(kind,values){return kind+':'+await digestBytes(new TextEncoder().encode(JSON.stringify(values)));}
-function author(value,origin){
- const source=origin==='com.elementeracoast.app'?['xiaohan','myri']:['owner','assistant'];
- const target=TARGET==='com.elementeracoast.app'?['xiaohan','myri']:['owner','assistant'];
- const i=source.indexOf(value);check(i>=0,'invalid library author');return target[i];
+function author(value){
+ check(['owner','assistant'].includes(value),'invalid portable library author');return value;
 }
 export async function restoreArchiveBook(db,sessionId,manifest,bookId,confirm=false){
  await validateArchiveManifest(manifest);
@@ -80,11 +77,11 @@ export async function restoreArchiveBook(db,sessionId,manifest,bookId,confirm=fa
        const chat=await db.prepare("SELECT s.state_json FROM conversations c JOIN conversation_states s ON s.conversation_id=c.id WHERE c.id=? AND c.user_id='owner' AND c.deleted_at IS NULL AND c.conversation_kind='chat'").bind(v.conversation_id).first();
        check(chat&&(!v.source_turn_id||JSON.parse(chat.state_json).turns.some(t=>t.id===v.source_turn_id)),'restore linked chat before book');
      }else check(v.source_turn_id===null,'note turn has no conversation');
-     v.author=author(v.author,manifest.application_id);
+     v.author=author(v.author);
    }else if(kind==='library_progress'||kind==='library_reading_logs'){
      check(pos(v)&&integer(v.updated_at),'invalid reading position');
      if(kind==='library_reading_logs')check(typeof v.day==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v.day)&&Number.isFinite(Date.parse(v.day))&&new Date(v.day).toISOString().slice(0,10)===v.day,'invalid reading date');
-     v.author=author(v.author,manifest.application_id);
+     v.author=author(v.author);
    }else if(kind==='library_covers'){
      const d=objects.get(r.media_objects[0]);check(v.size===d.size&&v.size>0&&v.size<=COVER_LIMIT_BYTES&&integer(v.updated_at),'invalid cover size');
      const data=await read(d,COVER_LIMIT_BYTES),sig={'image/png':[137,80,78,71,13,10,26,10],'image/jpeg':[255,216,255]}[v.mime];
