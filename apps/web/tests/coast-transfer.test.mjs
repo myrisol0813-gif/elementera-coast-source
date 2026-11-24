@@ -101,4 +101,10 @@ assert.equal((await previewCloudTransfer(provenanceTarget,provenanceBundle,['cal
 await importCloudTransfer(provenanceTarget,provenanceBundle,['calendar']);
 assert.deepEqual((await decodeTransfer(await exportCloudTransfer(provenanceTarget))).calendar,provenancePayload.calendar);
 assert.equal((await importCloudTransfer(provenanceTarget,provenanceBundle,['calendar'])).calendar.conflicts,0);
+const duplicateTool=structuredClone(provenancePayload);
+duplicateTool.calendar[0].id='different-calendar-id';
+const duplicateToolBundle=await encodeTransfer(duplicateTool);
+assert.equal((await previewCloudTransfer(provenanceTarget,duplicateToolBundle,['calendar'])).can_commit,false);
+await assert.rejects(()=>importCloudTransfer(provenanceTarget,duplicateToolBundle,['calendar']));
+assert.equal((await listCalendarEntries(provenanceTarget,{all:true})).length,1);
 console.log('portable transfer: checksum, branches, calendar, preview, idempotency, authorization, blocked batch: ok');
