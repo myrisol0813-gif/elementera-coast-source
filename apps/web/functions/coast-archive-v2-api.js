@@ -2,6 +2,9 @@ import { apiError, json, readJson, securityHeaders, unexpectedApiError } from '.
 import { listArchiveAttachments, readArchiveAttachment, listArchiveDogtalk } from './coast-archive-v2-media.js';
 import { STAGING_LIMITS, createArchiveSession, listArchiveSessions, cancelArchiveSession, registerArchiveObject, putArchiveChunk, archiveObjectStatus } from './coast-archive-v2-stage.js';
 
+import { archiveRecordPage, readArchiveChat, readArchiveVoice, RECORD_MODULES } from './coast-archive-v2-records.js';
+import { validateArchiveManifest, MODULES } from './coast-archive-v2-manifest.js';
+
 const BASE='/api/archive/v2';
 export const isArchiveV2Path=path=>path===BASE||path.startsWith(BASE+'/');
 async function binaryBody(request){
@@ -18,8 +21,19 @@ export async function routeArchiveV2(request,env,session){
   if(!db)return apiError('database_unavailable','海岸数据库不可用。',503);
   const url=new URL(request.url),parts=url.pathname.slice(BASE.length).split('/').filter(Boolean),method=request.method;
   try{
-    if(method==='GET'&&parts.length===0)return json({ok:true,limits:STAGING_LIMITS,restore_supported:false,stage_only:true});
+    if(method==='GET'&&parts.length===0)return json({ok:true,limits:STAGING_LIMITS,record_modules:RECORD_MODULES,manifest_modules:MODULES,restore_supported:false,stage_only:true});
     const opts={cursor:url.searchParams.get('cursor')||'',limit:Number(url.searchParams.get('limit')||50)};
+    if(method==='POST'&&parts.join('/')==='manifest/validate')return json({ok:true,...await validateArchiveManifest(await readJson(request,2*1024*1024)),restore_supported:false});
+    if(method==='GET'&&parts[0]==='records'&&parts.length===2)return json({ok:true,...await archiveRecordPage(db,parts[1],opts)});
+    if(method==='GET'&&parts[0]==='records'&&parts[1]==='chat'&&parts.length===3)return json({ok:true,...await readArchiveChat(db,parts[2])});
+    if(method==='GET'&&parts[0]==='voice'&&(parts.length===2||parts.length===4&&parts[2]==='chunks')){
+      const item=await readArchiveVoice(db,parts[1]);
+      if(parts.length===2)return json({ok:true,metadata:item.metadata,descriptor:item.descriptor});
+      const index=Number(parts[3]);
+      if(!/^(0|[1-9]\d*)$/.test(parts[3])||!item.chunks[index])return apiError('invalid_chunk','语音分块不存在。',404);
+      if(url.searchParams.get('object_sha256')!==item.descriptor.object_sha256)return apiError('source_changed','语音原件已变化。',409);
+      return new Response(item.chunks[index],{headers:securityHeaders({'Content-Type':'application/octet-stream','X-Coast-Chunk-SHA256':item.descriptor.chunks[index]})});
+    }
     if(method==='GET'&&parts.join('/')==='inventory/attachments')return json({ok:true,...await listArchiveAttachments(db,opts)});
     if(method==='GET'&&parts.join('/')==='inventory/dogtalk')return json({ok:true,...await listArchiveDogtalk(db,{...opts,kind:url.searchParams.get('kind')||'snapshots'})});
     if(method==='GET'&&parts[0]==='attachments'&&(parts.length===3||parts.length===5&&parts[3]==='chunks')){
