@@ -118,7 +118,7 @@ function validatedCalendar(row) {
   require(object(row) && validId(row.id) && validDate(row.day) && validStamp(row.created_at) && validStamp(row.updated_at), '日历 ID、日期或时间无效。');
   require(typeof row.title === 'string' && row.title.trim() && row.title.length <=120 && typeof row.body === 'string' && row.body.length <=4000, '日历文字超限。');
   require(['event','note'].includes(row.kind) && ['none','yearly'].includes(row.recurrence) && ['owner','assistant'].includes(row.author), '日历类型或作者无效。');
-  require(!row.conversation_id && !row.source_turn_id, '关联聊天的日历记录暂需保留原件。');
+  require((row.conversation_id == null || validId(row.conversation_id)) && (row.source_turn_id == null || (validId(row.source_turn_id) && row.conversation_id != null)), '日历来源窗口或轮次无效。');
   for (const key of ['model_label','tool_call_id']) require(row[key] == null || (typeof row[key] === 'string' && row[key].length <= 200), '日历来源字段无效。');
   if (row.anniversary != null) {
     const a = row.anniversary;
@@ -139,6 +139,8 @@ async function prepare(db,envelope,selection) {
   const activeCalendar = new Map((await listCalendarEntries(db,{all:true})).map(c=>[c.id,portableCalendar(c)]));
   const result = { source:payload.workspace, target:'backend', unsupported_modules:payload.includedModules.filter(k=>!SUPPORTED.includes(k)), chat:{ready:0,existing:0,conflicts:0,blocked:[]},calendar:{ready:0,existing:0,conflicts:0,blocked:[]},model_profile:{ready:0,existing:0,conflicts:0,blocked:[]},daily:{ready:0,existing:0,conflicts:0,blocked:[]} };
   const statements = [];
+  const stagedChatStates = new Map();
+  const conflictingChatIds = new Set();
   const seen = new Set();
   for (const row of selection.includes('chat')?payload.conversations:[]) {
     const id=row?.conversation?.id;
@@ -147,7 +149,7 @@ async function prepare(db,envelope,selection) {
       result.chat.existing++;
       const current=activeChats.get(id);
       if (!current || !identical(current,row.conversation) ||
-          !identical(portableHistory(await readConversationState(db,id),id),row.history)) result.chat.conflicts++;
+          !identical(portableHistory(await readConversationState(db,id),id),row.history)) { result.chat.conflicts++; conflictingChatIds.add(id); }
       continue;
     }
     let v;
@@ -155,6 +157,7 @@ async function prepare(db,envelope,selection) {
     const c=v.c;
     statements.push(db.prepare(`INSERT INTO conversations (id,user_id,title,created_at,updated_at,deleted_at,title_manual,title_generated_at,title_model_id,conversation_kind,room_type,source,source_window_id) VALUES (?,'owner',?,?,?,NULL,?,?,?,'chat',?,?,?)`).bind(c.id,c.title,stamp(c.created_at),stamp(c.updated_at),c.title_manual?1:0,c.title_generated_at==null?null:stamp(c.title_generated_at),c.title_model_id??null,c.room_type,c.source||'coast',c.source_window_id??null));
     statements.push(db.prepare('INSERT INTO conversation_states (conversation_id,state_json,updated_at) VALUES (?,?,?)').bind(c.id,JSON.stringify(v.state),stamp(v.state.updated_at)));
+    stagedChatStates.set(c.id,v.state);
     result.chat.ready++;
   }
   seen.clear();
@@ -167,12 +170,19 @@ async function prepare(db,envelope,selection) {
       continue;
     }
     try { validatedCalendar(row); } catch(e) { if (!(e instanceof TransferError)) throw e; result.calendar.blocked.push({id:row.id,reason:e.message}); continue; }
+    if (row.conversation_id != null) {
+      const parent=row.conversation_id;
+      const state=stagedChatStates.get(parent) || (activeChats.has(parent) ? await readConversationState(db,parent) : null);
+      if (conflictingChatIds.has(parent) || !state || (row.source_turn_id != null && !state.turns.some(t=>t.id===row.source_turn_id))) {
+        result.calendar.blocked.push({id:row.id,reason:'日历关联的原窗口或轮次不存在，或窗口内容冲突。'}); continue;
+      }
+    }
     if (row.tool_call_id != null) {
       if (usedCalendarToolIds.has(row.tool_call_id)) { result.calendar.blocked.push({id:row.id,reason:'日历工具调用 ID 已存在；原记录保留。'}); continue; }
       usedCalendarToolIds.add(row.tool_call_id);
     }
     const a=row.anniversary;
-    statements.push(db.prepare(`INSERT INTO coast_calendar_entries_v2 (id,day,kind,title,body,recurrence,author,source,model_label,tool_call_id,created_at,updated_at,anniversary_start_day,anniversary_mode,anniversary_target_days,anniversary_pinned) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(row.id,row.day,row.kind,row.title,row.body,row.recurrence,row.author==='owner'?OWNER_AUTHOR:ASSISTANT_AUTHOR,row.source||'manual',row.model_label??null,row.tool_call_id??null,stamp(row.created_at),stamp(row.updated_at),a?.startDay??null,a?.mode??null,a?.targetDays??null,a?.pinned?1:0));
+    statements.push(db.prepare(`INSERT INTO coast_calendar_entries_v2 (id,day,kind,title,body,recurrence,author,source,model_label,tool_call_id,conversation_id,source_turn_id,created_at,updated_at,anniversary_start_day,anniversary_mode,anniversary_target_days,anniversary_pinned) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(row.id,row.day,row.kind,row.title,row.body,row.recurrence,row.author==='owner'?OWNER_AUTHOR:ASSISTANT_AUTHOR,row.source||'manual',row.model_label??null,row.tool_call_id??null,row.conversation_id??null,row.source_turn_id??null,stamp(row.created_at),stamp(row.updated_at),a?.startDay??null,a?.mode??null,a?.targetDays??null,a?.pinned?1:0));
     result.calendar.ready++;
   }
   if (selection.includes('model_profile') && payload.profile !== null) {
