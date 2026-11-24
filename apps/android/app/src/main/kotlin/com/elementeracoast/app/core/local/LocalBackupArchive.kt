@@ -105,6 +105,7 @@ internal object LocalBackupArchive {
         data.conversations.forEach { row ->
             require(row.conversation.roomType in setOf("main", "radio", "lighthouse"))
             val h = row.history
+            require(h.archiveStorageUpdatedAt==null||h.archiveStorageUpdatedAt>=0) { "历史存储时间无效。" }
             require(h.version == 4 && h.conversationId == row.conversation.id) { "聊天历史版本或所属窗口不一致。" }
             unique(h.turns.map { it.id })
             h.turns.forEach { t ->
