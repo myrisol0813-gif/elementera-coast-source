@@ -47,7 +47,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
         }catch(e:Throwable){dir.deleteRecursively();throw e}
     }
     fun localModules(m:ArchiveV2Manifest):Set<String> =
-        if(local) m.modules.filter { it.coverage!="unavailable" && it.module in (if(m.workspace=="local")ArchiveV2Local.localModules else ArchiveV2Local.cloudModules) && (it.module!="daily"||m.workspace=="local"||m.applicationId==BuildConfig.APPLICATION_ID) && (it.module !in setOf("custom_instructions","memory_entries","memory_pockets","user_portrait","self_portrait","thinking_soil","thinking_soil_history","tools")||m.applicationId==BuildConfig.APPLICATION_ID) }.map { it.module }.toSet() else emptySet()
+        if(local) m.modules.filter { it.coverage!="unavailable" && it.module in (if(m.workspace=="local")ArchiveV2Local.localModules else ArchiveV2Local.cloudModules) && (it.module!="daily"||m.workspace=="local"||m.applicationId==BuildConfig.APPLICATION_ID) && (it.module !in setOf("custom_instructions","memory_entries","memory_pockets","user_portrait","self_portrait","thinking_soil","thinking_soil_history","tools","vault","dogtalk_records","dogtalk_snapshots")||m.applicationId==BuildConfig.APPLICATION_ID) }.map { it.module }.toSet() else emptySet()
     suspend fun localRestore(input:Imported,modules:Set<String>,confirm:Boolean):JsonObject=withContext(Dispatchers.IO){
         require(local&&NativeWorkspace.isLocal)
         val report=ArchiveV2Local.restore(input.manifest,input.stage,modules,BuildConfig.APPLICATION_ID,NativeWorkspace.persistence(context),confirm,context.filesDir)
