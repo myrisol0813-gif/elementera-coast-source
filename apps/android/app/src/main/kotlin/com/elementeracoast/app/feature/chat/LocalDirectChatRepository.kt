@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.collect
 internal class LocalDirectChatRepository(
     private val history: ChatRepository,
     private val providers: LocalProviderStore,
+    private val knowledge: LocalKnowledgeStore,
     private val client: LocalProviderClient = LocalProviderClient()
 ) : ChatRepository by history {
     override fun streamReply(
@@ -26,21 +27,22 @@ internal class LocalDirectChatRepository(
         if (ChatSyncMapper.activeAttachmentIds(historyWithUser, turnId).isNotEmpty())
             throw CoastApiException(CoastApiErrorKind.Request, "local_attachment_pending", "本机附件推理尚未接入。")
         val messages = ChatSyncMapper.contextMessages(historyWithUser, turnId, recentTurns)
-        if (messages.sumOf { it.content.length.toLong() } > contextBudget.coerceAtLeast(1800).toLong() * 3)
-            throw CoastApiException(CoastApiErrorKind.Request, "local_context_budget", "近期文字超过本机预览的保守上下文预算，请减少近期轮数或提高预算。")
+        val prepared=try{knowledge.context(messages,contextBudget,"main_chat")}catch(e:IllegalArgumentException){
+            throw CoastApiException(CoastApiErrorKind.Request,"local_context_budget",e.message.orEmpty())
+        }
         var content = ""
         var completed = false
-        client.stream(provider, model, messages, maxOutputTokens).collect { event ->
+        client.stream(provider, model, prepared.messages, maxOutputTokens).collect { event ->
             when (event) {
                 is LocalProviderEvent.Delta -> { content += event.text; emit(ChatProgress.Delta(event.text)) }
                 is LocalProviderEvent.Done -> {
                     if (content.isBlank()) throw CoastApiException(CoastApiErrorKind.Model, "local_empty_reply", "供应商没有返回可显示的文字。")
                     val next = ChatSyncMapper.appendAssistant(
                         history = ChatSyncMapper.clearUserFailure(historyWithUser, turnId), turnId = turnId,
-                        content = content, modelId = modelId, finishReason = event.reason)
+                        content = content, modelId = modelId, finishReason = event.reason,deskSlip=prepared.receipt)
                     val saved = history.persistHistory(conversationId, next)
                     completed = true
-                    emit(ChatProgress.Completed(saved, modelId, event.reason))
+                    emit(ChatProgress.Completed(saved, modelId, event.reason,TurnDeskMapper.toUi(prepared.receipt)))
                 }
             }
         }

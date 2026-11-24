@@ -24,6 +24,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
 ) : Interceptor {
     private val cache = RemoteCacheStore(store)
     private val calendar = LocalCalendarStore(store)
+    private val knowledge = LocalKnowledgeStore(store)
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
     private val media = "application/json; charset=utf-8".toMediaType()
 
@@ -35,6 +36,8 @@ class LocalCoastTransport(private val store: LocalPersistence,
             else route(request)
         } catch (error: LocalCalendarError) {
             failure(request, error.status, error.type, error.message.orEmpty())
+        } catch (error: IllegalArgumentException) {
+            failure(request, 400, "local_validation", error.message?.take(240) ?: "本机资料未通过校验。")
         } catch (_: Exception) {
             failure(request, 500, "local_storage_error", "本机读写失败，原始资料未自动转发到服务器。")
         }
@@ -125,12 +128,12 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if (!conversationExists(request.conversationId)) return missing(r)
             if (request.attachmentIds.isNotEmpty()) return unsupported(r)
             val budget = request.settings["contextBudget"]?.toLongOrNull()?.coerceAtLeast(1800) ?: 18000
-            if (request.messages.sumOf { it.content.length.toLong() } > budget * 3)
-                return failure(r, 400, "local_context_budget", "近期文字超过本机预览的保守上下文预算。")
+            val room=cache.conversations().first { it.id==request.conversationId }.roomType
+            val prepared=knowledge.context(request.messages,budget.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),if(room=="main")"main_chat" else room)
             return response(r, 200, element(RemoteNativeChatContext.serializer(), RemoteNativeChatContext(
                 ok = true,
-                modelMessages = array(RemoteChatMessage.serializer(), request.messages),
-                deskSlip = RemoteDeskSlip(summary = "本机近期文字上下文；记忆、附件及工具尚未接入")
+                modelMessages = array(RemoteChatMessage.serializer(), prepared.messages),
+                deskSlip = prepared.receipt
             )).jsonObject)
         }
         if (path == "/api/chat/native-echo" && method == "POST") {
@@ -141,6 +144,27 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val snapshot = b["snapshot"] ?: return unsupported(r)
             store.put("local.echo." + cid + "." + mid, snapshot.toString())
             return ok(r)
+        }
+        if(path=="/api/memory/custom-instructions"){
+            val value=when(method){
+                "GET"->knowledge.instructions()
+                "PUT"->knowledge.saveInstructions(json.decodeFromJsonElement(RemoteCustomInstructionsPutRequest.serializer(),body(r)))
+                else->return unsupported(r)
+            }
+            return ok(r,"instructions" to (value?.let{element(RemoteCustomInstructions.serializer(),it)}?:JsonNull))
+        }
+        if(path=="/api/worldbook"){
+            if(method=="GET")return ok(r,"entries" to array(RemoteWorldbookEntry.serializer(),knowledge.entries()))
+            if(method=="POST")return ok(r,"entry" to element(RemoteWorldbookEntry.serializer(),knowledge.saveWorldbook(null,json.decodeFromJsonElement(RemoteWorldbookEntryWriteRequest.serializer(),body(r)))))
+        }
+        if(path=="/api/worldbook/test-match"&&method=="POST"){
+            val req=json.decodeFromJsonElement(RemoteWorldbookMatchRequest.serializer(),body(r))
+            return ok(r,"matches" to array(RemoteWorldbookEntry.serializer(),knowledge.match(req.input,emptyList(),req.surface,req.limit,req.allowedScopes).map{it.entry}))
+        }
+        if(path.startsWith("/api/worldbook/")&&r.url.pathSegments.size==3){
+            val id=r.url.pathSegments.last()
+            if(method=="PATCH")return ok(r,"entry" to element(RemoteWorldbookEntry.serializer(),knowledge.saveWorldbook(id,json.decodeFromJsonElement(RemoteWorldbookEntryWriteRequest.serializer(),body(r)))))
+            if(method=="DELETE"){knowledge.disableWorldbook(id);return ok(r)}
         }
         if (path == "/api/daily/profile") {
             val old = cache.dailyProfile() ?: RemoteDailyProfile()

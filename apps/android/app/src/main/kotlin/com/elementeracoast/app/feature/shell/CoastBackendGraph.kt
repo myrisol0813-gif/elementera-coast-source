@@ -8,6 +8,7 @@ import com.elementeracoast.app.core.auth.MemoryAuthStore
 import com.elementeracoast.app.core.auth.DefaultAuthRepository
 import com.elementeracoast.app.core.local.LocalPersistence
 import com.elementeracoast.app.core.local.LocalProviderStore
+import com.elementeracoast.app.core.local.LocalKnowledgeStore
 import com.elementeracoast.app.feature.chat.LocalDirectChatRepository
 import com.elementeracoast.app.core.network.CoastApiClient
 import com.elementeracoast.app.core.network.CoastApiConfig
@@ -68,7 +69,7 @@ data class CoastBackendGraph(
                 auth = DefaultAuthRepository(authStore, api),
                 conversations = DefaultConversationRepository(api, cache, titleRemote),
                 profile = DefaultProfileRepository(api, cache),
-                chat = if (config.localTransport != null) LocalDirectChatRepository(chatRepository, LocalProviderStore(context)) else chatRepository,
+                chat = if (config.localTransport != null) LocalDirectChatRepository(chatRepository, LocalProviderStore(context), LocalKnowledgeStore(persistence)) else chatRepository,
                 reality = AndroidRealityContextSource(context.applicationContext, persistence),
                 thoughtSoil = DefaultThoughtSoilRepository(api, chatGptPlan),
                 daily = DefaultDailyRepository(api, cache),

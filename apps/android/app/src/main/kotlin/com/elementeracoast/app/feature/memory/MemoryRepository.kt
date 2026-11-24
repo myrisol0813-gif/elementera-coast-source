@@ -64,6 +64,11 @@ class DefaultMemoryRepository(
     override suspend fun refresh(conversationId: String) = coroutineScope {
         val cleanConversationId = conversationId.trim()
         primePocketSnapshot(cleanConversationId)
+        if(com.elementeracoast.app.core.local.NativeWorkspace.isLocal){
+            refreshWorldbook()
+            refreshInstructions()
+            return@coroutineScope
+        }
 
         val memories = async { remote.listEntries("memory") }
         val seeds = async { remote.listEntries("seed") }
