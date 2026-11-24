@@ -18,7 +18,7 @@ import kotlinx.coroutines.withContext
 import java.util.UUID
 
 @Composable
-internal fun LocalProviderPanel(current: String, onRefresh: () -> Unit, onSelect: (String) -> Unit) {
+internal fun LocalProviderPanel(current: String, onRefresh: () -> Unit) {
     val context = LocalContext.current.applicationContext
     val store = remember(context) { LocalProviderStore(context) }
     val client = remember { LocalProviderClient() }
@@ -33,15 +33,15 @@ internal fun LocalProviderPanel(current: String, onRefresh: () -> Unit, onSelect
     var key by remember { mutableStateOf("") }
     var manual by remember { mutableStateOf("") }
     var remove by remember { mutableStateOf<LocalProviderConfig?>(null) }
-    var expanded by remember { mutableStateOf<String?>(null) }
 
-    fun run(block: suspend () -> String) {
+    fun run(action: String, block: suspend () -> String) {
         if (busy) return
         busy = true
+        message = "$action · 正在处理…"
         scope.launch {
-            try { message = block() }
+            try { message = "$action · " + block() }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { message = if (e is com.elementeracoast.app.core.network.CoastApiException) e.message else "操作失败，请检查输入或本机凭据存储。" }
+            catch (e: Exception) { message = "$action 失败 · " + if (e is com.elementeracoast.app.core.network.CoastApiException) ((if (e.status > 0) "HTTP ${e.status} · " else "") + e.message) else "请检查输入或本机凭据存储。" }
             finally { busy = false }
         }
     }
@@ -71,33 +71,26 @@ internal fun LocalProviderPanel(current: String, onRefresh: () -> Unit, onSelect
                     Text("Key 已加密保存 · " + p.models.size + " 个模型", style = MaterialTheme.typography.bodySmall)
                     Row {
                         TextButton(enabled = !busy, onClick = { edit(p) }) { Text("编辑") }
-                        TextButton(enabled = !busy, onClick = { run {
+                        TextButton(enabled = !busy, onClick = { run("获取模型") {
                             val found = client.models(p)
                             if (found.isEmpty()) "连接成功，但供应商没有返回模型。"
                             else { withContext(Dispatchers.IO) { store.upsert(p.copy(models = (p.models + found).distinct())) }; reload(); "目录已读取：" + found.size + " 个模型。" }
                         } }) { Text("获取模型") }
-                        TextButton(enabled = !busy, onClick = { run { client.balance(p) } }) { Text("额度") }
+                        TextButton(enabled = !busy, onClick = { run("查询额度") { client.balance(p) } }) { Text("额度") }
                     }
                     Row {
-                        TextButton(enabled = !busy && p.models.isNotEmpty(), onClick = { run {
-                            val selected = p.models.firstOrNull { p.modelId(it) == current } ?: p.models.first()
+                        TextButton(enabled = !busy && p.models.any { p.modelId(it) == current }, onClick = { run("测试回复") {
+                            val selected = p.models.first { p.modelId(it) == current }
                             var reply = ""
                             client.stream(p, selected, listOf(RemoteChatMessage("user", "Reply with OK.")), 128).collect { e ->
                                 if (e is LocalProviderEvent.Delta) reply += e.text
                             }
                             if (reply.isBlank()) "连接成功但没有文字回复。" else "真实回复测试成功（可能消耗额度；未写入聊天）。"
                         } }) { Text("测试回复") }
-                        TextButton(enabled = !busy, onClick = { expanded = if (expanded == p.id) null else p.id }) { Text("模型列表") }
                         TextButton(enabled = !busy, onClick = { remove = p }) { Text("移除") }
                     }
-                    if (expanded == p.id) {
-                        p.models.take(100).forEach { model ->
-                            TextButton(enabled = !busy, onClick = { onSelect(p.modelId(model)) }) {
-                                Text((if (current == p.modelId(model)) "当前 · " else "") + model)
-                            }
-                        }
-                        if (p.models.size > 100) Text("其余模型可从聊天顶部搜索选择。", style = MaterialTheme.typography.bodySmall)
-                    }
+                    Text("先在模型目录设为当前，才能测试此供应商的回复。测试可能消耗额度。",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -126,14 +119,14 @@ internal fun LocalProviderPanel(current: String, onRefresh: () -> Unit, onSelect
             if (normalized == null || effective.isBlank() || name.isBlank()) { message = "请填写有效 HTTPS URL、名称及 Key。"; return@TextButton }
             val value = LocalProviderConfig(editId, name.trim(), normalized, effective, manual.lines())
             editing = false; key = ""
-            run { withContext(Dispatchers.IO) { store.upsert(value) }; reload(); "供应商已加密保存。" }
+            run("保存供应商") { withContext(Dispatchers.IO) { store.upsert(value) }; reload(); "供应商已加密保存。" }
         }) { Text("保存") } },
         dismissButton = { TextButton(onClick = { editing = false; key = "" }) { Text("取消") } }
     )
     remove?.let { p -> AlertDialog(
         onDismissRequest = { remove = null }, title = { Text("移除供应商？") },
         text = { Text("仅移除该本机供应商配置，不删除历史聊天。") },
-        confirmButton = { TextButton(onClick = { remove = null; run { withContext(Dispatchers.IO) { store.remove(p.id) }; reload(); "已移除。" } }) { Text("移除") } },
+        confirmButton = { TextButton(onClick = { remove = null; run("移除供应商") { withContext(Dispatchers.IO) { store.remove(p.id) }; reload(); "已移除。" } }) { Text("移除") } },
         dismissButton = { TextButton(onClick = { remove = null }) { Text("取消") } }
     ) }
 }

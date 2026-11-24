@@ -38,7 +38,8 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
     private fun failure(code: Int): CoastApiException = CoastApiException(
         CoastApiErrorKind.Model, "local_provider_http",
         when (code) {
-            401, 403 -> "模型供应商拒绝授权，请检查本机 Key 或账户权限。"
+            401 -> "供应商未接受 API Key，请检查是否复制完整、是否已失效。"
+            403 -> "供应商禁止此请求，请检查模型访问权限、账户或策略限制。"
             402 -> "模型供应商报告余额不足。"
             429 -> "模型供应商限流或额度不足。"
             in 300..399 -> "供应商要求重定向；为保护 Key，已阻止跳转。请检查 Base URL。"
