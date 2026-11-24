@@ -25,7 +25,7 @@ There are two different ways to try this repository. They are intentionally not 
 
 ### 1. Inspect the current public Android build
 
-Download the current **Source Native Visitor QA** APK and its SHA-256 from **[Latest APK release](../../releases/latest)**, then enter:
+Download the current **Source Native** APK and its SHA-256 from **[Latest APK release](../../releases/latest)**, then enter:
 
 ```text
 123456
@@ -33,7 +33,7 @@ Download the current **Source Native Visitor QA** APK and its SHA-256 from **[La
 
 This opens the real Native page structure and local appearance for inspection. Visitor mode is deliberately **offline-only**: account login, ChatGPT authorization, model calls, and other cloud actions are blocked before network transmission.
 
-**Only use Latest for a new install.** Old QA APKs mentioned in release notes are historical builds and may have expired backends or missing fixes.
+**Use Latest for new installs and stable-signed updates.** See [stable signing and migration](docs/release-notes/source-stable-signing.md) before updating from disposable QA. Old QA APKs mentioned in release notes are historical builds and may have expired backends or missing fixes.
 
 If your phone says **“no signature file”** or **“cannot verify signature”**, do not rename or unpack the APK and do not install it from a ZIP preview. Download the actual `.apk` file using the system browser and compare its SHA-256 with the `SHA256SUMS.txt` linked in the release. A mismatching digest means the download is damaged; a matching digest with an installer error needs device-specific debugging. A disposable QA signature is not an additional file to install.
 
@@ -641,14 +641,16 @@ The Native source can connect a user's ChatGPT account on-device. OAuth credenti
 
 ### Source QA and APK signing
 
-The public visitor publisher and temporary Live ChatGPT QA path build an **unsigned Release APK**, then call `scripts/sign-disposable-qa.sh <unsigned-apk> <signed-apk>`. The signer ZIP-aligns the original unsigned release, signs it once with disposable Source-only V1/V2/V3 signing material, and verifies the final distributable APK.
+Official GitHub releases from 0.2.26 use [stable Source-only signing](docs/release-notes/source-stable-signing.md); QA builds remain disposable-signed.
+
+The temporary Live ChatGPT QA path and CI checks build an **unsigned Release APK**, then call `scripts/sign-disposable-qa.sh <unsigned-apk> <signed-apk>`. The QA signer ZIP-aligns the original unsigned release, signs it once with disposable Source-only V1/V2/V3 signing material, and verifies the final distributable APK.
 
 `Source check` now exercises this disposable Release signing path in CI. The Live ChatGPT and V1/V2 diagnostic scripts no longer re-sign `app-debug.apk`, and their version checks are read from the current Gradle identity instead of historical hard-coded values.
 
 | Surface | Available in the current open-source implementation | Configuration / limits |
 | --- | --- | --- |
 | Web / PWA | Conversation UI, streaming/SSE paths, per-window context settings, visible context/tool records, owner/visitor separation, memory/world-book workspaces, attachments | Reality is intentionally limited to date, local time, and next-seven-days calendar context; weather/device reads are not part of the PWA send path |
-| Android Native | Jetpack Compose chat/Daily/calendar/library/memory surfaces, local ChatGPT connection, Reality device fields, themes including Cream Paper | `0.2.21-source`, `versionCode=23`; visitor builds are Source-only and disposable-signed |
+| Android Native | Jetpack Compose chat/Daily/calendar/library/memory surfaces, local ChatGPT connection, Reality device fields, themes including Cream Paper | `0.2.26-source`, `versionCode=28`; official APKs use stable Source-only signing; QA builds remain disposable-signed |
 | Owner calendar | Entries, notes, edits/deletion and recurrence | Requires self-hosted backend/storage; calendar can feed the next seven days into Reality Context when selected |
 | Tidal Library | TXT/EPUB imports, shelf/cover, chapter/page navigation, progress, highlights, annotations, reader options | PWA and Native use the same backend contracts when pointed at the same host |
 | Voice clips | Message-linked speech clip controls, playback and authorized generation endpoints | Actual generation needs self-hosted `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` |

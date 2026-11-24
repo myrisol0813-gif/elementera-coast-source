@@ -48,15 +48,19 @@ jobs:
           grep -Fq 'versionCode = 28' app/build.gradle.kts
           grep -Fq 'versionName = "0.2.26-source' app/build.gradle.kts
           ! grep -Eiq 'app[.]elementeracoast[.]com' app/build.gradle.kts
-      - name: Verify Source visitor release version plumbing
+      - name: Verify stable Source release version plumbing
         shell: bash
         run: |
           set -euo pipefail
           workflow="../../.github/workflows/source-native-prerelease.yml"
           grep -Fq 'steps.version_gate.outputs.base_version' "$workflow"
           grep -Fq 'steps.version_gate.outputs.version_code' "$workflow"
-          ! grep -Eq 'source-visitor-v0\.[0-9]' "$workflow"
-          ! grep -Eq 'elementera-coast-source-v0\.[0-9].*-visitor-qa[.]apk' "$workflow"
+          ! grep -Eq 'source-native-v0\.[0-9]' "$workflow"
+          ! grep -Eq 'elementera-coast-source-v0\.[0-9].*-release[.]apk' "$workflow"
+          grep -Fq 'bash scripts/sign-source-release.sh "$unsigned_apk" "$apk"' "$workflow"
+          ! grep -Fq 'bash scripts/sign-disposable-qa.sh' "$workflow"
+          bash -n scripts/sign-source-release.sh
+          grep -Fq '3e021e11f05b619d603543929e07edd32a037323478a9abfdfe5b405ce6fca59' scripts/sign-source-release.sh
       - name: Verify disposable QA signing callers
         shell: bash
         run: |
