@@ -42,6 +42,17 @@ class LocalSideArchiveRoundtripTest {
             side.writeNote(bookId,buildJsonObject{put("kind","annotation");put("chapter_index",0);put("paragraph_index",1);put("body","原来的批注")})
             val png=Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X4ZkAAAAASUVORK5CYII=")
             side.saveCover(bookId,png,"image/png")
+            val image=LocalAttachmentStore(from).upload(cid,"photo.png","image/png",png)
+            val visual=LocalAttachmentStore(from).attachmentContext(cid,listOf(image.id),listOf(RemoteChatMessage("user","look")))
+            assertEquals(1,visual.receipt.vision.imagesDelivered)
+            val payload=localMultimodalMessages(visual.messages,visual.imageParts)
+            val parts=payload.single().jsonObject.getValue("content").jsonArray
+            assertEquals("text",parts[0].jsonObject.getValue("type").jsonPrimitive.content)
+            assertEquals("data:image/png;base64,"+Base64.getEncoder().encodeToString(png),parts[1].jsonObject.getValue("image_url").jsonObject.getValue("url").jsonPrimitive.content)
+            assertFalse(Json.encodeToString(RemoteDeskAttachments.serializer(),visual.receipt).contains("base64"))
+            val wrong=LocalAttachmentStore(from).upload(cid,"fake.png","image/png",byteArrayOf(1,2,3))
+            assertTrue(runCatching{LocalAttachmentStore(from).attachmentContext(cid,listOf(wrong.id),listOf(RemoteChatMessage("user","look")))}.isFailure)
+            LocalAttachmentStore(from).remove(cid,wrong.id)
             val originalRoot=File(dir,"original").apply{mkdir()}
             val bg=File(File(originalRoot,"chat-background-local").apply{mkdir()},"background.png").apply{writeBytes(png)}
             from.put("wolf.chatBackgroundPath",bg.absolutePath);from.put("wolf.chatBackgroundName","背景");from.put("wolf.messageSurfaceAlpha","0.94")
