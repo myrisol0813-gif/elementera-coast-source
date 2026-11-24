@@ -26,7 +26,8 @@ internal object ArchiveV2Local {
                     val raw=buildJsonObject { put("kind",kind);put("data",data) }.toString().encodeToByteArray()
                     val d=describe(raw)
                     ByteArrayInputStream(raw).use { writer.objectEntry(d,it) }
-                    objects[d.objectSha256]=d;records.add(ArchiveV2Record(module,id,d.objectSha256,emptyList(),emptyList()))
+                    val dependencies=if(module=="calendar")data.jsonObject["conversation_id"]?.jsonPrimitive?.contentOrNull?.let { listOf("chat/"+it) }?:emptyList() else emptyList()
+                    objects[d.objectSha256]=d;records.add(ArchiveV2Record(module,id,d.objectSha256,emptyList(),dependencies))
                 }
                 fun list(module:String,field:String,kind:String,id:(JsonObject)->String) {
                     for(row in payload.getValue(field).jsonArray.map { it.jsonObject })add(module,id(row),kind,row)
@@ -55,7 +56,7 @@ internal object ArchiveV2Local {
         var profile:JsonElement=JsonNull;var daily:JsonElement=JsonNull
         fun id(v:JsonElement)=v.jsonObject.getValue("id").jsonPrimitive.content
         for(r in chosen){
-            require(r.mediaObjects.isEmpty()&&r.dependencies.isEmpty())
+            require(r.mediaObjects.isEmpty()&&(r.module=="calendar"||r.dependencies.isEmpty()))
             val d=byHash.getValue(r.recordObject)
             val raw=stage.verify(d,CoastTransferCodec.MAX_BYTES.toLong()).readBytes().decodeToString(throwOnInvalidSequence=true)
             val value=json.parseToJsonElement(raw).jsonObject
@@ -63,7 +64,12 @@ internal object ArchiveV2Local {
             val data=value.getValue("data");require(data is JsonObject)
             when(value.getValue("kind").jsonPrimitive.content){
                 "local_chat"->{require(r.module=="chat"&&id(data.getValue("conversation"))==r.id);chat.add(data)}
-                "local_calendar"->{require(r.module=="calendar"&&id(data)==r.id);calendar.add(data)}
+                "local_calendar"->{
+                    require(r.module=="calendar"&&id(data)==r.id)
+                    val parent=data["conversation_id"]?.jsonPrimitive?.contentOrNull
+                    require(r.dependencies==if(parent==null)emptyList() else listOf("chat/"+parent))
+                    calendar.add(data)
+                }
                 "local_moment"->{require(r.module=="daily"&&"moment:"+id(data)==r.id);moments.add(data)}
                 "local_diary"->{require(r.module=="daily"&&"diary:"+id(data)==r.id);diaries.add(data)}
                 "local_daily_profile"->{require(r.module=="daily"&&r.id=="profile"&&daily==JsonNull);daily=data}
