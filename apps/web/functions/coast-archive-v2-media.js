@@ -66,3 +66,46 @@ export async function prepareArchiveAttachment(db,metadata,descriptor,source,{co
   },{maxBytes:MAX_ATTACHMENT_BYTES});
   return statements;
 }
+
+// Restore historical private drafts and snapshots as a dependency-closed group.
+// No live writes: the caller publishes these statements with verified chat records.
+export async function prepareArchiveDogtalk(db,{records,snapshots},{conversationIds,sourceIds}={}){
+  check(Array.isArray(records)&&Array.isArray(snapshots)&&records.length+snapshots.length<=90,'invalid snapshot restore batch');
+  check(conversationIds instanceof Set&&sourceIds instanceof Set,'snapshot restore requires verified references');
+  await ensureDogtalkSchema(db);
+  const parents=new Map(),ids=new Set(),sources=new Set(),statements=[];
+  const strings=['body','true_core','self_note','model_partner_hint','not_to_misunderstand','weather'];
+  const common=['id','owner','visibility','room_scope','scope_key','conversation_id',...strings,'read_mode','readable_by_model_partner','auto_recall','memory_weight','not_instruction','not_preference','not_memory_seed','not_pocket','created_at'];
+  const stamp=v=>Number.isSafeInteger(v)&&v>=0;
+  function validate(row,extra){
+    check(row&&validId(row.id)&&row.owner==='owner'&&row.visibility==='private_to_owner_and_model_partner'&&Object.keys(row).every(k=>common.includes(k)||extra.includes(k)),'invalid snapshot metadata');
+    check(['conversation','radio','lighthouse'].includes(row.room_scope)&&
+      (row.room_scope==='conversation'?validId(row.conversation_id)&&conversationIds.has(row.conversation_id)&&row.scope_key==='conversation:'+row.conversation_id:row.conversation_id==null&&row.scope_key===row.room_scope+':main'),'snapshot scope is not in verified restore plan');
+    check(strings.every(k=>typeof row[k]==='string')&&new TextEncoder().encode(JSON.stringify(row)).length<=1500000,'invalid or oversized snapshot text');
+    check(['keep_private','when_confused','read_now'].includes(row.read_mode)&&row.readable_by_model_partner===1&&row.auto_recall===0&&row.memory_weight==='low'&&['not_instruction','not_preference','not_memory_seed','not_pocket'].every(k=>row[k]===1)&&stamp(row.created_at),'invalid snapshot privacy or time');
+  }
+  const sharedColumns=['id','owner','room_scope','scope_key','conversation_id','body','true_core','self_note','model_partner_hint','not_to_misunderstand','weather','read_mode','readable_by_model_partner','auto_recall','memory_weight','not_instruction','not_preference','not_memory_seed','not_pocket','visibility','created_at'];
+  const sharedValues=r=>[r.id,SNAPSHOT_OWNER,r.room_scope,r.scope_key,r.conversation_id??null,r.body,r.true_core,r.self_note,r.model_partner_hint,r.not_to_misunderstand,r.weather,r.read_mode,r.readable_by_model_partner,r.auto_recall,r.memory_weight,r.not_instruction,r.not_preference,r.not_memory_seed,r.not_pocket,'private_to_owner_and_model_partner',r.created_at];
+  const insert=(table,columns,values)=>db.prepare('INSERT INTO '+table+' ('+columns.join(',')+') VALUES ('+columns.map(()=>'?').join(',')+')').bind(...values);
+  for(const r of records){
+    validate(r,['type','status','source','updated_at','archived_at','last_read_at']);
+    check(!parents.has(r.id)&&['xiaohan_mystic_dogtalk','owner_mystic_dogtalk'].includes(r.type)&&['draft','saved','archived'].includes(r.status)&&typeof r.source==='string'&&r.source.length<=160&&stamp(r.updated_at)&&[r.archived_at,r.last_read_at].every(v=>v==null||stamp(v)),'invalid parent record');
+    check(!await db.prepare('SELECT id FROM coast_mystic_dogtalk WHERE id=?').bind(r.id).first(),'parent already exists; never overwrite');
+    // A second active draft in the same scope would alter which draft is visible.
+    if(r.status!=='archived'){
+      check(![...parents.values()].some(p=>p.scope_key===r.scope_key&&p.status!=='archived'),'multiple active drafts in restore group');
+      check(!await db.prepare("SELECT id FROM coast_mystic_dogtalk WHERE owner=? AND scope_key=? AND status IN ('draft','saved')").bind(SNAPSHOT_OWNER,r.scope_key).first(),'active target draft already exists; never overwrite');
+    }
+    parents.set(r.id,r);
+    statements.push(insert('coast_mystic_dogtalk',[...sharedColumns,'type','status','source','updated_at','archived_at','last_read_at'],[...sharedValues(r),'owner_mystic_dogtalk',r.status,r.source,r.updated_at,r.archived_at??null,r.last_read_at??null]));
+  }
+  for(const s of snapshots){
+    validate(s,['dogtalk_id','source_type','source_id']);
+    const parent=parents.get(s.dogtalk_id),source=s.source_type+':'+s.source_id;
+    check(!ids.has(s.id)&&parent&&parent.scope_key===s.scope_key&&['turn','radio_message','lighthouse_letter'].includes(s.source_type)&&validId(s.source_id)&&sourceIds.has(source)&&!sources.has(source),'snapshot dependency missing or duplicated');
+    check(!await db.prepare('SELECT id FROM coast_mystic_dogtalk_snapshots WHERE id=? OR (source_type=? AND source_id=?)').bind(s.id,s.source_type,s.source_id).first(),'snapshot already exists; never overwrite');
+    ids.add(s.id);sources.add(source);
+    statements.push(insert('coast_mystic_dogtalk_snapshots',[...sharedColumns,'dogtalk_id','source_type','source_id'],[...sharedValues(s),s.dogtalk_id,s.source_type,s.source_id]));
+  }
+  return statements;
+}
