@@ -1,6 +1,11 @@
 package com.elementeracoast.app.feature.wolf
 
 import android.net.Uri
+import java.io.File
+import java.util.UUID
+import com.elementeracoast.app.BuildConfig
+import com.elementeracoast.app.core.local.ArchiveV2Local
+import com.elementeracoast.app.core.local.NativeWorkspace
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -66,6 +71,9 @@ internal fun ChatRecordsScreen(
     var busy by remember { mutableStateOf(false) }
     var pendingArchive by remember { mutableStateOf<JsonElement?>(null) }
     var transferOpen by remember { mutableStateOf(false) }
+    var v2Open by remember { mutableStateOf(false) }
+    var pendingV2 by remember { mutableStateOf<File?>(null) }
+    var v2Progress by remember { mutableStateOf("") }
 
     fun write(uri: Uri?, text: String) {
         if (uri == null) {
@@ -111,6 +119,42 @@ internal fun ChatRecordsScreen(
         }
     }
 
+
+    val v2Export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        val file=pendingV2
+        pendingV2=null
+        if(uri==null||file==null){file?.parentFile?.deleteRecursively();busy=false;return@rememberLauncherForActivityResult}
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO){
+                    context.contentResolver.openOutputStream(uri,"wt")?.use { out->file.inputStream().use { it.copyTo(out) } }
+                        ?:error("无法打开目标文件")
+                }
+                onSnackbar("V2 归档已写入；覆盖范围详见 manifest.json，尚非全量可恢复包。")
+            }catch(e:Exception){onSnackbar("V2 导出失败："+(e.message?:"写入未完成"))}
+            finally {file.parentFile?.deleteRecursively();busy=false;v2Progress=""}
+        }
+    }
+    fun launchV2(){
+        if(busy)return
+        busy=true;v2Progress="正在采集资料"
+        scope.launch {
+            val dir=File(context.cacheDir,"archive-v2-"+UUID.randomUUID())
+            val file=File(dir,"archive.zip")
+            try {
+                withContext(Dispatchers.IO){
+                    check(dir.mkdir())
+                    if(localMode){
+                        check(NativeWorkspace.isLocal){"工作空间已切换"}
+                        ArchiveV2Local.export(NativeWorkspace.persistence(context),BuildConfig.APPLICATION_ID,file)
+                    }else archive.exportCloudV2(file){_,_->}
+                }
+                pendingV2=file;v2Progress="归档已生成，选择保存位置"
+                v2Export.launch("elementera-coast-v2-$stamp.zip")
+            }catch(e:Exception){dir.deleteRecursively();pendingV2=null;busy=false;v2Progress="";onSnackbar("V2 导出失败："+(e.message?:"未完成"))}
+        }
+    }
+
     fun launchGlobal(format: String) {
         if (busy) return
         busy = true
@@ -143,7 +187,13 @@ internal fun ChatRecordsScreen(
         item { Text("海岸归档", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) }
         item {
             WolfRow("导出完整海岸包", if (busy) "正在导出……" else if (localMode) "本机已实现模块 · 完整恢复尚未接通" else "当前可归档资料与原件 · 完整恢复尚未接通") {
-                launchGlobal("full")
+                if (!busy) v2Open = !v2Open
+            }
+        }
+        if (v2Open) item {
+            SettingGroup("归档格式") {
+                WolfRow("V2 分块 ZIP", if (busy) v2Progress.ifBlank { "正在处理" } else "试验归档 · 逐对象校验 · 部分模块恢复") { launchV2() }
+                WolfRow("旧版 JSON 完整归档", "保留已有导出范围 · 暂不移除") { launchGlobal("full") }
             }
         }
         item {
