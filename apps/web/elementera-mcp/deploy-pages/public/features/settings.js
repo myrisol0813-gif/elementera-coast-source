@@ -160,15 +160,9 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     subtitle: '完整前端与当前窗口 · 本机导入导出',
     className: 'settings-panel',
     body: group('海岸归档',
-      row('导出完整海岸包', '当前可归档资料与原件 · 完整恢复尚未接通', 'settings:export-full-archive')
-      + row('导出离线 HTML ZIP', '解压 index.html · 聊天变体、图片与语音原件', 'settings:export-html')
-      + row('导入海岸包', '当前兼容 V1 迁移包；兼容导出也在此处', 'settings:transfer-open')),
-  }));
-
-  router.register('settings-archive-format', () => ({
-    title: '海岸归档格式', className: 'settings-panel',
-    body: group('归档格式', row('V2 分块 ZIP', '试验归档 · 逐对象校验 · 部分恢复', 'settings:export-v2')
-      + row('旧版 JSON 完整归档', '保留原有导出范围 · 尚不移除', 'settings:export-legacy-full')),
+      row('导出', '海岸归档 ZIP · 原件与清单', 'settings:export-v2')
+      + row('导出 HTML', '离线阅读 ZIP · 解压后打开 index.html', 'settings:export-html')
+      + row('导入', '自动识别 ZIP / 旧版迁移 JSON · 先预览再确认', 'settings:transfer-open')),
   }));
 
   router.register('settings-theme', () => ({
@@ -237,29 +231,6 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     };
   });
 
-  async function exportFullArchive() {
-    toast('正在把完整前端收进一个包里…附件多时会慢一点。', 3200);
-    const data = await requestJson(API.fullArchive);
-    const archive = {
-      ...(data.archive || {}),
-      local_device: localArchiveState(storage, chat),
-    };
-    archive.included_modules = [
-      ...(Array.isArray(archive.included_modules) ? archive.included_modules : []),
-      'local_device_settings',
-      'local_letters',
-    ].filter((item, index, list) => list.indexOf(item) === index);
-    const body = JSON.stringify(archive, null, 2);
-    const bytes = new Blob([body], { type: 'application/json' }).size;
-    downloadFile(body, `elementera-coast-full-${timestampLabel()}.coastpack.json`, 'application/json');
-    const warnings = auditFullArchiveCompleteness(archive);
-    if (warnings.length) {
-      toast('海岸包已生成，但尚不能视为完整备份：' + warnings.join('；')
-        + '。请保留原始数据、核对导出文件，不要直接迁移旧红心。', 11000);
-    } else {
-      toast(`完整前端包已生成 · ${sizeLabel(bytes)} · 模型后端返回原文 ${Number(archive.model_echoes?.length || 0)} 条 · 附件原件 ${Number(archive.attachments?.payloads?.length || 0)} 个。请核对已下载文件再迁移。`, 6500);
-    }
-  }
 
   async function exportHtml() {
     toast('正在整理离线海岸 ZIP…', 3000);
@@ -350,16 +321,12 @@ export function createSettings({ storage, shell, chat, router, toast }) {
       globalThis.location.assign('/logout');
       return;
     }
-    if (name === 'export-full-archive') return router.open('settings-archive-format');
     if (name === 'export-v2') {
       try {
         const manifest=await saveArchiveV2({applicationId:'com.elementeracoast.source',filename:`elementera-coast-v2-${timestampLabel()}.zip`});
         toast('V2 已生成 · '+manifest.records.length+' 条记录；覆盖范围详见清单，尚非全量恢复包。',6500);
       } catch(error) { if(error.name!=='AbortError')toast('V2 导出失败：'+error.message,6500); }
       return;
-    }
-    if (name === 'export-legacy-full') {
-      return exportFullArchive().catch((error) => toast(`完整前端包导出失败：${error.message}`, 5200));
     }
     if (name === 'export-html') return exportHtml().catch(error => toast('离线归档失败：'+error.message, 5200));
     if (name === 'import-json') return importJson();

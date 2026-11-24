@@ -1,7 +1,6 @@
-import { saveArchiveV2 } from '../core/archive-v2-save.js';
 import { openArchiveV2 } from '../core/archive-v2-read.js';
 import { archiveV2Transport as api } from '../core/archive-v2-transport.js';
-import { escapeHtml,timestampLabel } from '../core/dom.js';
+import { escapeHtml } from '../core/dom.js';
 const APP='com.elementeracoast.source';
 const line=(title,body)=>'<div class="feature-row static"><span><strong>'+escapeHtml(title)+'</strong><small>'+escapeHtml(body)+'</small></span></div>';
 const action=(key,label,disabled)=>'<button class="primary-wide" type="button" data-action="settings:transfer-v2-'+key+'" '+(disabled?'disabled':'')+'>'+escapeHtml(label)+'</button>';
@@ -25,8 +24,8 @@ export function createV2Transfer({router,toast,chat}){
     if(previous?.name==='settings-transfer'&&next?.name!=='settings-transfer'){revision++;}
   });
   function render(){
-    let html='<div class="settings-group"><h2>V2 归档 · 试验</h2>'+line('范围说明','支持云端聊天组、书房、日历、世界书、模型资料、同应用记忆、画像、日常、拾潮、自定义；本机 ZIP 支持可兼容记录；同应用聊天及附件原件按窗口组原子恢复（最多 80 条记录、16 MiB、90 条数据库语句）。')+
-      action('export','导出 V2 ZIP',busy)+action('choose','读取 V2 ZIP',busy||!!incoming);
+    if(!incoming&&!busy&&!failure)return '';
+    let html='<div class="settings-group"><h2>归档预览</h2>';
     if(incoming){
       const m=incoming.manifest;
       html+=line('归档来源',m.workspace+' · '+m.records.length+' 项记录')+
@@ -44,15 +43,9 @@ export function createV2Transfer({router,toast,chat}){
     if(failure)html+=line('操作未完成',failure);
     return html+'</div>';
   }
-  async function handle(name,target){
-    if(!current()||busy)return;
-    if(name==='v2-export')return operate(async token=>{
-      await saveArchiveV2({applicationId:APP,filename:'elementera-coast-v2-'+timestampLabel()+'.zip',onProgress:p=>{if(token!==revision)throw Error('已离开归档页面');progress='已采集 '+p.records+' 项 · '+p.bytes+' 字节';}});
-      toast('V2 ZIP 已生成；覆盖范围见清单。');
-    });
-    if(name==='v2-choose'){
-      const input=document.createElement('input');input.type='file';input.accept='.zip,application/zip';
-      input.addEventListener('change',()=>{const file=input.files?.[0];if(!file)return;void operate(async token=>{
+  async function readFile(file){
+    if(!current()||busy||incoming)return;
+    return operate(async token=>{
         const data=await openArchiveV2(file,m=>api.validateManifest(remoteManifest(m)));
         if(token!==revision)return;
         // Full byte verification precedes preview and any upload.
@@ -90,8 +83,10 @@ export function createV2Transfer({router,toast,chat}){
         if(token!==revision)return;
         incoming=data;choices=options;selected=options[0]?.key||'';
         preview=null;result=null;uploaded=false;progress='原件校验完成';
-      });},{once:true});input.click();return;
-    }
+      });
+  }
+  async function handle(name,target){
+    if(!current()||busy)return;
     if(name==='v2-select'&&incoming&&!preview&&!result){const id=target.dataset.id;if(choices.some(r=>r.key===id))selected=id;return refresh();}
     if(name==='v2-back'&&preview&&!result){preview=null;failure='';return refresh();}
     if(name==='v2-next'&&result){choices=choices.filter(r=>r.key!==selected);selected=choices[0]?.key||'';preview=null;result=null;failure='';return refresh();}
@@ -117,5 +112,5 @@ export function createV2Transfer({router,toast,chat}){
       await chat.refreshFromCoast();toast('已确认恢复所选资料。');
     });
   }
-  return {render,handle};
+  return {render,handle,readFile,active:()=>busy||!!incoming};
 }
