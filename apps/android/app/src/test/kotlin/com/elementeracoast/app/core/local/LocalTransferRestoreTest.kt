@@ -102,7 +102,7 @@ class LocalTransferRestoreTest {
     }
 
     @Test fun fullWebDeskReceiptSurvivesRestoreAndReexport() {
-        val receipt = Json.parseToJsonElement("""{"summary":"本轮递给模型","recent_context":{"current_message_separate":true,"turns":1,"messages":[{"role":"user","content":"前一轮"}]},"custom_instructions":{"empty":true},"related_memory":{"items":[{"id":"memory-1","score":1,"title":"旧记忆"},{"id":"memory-2","score":0.1234,"title":"另一条"}]},"worldbook":{"matched_titles":["设定"],"delivered_titles":["设定"],"entries":[{"id":"world-1","matched_keywords":["关键词"],"title":"设定","delivered":true}]},"cross_window":{"sources":[{"conversation_id":"old-1","requested_messages":2,"loaded_messages":2,"delivered_to_model_messages":1}],"messages":[{"conversation_id":"old-1","messages":[{"role":"assistant","content":"旧消息","message_id":"old-message","turn_id":"old-turn","created_at":"2026-11-24T12:00:00Z"}]}]},"workbench":{"used_count":1,"model_visible_tools":[{"name":"test_tool","group":"core"}],"backend_tools":[{"name":"other_tool","group":null}]},"external_tide":{"empty":true}}""")
+        val receipt = Json.parseToJsonElement("""{"summary":"本轮递给模型","recent_context":{"current_message_separate":true,"turns":1,"messages":[{"role":"user","content":"前一轮"}]},"custom_instructions":{"empty":true},"related_memory":{"items":[{"id":"memory-1","score":1,"title":"旧记忆"},{"id":"memory-2","score":0.1234,"title":"另一条"}]},"worldbook":{"matched_titles":["设定"],"delivered_titles":["设定"],"entries":[{"id":"world-1","matched_keywords":["关键词"],"title":"设定","delivered":true}]},"cross_window":{"sources":[{"conversation_id":"old-1","requested_messages":2,"loaded_messages":2,"delivered_to_model_messages":1}],"messages":[{"conversation_id":"old-1","messages":[{"role":"assistant","content":"旧消息","message_id":"old-message","turn_id":"old-turn","created_at":"2026-11-24T12:00:00Z"}]}]},"workbench":{"used_count":1,"model_visible_tools":[{"name":"test_tool","group":"core"}],"backend_tools":[{"name":"other_tool","group":null}]},"external_tide":{"empty":true},"thinking_soil":{"hand_seeds":[{"title":"旧候选","content":"不可丢失","legacy_meta":{"flag":false,"nullable":null,"items":[1,2.50,{"unknown":"原文"}]}}]},"legacy_section":{"unknown_list":[{"k":"v"},null],"empty":[]}}""")
         val original = CoastTransferCodec.decode(cloudBundle())
         val rows = original.getValue("conversations").jsonArray
         val row = rows.single().jsonObject
@@ -131,5 +131,11 @@ class LocalTransferRestoreTest {
             }
         }
         assertRetained(receipt, restored)
+        assertEquals(receipt, restored)
+        val cache = RemoteCacheStore(local)
+        val saved = cache.history("cloud1")!!
+        cache.putHistory("cloud1", saved.copy(updatedAt = "2026-11-24T12:01:00Z"))
+        val reread = cache.history("cloud1")!!.turns.single().assistant.variantsByUserVariant.getValue("0")[1].deskSlip!!
+        assertEquals(receipt, Json.encodeToJsonElement(RemoteDeskSlip.serializer(), reread))
     }
 }
