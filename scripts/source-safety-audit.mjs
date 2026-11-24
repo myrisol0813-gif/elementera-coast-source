@@ -35,6 +35,10 @@ for (const path of filenames) {
     if (!body.includes(fixture)) failures.push({ category: 'missing_expected_redaction_fixture', path });
     else body = body.replaceAll(fixture, '[SYNTHETIC-REDACTION-TEST-FIXTURE]');
   }
+  // Only the exact public Source repository address is allowed in its updater.
+  if (path === 'apps/android/app/src/main/kotlin/com/elementeracoast/app/feature/wolf/LocalGithubUpdater.kt') {
+    body = body.replace('myrisol0813-gif/elementera-coast-source', '[PUBLIC-SOURCE-REPO]');
+  }
   scanned++;
   for (const [name, rule] of rules) {
     if (rule.test(body)) failures.push({ category: name, path });

@@ -3,9 +3,6 @@ package com.elementeracoast.app.feature.wolf
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
@@ -43,6 +40,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
+internal enum class LocalModelPage(val title: String) { Catalog("模型目录"), Codex("Codex 额度"), Providers("自有供应商") }
+
 @Composable
 internal fun ModelBoxScreen(
     models: List<String>,
@@ -54,28 +53,40 @@ internal fun ModelBoxScreen(
     onChatGptDisconnect: () -> Unit,
     onChatGptRefresh: () -> Unit,
     onChatGptProbe: (String) -> Unit,
-    localMode: Boolean = false
+    localMode: Boolean = false,
+    localPage: LocalModelPage = LocalModelPage.Catalog,
+    onLocalPage: (LocalModelPage) -> Unit = {}
 ) {
     var expandedModel by remember { mutableStateOf<String?>(null) }
     val grouped = remember(models, current) { groupedUnselectedModels(models, current) }
-    var page by remember { mutableStateOf(0) }
     var query by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf<ModelSeries?>(null) }
+    var openGroups by remember { mutableStateOf<Set<ModelSeries>>(emptySet()) }
     val context = LocalContext.current.applicationContext
     var providerNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    LaunchedEffect(localMode, models, page) {
+    LaunchedEffect(localMode, models, localPage) {
         if (localMode) providerNames = withContext(Dispatchers.IO) {
             runCatching { LocalProviderStore(context).load().associate { it.id to it.name } }.getOrDefault(emptyMap())
         }
     }
-    val localGrouped = remember(models, query, providerNames) { groupedLocalModels(models, query, providerNames) }
-    val freeCount = remember(models) { groupedLocalModels(models, "", emptyMap()).getValue(ModelSeries.Free).size }
+    val catalogModels = models + chatGpt.availableModels.map { "chatgpt-plan:" + it.slug }
+    val localGrouped = remember(catalogModels, query, providerNames) { groupedLocalModels(catalogModels, query, providerNames) }
+    if (localMode && localPage != LocalModelPage.Catalog) {
+        LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            item {
+                if (localPage == LocalModelPage.Codex) {
+                    ChatGptPlanCard(chatGpt, onChatGptConnect, onChatGptDisconnect, onChatGptRefresh, onSelect, onChatGptProbe, localMode = true)
+                    Text("套餐剩余额度以账户服务为准；当前未提供剩余额度数值。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else LocalProviderPanel(current, onRefresh)
+            }
+        }
+        return
+    }
 
     LazyColumn(
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        item {
+        if (!localMode) item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("模型箱", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -101,61 +112,47 @@ internal fun ModelBoxScreen(
         item {
             Text("当前模型", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(6.dp))
-            CurrentModelCard(current)
+            CurrentModelCard(current, if (!localMode) "" else if (current.startsWith("chatgpt-plan:")) "ChatGPT 套餐" else providerNames[localProviderId(current)].orEmpty())
         }
 
         if (localMode) {
             item {
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("模型目录", "ChatGPT 套餐", "供应商管理").forEachIndexed { index, label ->
-                        FilterChip(selected = page == index, onClick = { page = index }, label = { Text(label) })
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    LocalModelEntry("Codex 额度", if (chatGpt.connected) "已授权 · 账户与模型" else "账户与授权", Modifier.weight(1f)) { onLocalPage(LocalModelPage.Codex) }
+                    LocalModelEntry("自有供应商", "API · URL · 额度", Modifier.weight(1f)) { onLocalPage(LocalModelPage.Providers) }
+                }
+            }
+            item {
+                OutlinedTextField(value = query, onValueChange = { query = it }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
+                    placeholder = { Text("搜索模型、供应商或 ID") })
+            }
+            val sections = listOf(ModelSeries.Free) + ModelSeries.entries.filter { it != ModelSeries.Free }
+            sections.forEach { series ->
+                val entries = localGrouped[series].orEmpty()
+                if (entries.isNotEmpty() || query.isBlank()) {
+                    val opened = query.isNotBlank() || series in openGroups
+                    item(key = "local-series-${series.name}") {
+                        Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .45f), RoundedCornerShape(18.dp))
+                            .clickable { openGroups = if (series in openGroups) openGroups - series else openGroups + series }.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Text(if (series == ModelSeries.OtherOpenAi) "其他模型" else series.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Text("${entries.size}  " + if (opened) "⌃" else "⌄", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    if (opened) {
+                        if (entries.isEmpty()) item(key = "local-empty-${series.name}") { Text("暂无模型", style = MaterialTheme.typography.bodySmall) }
+                        items(entries, key = { "local-model:${it.id}" }) { item ->
+                            val owner = if (item.id.startsWith("chatgpt-plan:")) "ChatGPT 套餐" else providerNames[localProviderId(item.id)] ?: "供应商 " + localProviderId(item.id).take(8)
+                            ModelCatalogBubble(item = item, expanded = expandedModel == item.id,
+                                selected = current == item.id, source = owner, rawId = localRawModelId(item.id),
+                                onToggle = { expandedModel = if (expandedModel == item.id) null else item.id },
+                                onSelect = { onSelect(item.id); expandedModel = null })
+                        }
                     }
                 }
             }
-            when (page) {
-                1 -> item { ChatGptPlanCard(chatGpt, onChatGptConnect, onChatGptDisconnect, onChatGptRefresh, onSelect, onChatGptProbe, localMode = true) }
-                2 -> item { LocalProviderPanel(current, onRefresh) }
-                else -> {
-                    item {
-                        OutlinedTextField(value = query, onValueChange = { query = it }, singleLine = true,
-                            modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
-                            placeholder = { Text("搜索模型、供应商或 ID") })
-                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(selected = filter == null, onClick = { filter = null }, label = { Text("全部") })
-                            FilterChip(selected = filter == ModelSeries.Free, onClick = { filter = ModelSeries.Free },
-                                label = { Text("Free Test · $freeCount") })
-                            ModelSeries.entries.filter { it != ModelSeries.Free }.forEach { series ->
-                                FilterChip(selected = filter == series, onClick = { filter = series },
-                                    label = { Text(if (series == ModelSeries.OtherOpenAi) "其他模型" else series.title) })
-                            }
-                        }
-                        if (models.isEmpty()) Text("先在供应商管理添加 API 并获取模型。", style = MaterialTheme.typography.bodySmall)
-                    }
-                    val sections = if (filter == null) listOf(ModelSeries.Free) + ModelSeries.entries.filter { it != ModelSeries.Free } else listOfNotNull(filter)
-                    sections.forEach { series ->
-                        val entries = localGrouped[series].orEmpty()
-                        if (entries.isNotEmpty() || filter == series || (series == ModelSeries.Free && query.isBlank())) {
-                            item(key = "local-series-${series.name}") {
-                                Text((if (series == ModelSeries.OtherOpenAi) "其他模型" else series.title) + " · " + entries.size,
-                                    style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                                if (series == ModelSeries.Free) Text("按免费模型 ID 分组；实际可用额度以供应商为准。",
-                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                if (entries.isEmpty()) Text("暂无匹配模型。", style = MaterialTheme.typography.bodySmall)
-                            }
-                            items(entries, key = { "local-model:${it.id}" }) { item ->
-                                val owner = providerNames[localProviderId(item.id)] ?: ("供应商 " + localProviderId(item.id).take(8))
-                                ModelCatalogBubble(item = item, expanded = expandedModel == item.id,
-                                    selected = current == item.id, source = owner, rawId = localRawModelId(item.id),
-                                    onToggle = { expandedModel = if (expandedModel == item.id) null else item.id },
-                                    onSelect = { onSelect(item.id); expandedModel = null })
-                            }
-                        }
-                    }
-                    if (models.isNotEmpty() && localGrouped.values.all { it.isEmpty() } && query.isNotBlank()) item {
-                        Text("未找到匹配模型。", style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
+            if (localGrouped.values.all { it.isEmpty() } && query.isNotBlank()) item { Text("未找到匹配模型。", style = MaterialTheme.typography.bodySmall) }
         } else {
         item {
             ChatGptPlanCard(chatGpt, onChatGptConnect, onChatGptDisconnect, onChatGptRefresh, onSelect, onChatGptProbe)
@@ -215,23 +212,32 @@ internal fun ModelBoxScreen(
 }
 
 @Composable
-private fun CurrentModelCard(model: String) {
+private fun LocalModelEntry(title: String, subtitle: String, modifier: Modifier, onClick: () -> Unit) {
+    Surface(modifier = modifier.clickable(onClick = onClick), shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .55f)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun CurrentModelCard(model: String, source: String = "") {
     val shape = RoundedCornerShape(18.dp)
     Surface(
-        modifier = Modifier.widthIn(min = 190.dp, max = 320.dp),
+        modifier = Modifier.fillMaxWidth(),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shadowElevation = 1.dp
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             Text(
-                model.substringAfterLast('/').ifBlank { "尚未载入" },
+                model.removePrefix("chatgpt-plan:").substringAfterLast('/').ifBlank { "尚未载入" },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                "正在使用",
+                if (source.isBlank()) "正在使用" else "$source · 正在使用",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall
             )
@@ -266,7 +272,7 @@ private fun ModelCatalogBubble(
             )
             Text(if (expanded) "⌃" else "⌄", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (item.id.startsWith("local:")) Text(source, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+        if (item.id.startsWith("local:") || item.id.startsWith("chatgpt-plan:")) Text(source, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
         if (expanded) {
             Spacer(Modifier.height(8.dp))
             Text(rawId, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)

@@ -11,6 +11,8 @@ class ModelCatalogTest {
         assertEquals(ModelSeries.O, classifyModelSeries("o3"))
         assertEquals(ModelSeries.Gpt4, classifyModelSeries("openai/gpt-4.1"))
         assertEquals(ModelSeries.Gpt5, classifyModelSeries("GPT-5.6 Sol"))
+        assertEquals(ModelSeries.Gpt6, classifyModelSeries("gpt-6.2"))
+        assertEquals(1, groupedLocalModels(listOf("chatgpt-plan:gpt-6.2"), "Codex", emptyMap()).getValue(ModelSeries.Gpt6).size)
         assertEquals(ModelSeries.Free, classifyModelSeries("Free: North Mini"))
         assertEquals(ModelSeries.Free, classifyModelSeries("openai/gpt-oss:free"))
         assertEquals(ModelSeries.Image, classifyModelSeries("openai/gpt-image-1"))

@@ -79,6 +79,7 @@ internal fun FeatureLandingScreen(
                 onChatGptDisconnect = onChatGptDisconnect,
                 onChatGptRefresh = onChatGptRefresh,
                 onChatGptProbe = onChatGptProbe,
+                onBackToChat = onBackToChat,
                 onLogout = onLogout,
                 onImportMessages = onImportMessages,
                 onActionLogged = onLocalActionLogged,
