@@ -58,6 +58,31 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
     }
     fun cloudChats(m:ArchiveV2Manifest):List<String> =
         if(!local&&m.workspace=="backend"&&m.applicationId==BuildConfig.APPLICATION_ID) m.records.filter { it.module=="chat" }.map { it.id } else emptyList()
+    data class Choice(val kind:String,val id:String,val title:String){
+        val key get()=kind+":"+id
+    }
+    suspend fun cloudChoices(input:Imported):List<Choice> = withContext(Dispatchers.IO) {
+        if(local||input.manifest.workspace!="backend")return@withContext emptyList()
+        val m=input.manifest;val objects=m.objects.associateBy { it.objectSha256 }
+        buildList {
+            for(r in m.records){
+                if(!(r.module=="chat"&&m.applicationId==BuildConfig.APPLICATION_ID)&&!(r.module=="library"&&r.id.startsWith("library_books:")))continue
+                val d=objects.getValue(r.recordObject)
+                if(d.size>1800000)continue
+                val value=Json.parseToJsonElement(input.stage.verify(d,1800000).readText()).jsonObject
+                val kind=value.getValue("kind").jsonPrimitive.content
+                val data=value.getValue("data").jsonObject
+                if(r.module=="chat"&&kind=="chat"){
+                    val c=data.getValue("conversation").jsonObject
+                    if(c.getValue("id").jsonPrimitive.content==r.id)add(Choice("chat",r.id,c.getValue("title").jsonPrimitive.content))
+                }else if(r.module=="library"&&kind=="library_books"){
+                    val id=data.getValue("id").jsonPrimitive.content
+                    val identity="library_books:"+ArchiveV2Chunks.digest(JsonArray(listOf(JsonPrimitive(id))).toString().encodeToByteArray())
+                    if(r.id==identity&&Regex("[A-Za-z0-9_.:-]{1,160}").matches(id))add(Choice("book",id,data.getValue("title").jsonPrimitive.content))
+                }
+            }
+        }
+    }
     suspend fun createSession():String {
         require(!local)
         return api.archiveV2CreateSession().getValue("session").jsonObject.getValue("id").jsonPrimitive.content
@@ -66,9 +91,10 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
         require(!local)
         return ArchiveV2NativeCollector.upload(api,session,input.manifest,input.stage,progress)
     }
-    suspend fun cloudRestore(input:Imported,session:String,id:String,confirm:Boolean):JsonObject {
-        require(!local&&id in cloudChats(input.manifest))
-        return api.archiveV2RestoreChat(session,input.manifest,id,confirm)
+    suspend fun cloudRestore(input:Imported,session:String,choice:Choice,confirm:Boolean):JsonObject {
+        require(!local&&choice in cloudChoices(input))
+        return if(choice.kind=="book")api.archiveV2RestoreBook(session,input.manifest,choice.id,confirm)
+            else api.archiveV2RestoreChat(session,input.manifest,choice.id,confirm)
     }
     suspend fun cancelSession(session:String){require(!local);api.archiveV2CancelSession(session)}
 }
