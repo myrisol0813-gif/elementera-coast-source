@@ -1,6 +1,7 @@
 import { chooseImage, downloadFile, escapeAttribute, escapeHtml, q, timestampLabel } from '../core/dom.js';
 import { API, requestJson } from '../core/api.js';
 import { shortModelName } from '../core/model-format.js';
+import { createTransferSettings } from './settings-transfer.js';
 
 const LOADED_AT = new Date().toISOString();
 
@@ -81,6 +82,7 @@ export function auditFullArchiveCompleteness(archive) {
 
 export function createSettings({ storage, shell, chat, router, toast }) {
   const preferences = () => storage.read().preferences;
+  const transfer = createTransferSettings({ router, toast, chat });
 
   router.register('wolf', () => {
     const currentModel = chat.getProfile().current_chat_model;
@@ -155,7 +157,8 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     title: '聊天记录',
     subtitle: '完整前端与当前窗口 · 本机导入导出',
     className: 'settings-panel',
-    body: group('完整前端',
+    body: group('数据迁移', row('可迁移数据包', '本机与云端通用格式 · 预览后导入', 'settings:transfer-open'))
+      + group('完整前端',
       row('导出完整前端包', '前端完整数据 · 朋友信箱只含隐私摘要，不含访客正文 / 暗号材料', 'settings:export-full-archive')
       + row('导出 V1 防丢快照', '轻量 JSON · 附件只存索引 · 朋友信箱只含隐私摘要', 'settings:export-v1-snapshot')
       + row('导出全局 HTML', '与 V1 JSON 同源 · 朋友信箱仅隐私摘要 · 不含访客正文', 'settings:export-html'))
@@ -365,6 +368,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
   }
 
   async function handleAction(name, target) {
+    if (name.startsWith('transfer-')) return transfer.handle(name,target);
     const routes = {
       wolf: 'wolf',
       desk: 'desk',
