@@ -38,7 +38,8 @@ function portableCalendar(row) {
     created_at: row.created_at, updated_at: row.updated_at, ...(row.anniversary ? {anniversary:row.anniversary}:{}),
     ...(row.conversation_id ? {conversation_id:row.conversation_id}:{}),
     ...(row.source_turn_id ? {source_turn_id:row.source_turn_id}:{}),
-    ...(row.model_label ? {model_label:row.model_label}:{}) };
+    ...(row.model_label != null ? {model_label:row.model_label}:{}),
+    ...(row.tool_call_id != null ? {tool_call_id:row.tool_call_id}:{}) };
 }
 export async function exportCloudTransfer(db) {
   const conversations = [];
@@ -118,6 +119,7 @@ function validatedCalendar(row) {
   require(typeof row.title === 'string' && row.title.trim() && row.title.length <=120 && typeof row.body === 'string' && row.body.length <=4000, '日历文字超限。');
   require(['event','note'].includes(row.kind) && ['none','yearly'].includes(row.recurrence) && ['owner','assistant'].includes(row.author), '日历类型或作者无效。');
   require(!row.conversation_id && !row.source_turn_id, '关联聊天的日历记录暂需保留原件。');
+  for (const key of ['model_label','tool_call_id']) require(row[key] == null || (typeof row[key] === 'string' && row[key].length <= 200), '日历来源字段无效。');
   if (row.anniversary != null) {
     const a = row.anniversary;
     require(object(a) && typeof a.pinned === 'boolean' && Object.keys(a).every(k=>['startDay','mode','targetDays','pinned'].includes(k)), '纪念日字段无效。');
@@ -165,7 +167,7 @@ async function prepare(db,envelope,selection) {
     }
     try { validatedCalendar(row); } catch(e) { if (!(e instanceof TransferError)) throw e; result.calendar.blocked.push({id:row.id,reason:e.message}); continue; }
     const a=row.anniversary;
-    statements.push(db.prepare(`INSERT INTO coast_calendar_entries_v2 (id,day,kind,title,body,recurrence,author,source,model_label,created_at,updated_at,anniversary_start_day,anniversary_mode,anniversary_target_days,anniversary_pinned) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(row.id,row.day,row.kind,row.title,row.body,row.recurrence,row.author==='owner'?OWNER_AUTHOR:ASSISTANT_AUTHOR,row.source||'manual',row.model_label||null,stamp(row.created_at),stamp(row.updated_at),a?.startDay??null,a?.mode??null,a?.targetDays??null,a?.pinned?1:0));
+    statements.push(db.prepare(`INSERT INTO coast_calendar_entries_v2 (id,day,kind,title,body,recurrence,author,source,model_label,tool_call_id,created_at,updated_at,anniversary_start_day,anniversary_mode,anniversary_target_days,anniversary_pinned) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(row.id,row.day,row.kind,row.title,row.body,row.recurrence,row.author==='owner'?OWNER_AUTHOR:ASSISTANT_AUTHOR,row.source||'manual',row.model_label??null,row.tool_call_id??null,stamp(row.created_at),stamp(row.updated_at),a?.startDay??null,a?.mode??null,a?.targetDays??null,a?.pinned?1:0));
     result.calendar.ready++;
   }
   if (selection.includes('model_profile') && payload.profile !== null) {
