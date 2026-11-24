@@ -9,6 +9,7 @@ import { archiveDetailPage, readArchiveLibraryCover, DETAIL_MODULES } from './co
 
 import { restoreArchiveChatGroup } from './coast-archive-v2-restore.js';
 import { restoreArchiveBook } from './coast-archive-v2-restore-library.js';
+import { restoreArchiveRecord } from './coast-archive-v2-restore-record.js';
 const BASE='/api/archive/v2';
 export const isArchiveV2Path=path=>path===BASE||path.startsWith(BASE+'/');
 async function binaryBody(request){
@@ -25,7 +26,7 @@ export async function routeArchiveV2(request,env,session){
   if(!db)return apiError('database_unavailable','海岸数据库不可用。',503);
   const url=new URL(request.url),parts=url.pathname.slice(BASE.length).split('/').filter(Boolean),method=request.method;
   try{
-    if(method==='GET'&&parts.length===0)return json({ok:true,limits:STAGING_LIMITS,record_modules:RECORD_MODULES,manifest_modules:MODULES,detail_modules:DETAIL_MODULES,chat_group_restore_supported:true,book_restore_supported:true,restore_supported:false,stage_only:true});
+    if(method==='GET'&&parts.length===0)return json({ok:true,limits:STAGING_LIMITS,record_modules:RECORD_MODULES,manifest_modules:MODULES,detail_modules:DETAIL_MODULES,chat_group_restore_supported:true,book_restore_supported:true,record_restore_modules:['calendar','worldbook','model_profile'],restore_supported:false,stage_only:true});
     const opts={cursor:url.searchParams.get('cursor')||'',limit:Number(url.searchParams.get('limit')||50)};
     if(method==='POST'&&parts.join('/')==='manifest/validate')return json({ok:true,...await validateArchiveManifest(await readJson(request,2*1024*1024)),restore_supported:false});
     if(method==='GET'&&parts[0]==='details'&&parts.length===2)return json({ok:true,...await archiveDetailPage(db,parts[1],opts)});
@@ -61,6 +62,11 @@ export async function routeArchiveV2(request,env,session){
       if(parts.length===1&&method==='GET')return json({ok:true,sessions:await listArchiveSessions(db)});
       if(parts.length===1&&method==='POST')return json({ok:true,session:await createArchiveSession(db)},201);
       if(parts.length===2&&method==='DELETE')return json({ok:true,...await cancelArchiveSession(db,parts[1])});
+      if(parts.length===5&&parts[2]==='record-restore'&&method==='POST'){
+        const body=await readJson(request,2*1024*1024);
+        if(!body||typeof body.confirm!=='boolean')return apiError('invalid_restore','必须明确指定预览或确认恢复。',400);
+        return json({ok:true,...await restoreArchiveRecord(db,parts[1],body.manifest,parts[3],parts[4],body.confirm)});
+      }
       if(parts.length===4&&parts[2]==='book-restore'&&method==='POST'){
         const body=await readJson(request,2*1024*1024);
         if(!body||typeof body.confirm!=='boolean')return apiError('invalid_restore','必须明确指定预览或确认恢复。',400);
