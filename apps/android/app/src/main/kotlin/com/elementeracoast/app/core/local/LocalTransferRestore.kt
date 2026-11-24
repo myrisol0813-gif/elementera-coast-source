@@ -101,6 +101,22 @@ internal object LocalTransferRestore {
         }
         val conversations = combine("chat", current.conversations, incoming.conversations) { it.conversation.id }
         val calendar = combine("calendar", current.calendar.toList(), incoming.calendar.toList()) { it.jsonObject.getValue("id").jsonPrimitive.content }
+        // A fresh linked calendar may use a matching existing window or one staged
+        // in this transaction. Never attach it to a conflicting imported window.
+        val targetChats = conversations.associateBy { it.conversation.id }
+        val sourceChats = incoming.conversations.associateBy { it.conversation.id }
+        val oldCalendarIds = current.calendar.map { it.jsonObject.getValue("id").jsonPrimitive.content }.toSet()
+        if ("calendar" in modules) incoming.calendar.forEach { item ->
+            val row = item.jsonObject
+            if (row.getValue("id").jsonPrimitive.content !in oldCalendarIds) {
+                row["conversation_id"]?.jsonPrimitive?.contentOrNull?.let { id ->
+                    val target = requireNotNull(targetChats[id]) { "请先恢复日历关联的原窗口。" }
+                    require(sourceChats[id]?.let { it == target } != false) { "日历关联窗口存在内容冲突，未恢复。" }
+                    val turn = row["source_turn_id"]?.jsonPrimitive?.contentOrNull
+                    require(turn == null || target.history.turns.any { it.id == turn }) { "日历关联的原轮次不存在，未恢复。" }
+                }
+            }
+        }
         val moments = if ("daily" in modules) combine("moments", current.moments, incoming.moments) { it.id } else current.moments
         val diaries = if ("daily" in modules) combine("diaries", current.diaries, incoming.diaries) { it.id } else current.diaries
         val merged = current.copy(conversations = conversations, calendar = JsonArray(calendar), moments = moments, diaries = diaries,
