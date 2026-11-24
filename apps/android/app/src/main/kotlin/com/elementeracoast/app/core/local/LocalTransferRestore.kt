@@ -14,9 +14,19 @@ internal object LocalTransferRestore {
 
     fun availableModules(payload: JsonObject, applicationId: String): Set<String> {
         val declared = payload.getValue("includedModules").jsonArray.map { it.jsonPrimitive.content }.toSet()
-        val sameEdition = payload.getValue("applicationId").jsonPrimitive.content == applicationId &&
-            payload.getValue("workspace").jsonPrimitive.content == "local"
-        return declared.intersect(if (sameEdition) CoastTransferCodec.supportedModules else setOf("chat", "calendar"))
+        val origin = payload.getValue("applicationId").jsonPrimitive.content
+        val localSource = payload.getValue("workspace").jsonPrimitive.content == "local"
+        val sameEdition = origin == applicationId && localSource
+        val knownEditions = setOf("com.elementeracoast.app", "com.elementeracoast.source")
+        val crossEdition = localSource && origin in knownEditions && applicationId in knownEditions
+        // Model profile has an identical portable schema in both editions, with no provider credentials.
+        // Daily identity fields differ and require a separate explicit adapter.
+        val supported = when {
+            sameEdition -> CoastTransferCodec.supportedModules
+            crossEdition -> setOf("chat", "calendar", "model_profile")
+            else -> setOf("chat", "calendar")
+        }
+        return declared.intersect(supported)
     }
 
     private fun verifyMeaningful(raw: JsonElement, encoded: JsonElement?, path: String) {
