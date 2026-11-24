@@ -54,6 +54,8 @@ internal object ArchiveV2Local {
                     add("attachments",original.metadata.getValue("id").jsonPrimitive.content,"attachment",original.metadata,listOf(d.objectSha256))
                 }
                 val dogtalk=LocalDogtalkStore(store).read()
+                val bySnapshot=dogtalk.filter{it.module=="dogtalk_snapshots"}.associate{it.id to it.data}
+                for(c in LocalBackupArchive.capture(store,applicationId).conversations)for(t in c.history.turns)for(v in t.user.variants+t.assistant.variantsByUserVariant.values.flatten())v.dogtalkSnapshotId?.takeIf{it.isNotBlank()}?.let{LocalDogtalkStore.checkReference(c.conversation.id,t.id,it,bySnapshot)}
                 for(row in dogtalk)add(row.module,row.id,row.module,row.data,links=row.dependencies)
                 val side=LocalSideRecords(store)
                 for(row in side.rows()){
