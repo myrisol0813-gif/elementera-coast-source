@@ -33,7 +33,7 @@ function decode(item){
 }
 const style='body{font:16px/1.7 system-ui,sans-serif;background:#f5f5f2;color:#344554;margin:0}main{max-width:920px;margin:auto;padding:24px 16px}section,article{background:#fffdf9;padding:16px;border-radius:18px;margin:12px 0}article.user{background:#eaf1f7}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.6 monospace}img,video,audio{display:block;max-width:100%;margin:8px 0}a{color:#365e7d}small{color:#667984}summary{cursor:pointer}';
 const page=(title,body)=>'<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src \'self\' data: file:; media-src \'self\' file:"><title>'+esc(title)+'</title><style>'+style+'</style></head><body><main>'+body+'</main></body></html>';
-export function buildOfflineArchive(archive, initialWarnings=[]){
+export function buildOfflineArchive(archive, initialWarnings=[], ownerLabel='屋主'){
   const files=[],warnings=[...initialWarnings],media=[],attachments=new Map();
   const records=archive.chat?.conversations||[];
   for(const [kind,items] of [['attachment',archive.attachments?.payloads||[]],['voice',archive.voice?.payloads||[]]]){
@@ -53,7 +53,7 @@ export function buildOfflineArchive(archive, initialWarnings=[]){
   const nav=[];
   records.forEach(({conversation={},history={}},i)=>{
     const path='chats/'+(i+1)+'.html',title=conversation.title||conversation.id||'未命名窗口';nav.push('<li><a href="'+path+'">'+esc(title)+'</a></li>');
-    const article=(v,role,label)=>'<article class="'+role+'"><small>'+esc(label)+' · '+esc(v.created_at||'')+'</small><div style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(v.content)+'</div>'+ (v.attachments||[]).map(a=>{const m=attachments.get(conversation.id+':'+a.id);return m?mediaHtml(m,'../'):'<p>原件未归档：'+esc(a.name||a.id)+'</p>';}).join('')+(v.desk_slip?'<details><summary>历史回执</summary><pre>'+esc(JSON.stringify(v.desk_slip,strip,2))+'</pre></details>':'')+'</article>';
+    const article=(v,role,label)=>'<article class="'+role+'"><small>'+esc(v.display_author || (role==='user'?ownerLabel:'模型伙伴'))+' · '+esc(label)+' · '+esc(v.created_at||'')+'</small><div style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(v.content)+'</div>'+ (v.attachments||[]).map(a=>{const m=attachments.get(conversation.id+':'+a.id);return m?mediaHtml(m,'../'):'<p>原件未归档：'+esc(a.name||a.id)+'</p>';}).join('')+(v.desk_slip?'<details><summary>历史回执</summary><pre>'+esc(JSON.stringify(v.desk_slip,strip,2))+'</pre></details>':'')+'</article>';
     const rows=(history.turns||[]).map((t,j)=>'<section><h2>第 '+(j+1)+' 轮</h2>'+ (t.user?.variants||[]).map((v,k)=>article(v,'user','用户变体 '+(k+1))).join('')+Object.entries(t.assistant?.variantsByUserVariant||{}).map(([k,vs])=>vs.map((v,l)=>article(v,'assistant','分支 '+k+' · 回复 '+(l+1))).join('')).join('')+'</section>').join('');
     files.push([path,page(title,'<a href="../index.html">返回海岸</a><h1>'+esc(title)+'</h1>'+rows)]);
   });
