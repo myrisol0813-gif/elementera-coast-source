@@ -54,9 +54,9 @@ internal class LocalKnowledgeStore(store:LocalPersistence) {
         return matches.filter{it.by=="constant"}+matches.filter{it.by!="constant"}.take(limit.coerceIn(0,6))
     }
     fun surfaceFor(conversationId:String):String=cache.conversations().firstOrNull{it.id==conversationId}?.roomType?.let{if(it=="main")"main_chat" else it}?:error("本机窗口不存在。")
-    data class Context(val messages:List<RemoteChatMessage>,val receipt:RemoteDeskSlip)
+    data class Context(val messages:List<RemoteChatMessage>,val receipt:RemoteDeskSlip,val imageParts:List<JsonObject> = emptyList())
     fun context(input:List<RemoteChatMessage>,budget:Int,surface:String,conversationId:String="",attachmentIds:List<String> = emptyList()):Context {
-        val attachmentContext=attachments.textContext(conversationId,attachmentIds,input)
+        val attachmentContext=attachments.attachmentContext(conversationId,attachmentIds,input)
         val messages=attachmentContext.messages
         val instructions=instructions()?.content.orEmpty()
         val current=messages.lastOrNull{it.role=="user"}?.content.orEmpty()
@@ -79,7 +79,8 @@ internal class LocalKnowledgeStore(store:LocalPersistence) {
         val soilContext=(listOf(soilText)+after).filter{it.isNotBlank()}.joinToString("\n")
         if(soilContext.isNotEmpty())delivered.add(RemoteChatMessage("system","思维壤\n"+soilContext))
         delivered.addAll(messages)
-        val chars=delivered.sumOf{it.content.length.toLong()}
+        // Reserve a conservative estimate per image, not the base64 byte length.
+        val chars=delivered.sumOf{it.content.length.toLong()}+attachmentContext.imageParts.size*2048L*3
         require(chars<=maxChars){"本机上下文、完整画像、世界书与记忆超过预算，未截断、未发送。"}
         return Context(delivered,RemoteDeskSlip(
             summary="本机自定义指令、完整画像、世界书、已确认记忆（关键词检索）、思维壤与近期文字；附件按本轮回执递入",
@@ -93,7 +94,7 @@ internal class LocalKnowledgeStore(store:LocalPersistence) {
             relatedMemory=RemoteDeskMemory(status=if(memories.isEmpty())"未命中" else "已递给",confirmationStatus="仅已确认的 active 记录",count=memories.size,
                 items=memories.mapIndexed{i,e->RemoteDeskMemoryItem(title=e.title,id=e.id,entryType=e.entryType,tag=e.tag,sourceModel=e.sourceModel,sourceWindow=e.sourceWindow,sourceDate=e.sourceDate,reason="本机关键词命中",lifeCore=e.lifeCore,usageHint=e.usageHint,avoidHint=e.avoidHint,content=e.content,deliveredText=memoryText[i])}),
             contextBudget=RemoteDeskContextBudget(estimatedTokens=((chars+2)/3).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),comfortCeiling=budget.coerceAtLeast(1800),sourcesPreserved=listOf("recent_context")+(if(instructions.isEmpty())emptyList()else listOf("custom_instructions"))+(if(matches.isEmpty())emptyList()else listOf("worldbook"))+(if(memories.isEmpty())emptyList()else listOf("related_memory"))+(if(userPortrait.isEmpty())emptyList()else listOf("user_portrait"))+(if(selfPortrait.isEmpty())emptyList()else listOf("global_excerpt")),userPortrait=if(userPortrait.isEmpty())"empty" else "full",globalExcerpt=if(selfPortrait.isEmpty())"empty" else "full")
-        ))
+        ),attachmentContext.imageParts)
     }
     private fun portraitReceipt(label:String,body:String)=RemoteDeskGlobalExcerpt(label=label,status=if(body.isEmpty())"未设置" else "已递给",delivered=body.isNotEmpty(),injection=if(body.isEmpty())"none" else "full",estimatedTokens=(body.length+2)/3,length=body.length,content=body)
     companion object {

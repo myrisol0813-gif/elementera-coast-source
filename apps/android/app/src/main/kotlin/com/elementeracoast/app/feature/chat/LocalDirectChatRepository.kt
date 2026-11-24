@@ -31,7 +31,7 @@ internal class LocalDirectChatRepository(
         }
         var content = ""
         var completed = false
-        client.stream(provider, model, prepared.messages, maxOutputTokens).collect { event ->
+        client.stream(provider, model, prepared.messages, maxOutputTokens,prepared.imageParts).collect { event ->
             when (event) {
                 is LocalProviderEvent.Delta -> { content += event.text; emit(ChatProgress.Delta(event.text)) }
                 is LocalProviderEvent.Done -> {

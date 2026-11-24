@@ -208,7 +208,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val prepared=knowledge.context(request.messages,budget.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),if(room=="main")"main_chat" else room,request.conversationId,request.attachmentIds)
             return response(r, 200, element(RemoteNativeChatContext.serializer(), RemoteNativeChatContext(
                 ok = true,
-                modelMessages = array(RemoteChatMessage.serializer(), prepared.messages),
+                modelMessages = localMultimodalMessages(prepared.messages,prepared.imageParts),
                 deskSlip = prepared.receipt
             )).jsonObject)
         }

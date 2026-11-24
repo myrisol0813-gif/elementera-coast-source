@@ -78,7 +78,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,all
             busy=true;open.launch(arrayOf("application/zip","application/octet-stream"))
         }
         if(busy)Text(status.ifBlank { "处理中…" },style=MaterialTheme.typography.bodySmall)
-        Text(if(localMode)"本机与云端 ZIP 支持聊天、附件原件、语音、拾潮、书房、日历、模型资料、日常、世界书、自定义指令、记忆、画像、思维壤及脱敏工具历史。原始身份资料需同版本；外观仅本机 ZIP，选中确认将替换当前设备的外观设置（原件不覆盖）。未采集模块请保留原件。" else "支持云端聊天组、书房、日历、世界书、模型资料、同应用记忆、画像、日常、拾潮和自定义；本机 ZIP 支持兼容聊天及原件组、书房和拾潮；单窗口最多80条记录、16 MiB、90条语句，单书最多89条记录、16 MiB。云端预览仅暂存除本机外观以外的归档对象。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(if(localMode)"本机与云端 ZIP 支持聊天、附件原件、语音、拾潮、书房、日历、模型资料、日常、世界书、自定义指令、记忆、画像、思维壤及脱敏工具历史。原始身份资料需同版本；外观仅本机 ZIP，选中确认将替换当前设备的外观设置（原件不覆盖）。图片模型输入单轮原件合计最多16 MiB，文本每件1 MiB；模型不支持则明确失败。未采集模块请保留原件。" else "支持云端聊天组、书房、日历、世界书、模型资料、同应用记忆、画像、日常、拾潮和自定义；本机 ZIP 支持兼容聊天及原件组、书房和拾潮；单窗口最多80条记录、16 MiB、90条语句，单书最多89条记录、16 MiB。云端预览仅暂存除本机外观以外的归档对象。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
     val input=incoming?:return
     val available=operations.localModules(input.manifest)

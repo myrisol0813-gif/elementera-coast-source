@@ -62,17 +62,27 @@ internal class LocalAttachmentStore(private val store:LocalPersistence){
         val rows=entries();val row=rows.firstOrNull{it.metadata.str("conversation_id")==cid&&it.metadata.str("id")==id}?:return false
         writeIndex(rows-row);store.remove(key(id));return true
     }
-    data class TextContext(val messages:List<RemoteChatMessage>,val receipt:RemoteDeskAttachments)
-    fun textContext(cid:String,ids:List<String>,messages:List<RemoteChatMessage>):TextContext{
+    data class AttachmentContext(val messages:List<RemoteChatMessage>,val receipt:RemoteDeskAttachments,val imageParts:List<JsonObject> = emptyList())
+    fun attachmentContext(cid:String,ids:List<String>,messages:List<RemoteChatMessage>):AttachmentContext{
         require(ids.size<=12&&ids.distinct().size==ids.size){"每轮附件最多12个，不能重复。"}
-        if(ids.isEmpty())return TextContext(messages,RemoteDeskAttachments())
+        if(ids.isEmpty())return AttachmentContext(messages,RemoteDeskAttachments())
         val available=entries().filter{it.metadata.str("conversation_id")==cid}.associateBy{it.metadata.str("id")}
-        val items=mutableListOf<RemoteDeskAttachmentItem>();val content=mutableListOf<String>()
+        val items=mutableListOf<RemoteDeskAttachmentItem>();val content=mutableListOf<String>();val images=mutableListOf<JsonObject>();var imageBytes=0L
         for(id in ids){
             val r=requireNotNull(available[id]){"本轮附件不存在或不属于本窗口。"}
             val mime=r.metadata.str("mime");val name=r.metadata.str("name")
+            if(r.metadata.str("kind")=="image"){
+                val b=bytes(r);imageBytes+=b.size
+                require(imageBytes<=16L*1024*1024){"本机单轮图片原件合计最多16 MiB。"}
+                fun sig(offset:Int,vararg expected:Int)=b.size>=offset+expected.size&&expected.indices.all{(b[offset+it].toInt() and 255)==expected[it]}
+                require(when(mime){"image/png"->sig(0,137,80,78,71,13,10,26,10);"image/jpeg"->sig(0,255,216,255);"image/webp"->sig(0,82,73,70,70)&&sig(8,87,69,66,80);else->false}){"图片 MIME 与原件不一致。"}
+                val url="data:"+mime+";base64,"+java.util.Base64.getEncoder().encodeToString(b)
+                images.add(buildJsonObject{put("type","image_url");putJsonObject("image_url"){put("url",url)}})
+                items.add(RemoteDeskAttachmentItem(id=id,name=name,type="image",mode="image"))
+                continue
+            }
             val suffix=name.substringAfterLast('.',"").lowercase(java.util.Locale.ROOT)
-            require(mime.startsWith("text/")||mime in setOf("application/json","application/xml")||suffix in setOf("txt","md","markdown","json","csv","tsv","xml","yaml","yml","toml","ini","py","js","ts","kt","java","css","html","sql","log","sh","rs","go","c","cpp")){"本机目前仅支持 UTF-8 文本附件推理；图片和其他原件可以保存但本轮不能发送给模型。"}
+            require(mime.startsWith("text/")||mime in setOf("application/json","application/xml")||suffix in setOf("txt","md","markdown","json","csv","tsv","xml","yaml","yml","toml","ini","py","js","ts","kt","java","css","html","sql","log","sh","rs","go","c","cpp")){"本机推理支持 PNG/JPEG/WebP 与 UTF-8 文本；其他原件可保存，不能静默发送。"}
             val bytes=bytes(r);require(bytes.size<=1024*1024){"文本附件超过 1 MiB 读取上限。"}
             val text=bytes.decodeToString(throwOnInvalidSequence=true)
             require(!text.contains('\u0000')){"附件不是有效文本。"}
@@ -81,8 +91,8 @@ internal class LocalAttachmentStore(private val store:LocalPersistence){
         }
         val index=messages.indexOfLast{it.role=="user"};require(index>=0){"附件缺少本轮用户消息。"}
         val next=messages.toMutableList()
-        next[index]=next[index].copy(content=next[index].content+"\n\n"+content.joinToString("\n\n"))
-        return TextContext(next,RemoteDeskAttachments(uploaded=ids.size,deliveredToModel=items.size,delivered=items))
+        if(content.isNotEmpty())next[index]=next[index].copy(content=next[index].content+"\n\n"+content.joinToString("\n\n"))
+        return AttachmentContext(next,RemoteDeskAttachments(uploaded=ids.size,deliveredToModel=items.size,delivered=items,vision=RemoteDeskAttachmentVision(supported=images.isNotEmpty(),imagesDelivered=images.size)),images)
     }
     fun deleteConversation(cid:String){
         val rows=entries();val removed=rows.filter{it.metadata.str("conversation_id")==cid}

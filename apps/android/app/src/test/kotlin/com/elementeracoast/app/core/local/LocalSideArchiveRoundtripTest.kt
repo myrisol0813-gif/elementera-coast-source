@@ -25,7 +25,7 @@ class LocalSideArchiveRoundtripTest {
                 })}
             })
             LocalAttachmentStore(from).linkHistory(cid,h);cache.putHistory(cid,h)
-            val input=LocalAttachmentStore(from).textContext(cid,listOf(attachment.id),listOf(RemoteChatMessage("user","hello")))
+            val input=LocalAttachmentStore(from).attachmentContext(cid,listOf(attachment.id),listOf(RemoteChatMessage("user","hello")))
             assertTrue(input.messages.last().content.contains("原始文字"))
             assertEquals(1,input.receipt.deliveredToModel)
             val side=LocalSideRecords(from)
