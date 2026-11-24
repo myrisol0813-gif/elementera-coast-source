@@ -23,7 +23,7 @@ function author(value){
 }
 export async function restoreArchiveBook(db,sessionId,manifest,bookId,confirm=false){
  await validateArchiveManifest(manifest);
- check(manifest.workspace==='backend'&&id(bookId),'invalid library archive source');
+ check(['backend','local'].includes(manifest.workspace)&&id(bookId),'invalid library archive source');
  const rootKey='library/'+await identity('library_books',[bookId]);
  const group=manifest.records.filter(r=>r.module==='library'&&('library/'+r.id===rootKey||r.dependencies.includes(rootKey)));
  check(group.length>0&&group.length<=89,'book exceeds current 89-record transaction limit');

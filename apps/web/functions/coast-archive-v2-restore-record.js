@@ -30,7 +30,7 @@ const roles={owner:'owner',assistant:'assistant'};
 export async function restoreArchiveRecord(db,sessionId,manifest,module,recordId,confirm=false){
  if(module==='tools')return restoreSafeTool(db,sessionId,manifest,recordId,confirm);
  if(SOIL_MODULES.includes(module))return restoreArchiveSoil(db,sessionId,manifest,module,recordId,confirm);
- const localKnowledge=manifest?.workspace==='local'&&['worldbook','custom_instructions',...MEMORY_RESTORE_MODULES,...PORTRAIT_RESTORE_MODULES].includes(module);
+ const localKnowledge=manifest?.workspace==='local'&&['worldbook','custom_instructions','vault',...MEMORY_RESTORE_MODULES,...PORTRAIT_RESTORE_MODULES].includes(module);
  if(manifest?.workspace==='local'&&!localKnowledge)return restoreArchiveLocalRecord(db,sessionId,manifest,module,recordId,confirm);
  if(module==='daily')return restoreArchiveDaily(db,sessionId,manifest,recordId,confirm);
  if(PORTRAIT_RESTORE_MODULES.includes(module))return restoreArchivePortrait(db,sessionId,manifest,module,recordId,confirm);

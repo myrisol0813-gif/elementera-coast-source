@@ -60,13 +60,15 @@ export function createV2Transfer({router,toast,chat}){
         if(['backend','local'].includes(data.manifest.workspace)){
           const objects=new Map(data.manifest.objects.map(d=>[d.object_sha256,d]));
           for(const r of data.manifest.records){
-            if(data.manifest.workspace==='local'&&(!['chat','calendar','daily','model_profile','worldbook','custom_instructions','memory_entries','memory_pockets','user_portrait','self_portrait','thinking_soil','thinking_soil_history','tools'].includes(r.module)||(['custom_instructions','memory_entries','memory_pockets','user_portrait','self_portrait','thinking_soil','thinking_soil_history','tools'].includes(r.module)&&data.manifest.application_id!==APP)))continue;
+            if(data.manifest.workspace==='local'&&(!['chat','calendar','daily','model_profile','worldbook','custom_instructions','memory_entries','memory_pockets','user_portrait','self_portrait','thinking_soil','thinking_soil_history','tools','library','vault'].includes(r.module)||(['custom_instructions','memory_entries','memory_pockets','user_portrait','self_portrait','thinking_soil','thinking_soil_history','tools','vault'].includes(r.module)&&data.manifest.application_id!==APP)))continue;
             if(data.manifest.workspace==='backend'&&!(r.module==='chat'&&data.manifest.application_id===APP)&&!(r.module==='library'&&r.id.startsWith('library_books:'))&&!['calendar','worldbook','model_profile'].includes(r.module)&&!(data.manifest.application_id===APP&&['memory_entries','memory_pockets','user_portrait','self_portrait','daily','vault','custom_instructions','tools'].includes(r.module)))continue;
             const d=objects.get(r.record_object);if(!d||d.size>1800000)continue;
             const raw=new Uint8Array(d.size);let at=0;
             for await(const b of data.objectChunks(d)){raw.set(b,at);at+=b.length;}
             const v=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw));
             if(data.manifest.workspace==='local'){
+              if(r.module==='library'&&v.kind==='library_books'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(v.data?.id||''))options.push({key:'book:'+v.data.id,kind:'book',id:v.data.id,title:String(v.data.title||v.data.id),local:true});
+              if(r.module==='vault'&&['vault_treasures','vault_media_labels'].includes(v.kind))options.push({key:'vault:'+r.id,kind:'vault',id:r.id,title:String(v.data.display_name||v.data.excerpt||v.data.source_id).slice(0,80),local:true});
               const kinds={local_chat:'chat',local_calendar:'calendar',local_moment:'daily',local_diary:'daily',local_daily_profile:'daily',local_model_profile:'model_profile',worldbook:'worldbook',custom_instructions:'custom_instructions',memory_entries:'memory_entries',memory_pockets:'memory_pockets',user_portrait:'user_portrait',self_portrait:'self_portrait',thinking_soil:'thinking_soil',thinking_soil_history:'thinking_soil_history',tools:'tools'};
               if(kinds[v.kind]===r.module){
                 const grouped=r.module==='chat'&&data.manifest.records.some(x=>['attachments','voice','dogtalk_records','dogtalk_snapshots','thinking_soil','thinking_soil_history'].includes(x.module)&&x.dependencies.includes('chat/'+r.id));

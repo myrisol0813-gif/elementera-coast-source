@@ -66,7 +66,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
         val m=input.manifest;val objects=m.objects.associateBy { it.objectSha256 }
         buildList {
             for(r in m.records){
-                if(m.workspace=="local"&&((r.module !in ArchiveV2Local.localModules||r.module=="attachments")||r.module in setOf("custom_instructions","memory_entries","memory_pockets","user_portrait","self_portrait","thinking_soil","thinking_soil_history","tools")&&m.applicationId!=BuildConfig.APPLICATION_ID))continue
+                if(m.workspace=="local"&&((r.module !in ArchiveV2Local.localModules||r.module=="attachments")||r.module in setOf("custom_instructions","memory_entries","memory_pockets","user_portrait","self_portrait","thinking_soil","thinking_soil_history","tools","vault")&&m.applicationId!=BuildConfig.APPLICATION_ID))continue
                 if(m.workspace=="backend"&&!(r.module=="chat"&&m.applicationId==BuildConfig.APPLICATION_ID)&&!(r.module=="library"&&r.id.startsWith("library_books:"))&&r.module !in setOf("calendar","worldbook","model_profile")&&!(m.applicationId==BuildConfig.APPLICATION_ID&&r.module in setOf("memory_entries","memory_pockets","user_portrait","self_portrait","daily","vault","custom_instructions","thinking_soil","thinking_soil_history","tools")))continue
                 val d=objects.getValue(r.recordObject)
                 if(d.size>1800000)continue
@@ -74,6 +74,8 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
                 val kind=value.getValue("kind").jsonPrimitive.content
                 val data=value.getValue("data").jsonObject
                 if(m.workspace=="local"){
+                    if(r.module=="library"&&kind=="library_books")add(Choice("book",data.getValue("id").jsonPrimitive.content,data.getValue("title").jsonPrimitive.content,true))
+                    if(r.module=="vault"&&kind in setOf("vault_treasures","vault_media_labels"))add(Choice("vault",r.id,(data["display_name"]?.jsonPrimitive?.contentOrNull?:data["excerpt"]?.jsonPrimitive?.contentOrNull?:"拾潮").take(80),true))
                     val kinds=mapOf("local_chat" to "chat","local_calendar" to "calendar","local_moment" to "daily","local_diary" to "daily","local_daily_profile" to "daily","local_model_profile" to "model_profile","worldbook" to "worldbook","custom_instructions" to "custom_instructions","memory_entries" to "memory_entries","memory_pockets" to "memory_pockets","user_portrait" to "user_portrait","self_portrait" to "self_portrait","thinking_soil" to "thinking_soil","thinking_soil_history" to "thinking_soil_history","tools" to "tools")
                     if(kinds[kind]==r.module){val grouped=r.module=="chat"&&m.records.any{it.module in setOf("attachments","voice","dogtalk_records","dogtalk_snapshots","thinking_soil","thinking_soil_history")&&"chat/"+r.id in it.dependencies};if(grouped&&m.applicationId!=BuildConfig.APPLICATION_ID)continue;val title=((data["conversation"] as? JsonObject)?.get("title")?.jsonPrimitive?.contentOrNull?:data["title"]?.jsonPrimitive?.contentOrNull?:data["text"]?.jsonPrimitive?.contentOrNull?:when(r.module){"user_portrait"->"用户画像及历史";"self_portrait"->"自我画像及历史";else->r.module}).take(100);add(Choice(r.module,r.id,title,true,grouped))}
                     continue
