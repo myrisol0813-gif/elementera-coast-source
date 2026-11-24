@@ -14,7 +14,7 @@ const modules={
   chat:{ensure:ensureChatSchema,sql:"SELECT id, title, room_type, created_at,updated_at,deleted_at,title_manual,title_generated_at,title_model_id,source,source_window_id FROM conversations WHERE user_id='owner' AND deleted_at IS NULL AND conversation_kind='chat'"},
   memory_entries:{ensure:ensureMemorySchema,sql:"SELECT "+memColumns+" FROM memory_entries WHERE user_id=? AND deleted_at IS NULL AND ((scope='global' AND conversation_id IS NULL) OR (scope='conversation' AND conversation_id IN ("+active+")))",params:[MEMORY_OWNER_ID]},
   memory_pockets:{ensure:ensureMemorySchema,sql:"SELECT "+pocketColumns+" FROM memory_pockets WHERE user_id=? AND deleted_at IS NULL AND conversation_id IN ("+active+")",params:[MEMORY_OWNER_ID]},
-  calendar:{ensure:ensureCalendarSchema,sql:"SELECT * FROM coast_calendar_entries_v2 WHERE 1=1"},
+  calendar:{ensure:ensureCalendarSchema,sql:"SELECT id,day,kind,title,body,recurrence,author,source,conversation_id,source_turn_id,tool_call_id,model_label,created_at,updated_at,anniversary_start_day,anniversary_mode,anniversary_target_days,anniversary_pinned FROM coast_calendar_entries_v2 WHERE (conversation_id IS NULL OR conversation_id IN ("+active+"))"},
   model_profile:{ensure:ensureChatSchema,sql:"SELECT user_id AS id,assistant_avatar_dataurl,current_chat_model,current_image_model,model_box_json,updated_at FROM chat_profiles WHERE user_id='owner'",key:"user_id"},
   voice:{ensure:ensureVoiceSchema,sql:"SELECT v.id,v.conversation_id,v.turn_id,v.message_id,v.source,v.model_label,v.voice_id,v.text,v.audio_bytes,v.created_at FROM coast_voice_clips v WHERE v.conversation_id IN ("+active+")"}
 };
