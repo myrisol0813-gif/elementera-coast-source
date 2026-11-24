@@ -33,9 +33,9 @@ test('owner memory and pocket exact restore, target vector indexes reset, confli
    assert.equal((await restoreArchiveRecord(dst,s.id,m,r.module,r.id,false)).existing,1);
  }
  const e=await dst.prepare('SELECT vector_id,embedding_status FROM memory_entries WHERE id=?').bind(entry.id).first();
- assert.deepEqual(e,{vector_id:null,embedding_status:'pending'});
+ assert.deepEqual({...e},{vector_id:null,embedding_status:'pending'});
  const p=await dst.prepare('SELECT vector_ids_json,embedding_status FROM memory_pockets WHERE id=?').bind(pocket.id).first();
- assert.deepEqual(p,{vector_ids_json:'[]',embedding_status:'pending'});
+ assert.deepEqual({...p},{vector_ids_json:'[]',embedding_status:'pending'});
  await dst.prepare("UPDATE memory_entries SET content='target revision' WHERE id=?").bind(entry.id).run();
  await assert.rejects(()=>restoreArchiveRecord(dst,s.id,m,'memory_entries',entry.id,true),/never overwrite/);
 });
