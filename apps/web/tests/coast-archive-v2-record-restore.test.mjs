@@ -73,3 +73,32 @@ test('local V2 calendar record restores through existing portable cloud migratio
  assert.equal((await restoreArchiveRecord(dst,s.id,m,'calendar',data.id,true)).committed,true);
  const row=(await archiveRecordPage(dst,'calendar')).items[0];assert.equal(row.title,data.title);assert.equal(row.body,data.body);assert.equal(row.author,'owner');assert.equal(row.created_at,Date.parse(data.created_at));
 });
+
+import { ensureToolRunSchema } from '../functions/tool-run-log.js';
+import { safeToolPage,validateSafeToolRow } from '../functions/coast-archive-v2-tool-audit.js';
+import { createConversation } from '../functions/chat-store.js';
+import { readArchiveChat } from '../functions/coast-archive-v2-records.js';
+import { restoreArchiveChatGroup } from '../functions/coast-archive-v2-restore.js';
+
+test('archive tool audit never emits secrets or mailbox activity; records are not replayed',async()=>{
+ const src=new D1Database(),dst=new D1Database(),c=await createConversation(src,'fixture','main');
+ await ensureToolRunSchema(src);
+ for(const [id,key,room,status] of [['safe1','memory.search','main_chat','success'],['visitor1','mailbox.reply','main_chat','success'],['connector1','connector.fetch','main_chat','success'],['visitor2','memory.search','mailbox','success'],['running1','memory.search','main_chat','running']]){
+  await src.prepare('INSERT INTO coast_tool_runs (id,tool_key,actor,room_scope,conversation_id,status,input_summary,output_summary,error_message,created_at,finished_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)').bind(id,key,'api_model_partner',room,c.id,status,'SECRET_INPUT','SECRET_OUTPUT','SECRET_ERROR',10,status==='running'?null:20).run();
+ }
+ const page=await safeToolPage(src);assert.equal(page.items.length,1);
+ const v=page.items[0];assert.equal(v.id,'safe1');assert.ok(!JSON.stringify(v).includes('SECRET'));
+ assert.throws(()=>validateSafeToolRow({...v,input_summary:'SECRET_INPUT'}),/invalid safe/);
+ const chat=await encodeRecordObject({kind:'chat',data:await readArchiveChat(src,c.id)}),audit=await encodeRecordObject({kind:'tools',data:v});
+ const records=[{module:'chat',id:c.id,record_object:chat.descriptor.object_sha256,media_objects:[],dependencies:[]},{module:'tools',id:v.id,record_object:audit.descriptor.object_sha256,media_objects:[],dependencies:['chat/'+c.id]}];
+ const m={format:'elementera-coast-archive',version:2,workspace:'backend',application_id:'com.elementeracoast.source',exported_at:'2026-01-01T00:00:00Z',modules:MODULES.map(module=>({module,coverage:records.some(r=>r.module===module)?'partial':'unavailable',count:records.filter(r=>r.module===module).length})),records,objects:[chat.descriptor,audit.descriptor]};
+ const session=await createArchiveSession(dst);for(const o of [chat,audit]){await registerArchiveObject(dst,session.id,o.descriptor);for(let i=0;i<o.chunks.length;i++)await putArchiveChunk(dst,session.id,o.descriptor.object_sha256,i,o.chunks[i]);}
+ await assert.rejects(()=>restoreArchiveRecord(dst,session.id,m,'tools',v.id,true),/related owner chat/);
+ await restoreArchiveChatGroup(dst,session.id,m,c.id,true);
+ assert.equal((await restoreArchiveRecord(dst,session.id,m,'tools',v.id,false)).ready,1);
+ assert.equal((await restoreArchiveRecord(dst,session.id,{...m,workspace:'local'},'tools',v.id,true)).committed,true);
+ assert.equal((await restoreArchiveRecord(dst,session.id,m,'tools',v.id,false)).existing,1);
+ const restored=await dst.prepare('SELECT input_summary,output_summary,error_message FROM coast_tool_runs WHERE id=?').bind(v.id).first();
+ assert.deepEqual({...restored},{input_summary:null,output_summary:null,error_message:null});
+ assert.deepEqual((await safeToolPage(dst)).items,[v]);
+});
