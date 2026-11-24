@@ -6,6 +6,7 @@ enum class ModelSeries(val title: String) {
     O("o 系列"),
     Gpt4("GPT-4 系列"),
     Gpt5("GPT-5 系列"),
+    Gpt6("GPT-6 系列"),
     OtherOpenAi("其他 OpenAI Chat"),
     Free("Free Test"),
     Image("图片模型")
@@ -25,6 +26,7 @@ internal fun classifyModelSeries(modelId: String): ModelSeries {
         Regex("(^|/)o[0-9]").containsMatchIn(id) || Regex("^o[0-9]").containsMatchIn(id) -> ModelSeries.O
         id.contains("gpt-4") -> ModelSeries.Gpt4
         id.contains("gpt-5") -> ModelSeries.Gpt5
+        id.contains("gpt-6") -> ModelSeries.Gpt6
         else -> ModelSeries.OtherOpenAi
     }
 }
@@ -40,15 +42,15 @@ internal fun groupedUnselectedModels(models: List<String>, current: String): Map
 }
 
 internal fun localProviderId(id: String): String = id.removePrefix("local:").substringBefore('/')
-internal fun localRawModelId(id: String): String = if (id.startsWith("local:")) id.substringAfter('/') else id
+internal fun localRawModelId(id: String): String = if (id.startsWith("local:")) id.substringAfter('/') else id.removePrefix("chatgpt-plan:")
 
 internal fun groupedLocalModels(models: List<String>, query: String, names: Map<String, String>): Map<ModelSeries, List<LocalModelCatalogItem>> {
     val needle = query.trim()
-    val entries = models.asSequence().filter { it.startsWith("local:") && '/' in it }.distinct()
+    val entries = models.asSequence().filter { (it.startsWith("local:") && '/' in it) || it.startsWith("chatgpt-plan:") }.distinct()
         .map { id -> LocalModelCatalogItem(id, modelDisplayName(localRawModelId(id)), classifyModelSeries(localRawModelId(id))) }
         .filter { item -> localRawModelId(item.id).contains(needle, ignoreCase = true) ||
             item.displayName.contains(needle, ignoreCase = true) ||
-            names[localProviderId(item.id)].orEmpty().contains(needle, ignoreCase = true) }
+            (if (item.id.startsWith("chatgpt-plan:")) "ChatGPT 套餐 Codex" else names[localProviderId(item.id)].orEmpty()).contains(needle, ignoreCase = true) }
         .sortedBy { it.displayName.lowercase() }.toList()
     return ModelSeries.entries.associateWith { series -> entries.filter { it.series == series } }
 }

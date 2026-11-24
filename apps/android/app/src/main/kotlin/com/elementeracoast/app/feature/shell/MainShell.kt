@@ -149,7 +149,8 @@ fun MainShell(
         ) {
             val ownsPageChrome = state.activeFeature == FeatureDestination.Memory ||
                 state.activeFeature == FeatureDestination.Daily ||
-                state.activeFeature == FeatureDestination.IslandLetter
+                state.activeFeature == FeatureDestination.IslandLetter ||
+                state.activeFeature == FeatureDestination.Wolf
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
                 containerColor = MaterialTheme.colorScheme.background,

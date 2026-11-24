@@ -38,7 +38,8 @@ import com.elementeracoast.app.core.model.CoastShellState
 import com.elementeracoast.app.core.remote.RemoteDevUpdate
 import com.elementeracoast.app.feature.chatgpt.ChatGptConnectState
 import com.elementeracoast.app.feature.serpentdesk.DevHandsRepository
-import com.elementeracoast.app.feature.shell.FeatureLocalBackBar
+import com.elementeracoast.app.feature.shell.FeaturePageTopBar
+import androidx.activity.compose.BackHandler
 import com.elementeracoast.app.ui.theme.SnowLetterSurface
 import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
 import kotlinx.coroutines.launch
@@ -60,24 +61,35 @@ fun WolfScreen(
     onLogout: () -> Unit,
     onImportMessages: (List<ChatMessage>) -> Unit,
     onActionLogged: (String, String, String) -> Unit,
-    onSnackbar: (String) -> Unit
+    onSnackbar: (String) -> Unit,
+    onBackToChat: () -> Unit
 ) {
     val state by store.state.collectAsState()
     var page by remember { mutableStateOf<WolfDestination?>(null) }
     val current = page
+    var modelPage by remember { mutableStateOf(LocalModelPage.Catalog) }
+    val homeTitle = "屋主设置"
+    fun back() { if (current == WolfDestination.ModelBox && modelPage != LocalModelPage.Catalog) modelPage = LocalModelPage.Catalog else if (current != null) { page = null; modelPage = LocalModelPage.Catalog } else onBackToChat() }
+    BackHandler(enabled = current != null) { back() }
 
     if (current == null) {
+        Column(Modifier.fillMaxSize()) {
+        FeaturePageTopBar(homeTitle, "显示资料、外观、聊天与运行设置", onBack = ::back)
         WolfHome(
             state = state,
             model = shellState.currentModel,
             localMode = shellState.localMode,
             onOpen = { page = it }
         )
+        }
         return
     }
 
     Column(Modifier.fillMaxSize()) {
-        FeatureLocalBackBar("屋主设置") { page = null }
+        val sub = if (current == WolfDestination.ModelBox && modelPage != LocalModelPage.Catalog) " — " + modelPage.title else ""
+        FeaturePageTopBar("$homeTitle — ${current.title}$sub", if (shellState.localMode) "本机模式" else current.subtitle, onBack = ::back,
+            actionLabel = if (current == WolfDestination.ModelBox && shellState.localMode && modelPage == LocalModelPage.Catalog) "刷新" else null,
+            onAction = if (current == WolfDestination.ModelBox && shellState.localMode && modelPage == LocalModelPage.Catalog) onRefreshModels else null)
         Box(Modifier.weight(1f)) {
             when (current) {
                 WolfDestination.Profile -> ProfileScreen(state, store, onAppearance = { page = WolfDestination.Appearance }, onSnackbar = onSnackbar)
@@ -103,11 +115,13 @@ fun WolfScreen(
                     onChatGptDisconnect = onChatGptDisconnect,
                     onChatGptRefresh = onChatGptRefresh,
                     onChatGptProbe = onChatGptProbe,
-                    localMode = shellState.localMode
+                    localMode = shellState.localMode,
+                    localPage = modelPage,
+                    onLocalPage = { modelPage = it }
                 )
                 WolfDestination.BasicSettings -> BasicSettingsScreen(state.basic, store, onSnackbar)
                 WolfDestination.Diagnostics -> DiagnosticsScreen(shellState, state)
-                WolfDestination.Update -> WolfUpdateScreen(devHands, onSnackbar)
+                WolfDestination.Update -> if (shellState.localMode) LocalGithubUpdateScreen(onSnackbar) else WolfUpdateScreen(devHands, onSnackbar)
             }
         }
     }
@@ -298,7 +312,7 @@ private fun WolfUpdateScreen(
 }
 
 @Composable
-private fun WolfUpdateFact(label: String, value: String, mono: Boolean = false) {
+internal fun WolfUpdateFact(label: String, value: String, mono: Boolean = false) {
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.Top) {
         Text(label, modifier = Modifier.weight(.8f), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
         Text(value, modifier = Modifier.weight(1.5f), fontFamily = if (mono) FontFamily.Monospace else FontFamily.Default, style = MaterialTheme.typography.bodySmall)
