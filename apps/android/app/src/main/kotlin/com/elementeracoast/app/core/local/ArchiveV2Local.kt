@@ -30,7 +30,7 @@ internal object ArchiveV2Local {
                     val raw=buildJsonObject { put("kind",kind);put("data",data) }.toString().encodeToByteArray()
                     val d=describe(raw)
                     ByteArrayInputStream(raw).use { writer.objectEntry(d,it) }
-                    val dependencies=if(module in setOf("calendar","daily")+LocalMemoryStore.modules)data.jsonObject["conversation_id"]?.jsonPrimitive?.contentOrNull?.let { listOf("chat/"+it) }?:emptyList() else emptyList()
+                    val dependencies=if(module in setOf("calendar","daily")+LocalMemoryStore.modules+LocalSoilStore.modules)data.jsonObject["conversation_id"]?.jsonPrimitive?.contentOrNull?.let { listOf("chat/"+it) }?:emptyList() else emptyList()
                     objects[d.objectSha256]=d;records.add(ArchiveV2Record(module,id,d.objectSha256,emptyList(),dependencies))
                 }
                 fun list(module:String,field:String,kind:String,id:(JsonObject)->String) {
@@ -104,9 +104,11 @@ internal object ArchiveV2Local {
         val bytes=if(base.isEmpty())null else if(manifest.workspace=="backend")ArchiveV2CloudToLocal.convert(manifest,stage,base,selection) else bundle(manifest,stage,base)
         fun run(target:LocalPersistence,write:Boolean):LocalRestorePreview{
             val parents=bytes?.let{LocalTransferRestore.plannedParents(it,applicationId,base,target)}
-            val existing=RemoteCacheStore(target,strictReads=true).conversations().map{it.id}.toSet()
+            val cache=RemoteCacheStore(target,strictReads=true)
+            val existing=cache.conversations().map{it.id}.toSet()
+            val histories=if(extra.any{it in LocalSoilStore.modules})bytes?.let{LocalTransferRestore.plannedHistories(it,applicationId,base,target)}?:existing.associateWith{requireNotNull(cache.history(it))} else emptyMap()
             val report=bytes?.let{if(write)LocalTransferRestore.restoreStaged(it,applicationId,base,target) else LocalTransferRestore.preview(it,applicationId,base,target)}
-            val extras=ArchiveV2Knowledge.apply(rows,extra,target,write,parents?.first?:existing,parents?.second.orEmpty())
+            val extras=ArchiveV2Knowledge.apply(rows,extra,target,write,parents?.first?:existing,parents?.second.orEmpty(),histories)
             return LocalRestorePreview(manifest.workspace,report?.counts.orEmpty()+extras,report?.unsupportedModules.orEmpty())
         }
         return if(confirm)store.atomic{run(it,true)}else store.readConsistent{run(it,false)}

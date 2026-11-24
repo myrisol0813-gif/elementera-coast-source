@@ -7,7 +7,7 @@ import java.time.Instant
 /** These modules already have a real editable local store. Use the cloud's
  * canonical V2 record shape in both directions, not a parallel backup schema. */
 internal object ArchiveV2Knowledge {
-    val modules=setOf("custom_instructions","worldbook")+LocalMemoryStore.modules+LocalPortraitStore.modules
+    val modules=setOf("custom_instructions","worldbook")+LocalMemoryStore.modules+LocalPortraitStore.modules+LocalSoilStore.modules
     data class Row(val module:String,val id:String,val data:JsonObject,val kind:String=module)
     private fun identity(module:String,id:String)=module+":"+ArchiveV2Chunks.digest(JsonArray(listOf(JsonPrimitive(id))).toString().encodeToByteArray())
     private fun stamp(value:String?)=Instant.parse(requireNotNull(value)).toEpochMilli().also{require(it>=0)}
@@ -42,10 +42,14 @@ internal object ArchiveV2Knowledge {
                 items.forEach{result.add(Row(module,identity(kind,it.str("id")),it,kind))}
             }
         }
+        val soils=LocalSoilStore(store).read()
+        for((module,items) in listOf("thinking_soil" to soils.current,"thinking_soil_history" to soils.history)){
+            items.forEach{result.add(Row(module,LocalSoilStore.identity(module,it),it))}
+        }
         return result
     }
     fun read(manifest:ArchiveV2Manifest,stage:ArchiveV2Stage,selection:Set<String>,app:String):List<Row>{
-        require(selection.intersect(LocalMemoryStore.modules+LocalPortraitStore.modules+setOf("custom_instructions")).isEmpty()||manifest.applicationId==app){"记忆及自定义指令原始身份暂需同版本恢复。"}
+        require(selection.intersect(LocalMemoryStore.modules+LocalPortraitStore.modules+LocalSoilStore.modules+setOf("custom_instructions")).isEmpty()||manifest.applicationId==app){"记忆及自定义指令原始身份暂需同版本恢复。"}
         val objects=manifest.objects.associateBy{it.objectSha256}
         return manifest.records.filter{it.module in selection}.map{r->
             require(r.mediaObjects.isEmpty())
@@ -61,11 +65,14 @@ internal object ArchiveV2Knowledge {
                 require(v["deleted_at"]==JsonNull&&r.id==v.str("id"))
                 val cid=v["conversation_id"]?.jsonPrimitive?.contentOrNull
                 require(r.dependencies==if(cid==null)emptyList() else listOf("chat/"+cid))
+            }else if(r.module in LocalSoilStore.modules){
+                LocalSoilStore.validateRow(v,r.module=="thinking_soil_history")
+                require(r.id==LocalSoilStore.identity(r.module,v)&&r.dependencies==listOf("chat/"+v.str("conversation_id")))
             }else require(r.dependencies.isEmpty()&&r.id==identity(kind,v.str("id")))
             Row(r.module,r.id,v,kind)
         }
     }
-    fun apply(rows:List<Row>,selection:Set<String>,store:LocalPersistence,write:Boolean,parents:Set<String>,conflictingParents:Set<String>):Map<String,LocalRestoreCount>{
+    fun apply(rows:List<Row>,selection:Set<String>,store:LocalPersistence,write:Boolean,parents:Set<String>,conflictingParents:Set<String>,histories:Map<String,RemoteHistory>):Map<String,LocalRestoreCount>{
         val cache=RemoteCacheStore(store,strictReads=true)
         val counts=linkedMapOf<String,LocalRestoreCount>()
         if("custom_instructions" in selection){
@@ -129,6 +136,30 @@ internal object ArchiveV2Knowledge {
             require(same||blank){"目标画像已有正文或历史，不覆盖。"}
             counts[module]=LocalRestoreCount(if(same)0 else group.size,if(same)group.size else 0,0)
             if(write&&!same)portraits.write(module,document)
+        }
+        if(selection.any{it in LocalSoilStore.modules}){
+            val soil=LocalSoilStore(store);val old=soil.read()
+            fun merge(module:String,existing:List<JsonObject>):List<JsonObject>{
+                if(module !in selection)return existing
+                val incoming=rows.filter{it.module==module}.map{it.data}
+                val byId=existing.associateBy{LocalSoilStore.identity(module,it)}
+                val fresh=incoming.filter{LocalSoilStore.identity(module,it) !in byId}
+                val matched=incoming.filter{LocalSoilStore.identity(module,it) in byId}
+                for(v in fresh){
+                    val cid=v.str("conversation_id")
+                    require(cid in parents&&cid !in conflictingParents){"思维壤关联原窗口缺失或存在冲突。"}
+                    val h=requireNotNull(histories[cid]){"思维壤关联原聊天历史缺失。"}
+                    if(module=="thinking_soil_history"){
+                        val turn=h.turns.find{it.id==v.str("turn_id")}
+                        require(turn!=null&&turn.assistant.variantsByUserVariant.values.flatten().any{it.id==v.str("assistant_message_id")}){"思维壤快照找不到原助手消息。"}
+                    }
+                }
+                counts[module]=LocalRestoreCount(fresh.size,matched.size,matched.count{byId[LocalSoilStore.identity(module,it)]!=it})
+                return existing+fresh
+            }
+            val next=LocalSoilStore.Rows(merge("thinking_soil",old.current),merge("thinking_soil_history",old.history))
+            LocalSoilStore.validate(next)
+            if(write)soil.write(next)
         }
         return counts
     }

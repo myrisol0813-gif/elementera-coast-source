@@ -100,7 +100,8 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if (method == "DELETE") {
                 cache.putConversations(all.filterNot { it.id == cid })
                 cache.removeHistory(cid)
-                store.remove("local.soil." + cid)
+                val oldSoil=soil.read()
+                soil.write(LocalSoilStore.Rows(oldSoil.current.filterNot{it["conversation_id"]?.jsonPrimitive?.content==cid},oldSoil.history.filterNot{it["conversation_id"]?.jsonPrimitive?.content==cid}))
                 return ok(r)
             }
         }

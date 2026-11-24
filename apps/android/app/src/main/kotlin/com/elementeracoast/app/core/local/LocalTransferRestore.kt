@@ -140,6 +140,12 @@ internal object LocalTransferRestore {
             declared - availableModules(payload, applicationId)), merged)
     }
 
+    internal fun plannedHistories(bytes:ByteArray,applicationId:String,modules:Set<String>,store:LocalPersistence):Map<String,RemoteHistory>{
+        val incoming=decodeSelected(CoastTransferCodec.decode(bytes),applicationId,modules).conversations
+        val existing=LocalBackupArchive.capture(store,applicationId).conversations
+        return (incoming+existing).associate{it.conversation.id to it.history}
+    }
+
     internal fun plannedParents(bytes:ByteArray,applicationId:String,modules:Set<String>,store:LocalPersistence):Pair<Set<String>,Set<String>>{
         val payload=CoastTransferCodec.decode(bytes)
         val incoming=decodeSelected(payload,applicationId,modules).conversations
