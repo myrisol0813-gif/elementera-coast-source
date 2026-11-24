@@ -8,7 +8,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ArchiveV2CloudToLocalTest {
-    @Test fun cloudCalendarUsesLocalAtomicRestoreAndRejectsUnsupportedProvenance(){
+    @Test fun cloudCalendarRetainsStandaloneProvenanceAcrossLocalArchive(){
         val root=Files.createTempDirectory("coast-cloud-local").toFile()
         try{
             fun fixture(provenance:Boolean):Pair<ArchiveV2Manifest,ArchiveV2Stage>{
@@ -16,7 +16,8 @@ class ArchiveV2CloudToLocalTest {
                 val raw=buildJsonObject{
                     put("kind","calendar");putJsonObject("data"){
                         put("id","calendar-fixture");put("day","2026-11-24");put("kind","event");put("title","纪念");put("body","原文");put("recurrence","none");put("author","owner");put("source","manual")
-                        for(k in listOf("conversation_id","source_turn_id","tool_call_id","anniversary_start_day","anniversary_mode","anniversary_target_days"))put(k,JsonNull)
+                        for(k in listOf("conversation_id","source_turn_id","anniversary_start_day","anniversary_mode","anniversary_target_days"))put(k,JsonNull)
+                        put("tool_call_id",if(provenance)JsonPrimitive("tool-fixture") else JsonNull)
                         put("model_label",if(provenance)JsonPrimitive("model") else JsonNull);put("created_at",123L);put("updated_at",456L);put("anniversary_pinned",0)
                     }
                 }.toString().encodeToByteArray()
@@ -37,8 +38,22 @@ class ArchiveV2CloudToLocalTest {
             val row=LocalCalendarStore(target).snapshot()[0].jsonObject
             assertEquals("原文",row.getValue("body").jsonPrimitive.content);assertEquals(123L,row.getValue("created_at").jsonPrimitive.long)
             val (bad,badStage)=fixture(true)
-            assertTrue(runCatching{ArchiveV2Local.restore(bad,badStage,modules,app,target,true)}.isFailure)
-            assertEquals(1,LocalCalendarStore(target).snapshot().size)
+            assertEquals(1,ArchiveV2Local.restore(bad,badStage,modules,app,target,true).counts.getValue("calendar").conflicts)
+            assertEquals(row,LocalCalendarStore(target).snapshot()[0])
+            val clean=MemoryLocalPersistence()
+            ArchiveV2Local.restore(bad,badStage,modules,app,clean,true)
+            val restored=LocalCalendarStore(clean).snapshot()[0].jsonObject
+            assertEquals("model",restored.getValue("model_label").jsonPrimitive.content)
+            assertEquals("tool-fixture",restored.getValue("tool_call_id").jsonPrimitive.content)
+            val edited=LocalCalendarStore(clean).save("calendar-fixture",buildJsonObject{put("title","Edited")})
+            for(key in listOf("model_label","tool_call_id","author","source"))assertEquals(restored[key],edited[key])
+            val exported=File(root,"local-roundtrip.zip")
+            val localManifest=ArchiveV2Local.export(clean,app,exported)
+            val localStage=ArchiveV2Stage(root,"roundtrip")
+            assertEquals(localManifest,ArchiveV2ZipReader.stage(exported,localStage))
+            val roundtrip=MemoryLocalPersistence()
+            ArchiveV2Local.restore(localManifest,localStage,modules,app,roundtrip,true)
+            assertEquals(LocalCalendarStore(clean).snapshot(),LocalCalendarStore(roundtrip).snapshot())
         }finally{root.deleteRecursively()}
     }
 }
