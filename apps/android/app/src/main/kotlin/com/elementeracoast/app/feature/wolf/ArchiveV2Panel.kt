@@ -21,9 +21,10 @@ import java.time.format.DateTimeFormatter
 
 private val v2Labels=mapOf("chat" to "聊天","calendar" to "日历","daily" to "日常","model_profile" to "模型资料","attachments" to "附件","voice" to "语音","thinking_soil" to "思维壤","thinking_soil_history" to "思维壤历史","dogtalk_records" to "私人草稿","dogtalk_snapshots" to "历史快照","memory_entries" to "记忆","memory_pockets" to "候选","user_portrait" to "用户画像","self_portrait" to "自我画像","worldbook" to "世界书","custom_instructions" to "自定义","vault" to "拾潮","library" to "书房","appearance" to "外观","tools" to "工具")
 @Composable
-internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,allowed:Boolean,onSnackbar:(String)->Unit){
+internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchiveRepository,localMode:Boolean,allowed:Boolean,onSnackbar:(String)->Unit,htmlBusy:Boolean,onExportHtml:()->Unit){
     val context=LocalContext.current;val scope=rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
+    var legacyUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var status by remember { mutableStateOf("") }
     var pendingFile by remember { mutableStateOf<File?>(null) }
     var incoming by remember { mutableStateOf<ArchiveV2Operations.Imported?>(null) }
@@ -52,6 +53,11 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,all
         if(uri==null){busy=false;return@rememberLauncherForActivityResult}
         scope.launch{
             try{
+                val isZip=withContext(Dispatchers.IO){
+                    val header=context.contentResolver.openInputStream(uri)?.use { ByteArray(4).let { bytes -> var at=0; while(at<bytes.size){val n=it.read(bytes,at,bytes.size-at);if(n<0)break;at+=n};bytes.copyOf(at) } }?:error("无法读取归档")
+                    header.contentEquals(byteArrayOf(0x50,0x4b,0x03,0x04))
+                }
+                if(!isZip){legacyUri=uri;return@launch}
                 val input=operations.open(uri)
                 choices=operations.cloudChoices(input);chosen=choices.firstOrNull()
                 incoming=input;selected=operations.localModules(input.manifest)
@@ -61,8 +67,8 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,all
         }
     }
     Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
-        WolfRow("导出 V2 归档 ZIP · 试验","当前已接通资料 · 清单明确标注缺失模块"){
-            if(!allowed||busy)return@WolfRow
+        WolfRow("导出","海岸归档 ZIP · 原件与清单"){
+            if(!allowed||busy||legacyUri!=null||incoming!=null)return@WolfRow
             busy=true;status="准备归档"
             scope.launch{
                 try{
@@ -73,13 +79,17 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,all
                 }catch(e:CancellationException){throw e}catch(e:Exception){busy=false;onSnackbar("V2 导出未完成；原资料未修改。")}
             }
         }
-        WolfRow("读取 V2 归档 ZIP · 试验","先校验，后预览；只恢复目标已支持的模块"){
-            if(!allowed||busy||incoming!=null)return@WolfRow
-            busy=true;open.launch(arrayOf("application/zip","application/octet-stream"))
+        WolfRow("导出 HTML",if(htmlBusy)"正在导出…" else "离线阅读 ZIP · 解压后打开 index.html"){
+            if(!busy&&legacyUri==null&&incoming==null&&!htmlBusy)onExportHtml()
+        }
+        WolfRow("导入","自动识别 ZIP / 旧版迁移 JSON · 先预览再确认"){
+            if(!allowed||busy||incoming!=null||legacyUri!=null)return@WolfRow
+            busy=true;open.launch(arrayOf("application/zip","application/json","text/plain","application/octet-stream"))
         }
         if(busy)Text(status.ifBlank { "处理中…" },style=MaterialTheme.typography.bodySmall)
-        Text(if(localMode)"本机与云端 ZIP 支持聊天、附件原件、语音、拾潮、书房、日历、模型资料、日常、世界书、自定义指令、记忆、画像、思维壤、私人狗话及脱敏工具历史。原始身份资料需同版本；外观仅本机 ZIP，选中确认将替换当前设备的外观设置（原件不覆盖）。图片模型输入单轮原件合计最多16 MiB，文本每件1 MiB；模型不支持则明确失败。电波/灯塔独立消息的狗话快照暂不可恢复；未采集模块请保留原件。" else "支持云端聊天组、书房、日历、世界书、模型资料、同应用记忆、画像、日常、拾潮和自定义；本机 ZIP 支持兼容聊天及原件组、书房和拾潮；单窗口最多80条记录、16 MiB、90条语句，单书最多89条记录、16 MiB。云端预览仅暂存除本机外观以外的归档对象。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("归档范围以清单为准；尚未接通的模块不会恢复。HTML 仅用于阅读。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
+    legacyUri?.let { uri -> TransferPanel(archive,localMode,allowed,onSnackbar,uri){legacyUri=null} }
     val input=incoming?:return
     val available=operations.localModules(input.manifest)
     fun dismiss(){

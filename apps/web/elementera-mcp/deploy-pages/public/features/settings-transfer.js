@@ -1,6 +1,6 @@
 import { createV2Transfer } from './settings-archive-v2.js';
 import { requestJson } from '../core/api.js';
-import { escapeHtml, downloadFile, timestampLabel } from '../core/dom.js';
+import { escapeHtml } from '../core/dom.js';
 
 const BASE='/api/transfer/v1';
 const FILE_LIMIT=64*1024*1024;
@@ -42,8 +42,7 @@ export function createTransferSettings({router,toast,chat}){
   function reset(){revision++;payload=null;selection=new Set();preview=null;result=null;busy=false;failure='';}
   router.subscribe(({current:next,previous})=>{if(previous?.name==='settings-transfer'&&next?.name!=='settings-transfer')reset();});
   router.register('settings-transfer',()=>{
-    let content=v2.render()+section('可迁移数据包',line('当前目的地：在线海岸','导入写入已登录的云端。不会覆盖已有记录；原文件保留。')+
-      action('export','导出云端可迁移资料',busy)+action('choose','选择数据包',busy));
+    let content=section('导入',line('当前目的地：在线海岸','选择 ZIP 或旧版迁移 JSON。先校验和预览，确认后才写入。')+action('choose','选择归档文件',busy||v2.active()))+v2.render();
     if(payload){
       content+=section('选择模块',line('来源',payload.workspace==='local'?'本机海岸':'在线海岸')+payload.includedModules.map(k=>{
         const allowed=supported.includes(k);
@@ -60,7 +59,7 @@ export function createTransferSettings({router,toast,chat}){
       (result?line('导入完成','如果聊天列表尚未刷新，请重新打开海岸。'):(report.can_commit?action('import','确认写入云端',busy):line('本次不能导入','存在不兼容记录或超过 90 条原子写入上限。原资料未被修改。'))));
     }
     if(failure)content+=line('操作未完成',failure);
-    content+=section('范围与限制',line('数据包最多 64 MiB','云端单次上传 8 MiB；附件原件、长期记忆、语音及其他模块暂不恢复。原 JSON / HTML 防丢导出仍保留。'));
+    if(payload)content+=section('旧版迁移包范围',line('旧版 JSON 最多 64 MiB','云端单次上传 8 MiB；此限制仅适用于 V1。HTML 与旧完整阅读 JSON 不可直接恢复。'));
     return {title:'海岸数据迁移',subtitle:'选择、预览、确认 · 云端存储',className:'settings-panel',body:content};
   });
   async function operate(work){
@@ -72,18 +71,19 @@ export function createTransferSettings({router,toast,chat}){
     if(name.startsWith('transfer-v2-'))return v2.handle(name.slice('transfer-'.length),target);
     if(name==='transfer-open'){reset();return router.open('settings-transfer');}
     if(!current()||busy)return;
-    if(name==='transfer-export')return operate(async token=>{
-      const {bundle}=await requestJson(BASE);if(token!==revision)return;
-      downloadFile(JSON.stringify(bundle),'elementera-coast-transfer-'+timestampLabel()+'.json','application/json');
-      toast('数据包已导出；请妥善保存。');
-    });
     if(name==='transfer-choose'){
-      const input=document.createElement('input');input.type='file';input.accept='.json,application/json';
+      if(v2.active())return;
+      const input=document.createElement('input');input.type='file';input.accept='.zip,.json,application/zip,application/json,application/octet-stream';
       const token=revision;
       input.addEventListener('change',()=>{const file=input.files?.[0];if(!file||token!==revision||!current())return;
-        void operate(async v=>{const data=await readBundle(file);if(v!==revision)return;
-          payload=data;selection=new Set(data.includedModules.filter(k=>supported.includes(k)));preview=null;result=null;
-        });
+        void (async()=>{
+          const header=new Uint8Array(await file.slice(0,4).arrayBuffer());
+          if(token!==revision||!current())return;
+          if(header.length===4&&header[0]===0x50&&header[1]===0x4b&&header[2]===3&&header[3]===4){reset();await v2.readFile(file);return;}
+          await operate(async v=>{const data=await readBundle(file);if(v!==revision)return;
+            payload=data;selection=new Set(data.includedModules.filter(k=>supported.includes(k)));preview=null;result=null;
+          });
+        })().catch(e=>{if(current()){failure=e.message||'无法读取归档';void refresh();}});
       },{once:true});input.click();return;
     }
     if(name==='transfer-toggle'&&payload&&!result){
