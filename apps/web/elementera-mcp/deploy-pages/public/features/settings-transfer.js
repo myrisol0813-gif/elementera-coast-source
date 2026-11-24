@@ -53,7 +53,7 @@ export function createTransferSettings({router,toast,chat}){
     if(report){
       content+=section(result?'已确认导入':'导入预览',supported.map(k=>{
         const row=report[k];if(!row||!selection.has(k))return '';
-        return line(labels[k],(result?'已新增 ':'可新增 ')+row.ready+' · 已存在保留 '+row.existing)+(row.blocked||[]).map(x=>line('不可迁移',x.reason)).join('');
+        return line(labels[k],(result?'已新增 ':'可新增 ')+row.ready+' · 已存在保留 '+row.existing+' · 内容冲突 '+(row.conflicts||0))+(row.blocked||[]).map(x=>line('不可迁移',x.reason)).join('');
       }).join('')+
       (result?line('导入完成','如果聊天列表尚未刷新，请重新打开海岸。'):(report.can_commit?action('import','确认写入云端',busy):line('本次不能导入','存在不兼容记录或超过 90 条原子写入上限。原资料未被修改。'))));
     }
