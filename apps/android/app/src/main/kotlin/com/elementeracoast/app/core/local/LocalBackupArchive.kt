@@ -62,39 +62,21 @@ internal object LocalBackupArchive {
     fun encode(payload: LocalBackupPayload): ByteArray {
         validate(payload)
         val value = json.encodeToJsonElement(LocalBackupPayload.serializer(), payload).jsonObject
-        return CoastTransferCodec.encode(buildJsonObject {
-            putJsonObject("source") { put("application", payload.applicationId); put("mode", "local") }
-            put("exported_at", payload.exportedAt)
-            putJsonObject("modules") {
-                putJsonObject("chat") { put("conversations", value.getValue("conversations")) }
-                put("model_profile", value.getValue("profile"))
-                putJsonObject("daily") {
-                    put("profile", value.getValue("dailyProfile")); put("moments", value.getValue("moments")); put("diaries", value.getValue("diaries"))
-                }
-                putJsonObject("calendar") { put("entries", value.getValue("calendar")) }
-            }
-            put("excluded_modules", JsonArray(excluded.map(::JsonPrimitive)))
-        })
+        return CoastTransferCodec.encode(JsonObject(value + mapOf(
+            "workspace" to JsonPrimitive("local"),
+            "includedModules" to JsonArray(listOf("chat", "calendar", "daily", "model_profile").map(::JsonPrimitive))
+        )))
     }
 
-    // Full local restore decoder; cross-edition daily identities need an explicit mapping before restore.
-    // Common chat-only transfer is read separately, without this edition restriction.
+    // Full local modules are typed by edition. The generic wire reader is unrestricted.
     fun decode(bytes: ByteArray, applicationId: String): LocalBackupPayload {
         val payload = CoastTransferCodec.decode(bytes)
-        val source = payload.getValue("source").jsonObject
-        require(source.getValue("application").jsonPrimitive.content == applicationId && source.getValue("mode").jsonPrimitive.content == "local") {
-            "完整本机模块恢复暂需同应用；通用聊天迁移另走模块选择。"
+        require(payload.getValue("applicationId").jsonPrimitive.content == applicationId &&
+            payload.getValue("workspace").jsonPrimitive.content == "local") {
+            "完整本机模块恢复暂需同应用；通用聊天与日历迁移另走模块选择。"
         }
-        val modules = payload.getValue("modules").jsonObject
-        require(modules.keys == setOf("chat", "model_profile", "daily", "calendar"))
-        val daily = modules.getValue("daily").jsonObject
-        val value = buildJsonObject {
-            put("applicationId", applicationId); put("exportedAt", payload.getValue("exported_at"))
-            put("conversations", modules.getValue("chat").jsonObject.getValue("conversations"))
-            put("profile", modules.getValue("model_profile"))
-            put("dailyProfile", daily.getValue("profile")); put("moments", daily.getValue("moments")); put("diaries", daily.getValue("diaries"))
-            put("calendar", modules.getValue("calendar").jsonObject.getValue("entries"))
-        }
+        require(payload.getValue("includedModules").jsonArray.map { it.jsonPrimitive.content }.toSet() == CoastTransferCodec.supportedModules)
+        val value = JsonObject(payload.filterKeys { it !in setOf("workspace", "includedModules") })
         return json.decodeFromJsonElement(LocalBackupPayload.serializer(), value).also(::validate)
     }
 

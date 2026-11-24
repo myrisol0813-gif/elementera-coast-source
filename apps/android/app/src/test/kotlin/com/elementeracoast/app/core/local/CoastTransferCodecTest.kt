@@ -6,7 +6,12 @@ import org.junit.Test
 
 class CoastTransferCodecTest {
     @Test fun backendEnvelopeCanBeReadWithoutApplicationGate() {
-        val payload = Json.parseToJsonElement("{\"source\":{\"application\":\"fixture\",\"mode\":\"backend\"},\"exported_at\":\"2026-11-24T12:00:00Z\",\"modules\":{\"chat\":{\"conversations\":[]}},\"excluded_modules\":[\"media\"]}").jsonObject
+        val payload = buildJsonObject {
+            put("applicationId", "fixture"); put("workspace", "backend"); put("exportedAt", "2026-11-24T12:00:00Z")
+            putJsonArray("includedModules") { add("chat") }
+            for (key in listOf("conversations", "calendar", "moments", "diaries")) put(key, JsonArray(emptyList()))
+            put("profile", JsonNull); put("dailyProfile", JsonNull)
+        }
         val bytes = CoastTransferCodec.encode(payload)
         assertEquals(payload, CoastTransferCodec.decode(bytes))
         val envelope = Json.parseToJsonElement(bytes.decodeToString()).jsonObject

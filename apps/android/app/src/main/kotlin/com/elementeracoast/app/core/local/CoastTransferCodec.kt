@@ -34,16 +34,22 @@ internal object CoastTransferCodec {
         return json.parseToJsonElement(envelope.payload_json).jsonObject.also(::validate)
     }
 
+    val supportedModules = setOf("chat", "calendar", "daily", "model_profile")
+
     private fun validate(payload: JsonObject) {
-        require(payload.keys == setOf("source", "exported_at", "modules", "excluded_modules"))
-        val source = payload.getValue("source").jsonObject
-        require(source.keys == setOf("application", "mode"))
-        require(source.getValue("application").jsonPrimitive.isString &&
-            source.getValue("application").jsonPrimitive.content.length in 1..100)
-        require(source.getValue("mode").jsonPrimitive.content in setOf("local", "backend"))
-        Instant.parse(payload.getValue("exported_at").jsonPrimitive.content)
-        val modules = payload.getValue("modules").jsonObject
-        require(modules.isNotEmpty() && modules.keys.all { it.matches(Regex("[a-z][a-z0-9_]{0,63}")) })
-        require(payload.getValue("excluded_modules").jsonArray.all { it is JsonPrimitive && it.isString })
+        require(payload.keys == setOf("applicationId", "workspace", "exportedAt", "includedModules",
+            "conversations", "calendar", "profile", "dailyProfile", "moments", "diaries"))
+        val source = payload.getValue("applicationId").jsonPrimitive
+        require(source.isString && source.content.matches(Regex("[A-Za-z0-9_.-]{1,100}")))
+        require(payload.getValue("workspace").jsonPrimitive.content in setOf("local", "backend"))
+        Instant.parse(payload.getValue("exportedAt").jsonPrimitive.content)
+        val modules = payload.getValue("includedModules").jsonArray.map { it.jsonPrimitive.content }
+        require(modules.all { it in supportedModules } && modules.distinct().size == modules.size)
+        for (key in listOf("conversations", "calendar", "moments", "diaries")) require(payload[key] is JsonArray)
+        for (key in listOf("profile", "dailyProfile")) require(payload[key] == JsonNull || payload[key] is JsonObject)
+        if ("chat" !in modules) require(payload.getValue("conversations").jsonArray.isEmpty())
+        if ("calendar" !in modules) require(payload.getValue("calendar").jsonArray.isEmpty())
+        if ("daily" !in modules) require(payload["dailyProfile"] == JsonNull && payload.getValue("moments").jsonArray.isEmpty() && payload.getValue("diaries").jsonArray.isEmpty())
+        if ("model_profile" !in modules) require(payload["profile"] == JsonNull)
     }
 }

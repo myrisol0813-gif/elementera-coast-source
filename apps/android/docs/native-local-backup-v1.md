@@ -10,4 +10,4 @@
 
 ## 统一数据包修订
 
-屋主明确要求本机与云端共享可迁移格式。未发行的专用本机 envelope 已改为 elementera-coast-transfer v1：payload_json 为原始 UTF-8 JSON 字符串，SHA-256 校验其精确字节，避免 JS/Kotlin JSON 重排差异。source.application / source.mode 为来源说明，不是权限凭据；modules 按模块承载真实数据，excluded_modules 明示未包含范围。通用解码无应用限制。完整本机恢复的模块映射仍待完成，不能将该阶段当成跨端恢复已实现。单文件 64 MiB，云端初期单请求 8 MiB，超限另做分块传输而非截断。
+屋主明确要求本机与云端共享可迁移格式。未发行的专用本机 envelope 已改为 elementera-coast-transfer v1：payload_json 为原始 UTF-8 JSON 字符串，SHA-256 校验其精确字节，避免 JS/Kotlin JSON 重排差异。applicationId / workspace 为来源说明，不是权限凭据；includedModules 声明所含模块，顶层类型化记录与云端实现一致。通用解码无应用限制。完整本机恢复的模块映射仍待完成，不能将该阶段当成跨端恢复已实现。单文件 64 MiB，云端初期单请求 8 MiB，超限另做分块传输而非截断。
