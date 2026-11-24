@@ -1,0 +1,7 @@
+# Archive V2 binary object contract (foundation, not a live migration route)
+
+A binary object has a safe integer size in bytes, ordered SHA-256 digests of fixed 1 MiB chunks (final chunk may be shorter), and object_sha256 = SHA-256 of UTF-8 "coast-object-v2\n" + decimal size + "\n" + digests joined by LF. Empty objects have no chunks. The object fingerprint is a digest of the ordered chunk manifest, NOT a SHA-256 of the raw file. The only object path is objects/<object_sha256>, independent of an uploaded file name.
+
+The verifier checks manifest shape, bounds, fingerprint, each chunk length/digest, complete length and no trailing data. Callers must write to disposable staging and discard it on failure. No data becomes live through this primitive. maxBytes/maxChunks are caller-configured resource limits; default 65,536 chunks is a 64 GiB theoretical per-object descriptor ceiling, not a supported upload/restore promise. Tests cover 3 GiB descriptors without allocating 3 GiB. Transport must impose request and quota limits.
+
+Remaining work: owner-only paged inventory of stable record IDs and original media, export streams and archive manifest across modules, durable import session and quota checks, atomic/staged publication with referential validation, same-edition/cross-edition mapping, actual local media storage and snapshot support, multi-GB end-to-end restore tests. Keep V1 readable until V2 actually restores all exported records. Exclude credentials and visitor private content.
