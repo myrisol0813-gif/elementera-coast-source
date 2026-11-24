@@ -25,6 +25,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
     private val cache = RemoteCacheStore(store)
     private val calendar = LocalCalendarStore(store)
     private val knowledge = LocalKnowledgeStore(store)
+    private val memory = LocalMemoryStore(store)
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
     private val media = "application/json; charset=utf-8".toMediaType()
 
@@ -129,7 +130,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if (request.attachmentIds.isNotEmpty()) return unsupported(r)
             val budget = request.settings["contextBudget"]?.toLongOrNull()?.coerceAtLeast(1800) ?: 18000
             val room=cache.conversations().first { it.id==request.conversationId }.roomType
-            val prepared=knowledge.context(request.messages,budget.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),if(room=="main")"main_chat" else room)
+            val prepared=knowledge.context(request.messages,budget.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),if(room=="main")"main_chat" else room,request.conversationId)
             return response(r, 200, element(RemoteNativeChatContext.serializer(), RemoteNativeChatContext(
                 ok = true,
                 modelMessages = array(RemoteChatMessage.serializer(), prepared.messages),
@@ -144,6 +145,26 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val snapshot = b["snapshot"] ?: return unsupported(r)
             store.put("local.echo." + cid + "." + mid, snapshot.toString())
             return ok(r)
+        }
+        if(path=="/api/memory/entries"){
+            if(method=="GET"){
+                val type=r.url.queryParameter("entry_type")?:"memory"
+                return ok(r,"entries" to array(RemoteMemoryEntry.serializer(),memory.entries(type)))
+            }
+            if(method=="POST")return ok(r,"entry" to element(RemoteMemoryEntry.serializer(),memory.save(null,json.decodeFromJsonElement(RemoteMemoryEntryWriteRequest.serializer(),body(r)))))
+        }
+        if(path.startsWith("/api/memory/entries/")&&r.url.pathSegments.size==4){
+            val id=r.url.pathSegments.last()
+            if(method=="PATCH")return ok(r,"entry" to element(RemoteMemoryEntry.serializer(),memory.save(id,json.decodeFromJsonElement(RemoteMemoryEntryWriteRequest.serializer(),body(r)))))
+            if(method=="DELETE"){memory.delete(id);return ok(r)}
+        }
+        if(path=="/api/memory/pockets"&&method=="GET"){
+            val cid=r.url.queryParameter("conversation_id").orEmpty()
+            if(!conversationExists(cid))return missing(r)
+            return ok(r,"pockets" to array(RemoteMemoryPocket.serializer(),memory.pockets(cid)))
+        }
+        if(path.startsWith("/api/memory/pockets/")&&r.url.pathSegments.size==5&&r.url.pathSegments.last()=="resolve"&&method=="POST"){
+            return response(r,200,element(RemoteMemoryPocketResolveResponse.serializer(),memory.resolve(r.url.pathSegments[3],json.decodeFromJsonElement(RemoteMemoryPocketResolveRequest.serializer(),body(r)))).jsonObject)
         }
         if(path=="/api/memory/custom-instructions"){
             val value=when(method){

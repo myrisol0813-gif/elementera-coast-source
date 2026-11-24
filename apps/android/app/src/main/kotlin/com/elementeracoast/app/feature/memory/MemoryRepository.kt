@@ -65,6 +65,8 @@ class DefaultMemoryRepository(
         val cleanConversationId = conversationId.trim()
         primePocketSnapshot(cleanConversationId)
         if(com.elementeracoast.app.core.local.NativeWorkspace.isLocal){
+            refreshEntries()
+            refreshPockets(cleanConversationId)
             refreshWorldbook()
             refreshInstructions()
             return@coroutineScope

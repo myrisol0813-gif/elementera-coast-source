@@ -46,7 +46,7 @@ class LocalCoastTransportTest {
     @Test fun unsupportedOperationsAndWrongHostsCannotReachNetwork() {
         val a = client(MemoryLocalPersistence())
         assertEquals(501, call(a, "/api/chat", "POST").first)
-        assertEquals(501, call(a, "/api/memory/entries").first)
+        assertEquals(501, call(a, "/api/memory/user-portrait").first)
         a.newCall(Request.Builder().url("https://example.com/").build()).execute().use {
             assertEquals(403, it.code)
         }
