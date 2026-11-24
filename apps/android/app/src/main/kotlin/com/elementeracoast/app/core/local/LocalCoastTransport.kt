@@ -22,6 +22,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
     private val providerCatalog: () -> RemoteModelCatalogResponse = { RemoteModelCatalogResponse(ok = true) }
 ) : Interceptor {
     private val cache = RemoteCacheStore(store)
+    private val calendar = LocalCalendarStore(store)
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
     private val media = "application/json; charset=utf-8".toMediaType()
 
@@ -31,6 +32,8 @@ class LocalCoastTransport(private val store: LocalPersistence,
         try {
             if (request.url.host != HOST) failure(request, 403, "local_boundary", "本机模式禁止连接海岸服务器。")
             else route(request)
+        } catch (error: LocalCalendarError) {
+            failure(request, error.status, error.type, error.message.orEmpty())
         } catch (_: Exception) {
             failure(request, 500, "local_storage_error", "本机读写失败，原始资料未自动转发到服务器。")
         }
@@ -171,6 +174,16 @@ class LocalCoastTransport(private val store: LocalPersistence,
         if (path == "/api/daily/moments" || path == "/api/daily/diaries" ||
             path.startsWith("/api/daily/moments/") || path.startsWith("/api/daily/diaries/"))
             return daily(r, path, method)
+        if (path == "/api/calendar/entries") {
+            if (method == "GET") return ok(r, "entries" to JsonArray(calendar.list(r.url.queryParameter("month"),
+                r.url.queryParameter("pinned") == "1", r.url.queryParameter("today"))))
+            if (method == "POST") return ok(r, "entry" to calendar.save(null, body(r)))
+        }
+        if (path.startsWith("/api/calendar/entries/") && r.url.pathSegments.size == 4) {
+            val cid = r.url.pathSegments.last()
+            if (method == "PATCH") return ok(r, "entry" to calendar.save(cid, body(r)))
+            if (method == "DELETE") { calendar.delete(cid); return ok(r, "deleted" to JsonPrimitive(true), "id" to JsonPrimitive(cid)) }
+        }
         if (path == "/api/export/v1-snapshot" && method == "GET") {
             val snapshot = buildJsonObject {
                 put("format", "elementera-coast-v1-snapshot")
@@ -178,7 +191,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 put("scope", "local")
                 put("workspace", "local")
                 put("exported_at", now())
-                put("included_modules", JsonArray(listOf("chat", "daily", "model_profile").map(::JsonPrimitive)))
+                put("included_modules", JsonArray(listOf("chat", "daily", "model_profile", "calendar").map(::JsonPrimitive)))
                 put("excluded_modules", JsonArray(listOf("attachments", "memory", "thinking_soil", "worldbook", "vault", "library", "voice", "local_appearance", "provider_credentials", "oauth_credentials", "full_restore").map(::JsonPrimitive)))
                 put("chat", buildJsonObject {
                     put("conversations", buildJsonArray { cache.conversations().forEach { c ->
@@ -193,6 +206,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
                     put("moments", array(RemoteDailyMoment.serializer(), cache.dailyMoments()))
                     put("diaries", array(RemoteDailyDiary.serializer(), cache.dailyDiaries()))
                 })
+                put("calendar", buildJsonObject { put("entries", calendar.snapshot()) })
                 put("model_profile", element(RemoteProfile.serializer(), cache.profile() ?: RemoteProfile()))
             }
             return ok(r, "snapshot" to snapshot)
