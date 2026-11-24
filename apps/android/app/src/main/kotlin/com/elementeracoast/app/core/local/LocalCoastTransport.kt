@@ -50,6 +50,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
         require(conversationExists(cid)){"附件所属窗口不存在。"}
         store.atomic{LocalAttachmentStore(it).upload(cid,name,mime,bytes)}
     }
+    internal fun importLocalBook(payload:JsonObject):JsonObject=synchronized(this){store.atomic{LocalSideRecords(it).importBook(payload)}}
     private fun now() = Instant.now().toString()
     private fun id() = UUID.randomUUID().toString()
     private fun body(request: Request): JsonObject {
@@ -103,6 +104,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             }
             if (method == "DELETE") {
                 cache.putConversations(all.filterNot { it.id == cid })
+                LocalSideRecords(store).removeConversation(cid)
                 cache.removeHistory(cid)
                 LocalAttachmentStore(store).deleteConversation(cid)
                 val oldSoil=soil.read()
@@ -136,6 +138,47 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if(method!="GET")return unsupported(r)
             val bytes=originals.bytes(original)
             return Response.Builder().request(r).protocol(Protocol.HTTP_1_1).code(200).message("OK").body(bytes.toResponseBody(original.metadata.getValue("mime").jsonPrimitive.content.toMediaType())).build()
+        }
+        val side=LocalSideRecords(store)
+        val parts=r.url.pathSegments
+        fun binary(row:LocalSideRecords.Row,mime:String):Response=Response.Builder().request(r).protocol(Protocol.HTTP_1_1).code(200).message("OK").body(side.bytes(row).toResponseBody(mime.toMediaType())).build()
+        fun rows(key:String,items:List<JsonObject>)=ok(r,key to JsonArray(items))
+        if(path=="/api/voice/clips"&&method=="GET"){
+            val cid=r.url.queryParameter("conversation_id").orEmpty();if(!conversationExists(cid))return missing(r)
+            return rows("clips",side.clips(cid))
+        }
+        if(parts.size==5&&parts.take(3)==listOf("api","voice","clips")&&parts.last()=="audio"&&method=="GET")return binary(side.audio(parts[3])?:return missing(r),"audio/mpeg")
+        if(path=="/api/coast-vault/media"&&method=="GET")return response(r,200,JsonObject(side.media(r.url.queryParameter("kind")?:"all",r.url.queryParameter("q").orEmpty(),r.url.queryParameter("cursor")?.toIntOrNull()?:0)+("ok" to JsonPrimitive(true))))
+        if(path=="/api/coast-vault/treasures"){
+            if(method=="GET")return response(r,200,JsonObject(side.treasureRows(r.url.queryParameter("kind")?:"all",r.url.queryParameter("q").orEmpty(),r.url.queryParameter("conversation_id").orEmpty(),r.url.queryParameter("turn_id").orEmpty(),r.url.queryParameter("cursor")?.toIntOrNull()?:0)+("ok" to JsonPrimitive(true))))
+            if(method=="POST")return ok(r,"treasure" to store.atomic{LocalSideRecords(it).saveTreasure(body(r))})
+        }
+        if(parts.size==4&&parts.take(3)==listOf("api","coast-vault","treasures")){
+            if(method=="PATCH")return ok(r,"treasure" to store.atomic{LocalSideRecords(it).changeTreasure(parts.last(),body(r).str("notes").orEmpty())})
+            if(method=="DELETE"){store.atomic{LocalSideRecords(it).changeTreasure(parts.last(),null)};return ok(r)}
+        }
+        if(path=="/api/coast-vault/media-labels"&&method=="PATCH")return ok(r,"label" to store.atomic{LocalSideRecords(it).renameImage(body(r))})
+        if(path=="/api/library/books"&&method=="GET")return rows("books",side.books())
+        if(parts.size>=4&&parts.take(3)==listOf("api","library","books")){
+            val id=parts[3]
+            if(parts.size==4&&method=="GET")return ok(r,"book" to side.book(id))
+            if(parts.size==4&&method=="DELETE"){store.atomic{LocalSideRecords(it).deleteBook(id)};return ok(r)}
+            if(parts.size==5&&parts[4]=="cover"){
+                if(method=="GET"){val row=side.cover(id)?:return missing(r);return binary(row,row.data.getValue("mime").jsonPrimitive.content)}
+            }
+            if(parts.size==5&&parts[4]=="notes"){
+                if(method=="GET")return rows("notes",side.notes(id))
+                if(method=="POST")return ok(r,"note" to store.atomic{LocalSideRecords(it).writeNote(id,body(r))})
+            }
+            if(parts.size==5&&parts[4]=="progress"&&method=="POST"){val v=body(r);return ok(r,"progress" to store.atomic{LocalSideRecords(it).progress(id,v.getValue("chapter_index").jsonPrimitive.int,v.getValue("paragraph_index").jsonPrimitive.int)})}
+            if(parts.size in 6..7&&parts[4]=="chapters"&&method=="GET"){
+                val index=parts[5].toInt()
+                return ok(r,"chapter" to if(parts.size==7&&parts[6]=="text")side.chapter(id,index)else side.chapter(id,index,r.url.queryParameter("start")?.toIntOrNull()?:0,r.url.queryParameter("limit")?.toIntOrNull()?:12))
+            }
+        }
+        if(parts.size==4&&parts.take(3)==listOf("api","library","notes")){
+            if(method=="PATCH")return ok(r,"note" to store.atomic{LocalSideRecords(it).editNote(parts.last(),body(r).str("body").orEmpty())})
+            if(method=="DELETE"){store.atomic{LocalSideRecords(it).editNote(parts.last(),null)};return ok(r)}
         }
         if (path == "/api/chat/profile") {
             val profile = when (method) {

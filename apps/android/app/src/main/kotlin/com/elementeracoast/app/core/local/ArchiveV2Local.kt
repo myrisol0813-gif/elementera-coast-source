@@ -11,8 +11,8 @@ import kotlinx.serialization.json.*
 internal object ArchiveV2Local {
     private val json=Json { ignoreUnknownKeys=false }
     private val modules=CoastTransferCodec.supportedModules
-    val localModules=modules+ArchiveV2Knowledge.modules+setOf("attachments")
-    val cloudModules get()=ArchiveV2CloudToLocal.supportedModules+ArchiveV2Knowledge.modules+setOf("attachments")
+    val localModules=modules+ArchiveV2Knowledge.modules+setOf("attachments")+LocalSideRecords.modules
+    val cloudModules get()=ArchiveV2CloudToLocal.supportedModules+ArchiveV2Knowledge.modules+setOf("attachments")+LocalSideRecords.modules
     private fun describe(bytes:ByteArray):ArchiveV2Object {
         val chunk=ArchiveV2Chunks.CHUNK_BYTES
         val hashes=(bytes.indices step chunk).map { ArchiveV2Chunks.digest(bytes.copyOfRange(it,minOf(it+chunk,bytes.size))) }
@@ -29,12 +29,12 @@ internal object ArchiveV2Local {
         val records=mutableListOf<ArchiveV2Record>();val objects=linkedMapOf<String,ArchiveV2Object>()
         try {
             ArchiveV2ZipWriter(output.outputStream()).use { writer->
-                fun add(module:String,id:String,kind:String,data:JsonElement,media:List<String> = emptyList()) {
+                fun add(module:String,id:String,kind:String,data:JsonElement,media:List<String> = emptyList(),links:List<String>?=null) {
                     require(data!=JsonNull)
                     val raw=buildJsonObject { put("kind",kind);put("data",data) }.toString().encodeToByteArray()
                     val d=describe(raw)
                     ByteArrayInputStream(raw).use { writer.objectEntry(d,it) }
-                    val dependencies=if(module in setOf("calendar","daily")+LocalMemoryStore.modules+LocalSoilStore.modules+setOf("tools","attachments"))data.jsonObject["conversation_id"]?.jsonPrimitive?.contentOrNull?.let { listOf("chat/"+it) }?:emptyList() else emptyList()
+                    val dependencies=links?:if(module in setOf("calendar","daily")+LocalMemoryStore.modules+LocalSoilStore.modules+setOf("tools","attachments"))data.jsonObject["conversation_id"]?.jsonPrimitive?.contentOrNull?.let { listOf("chat/"+it) }?:emptyList() else emptyList()
                     objects[d.objectSha256]=d;records.add(ArchiveV2Record(module,id,d.objectSha256,media,dependencies))
                 }
                 fun list(module:String,field:String,kind:String,id:(JsonObject)->String) {
@@ -52,6 +52,15 @@ internal object ArchiveV2Local {
                     ByteArrayInputStream(bytes).use{writer.objectEntry(d,it)}
                     objects[d.objectSha256]=d
                     add("attachments",original.metadata.getValue("id").jsonPrimitive.content,"attachment",original.metadata,listOf(d.objectSha256))
+                }
+                val side=LocalSideRecords(store)
+                for(row in side.rows()){
+                    val media=if(row.digest==null)emptyList()else{
+                        val bytes=side.bytes(row);val d=describe(bytes)
+                        ByteArrayInputStream(bytes).use{writer.objectEntry(d,it)};objects[d.objectSha256]=d
+                        listOf(d.objectSha256)
+                    }
+                    add(row.module,row.id,row.kind,row.data,media,row.dependencies)
                 }
                 val counts=records.groupingBy { it.module }.eachCount()
                 val manifest=ArchiveV2Manifest("elementera-coast-archive",2,"local",applicationId,payload.getValue("exportedAt").jsonPrimitive.content,
@@ -109,7 +118,8 @@ internal object ArchiveV2Local {
         val objects=manifest.objects.associateBy{it.objectSha256}
         require(manifest.records.filter{it.module in selection}.sumOf{objects.getValue(it.recordObject).size}<=CoastTransferCodec.MAX_BYTES){"本机恢复事务最多64 MiB。"}
         val extra=selection.intersect(ArchiveV2Knowledge.modules)
-        val base=selection-extra-setOf("attachments")
+        val base=selection-extra-setOf("attachments")-LocalSideRecords.modules
+        val side=ArchiveV2SideRecords.read(manifest,stage,selection,applicationId)
         val attachments=ArchiveV2Attachments.read(manifest,stage,selection)
         val attachmentMeta=attachments.associate{it.metadata.getValue("id").jsonPrimitive.content to it.metadata}
         val rows=ArchiveV2Knowledge.read(manifest,stage,extra,applicationId)
@@ -118,11 +128,16 @@ internal object ArchiveV2Local {
             val parents=bytes?.let{LocalTransferRestore.plannedParents(it,applicationId,base,target,attachmentMeta)}
             val cache=RemoteCacheStore(target,strictReads=true)
             val existing=cache.conversations().map{it.id}.toSet()
-            val histories=if(extra.any{it in LocalSoilStore.modules}||"attachments" in selection)bytes?.let{LocalTransferRestore.plannedHistories(it,applicationId,base,target,attachmentMeta)}?:existing.associateWith{requireNotNull(cache.history(it))} else emptyMap()
+            val histories=if(extra.any{it in LocalSoilStore.modules}||"attachments" in selection||selection.any{it in LocalSideRecords.modules})bytes?.let{LocalTransferRestore.plannedHistories(it,applicationId,base,target,attachmentMeta)}?:existing.associateWith{requireNotNull(cache.history(it))} else emptyMap()
             val report=bytes?.let{if(write)LocalTransferRestore.restoreStaged(it,applicationId,base,target,attachmentMeta) else LocalTransferRestore.preview(it,applicationId,base,target,attachmentMeta)}
             val extras=ArchiveV2Knowledge.apply(rows,extra,target,write,parents?.first?:existing,parents?.second.orEmpty(),histories)
             val files=if("attachments" in selection)mapOf("attachments" to ArchiveV2Attachments.apply(attachments,target,histories,parents?.second.orEmpty(),write))else emptyMap()
-            return LocalRestorePreview(manifest.workspace,report?.counts.orEmpty()+extras+files,report?.unsupportedModules.orEmpty())
+            val sideCounts=if(selection.any{it in LocalSideRecords.modules}){
+                val media=(LocalAttachmentStore(target).entries().map{it.metadata}+attachments.map{it.metadata}).distinctBy{it["id"]}
+                val soil=(LocalSoilStore(target).read().history+rows.filter{it.kind=="thinking_soil_history"}.map{it.data}).distinctBy{it["conversation_id"] to it["assistant_message_id"]}
+                ArchiveV2SideRecords.apply(side,selection,target,histories,parents?.second.orEmpty(),media,soil,write)
+            }else emptyMap()
+            return LocalRestorePreview(manifest.workspace,report?.counts.orEmpty()+extras+files+sideCounts,report?.unsupportedModules.orEmpty())
         }
         return if(confirm)store.atomic{run(it,true)}else store.readConsistent{run(it,false)}
     }
