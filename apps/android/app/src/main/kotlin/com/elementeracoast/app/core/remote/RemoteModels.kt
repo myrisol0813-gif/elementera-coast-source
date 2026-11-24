@@ -164,7 +164,7 @@ data class RemoteVariant(
     @SerialName("errorDetail") val errorDetail: String? = null,
     val attachments: List<RemoteAttachment> = emptyList(),
     @SerialName("furniture_runs") val furnitureRuns: List<RemoteFurnitureRun> = emptyList(),
-    @SerialName("desk_slip") val deskSlip: RemoteDeskSlip? = null,
+    @SerialName("desk_slip") @Serializable(with = RemoteDeskSlipWireSerializer::class) val deskSlip: RemoteDeskSlip? = null,
     val usage: RemoteModelUsage? = null,
     @SerialName("input_type") val inputType: String? = null,
     @SerialName("source_model_label") val sourceModelLabel: String? = null,

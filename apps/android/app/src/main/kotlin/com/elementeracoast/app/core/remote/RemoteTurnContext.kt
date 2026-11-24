@@ -2,8 +2,26 @@ package com.elementeracoast.app.core.remote
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KeepGeneratedSerializer
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.Transient
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonEncoder
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonUnquotedLiteral
 
-@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = RemoteDeskSlipWireSerializer::class)
 data class RemoteDeskSlip(
     val summary: String = "",
     val comfort: String = "",
@@ -23,8 +41,43 @@ data class RemoteDeskSlip(
     val attachments: RemoteDeskAttachments? = null,
     @SerialName("web_search") val webSearch: RemoteDeskWebSearch? = null,
     @SerialName("external_tide") val externalTide: RemoteDeskExternalTide = RemoteDeskExternalTide(),
-    @SerialName("context_budget") val contextBudget: RemoteDeskContextBudget = RemoteDeskContextBudget()
+    @SerialName("context_budget") val contextBudget: RemoteDeskContextBudget = RemoteDeskContextBudget(),
+    @Transient val archivedJson: JsonObject? = null
 )
+
+/**
+ * Receipts are immutable historical evidence, not editable settings.
+ * Preserve the original JSON object in the same wire field; the typed model
+ * is only the rendering projection. No secondary persistence or extra wire key.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+object RemoteDeskSlipWireSerializer : KSerializer<RemoteDeskSlip> {
+    private val typed = RemoteDeskSlip.generatedSerializer()
+    private val projection = Json { ignoreUnknownKeys = true; explicitNulls = false; encodeDefaults = false }
+    override val descriptor get() = JsonObject.serializer().descriptor
+
+    override fun deserialize(decoder: Decoder): RemoteDeskSlip {
+        val input = decoder as? JsonDecoder ?: throw SerializationException("Desk receipt requires JSON")
+        val raw = input.decodeJsonElement() as? JsonObject ?: throw SerializationException("Desk receipt must be an object")
+        val view = projection.decodeFromJsonElement(typed, raw)
+        return view.copy(archivedJson = raw)
+    }
+
+    // JsonPrimitive's default serializer can parse numbers as Double/Long and
+    // change their spelling or precision. Preserve validated JSON number tokens.
+    private fun exactNumbers(element: JsonElement): JsonElement = when (element) {
+        is JsonObject -> JsonObject(element.mapValues { exactNumbers(it.value) })
+        is JsonArray -> JsonArray(element.map(::exactNumbers))
+        is JsonPrimitive -> if (element != JsonNull && !element.isString && element.content != "true" && element.content != "false") {
+            JsonUnquotedLiteral(element.content)
+        } else element
+    }
+
+    override fun serialize(encoder: Encoder, value: RemoteDeskSlip) {
+        val output = encoder as? JsonEncoder ?: throw SerializationException("Desk receipt requires JSON")
+        output.encodeJsonElement(exactNumbers(value.archivedJson ?: projection.encodeToJsonElement(typed, value)))
+    }
+}
 
 @Serializable
 data class RemoteDeskCurrentMessage(
@@ -42,6 +95,7 @@ data class RemoteDeskRecentContext(
     val status: String = "未递给",
     @SerialName("status_detail") val statusDetail: String = "",
     val turns: Int = 0,
+    @SerialName("current_message_separate") val currentMessageSeparate: Boolean? = null,
     val messages: List<RemoteChatMessage> = emptyList()
 )
 
@@ -51,6 +105,7 @@ data class RemoteDeskCustomInstructions(
     val description: String = "",
     val status: String = "未递给",
     val delivered: Boolean = false,
+    val empty: Boolean? = null,
     val length: Int = 0,
     val content: String = ""
 )
@@ -112,6 +167,8 @@ data class RemoteDeskMemory(
 @Serializable
 data class RemoteDeskMemoryItem(
     val title: String = "",
+    val id: String? = null,
+    val score: kotlinx.serialization.json.JsonPrimitive? = null,
     @SerialName("entry_type") val entryType: String = "memory",
     val tag: String = "",
     @SerialName("source_model") val sourceModel: String = "",
@@ -133,12 +190,16 @@ data class RemoteDeskWorldbook(
     val status: String = "未命中",
     @SerialName("matched_count") val matchedCount: Int = 0,
     @SerialName("delivered_count") val deliveredCount: Int = 0,
+    @SerialName("matched_titles") val matchedTitles: List<String>? = null,
+    @SerialName("delivered_titles") val deliveredTitles: List<String>? = null,
     val entries: List<RemoteDeskWorldbookItem> = emptyList()
 )
 
 @Serializable
 data class RemoteDeskWorldbookItem(
     val title: String = "",
+    val id: String? = null,
+    @SerialName("matched_keywords") val matchedKeywords: List<String>? = null,
     val content: String = "",
     val scope: String = "",
     @SerialName("matched_by") val matchedBy: String = "",
@@ -230,13 +291,25 @@ data class RemoteDeskCrossWindowSource(
     @SerialName("requested_turns") val requestedTurns: Int = 0,
     @SerialName("loaded_turns") val loadedTurns: Int = 0,
     @SerialName("delivered_to_model_turns") val deliveredToModelTurns: Int = 0,
+    @SerialName("requested_messages") val requestedMessages: Int? = null,
+    @SerialName("loaded_messages") val loadedMessages: Int? = null,
+    @SerialName("delivered_to_model_messages") val deliveredToModelMessages: Int? = null,
     @SerialName("delivered_turns") val deliveredTurns: Int = 0
 )
 
 @Serializable
 data class RemoteDeskCrossWindowMessages(
     @SerialName("conversation_id") val conversationId: String = "",
-    val messages: List<RemoteChatMessage> = emptyList()
+    val messages: List<RemoteDeskCrossWindowMessage> = emptyList()
+)
+
+@Serializable
+data class RemoteDeskCrossWindowMessage(
+    val role: String,
+    val content: String,
+    @SerialName("message_id") val messageId: String? = null,
+    @SerialName("turn_id") val turnId: String? = null,
+    @SerialName("created_at") val createdAt: String? = null
 )
 
 @Serializable
@@ -252,6 +325,7 @@ data class RemoteDeskWorkbench(
     @SerialName("core_tools") val coreTools: List<RemoteDeskTool> = emptyList(),
     @SerialName("side_tools") val sideTools: List<RemoteDeskTool> = emptyList(),
     val furniture: List<String> = emptyList(),
+    @SerialName("used_count") val usedCount: Int? = null,
     @SerialName("tool_results") val toolResults: List<RemoteDeskToolResult> = emptyList()
 )
 
@@ -305,12 +379,14 @@ data class RemoteDeskExternalTide(
     val description: String = "",
     val status: String = "未递给",
     val delivered: Boolean = false,
+    val empty: Boolean? = null,
     val content: String = "本轮没有递入外部材料。"
 )
 
 @Serializable
 data class RemoteDeskTool(
     val name: String = "",
+    val group: String? = null,
     @SerialName("display_name") val displayName: String = "",
     @SerialName("tool_key") val toolKey: String = ""
 )

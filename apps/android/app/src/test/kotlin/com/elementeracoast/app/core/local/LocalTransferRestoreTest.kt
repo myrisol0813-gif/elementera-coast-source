@@ -100,4 +100,43 @@ class LocalTransferRestoreTest {
         assertEquals("keep",local.get("original"))
         assertEquals("",local.get("new"))
     }
+
+    @Test fun fullWebDeskReceiptSurvivesRestoreAndReexport() {
+        val receipt = Json.parseToJsonElement("""{"summary":"本轮递给模型","recent_context":{"current_message_separate":true,"turns":1,"messages":[{"role":"user","content":"前一轮"}]},"custom_instructions":{"empty":true},"related_memory":{"items":[{"id":"memory-1","score":1,"title":"旧记忆"},{"id":"memory-2","score":0.1234,"title":"另一条"}]},"worldbook":{"matched_titles":["设定"],"delivered_titles":["设定"],"entries":[{"id":"world-1","matched_keywords":["关键词"],"title":"设定","delivered":true}]},"cross_window":{"sources":[{"conversation_id":"old-1","requested_messages":2,"loaded_messages":2,"delivered_to_model_messages":1}],"messages":[{"conversation_id":"old-1","messages":[{"role":"assistant","content":"旧消息","message_id":"old-message","turn_id":"old-turn","created_at":"2026-11-24T12:00:00Z"}]}]},"workbench":{"used_count":1,"model_visible_tools":[{"name":"test_tool","group":"core"}],"backend_tools":[{"name":"other_tool","group":null}]},"external_tide":{"empty":true},"thinking_soil":{"hand_seeds":[{"title":"旧候选","content":"不可丢失","legacy_meta":{"flag":false,"nullable":null,"items":[1,2.50,900719925474099312345,1.234567890123456789e-20,{"unknown":"原文"}]}}]},"legacy_section":{"unknown_list":[{"k":"v"},null],"empty":[]}}""")
+        val original = CoastTransferCodec.decode(cloudBundle())
+        val rows = original.getValue("conversations").jsonArray
+        val row = rows.single().jsonObject
+        val history = row.getValue("history").jsonObject
+        val turns = history.getValue("turns").jsonArray
+        val turn = turns.single().jsonObject
+        val assistant = turn.getValue("assistant").jsonObject
+        val variants = assistant.getValue("variantsByUserVariant").jsonObject
+        val replies = variants.getValue("0").jsonArray
+        val withReceipt = JsonArray(listOf(replies[0], JsonObject(replies[1].jsonObject + ("desk_slip" to receipt))))
+        val withAssistant = JsonObject(assistant + ("variantsByUserVariant" to JsonObject(variants + ("0" to withReceipt))))
+        val withHistory = JsonObject(history + ("turns" to JsonArray(listOf(JsonObject(turn + ("assistant" to withAssistant))))))
+        val payload = JsonObject(original + ("conversations" to JsonArray(listOf(JsonObject(row + ("history" to withHistory))))))
+        val local = MemoryLocalPersistence()
+        val bytes = CoastTransferCodec.encode(payload)
+        LocalTransferRestore.restore(bytes, app, setOf("chat"), local)
+        val archived = CoastTransferCodec.decode(LocalBackupArchive.encode(LocalBackupArchive.capture(local, app)))
+        val restored = archived.getValue("conversations").jsonArray.single().jsonObject.getValue("history").jsonObject
+            .getValue("turns").jsonArray.single().jsonObject.getValue("assistant").jsonObject.getValue("variantsByUserVariant").jsonObject
+            .getValue("0").jsonArray[1].jsonObject.getValue("desk_slip")
+        fun assertRetained(expected: JsonElement, actual: JsonElement) {
+            when (expected) {
+                is JsonObject -> expected.forEach { (key, value) -> assertRetained(value, actual.jsonObject.getValue(key)) }
+                is JsonArray -> { assertEquals(expected.size, actual.jsonArray.size); expected.forEachIndexed { i, value -> assertRetained(value, actual.jsonArray[i]) } }
+                else -> assertEquals(expected, actual)
+            }
+        }
+        assertRetained(receipt, restored)
+        assertEquals(receipt, restored)
+        assertEquals(receipt.toString(), Json.encodeToString(RemoteDeskSlip.serializer(), Json { ignoreUnknownKeys = true }.decodeFromJsonElement(RemoteDeskSlip.serializer(), receipt)))
+        val cache = RemoteCacheStore(local)
+        val saved = cache.history("cloud1")!!
+        cache.putHistory("cloud1", saved.copy(updatedAt = "2026-11-24T12:01:00Z"))
+        val reread = cache.history("cloud1")!!.turns.single().assistant.variantsByUserVariant.getValue("0")[1].deskSlip!!
+        assertEquals(receipt, Json.encodeToJsonElement(RemoteDeskSlip.serializer(), reread))
+    }
 }

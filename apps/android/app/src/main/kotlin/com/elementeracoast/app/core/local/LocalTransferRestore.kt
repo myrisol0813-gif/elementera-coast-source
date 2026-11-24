@@ -30,18 +30,25 @@ internal object LocalTransferRestore {
     }
 
     private fun verifyMeaningful(raw: JsonElement, encoded: JsonElement?, path: String) {
-        if (encoded == null && (raw == JsonNull || raw == JsonPrimitive("") || raw == JsonPrimitive(false) ||
-            (raw is JsonArray && raw.isEmpty()) || (raw is JsonObject && raw.isEmpty()))) return
-        when (raw) {
-            is JsonObject -> {
-                require(encoded is JsonObject) { "目标不能完整保留字段：$path" }
-                raw.forEach { (key, value) -> verifyMeaningful(value, encoded[key], "$path.$key") }
+        val mismatches = linkedSetOf<String>()
+        val limit = 8
+        fun visit(value: JsonElement, restored: JsonElement?, location: String) {
+            if (mismatches.size >= limit) return
+            if (restored == null && (value == JsonNull || value == JsonPrimitive("") || value == JsonPrimitive(false) ||
+                (value is JsonArray && value.isEmpty()) || (value is JsonObject && value.isEmpty()))) return
+            when (value) {
+                is JsonObject -> if (restored is JsonObject) {
+                    value.forEach { (key, item) -> visit(item, restored[key], "$location.$key") }
+                } else { mismatches.add(location) }
+                is JsonArray -> if (restored is JsonArray && restored.size == value.size) {
+                    value.forEachIndexed { i, item -> visit(item, restored[i], "$location[]") }
+                } else { mismatches.add(location) }
+                else -> if (value != restored) { mismatches.add(location) }
             }
-            is JsonArray -> {
-                require(encoded is JsonArray && encoded.size == raw.size) { "目标不能完整保留列表：$path" }
-                raw.forEachIndexed { i, value -> verifyMeaningful(value, encoded[i], "$path[]") }
-            }
-            else -> require(raw == encoded) { "目标不能完整保留字段：$path" }
+        }
+        visit(raw, encoded, path)
+        require(mismatches.isEmpty()) {
+            "目标不能完整保留以下字段（最多显示 8 处）：\n" + mismatches.joinToString("\n")
         }
     }
 
