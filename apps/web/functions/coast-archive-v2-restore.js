@@ -37,9 +37,9 @@ export async function prepareArchiveChatGroup(db,sessionId,manifest,conversation
   let canonical=entry.data;
   if(manifest.workspace==='local'){
     check(entry.kind==='local_chat','invalid local chat record kind');
-    const {c,state}=validatedChat(entry.data,{verifiedMediaGroup:true});
+    const {c,state,storageUpdatedAt}=validatedChat(entry.data,{verifiedMediaGroup:true});
     const ms=v=>typeof v==='number'?v:Date.parse(v);
-    canonical={conversation:{id:c.id,title:c.title,room_type:c.room_type,created_at:ms(c.created_at),updated_at:ms(c.updated_at),deleted_at:null,title_manual:c.title_manual?1:0,title_generated_at:c.title_generated_at==null?null:ms(c.title_generated_at),title_model_id:c.title_model_id??null,source:c.source||'coast',source_window_id:c.source_window_id??null},history_json:JSON.stringify(state),history_updated_at:ms(state.updated_at)};
+    canonical={conversation:{id:c.id,title:c.title,room_type:c.room_type,created_at:ms(c.created_at),updated_at:ms(c.updated_at),deleted_at:null,title_manual:c.title_manual?1:0,title_generated_at:c.title_generated_at==null?null:ms(c.title_generated_at),title_model_id:c.title_model_id??null,source:c.source||'coast',source_window_id:c.source_window_id??null},history_json:JSON.stringify(state),history_updated_at:storageUpdatedAt};
   }else check(entry.kind==='chat','invalid backend chat record kind');
   const {conversation:c,history_json:raw,history_updated_at:updated}=canonical;
   check(c?.id===conversationId&&Object.keys(c).every(k=>['id','title','room_type','created_at','updated_at','deleted_at','title_manual','title_generated_at','title_model_id','source','source_window_id'].includes(k)),'invalid conversation metadata');

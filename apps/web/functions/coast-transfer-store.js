@@ -90,6 +90,9 @@ export function validatedChat(row,{verifiedMediaGroup=false}={}) {
     }
   }
   const h2 = structuredClone(h);
+  const storageUpdatedAt=h2.archive_storage_updated_at;
+  require(storageUpdatedAt==null||(Number.isSafeInteger(storageUpdatedAt)&&storageUpdatedAt>=0),'历史存储时间无效。');
+  delete h2.archive_storage_updated_at;
   for (const t of h2.turns) for (const v of [...t.user.variants,...Object.values(t.assistant.variantsByUserVariant).flat()]) {
     if (v.message_source === 'owner_web') v.message_source = WEB_MESSAGE_SOURCE;
     // Native uses explicit null/default fields, which the server omits. Compare meaningful values below.
@@ -112,7 +115,7 @@ export function validatedChat(row,{verifiedMediaGroup=false}={}) {
   };
   compare(h2, normalized, 'history');
   require(byteLength(JSON.stringify(normalized)) <= 1800000, '目标数据库单窗口记录超过安全大小，未截断。');
-  return { c, state:normalized };
+  return { c, state:normalized, storageUpdatedAt:storageUpdatedAt??stamp(normalized.updated_at) };
 }
 function validatedCalendar(row) {
   require(object(row) && validId(row.id) && validDate(row.day) && validStamp(row.created_at) && validStamp(row.updated_at), '日历 ID、日期或时间无效。');
@@ -156,7 +159,7 @@ async function prepare(db,envelope,selection) {
     try { v=validatedChat(row); } catch(e) { if (!(e instanceof TransferError)) throw e; result.chat.blocked.push({id,reason:e.message}); continue; }
     const c=v.c;
     statements.push(db.prepare(`INSERT INTO conversations (id,user_id,title,created_at,updated_at,deleted_at,title_manual,title_generated_at,title_model_id,conversation_kind,room_type,source,source_window_id) VALUES (?,'owner',?,?,?,NULL,?,?,?,'chat',?,?,?)`).bind(c.id,c.title,stamp(c.created_at),stamp(c.updated_at),c.title_manual?1:0,c.title_generated_at==null?null:stamp(c.title_generated_at),c.title_model_id??null,c.room_type,c.source||'coast',c.source_window_id??null));
-    statements.push(db.prepare('INSERT INTO conversation_states (conversation_id,state_json,updated_at) VALUES (?,?,?)').bind(c.id,JSON.stringify(v.state),stamp(v.state.updated_at)));
+    statements.push(db.prepare('INSERT INTO conversation_states (conversation_id,state_json,updated_at) VALUES (?,?,?)').bind(c.id,JSON.stringify(v.state),v.storageUpdatedAt));
     stagedChatStates.set(c.id,v.state);
     result.chat.ready++;
   }

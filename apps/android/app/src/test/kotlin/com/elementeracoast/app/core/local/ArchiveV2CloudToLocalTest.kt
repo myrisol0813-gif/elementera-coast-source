@@ -87,4 +87,42 @@ class ArchiveV2CloudToLocalTest {
             assertEquals(LocalCalendarStore(clean).snapshot(),LocalCalendarStore(roundtrip).snapshot())
         }finally{root.deleteRecursively()}
     }
+
+    @Test fun differentCloudHistoryAndStorageClocksSurviveLocalZipRoundtrip(){
+        val root=Files.createTempDirectory("history-clocks").toFile()
+        try{
+            val raw=buildJsonObject{
+                put("kind","chat");putJsonObject("data"){
+                    putJsonObject("conversation"){
+                        put("id","clock-fixture");put("title","Clock fixture");put("room_type","main")
+                        put("created_at",100L);put("updated_at",456L);put("deleted_at",JsonNull);put("title_manual",0)
+                        put("title_generated_at",JsonNull);put("title_model_id",JsonNull);put("source","coast");put("source_window_id",JsonNull)
+                    }
+                    put("history_json","""{"version":4,"updated_at":"1970-01-01T00:00:00.123Z","turns":[]}""")
+                    put("history_updated_at",456L)
+                }
+            }.toString().encodeToByteArray()
+            val chunks=listOf(ArchiveV2Chunks.digest(raw))
+            val d=ArchiveV2Object(raw.size.toLong(),chunks,ArchiveV2Chunks.fingerprint(raw.size.toLong(),chunks))
+            val m=ArchiveV2Manifest("elementera-coast-archive",2,"backend","com.elementeracoast.source","2026-11-24T00:00:00Z",
+                ArchiveV2Manifests.modules.map{ArchiveV2Coverage(it,if(it=="chat")"partial" else "unavailable",if(it=="chat")1 else 0)},
+                listOf(ArchiveV2Record("chat","clock-fixture",d.objectSha256,emptyList(),emptyList())),listOf(d))
+            val file=File(root,"cloud.zip")
+            ArchiveV2ZipWriter(file.outputStream()).use{it.objectEntry(d,ByteArrayInputStream(raw));it.finish(m)}
+            val stage=ArchiveV2Stage(root,"verified");assertEquals(m,ArchiveV2ZipReader.stage(file,stage))
+            val app="com.elementeracoast.source";val modules=setOf("chat");val target=MemoryLocalPersistence()
+            assertEquals(1,ArchiveV2Local.restore(m,stage,modules,app,target,false).counts.getValue("chat").ready)
+            val cache=com.elementeracoast.app.core.remote.RemoteCacheStore(target)
+            assertNull(cache.history("clock-fixture"))
+            ArchiveV2Local.restore(m,stage,modules,app,target,true)
+            val history=cache.history("clock-fixture")!!
+            assertEquals("1970-01-01T00:00:00.123Z",history.updatedAt);assertEquals(456L,history.archiveStorageUpdatedAt!!)
+            val local=File(root,"local.zip");val lm=ArchiveV2Local.export(target,app,local);val ls=ArchiveV2Stage(root,"local")
+            assertEquals(lm,ArchiveV2ZipReader.stage(local,ls))
+            val again=MemoryLocalPersistence();ArchiveV2Local.restore(lm,ls,modules,app,again,true)
+            assertEquals(history,com.elementeracoast.app.core.remote.RemoteCacheStore(again).history("clock-fixture"))
+            cache.putHistory("clock-fixture",history.copy(updatedAt="1970-01-01T00:00:01Z"))
+            assertNull(cache.history("clock-fixture")!!.archiveStorageUpdatedAt)
+        }finally{root.deleteRecursively()}
+    }
 }

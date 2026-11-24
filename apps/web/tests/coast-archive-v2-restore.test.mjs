@@ -69,7 +69,7 @@ test('local archive with binary originals restores as a single cloud transaction
  const chat=await readArchiveChat(src,c.id),media=await readArchiveAttachment(src,c.id,a.id);
  const iso=v=>v==null?null:new Date(v).toISOString();
  const conversation={...chat.conversation,created_at:iso(chat.conversation.created_at),updated_at:iso(chat.conversation.updated_at),title_manual:!!chat.conversation.title_manual,title_generated_at:iso(chat.conversation.title_generated_at)};
- const history={...JSON.parse(chat.history_json),conversation_id:c.id};
+ const history={...JSON.parse(chat.history_json),conversation_id:c.id,archive_storage_updated_at:123456789};
  const local=await encodeRecordObject({kind:'local_chat',data:{conversation,history}});
  const attachment=await encodeRecordObject({kind:'attachment',data:media.metadata});
  const records=[{module:'chat',id:c.id,record_object:local.descriptor.object_sha256,media_objects:[],dependencies:[]},{module:'attachments',id:a.id,record_object:attachment.descriptor.object_sha256,media_objects:[media.descriptor.object_sha256],dependencies:['chat/'+c.id]}];
@@ -87,7 +87,11 @@ test('local archive with binary originals restores as a single cloud transaction
  await assert.rejects(()=>restoreArchiveChatGroup(dst,session.id,{...manifest,application_id:'com.elementeracoast.app'},c.id,true),/same-edition/);
  await restoreArchiveChatGroup(dst,session.id,manifest,c.id,true);
  assert.deepEqual([...new Uint8Array((await getChatAttachmentRecord(dst,c.id,a.id)).data)],[...bytes]);
- assert.equal((await readArchiveChat(dst,c.id)).conversation.title,'Local fixture');
+ const restored=await readArchiveChat(dst,c.id);
+ assert.equal(restored.conversation.title,'Local fixture');
+ assert.equal(restored.history_updated_at,123456789);
+ assert.equal(JSON.parse(restored.history_json).updated_at,history.updated_at);
+ assert.equal(Object.hasOwn(JSON.parse(restored.history_json),'archive_storage_updated_at'),false);
  assert.deepEqual((await listArchiveDogtalk(dst)).items,(await listArchiveDogtalk(src)).items);
  assert.deepEqual((await listArchiveDogtalk(dst,{kind:'records'})).items,(await listArchiveDogtalk(src,{kind:'records'})).items);
  await assert.rejects(()=>restoreArchiveChatGroup(dst,session.id,manifest,c.id,true),/already exists/);
