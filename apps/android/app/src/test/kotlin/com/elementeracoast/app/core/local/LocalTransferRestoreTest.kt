@@ -34,6 +34,32 @@ class LocalTransferRestoreTest {
         assertEquals(1,repeated.counts.getValue("chat").conflicts)
         assertTrue(cache.history("cloud1")!!.turns.isEmpty())
     }
+    @Test fun linkedCalendarRequiresOriginalChatAndTurn() {
+        val raw=CoastTransferCodec.decode(cloudBundle())
+        val row=raw.getValue("calendar").jsonArray.single().jsonObject
+        fun linked(turn:String):ByteArray {
+            val linkedRow=JsonObject(row+mapOf("conversation_id" to JsonPrimitive("cloud1"),"source_turn_id" to JsonPrimitive(turn)))
+            return CoastTransferCodec.encode(JsonObject(raw+("calendar" to JsonArray(listOf(linkedRow)))))
+        }
+        val bytes=linked("turn1")
+        val target=MemoryLocalPersistence()
+        assertTrue(runCatching { LocalTransferRestore.restore(bytes,app,setOf("calendar"),target) }.isFailure)
+        assertTrue(LocalCalendarStore(target).snapshot().isEmpty())
+        assertTrue(runCatching { LocalTransferRestore.restore(linked("missing"),app,setOf("chat","calendar"),target) }.isFailure)
+        assertTrue(RemoteCacheStore(target).conversations().isEmpty())
+        LocalTransferRestore.restore(bytes,app,setOf("chat","calendar"),target)
+        val saved=LocalCalendarStore(target).snapshot().single().jsonObject
+        assertEquals("cloud1",saved.getValue("conversation_id").jsonPrimitive.content)
+        assertEquals("turn1",saved.getValue("source_turn_id").jsonPrimitive.content)
+        val edited=LocalCalendarStore(target).save("calendar1",buildJsonObject { put("title","Edited") })
+        assertEquals(saved["source_turn_id"],edited["source_turn_id"])
+        val other=MemoryLocalPersistence()
+        LocalTransferRestore.restore(bytes,app,setOf("chat"),other)
+        val cache=RemoteCacheStore(other)
+        cache.putHistory("cloud1",cache.history("cloud1")!!.copy(turns=emptyList()))
+        assertTrue(runCatching { LocalTransferRestore.restore(bytes,app,setOf("chat","calendar"),other) }.isFailure)
+        assertTrue(LocalCalendarStore(other).snapshot().isEmpty())
+    }
     @Test fun crossEditionLocalModelProfileRetainsExistingSelection() {
         val original = MemoryLocalPersistence()
         val profile = RemoteProfile(currentChatModel = "portable-model", modelBox = RemoteModelBox(chat = listOf("portable-model")))
