@@ -22,7 +22,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
         try {
             val manifest=if(local) {
                 require(NativeWorkspace.isLocal)
-                ArchiveV2Local.export(NativeWorkspace.persistence(context),BuildConfig.APPLICATION_ID,file)
+                ArchiveV2Local.export(NativeWorkspace.persistence(context),BuildConfig.APPLICATION_ID,file,context.filesDir)
             }else ArchiveV2NativeCollector.collectCloud(api,file,BuildConfig.APPLICATION_ID,progress)
             file to manifest
         }catch(e:Throwable){dir.deleteRecursively();throw e}
@@ -50,7 +50,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
         if(local) m.modules.filter { it.coverage!="unavailable" && it.module in (if(m.workspace=="local")ArchiveV2Local.localModules else ArchiveV2Local.cloudModules) && (it.module!="daily"||m.workspace=="local"||m.applicationId==BuildConfig.APPLICATION_ID) && (it.module !in setOf("custom_instructions","memory_entries","memory_pockets","user_portrait","self_portrait","thinking_soil","thinking_soil_history","tools")||m.applicationId==BuildConfig.APPLICATION_ID) }.map { it.module }.toSet() else emptySet()
     suspend fun localRestore(input:Imported,modules:Set<String>,confirm:Boolean):JsonObject=withContext(Dispatchers.IO){
         require(local&&NativeWorkspace.isLocal)
-        val report=ArchiveV2Local.restore(input.manifest,input.stage,modules,BuildConfig.APPLICATION_ID,NativeWorkspace.persistence(context),confirm)
+        val report=ArchiveV2Local.restore(input.manifest,input.stage,modules,BuildConfig.APPLICATION_ID,NativeWorkspace.persistence(context),confirm,context.filesDir)
         buildJsonObject{
             put("committed",confirm)
             report.counts.forEach { (key,value)->putJsonObject(key){put("ready",value.ready);put("existing",value.existing);put("conflicts",value.conflicts)} }
@@ -66,7 +66,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
         val m=input.manifest;val objects=m.objects.associateBy { it.objectSha256 }
         buildList {
             for(r in m.records){
-                if(m.workspace=="local"&&((r.module !in ArchiveV2Local.localModules||r.module=="attachments")||r.module in setOf("custom_instructions","memory_entries","memory_pockets","user_portrait","self_portrait","thinking_soil","thinking_soil_history","tools","vault")&&m.applicationId!=BuildConfig.APPLICATION_ID))continue
+                if(m.workspace=="local"&&((r.module !in ArchiveV2Local.localModules||r.module in setOf("attachments","appearance"))||r.module in setOf("custom_instructions","memory_entries","memory_pockets","user_portrait","self_portrait","thinking_soil","thinking_soil_history","tools","vault")&&m.applicationId!=BuildConfig.APPLICATION_ID))continue
                 if(m.workspace=="backend"&&!(r.module=="chat"&&m.applicationId==BuildConfig.APPLICATION_ID)&&!(r.module=="library"&&r.id.startsWith("library_books:"))&&r.module !in setOf("calendar","worldbook","model_profile")&&!(m.applicationId==BuildConfig.APPLICATION_ID&&r.module in setOf("memory_entries","memory_pockets","user_portrait","self_portrait","daily","vault","custom_instructions","thinking_soil","thinking_soil_history","tools")))continue
                 val d=objects.getValue(r.recordObject)
                 if(d.size>1800000)continue

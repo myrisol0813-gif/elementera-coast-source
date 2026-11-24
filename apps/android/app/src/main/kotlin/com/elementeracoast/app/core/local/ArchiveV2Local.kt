@@ -11,15 +11,15 @@ import kotlinx.serialization.json.*
 internal object ArchiveV2Local {
     private val json=Json { ignoreUnknownKeys=false }
     private val modules=CoastTransferCodec.supportedModules
-    val localModules=modules+ArchiveV2Knowledge.modules+setOf("attachments")+LocalSideRecords.modules
+    val localModules=modules+ArchiveV2Knowledge.modules+setOf("attachments","appearance")+LocalSideRecords.modules
     val cloudModules get()=ArchiveV2CloudToLocal.supportedModules+ArchiveV2Knowledge.modules+setOf("attachments")+LocalSideRecords.modules
     private fun describe(bytes:ByteArray):ArchiveV2Object {
         val chunk=ArchiveV2Chunks.CHUNK_BYTES
         val hashes=(bytes.indices step chunk).map { ArchiveV2Chunks.digest(bytes.copyOfRange(it,minOf(it+chunk,bytes.size))) }
         return ArchiveV2Object(bytes.size.toLong(),hashes,ArchiveV2Chunks.fingerprint(bytes.size.toLong(),hashes))
     }
-    fun export(store:LocalPersistence,applicationId:String,output:File):ArchiveV2Manifest = store.readConsistent { stable -> exportStable(stable,applicationId,output) }
-    private fun exportStable(store:LocalPersistence,applicationId:String,output:File):ArchiveV2Manifest {
+    fun export(store:LocalPersistence,applicationId:String,output:File,appearanceRoot:File?=null):ArchiveV2Manifest = store.readConsistent { stable -> exportStable(stable,applicationId,output,appearanceRoot) }
+    private fun exportStable(store:LocalPersistence,applicationId:String,output:File,appearanceRoot:File?):ArchiveV2Manifest {
         require(!output.exists()&&output.parentFile?.isDirectory==true)
         val payload=CoastTransferCodec.decode(LocalBackupArchive.encode(LocalBackupArchive.capture(store,applicationId)))
         val originals=LocalAttachmentStore(store)
@@ -62,9 +62,17 @@ internal object ArchiveV2Local {
                     }
                     add(row.module,row.id,row.kind,row.data,media,row.dependencies)
                 }
+                if(appearanceRoot!=null){
+                    val appearance=ArchiveV2Appearance.capture(store,appearanceRoot)
+                    val media=appearance.originals.map{a->
+                        val d=describe(a.bytes);ByteArrayInputStream(a.bytes).use{writer.objectEntry(d,it)}
+                        objects[d.objectSha256]=d;d.objectSha256
+                    }
+                    if(appearance.settings.isNotEmpty()||media.isNotEmpty())add("appearance",ArchiveV2Appearance.ID,"appearance",appearance.data(),media)
+                }
                 val counts=records.groupingBy { it.module }.eachCount()
                 val manifest=ArchiveV2Manifest("elementera-coast-archive",2,"local",applicationId,payload.getValue("exportedAt").jsonPrimitive.content,
-                    ArchiveV2Manifests.modules.map { ArchiveV2Coverage(it,if(it in localModules)"partial" else "unavailable",counts[it]?:0) },records,objects.values.toList())
+                    ArchiveV2Manifests.modules.map { ArchiveV2Coverage(it,if(it in localModules&&(it!="appearance"||appearanceRoot!=null))"partial" else "unavailable",counts[it]?:0) },records,objects.values.toList())
                 ArchiveV2Manifests.validate(manifest);writer.finish(manifest);return manifest
             }
         }catch(e:Throwable){output.delete();throw e}
@@ -110,7 +118,7 @@ internal object ArchiveV2Local {
             put("conversations",JsonArray(chat));put("calendar",JsonArray(calendar));put("moments",JsonArray(moments));put("diaries",JsonArray(diaries));put("profile",profile);put("dailyProfile",daily)
         })
     }
-    fun restore(manifest:ArchiveV2Manifest,stage:ArchiveV2Stage,selection:Set<String>,applicationId:String,store:LocalPersistence,confirm:Boolean):LocalRestorePreview {
+    fun restore(manifest:ArchiveV2Manifest,stage:ArchiveV2Stage,selection:Set<String>,applicationId:String,store:LocalPersistence,confirm:Boolean,appearanceRoot:File?=null):LocalRestorePreview {
         require(manifest.workspace!="backend"||"daily" !in selection||manifest.applicationId==applicationId){"日常云端原始记录暂需同版本恢复；本机便携归档仍可跨版本。"}
         ArchiveV2Manifests.validate(manifest)
         require(selection.isNotEmpty()&&(if(manifest.workspace=="local")localModules else cloudModules).containsAll(selection))
@@ -118,7 +126,9 @@ internal object ArchiveV2Local {
         val objects=manifest.objects.associateBy{it.objectSha256}
         require(manifest.records.filter{it.module in selection}.sumOf{objects.getValue(it.recordObject).size}<=CoastTransferCodec.MAX_BYTES){"本机恢复事务最多64 MiB。"}
         val extra=selection.intersect(ArchiveV2Knowledge.modules)
-        val base=selection-extra-setOf("attachments")-LocalSideRecords.modules
+        val base=selection-extra-setOf("attachments","appearance")-LocalSideRecords.modules
+        require("appearance" !in selection||appearanceRoot!=null){"外观恢复缺少设备文件目录。"}
+        val appearance=ArchiveV2Appearance.read(manifest,stage,selection)
         val side=ArchiveV2SideRecords.read(manifest,stage,selection,applicationId)
         val attachments=ArchiveV2Attachments.read(manifest,stage,selection)
         val attachmentMeta=attachments.associate{it.metadata.getValue("id").jsonPrimitive.content to it.metadata}
@@ -137,7 +147,8 @@ internal object ArchiveV2Local {
                 val soil=(LocalSoilStore(target).read().history+rows.filter{it.kind=="thinking_soil_history"}.map{it.data}).distinctBy{it["conversation_id"] to it["assistant_message_id"]}
                 ArchiveV2SideRecords.apply(side,selection,target,histories,parents?.second.orEmpty(),media,soil,write)
             }else emptyMap()
-            return LocalRestorePreview(manifest.workspace,report?.counts.orEmpty()+extras+files+sideCounts,report?.unsupportedModules.orEmpty())
+            val appearanceCounts=if("appearance" in selection)mapOf("appearance" to ArchiveV2Appearance.apply(appearance,target,requireNotNull(appearanceRoot),write))else emptyMap()
+            return LocalRestorePreview(manifest.workspace,report?.counts.orEmpty()+extras+files+sideCounts+appearanceCounts,report?.unsupportedModules.orEmpty())
         }
         return if(confirm)store.atomic{run(it,true)}else store.readConsistent{run(it,false)}
     }
