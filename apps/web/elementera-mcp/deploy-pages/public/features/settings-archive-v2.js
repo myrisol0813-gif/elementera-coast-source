@@ -7,6 +7,7 @@ const line=(title,body)=>'<div class="feature-row static"><span><strong>'+escape
 const action=(key,label,disabled)=>'<button class="primary-wide" type="button" data-action="settings:transfer-v2-'+key+'" '+(disabled?'disabled':'')+'>'+escapeHtml(label)+'</button>';
 const labels={chat:'聊天',attachments:'附件',voice:'语音',dogtalk_records:'私人草稿',dogtalk_snapshots:'历史快照',thinking_soil:'思维壤',thinking_soil_history:'思维壤历史',memory_entries:'记忆',memory_pockets:'候选',calendar:'日历',daily:'日常',model_profile:'模型资料',user_portrait:'用户画像',self_portrait:'自我画像',worldbook:'世界书',custom_instructions:'自定义',vault:'拾潮',library:'书房',appearance:'外观',tools:'工具历史（脱敏）'};
 export function createV2Transfer({router,toast,chat}){
+  const remoteManifest=m=>{const records=m.records.filter(r=>r.module!=='appearance'),used=new Set(records.flatMap(r=>[r.record_object,...r.media_objects]));return {...m,records,objects:m.objects.filter(d=>used.has(d.object_sha256)),modules:m.modules.map(v=>v.module==='appearance'?{...v,coverage:'unavailable',count:0}:v)};};
   let incoming=null,choices=[],selected='',preview=null,result=null,session=null,uploaded=false,busy=false,failure='',progress='',revision=0;
   const current=()=>router.current()?.name==='settings-transfer';
   const refresh=()=>current()?router.refresh():Promise.resolve();
@@ -31,7 +32,7 @@ export function createV2Transfer({router,toast,chat}){
       html+=line('归档来源',m.workspace+' · '+m.records.length+' 项记录')+
         m.modules.map(v=>line(labels[v.module]||v.module,v.count+' 项 · '+(v.coverage==='unavailable'?'未采集':'已列入清单'))).join('');
       html+=choices.map(r=>'<button class="feature-row" type="button" data-action="settings:transfer-v2-select" data-id="'+escapeHtml(r.key)+'" aria-pressed="'+(selected===r.key)+'" '+(busy||preview||result?'disabled':'')+'><span><strong>'+escapeHtml(r.title)+'</strong><small>'+escapeHtml(r.kind==='chat'?'聊天窗口':r.kind==='book'?'书房':labels[r.kind])+'</small></span></button>').join('');
-      html+=line('上传范围','预览将把此归档的全部对象暂存在已登录云端；仅确认后才写入所选资料。');
+      html+=line('上传范围','预览将把除本机外观以外的对象暂存在已登录云端；仅确认后才写入所选资料。');
       if(!choices.length)html+=line('目标暂不支持','请保留原始归档。');
       if(preview||result){const p=result||preview;html+=line(result?'已恢复资料':'预览通过',p.scope==='daily_group'?'评论 '+p.comments+' · 点赞 '+p.likes:p.scope==='portrait_group'?'候选 '+p.candidates+' · 历史 '+p.revisions:p.scope==='record_only'?'新增 '+p.ready+' · 已有 '+p.existing:p.scope==='book_only'?'章节 '+p.chapters+' · 批注 '+p.notes:'轮次 '+p.turns+' · 附件 '+p.attachments+' · 语音 '+p.voices+' · 思维壤 '+p.soils+' · 快照 '+p.snapshots);}
       if(!result)html+=action(preview?'commit':'preview',preview?'确认恢复所选资料':'上传并预览',busy||!selected);
@@ -52,7 +53,7 @@ export function createV2Transfer({router,toast,chat}){
     if(name==='v2-choose'){
       const input=document.createElement('input');input.type='file';input.accept='.zip,application/zip';
       input.addEventListener('change',()=>{const file=input.files?.[0];if(!file)return;void operate(async token=>{
-        const data=await openArchiveV2(file,m=>api.validateManifest(m));
+        const data=await openArchiveV2(file,m=>api.validateManifest(remoteManifest(m)));
         if(token!==revision)return;
         // Full byte verification precedes preview and any upload.
         for(const d of data.manifest.objects){for await(const b of data.objectChunks(d)){if(token!==revision)throw Error('已离开归档页面');}progress='正在校验原件';}
@@ -98,20 +99,20 @@ export function createV2Transfer({router,toast,chat}){
       if(!session)session=(await api.createSession()).session.id;
       if(!uploaded){
         let n=0;
-        for(const d of incoming.manifest.objects){
+        for(const d of remoteManifest(incoming.manifest).objects){
           if(token!==revision)throw Error('已离开归档页面；可返回继续或清理暂存');
           await api.registerObject(session,d);const received=new Set((await api.status(session,d.object_sha256)).received);
           let i=0;for await(const b of incoming.objectChunks(d)){if(token!==revision)throw Error('已离开归档页面；可返回继续');if(!received.has(i)){await api.putChunk(session,d.object_sha256,i,b);progress='已上传 '+(++n)+' 个新分块';}i++;}
         }
-        const p=await api.preflight(session,incoming.manifest);if(!p.ready_for_byte_verification)throw Error('云端暂存未到齐');uploaded=true;
+        const p=await api.preflight(session,remoteManifest(incoming.manifest));if(!p.ready_for_byte_verification)throw Error('云端暂存未到齐');uploaded=true;
       }
       if(token!==revision)return;
       const choice=choices.find(r=>r.key===selected);if(!choice)throw Error('请选择资料');
-      preview=await (choice.kind==='book'?api.restoreBook(session,incoming.manifest,choice.id,false):choice.kind==='chat'&&(!choice.local||choice.grouped)?api.restoreChat(session,incoming.manifest,choice.id,false):api.restoreRecord(session,incoming.manifest,choice.kind,choice.id,false));
+      preview=await (choice.kind==='book'?api.restoreBook(session,remoteManifest(incoming.manifest),choice.id,false):choice.kind==='chat'&&(!choice.local||choice.grouped)?api.restoreChat(session,remoteManifest(incoming.manifest),choice.id,false):api.restoreRecord(session,remoteManifest(incoming.manifest),choice.kind,choice.id,false));
     });
     if(name==='v2-commit'&&preview&&!result&&session)return operate(async token=>{
       const choice=choices.find(r=>r.key===selected);if(!choice)throw Error('请选择资料');
-      result=await (choice.kind==='book'?api.restoreBook(session,incoming.manifest,choice.id,true):choice.kind==='chat'&&(!choice.local||choice.grouped)?api.restoreChat(session,incoming.manifest,choice.id,true):api.restoreRecord(session,incoming.manifest,choice.kind,choice.id,true));
+      result=await (choice.kind==='book'?api.restoreBook(session,remoteManifest(incoming.manifest),choice.id,true):choice.kind==='chat'&&(!choice.local||choice.grouped)?api.restoreChat(session,remoteManifest(incoming.manifest),choice.id,true):api.restoreRecord(session,remoteManifest(incoming.manifest),choice.kind,choice.id,true));
       await chat.refreshFromCoast();toast('已确认恢复所选资料。');
     });
   }

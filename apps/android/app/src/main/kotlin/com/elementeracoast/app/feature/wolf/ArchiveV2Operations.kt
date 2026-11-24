@@ -99,19 +99,24 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
             }
         }
     }
+    private fun remoteManifest(m:ArchiveV2Manifest):ArchiveV2Manifest{
+        val records=m.records.filter{it.module!="appearance"}
+        val used=records.flatMap{listOf(it.recordObject)+it.mediaObjects}.toSet()
+        return m.copy(records=records,objects=m.objects.filter{it.objectSha256 in used},modules=m.modules.map{if(it.module=="appearance")it.copy(coverage="unavailable",count=0)else it}).also{ArchiveV2Manifests.validate(it)}
+    }
     suspend fun createSession():String {
         require(!local)
         return api.archiveV2CreateSession().getValue("session").jsonObject.getValue("id").jsonPrimitive.content
     }
     suspend fun upload(input:Imported,session:String,progress:(Int)->Unit):JsonObject {
         require(!local)
-        return ArchiveV2NativeCollector.upload(api,session,input.manifest,input.stage,progress)
+        return ArchiveV2NativeCollector.upload(api,session,remoteManifest(input.manifest),input.stage,progress)
     }
     suspend fun cloudRestore(input:Imported,session:String,choice:Choice,confirm:Boolean):JsonObject {
         require(!local&&choice in cloudChoices(input))
-        return if(choice.kind=="book")api.archiveV2RestoreBook(session,input.manifest,choice.id,confirm)
-            else if(choice.kind=="chat"&&(!choice.fromLocal||choice.grouped))api.archiveV2RestoreChat(session,input.manifest,choice.id,confirm)
-            else api.archiveV2RestoreRecord(session,input.manifest,choice.kind,choice.id,confirm)
+        return if(choice.kind=="book")api.archiveV2RestoreBook(session,remoteManifest(input.manifest),choice.id,confirm)
+            else if(choice.kind=="chat"&&(!choice.fromLocal||choice.grouped))api.archiveV2RestoreChat(session,remoteManifest(input.manifest),choice.id,confirm)
+            else api.archiveV2RestoreRecord(session,remoteManifest(input.manifest),choice.kind,choice.id,confirm)
     }
     suspend fun cancelSession(session:String){require(!local);api.archiveV2CancelSession(session)}
 }
