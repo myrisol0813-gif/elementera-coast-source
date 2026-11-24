@@ -24,7 +24,7 @@ class ArchiveV2LocalTest {
             assertNull(RemoteCacheStore(target).profile())
             ArchiveV2Local.restore(manifest,stage,selection,app,target,true)
             assertEquals(profile,RemoteCacheStore(target).profile())
-            assertTrue(manifest.modules.any { it.module=="attachments"&&it.coverage=="unavailable" })
+            assertTrue(manifest.modules.any { it.module=="attachments"&&it.coverage=="partial"&&it.count==0 })
         }finally{root.deleteRecursively()}
     }
 }
