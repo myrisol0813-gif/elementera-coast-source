@@ -57,6 +57,11 @@ function validatedChat(row) {
   require(validId(c.id) && typeof c.title === 'string' && c.title.trim() && c.title.length <= 1000, '窗口名称或 ID 无效。');
   require(['main','radio','lighthouse'].includes(c.room_type) && validStamp(c.created_at) && validStamp(c.updated_at), '窗口类型或时间无效。');
   require(!c.deleted_at, '已删除窗口不能直接恢复为活动窗口。');
+  require(c.title_manual == null || typeof c.title_manual === 'boolean', '标题来源标记无效。');
+  require(c.title_generated_at == null || validStamp(c.title_generated_at), '标题生成时间无效。');
+  require(c.title_model_id == null || typeof c.title_model_id === 'string', '标题模型标记无效。');
+  require(c.source == null || (typeof c.source === 'string' && c.source.trim() === c.source && c.source.length <= 160), '窗口来源无效。');
+  require(c.source_window_id == null || typeof c.source_window_id === 'string', '窗口来源 ID 无效。');
   require(h.version === 4 && h.conversation_id === c.id && Array.isArray(h.turns) && validStamp(h.updated_at), '历史版本、所属窗口或时间无效。');
   require(h.turns.length <= 400, '目标后端每个窗口最多 400 轮；该窗口未截断。');
   const turnIds = new Set();
@@ -126,24 +131,36 @@ async function prepare(db,envelope,selection) {
   await ensureChatSchema(db); await ensureCalendarSchema(db);
   const existingChats = new Set((await db.prepare('SELECT id FROM conversations').all()).results.map(r=>r.id));
   const existingCalendar = new Set((await db.prepare('SELECT id FROM coast_calendar_entries_v2').all()).results.map(r=>r.id));
-  const result = { source:payload.workspace, target:'backend', unsupported_modules:payload.includedModules.filter(k=>!SUPPORTED.includes(k)), chat:{ready:0,existing:0,blocked:[]},calendar:{ready:0,existing:0,blocked:[]} };
+  const activeChats = new Map((await listConversations(db)).map(c=>[c.id,c]));
+  const activeCalendar = new Map((await listCalendarEntries(db,{all:true})).map(c=>[c.id,portableCalendar(c)]));
+  const result = { source:payload.workspace, target:'backend', unsupported_modules:payload.includedModules.filter(k=>!SUPPORTED.includes(k)), chat:{ready:0,existing:0,conflicts:0,blocked:[]},calendar:{ready:0,existing:0,conflicts:0,blocked:[]} };
   const statements = [];
   const seen = new Set();
   for (const row of selection.includes('chat')?payload.conversations:[]) {
     const id=row?.conversation?.id;
     require(validId(id)&&!seen.has(id),'数据包内窗口 ID 重复或无效。');seen.add(id);
-    if (existingChats.has(id)) { result.chat.existing++; continue; }
+    if (existingChats.has(id)) {
+      result.chat.existing++;
+      const current=activeChats.get(id);
+      if (!current || !identical(current,row.conversation) ||
+          !identical(portableHistory(await readConversationState(db,id),id),row.history)) result.chat.conflicts++;
+      continue;
+    }
     let v;
     try { v=validatedChat(row); } catch(e) { if (!(e instanceof TransferError)) throw e; result.chat.blocked.push({id,reason:e.message}); continue; }
     const c=v.c;
-    statements.push(db.prepare(`INSERT INTO conversations (id,user_id,title,created_at,updated_at,deleted_at,title_manual,conversation_kind,room_type,source,source_window_id) VALUES (?,'owner',?,?,?,NULL,1,'chat',?,'coast',?)`).bind(c.id,c.title,stamp(c.created_at),stamp(c.updated_at),c.room_type,c.source_window_id||null));
+    statements.push(db.prepare(`INSERT INTO conversations (id,user_id,title,created_at,updated_at,deleted_at,title_manual,title_generated_at,title_model_id,conversation_kind,room_type,source,source_window_id) VALUES (?,'owner',?,?,?,NULL,?,?,?,'chat',?,?,?)`).bind(c.id,c.title,stamp(c.created_at),stamp(c.updated_at),c.title_manual?1:0,c.title_generated_at==null?null:stamp(c.title_generated_at),c.title_model_id??null,c.room_type,c.source||'coast',c.source_window_id??null));
     statements.push(db.prepare('INSERT INTO conversation_states (conversation_id,state_json,updated_at) VALUES (?,?,?)').bind(c.id,JSON.stringify(v.state),stamp(v.state.updated_at)));
     result.chat.ready++;
   }
   seen.clear();
   for (const row of selection.includes('calendar')?payload.calendar:[]) {
     require(validId(row?.id)&&!seen.has(row.id),'数据包内日历 ID 重复或无效。');seen.add(row.id);
-    if (existingCalendar.has(row.id)) { result.calendar.existing++;continue; }
+    if (existingCalendar.has(row.id)) {
+      result.calendar.existing++;
+      if (!identical(activeCalendar.get(row.id),row)) result.calendar.conflicts++;
+      continue;
+    }
     try { validatedCalendar(row); } catch(e) { if (!(e instanceof TransferError)) throw e; result.calendar.blocked.push({id:row.id,reason:e.message}); continue; }
     const a=row.anniversary;
     statements.push(db.prepare(`INSERT INTO coast_calendar_entries_v2 (id,day,kind,title,body,recurrence,author,source,model_label,created_at,updated_at,anniversary_start_day,anniversary_mode,anniversary_target_days,anniversary_pinned) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(row.id,row.day,row.kind,row.title,row.body,row.recurrence,row.author==='owner'?OWNER_AUTHOR:ASSISTANT_AUTHOR,row.source||'manual',row.model_label||null,stamp(row.created_at),stamp(row.updated_at),a?.startDay??null,a?.mode??null,a?.targetDays??null,a?.pinned?1:0));
