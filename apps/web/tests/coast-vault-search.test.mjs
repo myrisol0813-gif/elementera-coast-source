@@ -298,7 +298,7 @@ assert.equal(vaultSnapshot.treasures.complete, true);
 const { buildOfflineArchive } = await import('../elementera-mcp/deploy-pages/public/features/offline-archive.js');
 const vaultZip = buildOfflineArchive({ coast_vault: vaultSnapshot });
 const vaultZipText = new TextDecoder().decode(await vaultZip.blob.arrayBuffer());
-assert.ok(vaultZipText.includes('coast_vault') && vaultZipText.includes('极光就是被烧上天的诗灰。'), 'offline ZIP must render vault snapshot and actual treasure text');
+assert.ok(vaultZipText.includes('coast_vault') && vaultZipText.includes(textFavorite.excerpt), 'offline ZIP must render vault snapshot and actual treasure text');
 const { saveSoilSnapshot } = await import('../functions/memory-store.js');
 await saveSoilSnapshot(db, conversation.id, {
   turn_id: 'turn-vault-1',
