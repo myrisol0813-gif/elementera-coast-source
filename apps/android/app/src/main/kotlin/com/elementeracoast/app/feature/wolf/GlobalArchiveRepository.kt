@@ -9,7 +9,12 @@ import com.elementeracoast.app.BuildConfig
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+import java.io.File
+import com.elementeracoast.app.core.local.ArchiveV2Manifest
+import com.elementeracoast.app.core.local.ArchiveV2NativeCollector
+
 interface GlobalArchiveRepository {
+    suspend fun exportCloudV2(output: File, onProgress: (Int,Long)->Unit): ArchiveV2Manifest = error("云端 V2 导出未接入。")
     suspend fun snapshot(): JsonElement
     suspend fun fullArchive(): JsonElement = error("完整包导出未接入。")
     suspend fun transferExport(): JsonObject = error("迁移导出未接入。")
@@ -21,6 +26,7 @@ class DefaultGlobalArchiveRepository(
     private val api: CoastApiClient
 ) : GlobalArchiveRepository {
     internal fun archiveV2(context: android.content.Context, local: Boolean) = ArchiveV2Operations(api,context,local)
+    override suspend fun exportCloudV2(output: File,onProgress: (Int,Long)->Unit): ArchiveV2Manifest = ArchiveV2NativeCollector.collectCloud(api,output,BuildConfig.APPLICATION_ID,onProgress)
     override suspend fun snapshot(): JsonElement = api.getGlobalSnapshot()
     override suspend fun fullArchive(): JsonElement = api.getFullArchive()
     override suspend fun transferExport(): JsonObject = api.transferExport()
