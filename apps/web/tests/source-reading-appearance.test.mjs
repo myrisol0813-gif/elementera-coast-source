@@ -41,7 +41,10 @@ for (const content of [toolDescriptions, libraryApi, libraryImport, settings, do
 }
 assert.match(toolDescriptions, /查看书架/);
 assert.match(toolDescriptions, /阅读书页/);
-assert.match(settings, /snapshotDataSection\('书房', snapshot\.tidal_library\)/);
+const { buildOfflineArchive } = await import('../elementera-mcp/deploy-pages/public/features/offline-archive.js');
+const libraryZip = buildOfflineArchive({tidal_library:{books:[{title:'离线书房验收',notes:'完整笔记保留'}]}});
+const libraryZipText = new TextDecoder().decode(await libraryZip.blob.arrayBuffer());
+assert.ok(libraryZipText.includes('tidal_library') && libraryZipText.includes('离线书房验收') && libraryZipText.includes('完整笔记保留'), 'offline archive includes library records and notes');
 assert.match(dogtalkDrawer, /跨窗口选取/);
 assert.match(dogtalkDrawer, /历史消息搜索/);
 assert.doesNotMatch(dogtalkDrawer, /旧信关键词|跨窗口取信/);
