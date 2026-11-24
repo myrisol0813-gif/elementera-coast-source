@@ -42,6 +42,7 @@ data class RemoteDeskRecentContext(
     val status: String = "未递给",
     @SerialName("status_detail") val statusDetail: String = "",
     val turns: Int = 0,
+    @SerialName("current_message_separate") val currentMessageSeparate: Boolean? = null,
     val messages: List<RemoteChatMessage> = emptyList()
 )
 
@@ -51,6 +52,7 @@ data class RemoteDeskCustomInstructions(
     val description: String = "",
     val status: String = "未递给",
     val delivered: Boolean = false,
+    val empty: Boolean? = null,
     val length: Int = 0,
     val content: String = ""
 )
@@ -112,6 +114,8 @@ data class RemoteDeskMemory(
 @Serializable
 data class RemoteDeskMemoryItem(
     val title: String = "",
+    val id: String? = null,
+    val score: Double? = null,
     @SerialName("entry_type") val entryType: String = "memory",
     val tag: String = "",
     @SerialName("source_model") val sourceModel: String = "",
@@ -133,12 +137,16 @@ data class RemoteDeskWorldbook(
     val status: String = "未命中",
     @SerialName("matched_count") val matchedCount: Int = 0,
     @SerialName("delivered_count") val deliveredCount: Int = 0,
+    @SerialName("matched_titles") val matchedTitles: List<String>? = null,
+    @SerialName("delivered_titles") val deliveredTitles: List<String>? = null,
     val entries: List<RemoteDeskWorldbookItem> = emptyList()
 )
 
 @Serializable
 data class RemoteDeskWorldbookItem(
     val title: String = "",
+    val id: String? = null,
+    @SerialName("matched_keywords") val matchedKeywords: List<String>? = null,
     val content: String = "",
     val scope: String = "",
     @SerialName("matched_by") val matchedBy: String = "",
@@ -230,13 +238,25 @@ data class RemoteDeskCrossWindowSource(
     @SerialName("requested_turns") val requestedTurns: Int = 0,
     @SerialName("loaded_turns") val loadedTurns: Int = 0,
     @SerialName("delivered_to_model_turns") val deliveredToModelTurns: Int = 0,
+    @SerialName("requested_messages") val requestedMessages: Int? = null,
+    @SerialName("loaded_messages") val loadedMessages: Int? = null,
+    @SerialName("delivered_to_model_messages") val deliveredToModelMessages: Int? = null,
     @SerialName("delivered_turns") val deliveredTurns: Int = 0
 )
 
 @Serializable
 data class RemoteDeskCrossWindowMessages(
     @SerialName("conversation_id") val conversationId: String = "",
-    val messages: List<RemoteChatMessage> = emptyList()
+    val messages: List<RemoteDeskCrossWindowMessage> = emptyList()
+)
+
+@Serializable
+data class RemoteDeskCrossWindowMessage(
+    val role: String,
+    val content: String,
+    @SerialName("message_id") val messageId: String? = null,
+    @SerialName("turn_id") val turnId: String? = null,
+    @SerialName("created_at") val createdAt: String? = null
 )
 
 @Serializable
@@ -252,6 +272,7 @@ data class RemoteDeskWorkbench(
     @SerialName("core_tools") val coreTools: List<RemoteDeskTool> = emptyList(),
     @SerialName("side_tools") val sideTools: List<RemoteDeskTool> = emptyList(),
     val furniture: List<String> = emptyList(),
+    @SerialName("used_count") val usedCount: Int? = null,
     @SerialName("tool_results") val toolResults: List<RemoteDeskToolResult> = emptyList()
 )
 
@@ -305,12 +326,14 @@ data class RemoteDeskExternalTide(
     val description: String = "",
     val status: String = "未递给",
     val delivered: Boolean = false,
+    val empty: Boolean? = null,
     val content: String = "本轮没有递入外部材料。"
 )
 
 @Serializable
 data class RemoteDeskTool(
     val name: String = "",
+    val group: String? = null,
     @SerialName("display_name") val displayName: String = "",
     @SerialName("tool_key") val toolKey: String = ""
 )
