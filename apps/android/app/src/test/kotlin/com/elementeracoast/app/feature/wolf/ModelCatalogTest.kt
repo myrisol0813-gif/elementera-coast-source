@@ -33,6 +33,19 @@ class ModelCatalogTest {
     }
 
     @Test
+    fun localChannelsAreSeparateEvenForIdenticalModelNames() {
+        val ids = listOf("chatgpt-plan:gpt-6.2-sol", "local:one/openai/gpt-6.2-sol", "local:one/vendor/a:free", "chatgpt-plan:gpt-6.2-sol", "backend/model")
+        val codex = localChannelModels(ids, LocalModelChannel.Codex, true)
+        val providers = localChannelModels(ids, LocalModelChannel.Provider, true)
+        assertEquals(listOf(ids[0]), codex)
+        assertEquals(listOf(ids[1], ids[2]), providers)
+        assertTrue(localChannelModels(ids, LocalModelChannel.Codex, false).isEmpty())
+        assertEquals(providers, localChannelModels(ids, LocalModelChannel.Provider, false))
+        assertEquals(1, groupedLocalModels(codex, "6.2", emptyMap()).getValue(ModelSeries.Gpt6).size)
+        assertEquals(1, groupedLocalModels(providers, "free", emptyMap()).getValue(ModelSeries.Free).size)
+    }
+
+    @Test
     fun groupedCatalogExcludesCurrentModelAndKeepsSeriesOrder() {
         val models = listOf("Free: North Mini", "GPT-5.6 Sol", "GPT-5.5 Thinking", "o3")
         val grouped = groupedUnselectedModels(models, "GPT-5.6 Sol")

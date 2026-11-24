@@ -54,3 +54,13 @@ internal fun groupedLocalModels(models: List<String>, query: String, names: Map<
         .sortedBy { it.displayName.lowercase() }.toList()
     return ModelSeries.entries.associateWith { series -> entries.filter { it.series == series } }
 }
+
+internal enum class LocalModelChannel { Codex, Provider }
+
+/** Browsing a channel never changes the active model. Keep provider IDs intact. */
+internal fun localChannelModels(models: List<String>, channel: LocalModelChannel, connected: Boolean): List<String> = models.filter { id ->
+    when (channel) {
+        LocalModelChannel.Codex -> connected && id.startsWith("chatgpt-plan:") && id.removePrefix("chatgpt-plan:").isNotBlank()
+        LocalModelChannel.Provider -> id.startsWith("local:") && '/' in id
+    }
+}.distinct()
