@@ -499,7 +499,13 @@ async function buildFullArchive(env) {
       update_records: updateRecordsAll,
     },
   };
-  return redactSnapshot(archive);
+  // Redact metadata, not bytes freshly read from the authorized media store.
+  // Redacting base64 as ordinary text clips large originals and corrupts archives.
+  const safe = redactSnapshot({ ...archive, attachments: { ...archive.attachments, payloads: undefined }, voice: { ...archive.voice, payloads: undefined } });
+  const preserve = item => { const { data_base64, data_b64, chunks, ...metadata } = item; return { ...redactSnapshot(metadata), ...(data_base64 !== undefined ? { data_base64 } : {}), ...(data_b64 !== undefined ? { data_b64 } : {}), ...(chunks !== undefined ? { chunks } : {}) }; };
+  safe.attachments.payloads = attachmentPayloads.map(preserve);
+  safe.voice.payloads = voiceAudioPayloads.map(preserve);
+  return safe;
 }
 
 export function isSnapshotApiPath(pathname) {
