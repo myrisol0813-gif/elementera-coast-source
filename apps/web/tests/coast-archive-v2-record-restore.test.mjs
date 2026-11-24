@@ -36,3 +36,16 @@ test('calendar, worldbook and model profile restore exact portable records; prev
  await dst.prepare("UPDATE coast_worldbook_entries SET content='existing change'").run();
  const w=records.find(r=>r.module==='worldbook');await assert.rejects(()=>restoreArchiveRecord(dst,s.id,m,w.module,w.id,true),/never overwrite/);
 });
+
+test('local V2 calendar record restores through existing portable cloud migration',async()=>{
+ const dst=new D1Database();
+ const data={id:'local-calendar',day:'2026-11-24',occurrence_day:'2026-11-24',kind:'event',title:'本机纪念',body:'原文',recurrence:'none',author:'owner',source:'manual',created_at:'2026-11-24T00:00:00Z',updated_at:'2026-11-24T00:00:00Z'};
+ const o=await encodeRecordObject({kind:'local_calendar',data});
+ const record={module:'calendar',id:data.id,record_object:o.descriptor.object_sha256,media_objects:[],dependencies:[]};
+ const m={format:'elementera-coast-archive',version:2,workspace:'local',application_id:'com.elementeracoast.source',exported_at:'2026-11-24T00:00:00Z',modules:MODULES.map(module=>({module,coverage:module==='calendar'?'partial':'unavailable',count:module==='calendar'?1:0})),records:[record],objects:[o.descriptor]};
+ const s=await createArchiveSession(dst);await registerArchiveObject(dst,s.id,o.descriptor);for(let i=0;i<o.chunks.length;i++)await putArchiveChunk(dst,s.id,o.descriptor.object_sha256,i,o.chunks[i]);
+ assert.equal((await restoreArchiveRecord(dst,s.id,m,'calendar',data.id,false)).ready,1);
+ assert.equal((await archiveRecordPage(dst,'calendar')).items.length,0);
+ assert.equal((await restoreArchiveRecord(dst,s.id,m,'calendar',data.id,true)).committed,true);
+ const row=(await archiveRecordPage(dst,'calendar')).items[0];assert.equal(row.title,data.title);assert.equal(row.body,data.body);assert.equal(row.author,'owner');assert.equal(row.created_at,Date.parse(data.created_at));
+});
