@@ -18,7 +18,9 @@ import okio.Buffer
  * No server, socket, cookie, or cloud fallback. Unsupported operations fail explicitly.
  * The existing repositories, chat branching and UI remain the same.
  */
-class LocalCoastTransport(private val store: LocalPersistence) : Interceptor {
+class LocalCoastTransport(private val store: LocalPersistence,
+    private val providerCatalog: () -> RemoteModelCatalogResponse = { RemoteModelCatalogResponse(ok = true) }
+) : Interceptor {
     private val cache = RemoteCacheStore(store)
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
     private val media = "application/json; charset=utf-8".toMediaType()
@@ -113,7 +115,29 @@ class LocalCoastTransport(private val store: LocalPersistence) : Interceptor {
             return ok(r, "profile" to element(RemoteProfile.serializer(), profile))
         }
         if (path == "/api/models" && method == "GET")
-            return response(r, 200, element(RemoteModelCatalogResponse.serializer(), RemoteModelCatalogResponse(ok = true)).jsonObject)
+            return response(r, 200, element(RemoteModelCatalogResponse.serializer(), providerCatalog()).jsonObject)
+        if (path == "/api/chat/native-context" && method == "POST") {
+            val request = json.decodeFromJsonElement(RemoteChatRequest.serializer(), body(r))
+            if (!conversationExists(request.conversationId)) return missing(r)
+            if (request.attachmentIds.isNotEmpty()) return unsupported(r)
+            val budget = request.settings["contextBudget"]?.toLongOrNull()?.coerceAtLeast(1800) ?: 18000
+            if (request.messages.sumOf { it.content.length.toLong() } > budget * 3)
+                return failure(r, 400, "local_context_budget", "近期文字超过本机预览的保守上下文预算。")
+            return response(r, 200, element(RemoteNativeChatContext.serializer(), RemoteNativeChatContext(
+                ok = true,
+                modelMessages = array(RemoteChatMessage.serializer(), request.messages),
+                deskSlip = RemoteDeskSlip(summary = "本机近期文字上下文；记忆、附件及工具尚未接入")
+            )).jsonObject)
+        }
+        if (path == "/api/chat/native-echo" && method == "POST") {
+            val b = body(r)
+            val cid = b.str("conversation_id").orEmpty()
+            val mid = b.str("message_id").orEmpty()
+            if (!conversationExists(cid) || mid.isBlank()) return missing(r)
+            val snapshot = b["snapshot"] ?: return unsupported(r)
+            store.put("local.echo." + cid + "." + mid, snapshot.toString())
+            return ok(r)
+        }
         if (path == "/api/daily/profile") {
             val old = cache.dailyProfile() ?: RemoteDailyProfile()
             val profile = when (method) {
@@ -149,16 +173,21 @@ class LocalCoastTransport(private val store: LocalPersistence) : Interceptor {
             return daily(r, path, method)
         if (path == "/api/export/v1-snapshot" && method == "GET") {
             val snapshot = buildJsonObject {
+                put("format", "elementera-coast-v1-snapshot")
+                put("version", 1)
+                put("scope", "local")
                 put("workspace", "local")
                 put("exported_at", now())
                 put("included_modules", JsonArray(listOf("chat", "daily", "model_profile").map(::JsonPrimitive)))
-                put("excluded_modules", JsonArray(listOf("attachments", "memory", "thinking_soil", "worldbook", "vault", "library", "voice", "local_appearance").map(::JsonPrimitive)))
-                put("chat", buildJsonArray { cache.conversations().forEach { c ->
+                put("excluded_modules", JsonArray(listOf("attachments", "memory", "thinking_soil", "worldbook", "vault", "library", "voice", "local_appearance", "provider_credentials", "oauth_credentials", "full_restore").map(::JsonPrimitive)))
+                put("chat", buildJsonObject {
+                    put("conversations", buildJsonArray { cache.conversations().forEach { c ->
                     add(buildJsonObject {
                         put("conversation", element(RemoteConversation.serializer(), c))
                         put("history", element(RemoteHistory.serializer(), cache.history(c.id) ?: RemoteHistory(conversationId = c.id)))
                     })
                 } })
+                })
                 put("daily", buildJsonObject {
                     put("profile", element(RemoteDailyProfile.serializer(), cache.dailyProfile() ?: RemoteDailyProfile()))
                     put("moments", array(RemoteDailyMoment.serializer(), cache.dailyMoments()))

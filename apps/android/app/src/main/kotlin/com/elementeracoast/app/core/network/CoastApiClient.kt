@@ -114,6 +114,14 @@ class CoastApiClient(
         runCatching { execute(builder.build()) { Unit } }
     }
 
+    suspend fun getFullArchive(): JsonElement {
+        val envelope = jsonRequestElement(
+            Request.Builder().url(config.url("/api/export/full-archive")).get().build()
+        )
+        return envelope.runCatching { jsonObject["archive"] }.getOrNull()
+            ?: throw CoastApiException(CoastApiErrorKind.Decode, "archive_missing", "完整海岸包没有返回 archive 正文。")
+    }
+
     suspend fun getGlobalSnapshot(): JsonElement {
         val envelope = jsonRequestElement(
             Request.Builder().url(config.url("/api/export/v1-snapshot")).get().build()

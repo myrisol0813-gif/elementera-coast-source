@@ -30,9 +30,9 @@ data class ChatGptConnection(
 /** This store is device-only, encrypted with a separate Android Keystore key.
  * It must never be synchronized with the Coast backend, archive, or APK logs.
  */
-class ChatGptSecureStore(context: Context) {
+class ChatGptSecureStore(context: Context, private val localMode: Boolean = false) {
     private val preferences = context.applicationContext
-        .getSharedPreferences("coast_chatgpt_account", Context.MODE_PRIVATE)
+        .getSharedPreferences(if (localMode) "coast_chatgpt_account_local" else "coast_chatgpt_account", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
 
     fun hostId(): String {
@@ -85,12 +85,13 @@ class ChatGptSecureStore(context: Context) {
     }
 
     private fun key(): SecretKey {
+        val alias = if (localMode) ALIAS + "_local" else ALIAS
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        (store.getKey(ALIAS, null) as? SecretKey)?.let { return it }
+        (store.getKey(alias, null) as? SecretKey)?.let { return it }
         val gen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
         gen.init(
             KeyGenParameterSpec.Builder(
-                ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+                alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
             ).setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setRandomizedEncryptionRequired(true)

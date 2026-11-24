@@ -60,7 +60,8 @@ fun ModelQuickPicker(
     chatGpt: ChatGptConnectState,
     onChatGptConnect: () -> Unit,
     onChatGptRefresh: () -> Unit,
-    onChatGptProbe: (String) -> Unit
+    onChatGptProbe: (String) -> Unit,
+    localMode: Boolean = false
 ) {
     var query by remember { mutableStateOf("") }
     val localContext = LocalContext.current
@@ -93,7 +94,7 @@ fun ModelQuickPicker(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                "Elementera Coast / OpenRouter 与 ChatGPT 套餐均可设为当前聊天模型。ChatGPT 套餐参数按账户与模型实际能力生效。",
+                if (localMode) "本机供应商和已授权的 ChatGPT 套餐均可选用；在模型箱管理 Key 与 URL。" else "Elementera Coast / OpenRouter 与 ChatGPT 套餐均可设为当前聊天模型。ChatGPT 套餐参数按账户与模型实际能力生效。",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -174,7 +175,7 @@ fun ModelQuickPicker(
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 item(key = "coast-provider-heading") {
-                    ProviderSectionHeading("海岸 · OpenRouter", "可选择当前聊天模型")
+                    ProviderSectionHeading(if (localMode) "本机 API 供应商" else "海岸 · OpenRouter", "可选择当前聊天模型")
                 }
                 if (filtered.coast.isEmpty()) {
                     item(key = "coast-provider-empty") {

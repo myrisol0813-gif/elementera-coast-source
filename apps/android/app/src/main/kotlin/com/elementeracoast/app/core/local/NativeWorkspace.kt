@@ -29,7 +29,7 @@ object NativeWorkspace {
             if (current != null) return // configuration change: retain the same store and transport
             val store = FileLocalPersistence(File(context.noBackupFilesDir, "coast-local-v1"))
             localStore = store
-            current = LocalCoastTransport(store)
+            current = LocalCoastTransport(store) { LocalProviderStore(context).catalog() }
         } else {
             current = null
             localStore = null

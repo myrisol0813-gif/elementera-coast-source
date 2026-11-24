@@ -4,17 +4,21 @@ import com.elementeracoast.app.core.network.CoastApiClient
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.*
+import com.elementeracoast.app.BuildConfig
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 interface GlobalArchiveRepository {
     suspend fun snapshot(): JsonElement
+    suspend fun fullArchive(): JsonElement = error("完整包导出未接入。")
 }
 
 class DefaultGlobalArchiveRepository(
     private val api: CoastApiClient
 ) : GlobalArchiveRepository {
     override suspend fun snapshot(): JsonElement = api.getGlobalSnapshot()
+    override suspend fun fullArchive(): JsonElement = api.getFullArchive()
 }
 
 object GlobalArchive {
@@ -22,6 +26,71 @@ object GlobalArchive {
 
     fun exportJson(snapshot: JsonElement): String =
         prettyJson.encodeToString(JsonElement.serializer(), snapshot)
+
+    /** Same completeness checks as the Web full archive; do not advertise a partial file as recoverable. */
+    fun auditFullArchive(archive: JsonElement): List<String> = buildList {
+        val root = archive as? JsonObject ?: run { add("完整包不是对象"); return@buildList }
+        fun JsonObject.obj(k: String) = this[k] as? JsonObject
+        fun JsonObject.arr(k: String) = this[k] as? JsonArray
+        fun JsonObject.str(k: String) = (this[k] as? JsonPrimitive)?.contentOrNull
+        fun JsonObject.yes(k: String) = (this[k] as? JsonPrimitive)?.booleanOrNull == true
+        if (root.str("format") != "elementera-coast-full-archive" || root.str("version") != "1") add("文件格式或版本不符合完整海岸包约定")
+        if (root.obj("chat")?.arr("conversations") == null) add("缺少完整聊天窗口目录")
+        val vault = root.obj("coast_vault")
+        if (vault?.obj("basic_media")?.yes("complete") != true || vault?.obj("treasures")?.yes("complete") != true)
+            add("基本文件库或拾潮索引缺失或存在未导出的分页")
+        val attachment = root.obj("attachments")
+        val count = attachment?.str("count")?.toIntOrNull() ?: 0
+        val payloads = attachment?.arr("payloads")
+        if (count > 0 && payloads == null) add("附件原件清单缺失")
+        else if (payloads != null) {
+            val unavailable = payloads.count { (it as? JsonObject)?.yes("unavailable") == true }
+            val omitted = (count - payloads.size).coerceAtLeast(0)
+            if (unavailable + omitted > 0) add("附件原件缺失 " + (unavailable + omitted) + " 项")
+        }
+        val voice = root.obj("voice")
+        val voiceCount = voice?.arr("clips")?.size ?: 0
+        if (voiceCount > (voice?.arr("payloads")?.size ?: 0)) add("已存语音原件数量与索引不一致")
+    }
+
+    fun withNativeSettings(snapshot: JsonElement, state: WolfState?, localMode: Boolean): JsonElement {
+        val root = snapshot as? JsonObject ?: return snapshot
+        val device = buildJsonObject {
+            put("exported_from", "native")
+            put("workspace", if (localMode) "local" else "backend")
+            put("current_app_version", BuildConfig.VERSION_NAME)
+            if (state != null) {
+                put("display_profile", buildJsonObject { put("nickname", state.profile.nickname); put("signature", state.profile.signature) })
+                put("appearance", buildJsonObject {
+                    put("theme", state.appearance.theme.name)
+                    put("user_bubble_hex", state.appearance.userBubbleHex)
+                    put("accent_hex", state.appearance.accentHex)
+                    put("font_mode", state.appearance.fontMode.name)
+                    put("paper_mode", state.appearance.paperMode.name)
+                    put("reading_weight", state.appearance.readingWeight.name)
+                    put("cloud_outline_enabled", state.appearance.cloudOutlineEnabled)
+                    put("message_surface_alpha", state.appearance.messageSurfaceAlpha)
+                    put("chat_background_dim_alpha", state.appearance.chatBackgroundDimAlpha)
+                })
+                put("basic_settings", buildJsonObject {
+                    put("recentTurns", state.basic.recentTurns); put("contextBudget", state.basic.contextBudget)
+                    put("outputLength", state.basic.outputLength); put("maxOutputTokens", state.basic.maxOutputTokens)
+                    put("creativity", state.basic.creativity); put("streamingEnabled", state.basic.streamingEnabled)
+                    put("soilBudget", state.basic.soilBudget); put("seedCooldownTurns", state.basic.seedCooldownTurns)
+                    put("worldbookEnabled", state.basic.worldbookEnabled); put("worldbookLimit", state.basic.worldbookLimit)
+                    put("memoryLimit", state.basic.memoryLimit)
+                })
+            }
+        }
+        return buildJsonObject {
+            root.forEach { (key, value) -> put(key, value) }
+            put("local_device", device)
+            put("included_modules", JsonArray(((root["included_modules"] as? JsonArray).orEmpty() +
+                JsonPrimitive("native_device_settings")).distinct()))
+            put("excluded_modules", JsonArray(((root["excluded_modules"] as? JsonArray).orEmpty() +
+                listOf("native_background_and_font_binary", "local_provider_credentials", "oauth_credentials").map(::JsonPrimitive)).distinct()))
+        }
+    }
 
     fun exportHtml(snapshot: JsonElement): String {
         val root = snapshot.runCatching { jsonObject }.getOrNull()
@@ -35,6 +104,11 @@ object GlobalArchive {
             "dogtalk" to "私人草稿 / 跨窗口相关数据",
             "mailbox" to "访客信箱 / 来信（隐私摘要）",
             "daily" to "日常 / 日记",
+            "calendar" to "日历与日程",
+            "voice" to "语音索引",
+            "coast_vault" to "文件库与拾潮",
+            "tidal_library" to "书房与批注",
+            "local_device" to "本机设置",
             "model_profile" to "模型资料",
             "model_echo_summaries" to "模型后端返回原文摘要",
             "tools" to "工具设置与日志摘要",

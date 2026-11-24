@@ -59,7 +59,7 @@ internal fun ModelBoxScreen(
                 Column(Modifier.weight(1f)) {
                     Text("模型箱", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
-                        if (localMode) "本机模式 · 模型 API 尚未接入" else "海岸 · OpenRouter 模型目录，与 PWA 共用当前聊天模型",
+                        if (localMode) "本机模式 · 供应商与账户" else "海岸 · OpenRouter 模型目录，与 PWA 共用当前聊天模型",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -67,7 +67,7 @@ internal fun ModelBoxScreen(
                 Row(
                     modifier = Modifier
                         .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
-                        .clickable(enabled = !localMode, onClick = onRefresh)
+                        .clickable(onClick = onRefresh)
                         .padding(horizontal = 12.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -83,14 +83,12 @@ internal fun ModelBoxScreen(
             CurrentModelCard(current)
         }
 
-        if (localMode) {
-            item {
-                Text("当前仅在本机保存文字记录。模型连接、上下文编排与自动回复尚未移植，不会使用在线账户或服务器配置。", style = MaterialTheme.typography.bodyMedium)
-            }
-        } else {
         item {
             ChatGptPlanCard(chatGpt, onChatGptConnect, onChatGptDisconnect, onChatGptRefresh, onSelect, onChatGptProbe)
         }
+        if (localMode) {
+            item { LocalProviderPanel(current, onRefresh, onSelect) }
+        } else {
 
         item {
             Text("海岸 · OpenRouter", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
