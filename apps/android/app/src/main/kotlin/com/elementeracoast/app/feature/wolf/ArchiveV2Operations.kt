@@ -66,7 +66,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
         val m=input.manifest;val objects=m.objects.associateBy { it.objectSha256 }
         buildList {
             for(r in m.records){
-                if(m.workspace=="local"&&(r.module !in ArchiveV2Local.localModules||r.module in setOf("custom_instructions","memory_entries","memory_pockets","user_portrait","self_portrait","thinking_soil","thinking_soil_history","tools")&&m.applicationId!=BuildConfig.APPLICATION_ID))continue
+                if(m.workspace=="local"&&((r.module !in ArchiveV2Local.localModules||r.module=="attachments")||r.module in setOf("custom_instructions","memory_entries","memory_pockets","user_portrait","self_portrait","thinking_soil","thinking_soil_history","tools")&&m.applicationId!=BuildConfig.APPLICATION_ID))continue
                 if(m.workspace=="backend"&&!(r.module=="chat"&&m.applicationId==BuildConfig.APPLICATION_ID)&&!(r.module=="library"&&r.id.startsWith("library_books:"))&&r.module !in setOf("calendar","worldbook","model_profile")&&!(m.applicationId==BuildConfig.APPLICATION_ID&&r.module in setOf("memory_entries","memory_pockets","user_portrait","self_portrait","daily","vault","custom_instructions","thinking_soil","thinking_soil_history","tools")))continue
                 val d=objects.getValue(r.recordObject)
                 if(d.size>1800000)continue

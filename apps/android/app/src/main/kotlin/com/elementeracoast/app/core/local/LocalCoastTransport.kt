@@ -100,6 +100,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if (method == "DELETE") {
                 cache.putConversations(all.filterNot { it.id == cid })
                 cache.removeHistory(cid)
+                LocalAttachmentStore(store).deleteConversation(cid)
                 val oldSoil=soil.read()
                 soil.write(LocalSoilStore.Rows(oldSoil.current.filterNot{it["conversation_id"]?.jsonPrimitive?.content==cid},oldSoil.history.filterNot{it["conversation_id"]?.jsonPrimitive?.content==cid}))
                 return ok(r)
@@ -116,6 +117,14 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 cache.putHistory(cid, h)
                 return ok(r, "source" to JsonPrimitive("local"), "history" to element(RemoteHistory.serializer(), h))
             }
+        }
+        if(path.startsWith("/api/chat/attachments/")&&method=="GET"&&r.url.pathSegments.size==4){
+            val cid=r.url.queryParameter("conversation_id").orEmpty()
+            if(!conversationExists(cid))return missing(r)
+            val id=r.url.pathSegments.last();val originals=LocalAttachmentStore(store)
+            val original=originals.entries().firstOrNull{it.metadata["id"]?.jsonPrimitive?.content==id&&it.metadata["conversation_id"]?.jsonPrimitive?.content==cid}?:return missing(r)
+            val bytes=originals.bytes(original)
+            return Response.Builder().request(r).protocol(Protocol.HTTP_1_1).code(200).message("OK").body(bytes.toResponseBody(original.metadata.getValue("mime").jsonPrimitive.content.toMediaType())).build()
         }
         if (path == "/api/chat/profile") {
             val profile = when (method) {
