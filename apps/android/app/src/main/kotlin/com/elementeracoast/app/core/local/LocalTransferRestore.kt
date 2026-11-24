@@ -45,47 +45,11 @@ internal object LocalTransferRestore {
         }
     }
 
-    private fun adaptDaily(payload: JsonObject, applicationId: String): JsonObject {
-        val origin = payload.getValue("applicationId").jsonPrimitive.content
-        if (origin == applicationId) return payload
-        val toPublic = applicationId == "com.elementeracoast.source"
-        val privateFields = listOf("xiaohan_avatar_dataurl", "myri_avatar_dataurl", "myri_display_name")
-        val publicFields = listOf("owner_avatar_dataurl", "model_partner_avatar_dataurl", "model_partner_display_name")
-        val fields = if (toPublic) privateFields.zip(publicFields).toMap() else publicFields.zip(privateFields).toMap()
-        val authors = if (toPublic) mapOf("xiaohan" to "owner", "myri" to "model_partner")
-            else mapOf("owner" to "xiaohan", "model_partner" to "myri")
-        fun author(value: JsonElement): JsonElement {
-            val item = value.jsonObject
-            val updated = item.toMutableMap()
-            for (key in listOf("author", "actor")) {
-                val old = item[key]?.jsonPrimitive?.contentOrNull ?: continue
-                val next = authors[old] ?: continue
-                updated[key] = JsonPrimitive(next)
-            }
-            return JsonObject(updated)
-        }
-        val profile = payload.getValue("dailyProfile")
-        val nextProfile = if (profile == JsonNull) JsonNull else {
-            val entries = profile.jsonObject.entries.map { (key, value) -> (fields[key] ?: key) to value }
-            require(entries.map { it.first }.distinct().size == entries.size) { "日常资料身份字段冲突。" }
-            JsonObject(entries.toMap())
-        }
-        val moments = JsonArray(payload.getValue("moments").jsonArray.map { raw ->
-            val item = author(raw).jsonObject
-            val next = item.toMutableMap()
-            (item["comments"] as? JsonArray)?.let { next["comments"] = JsonArray(it.map(::author)) }
-            (item["likes"] as? JsonArray)?.let { next["likes"] = JsonArray(it.map(::author)) }
-            JsonObject(next)
-        })
-        return JsonObject(payload + mapOf("dailyProfile" to nextProfile, "moments" to moments,
-            "diaries" to JsonArray(payload.getValue("diaries").jsonArray.map(::author))))
-    }
-
     private fun decodeSelected(payload: JsonObject, applicationId: String, modules: Set<String>): LocalBackupPayload {
         require(modules.isNotEmpty() && availableModules(payload, applicationId).containsAll(modules)) {
             "请选择目标已支持且数据包中包含的模块。"
         }
-        val daily = if ("daily" in modules) adaptDaily(payload, applicationId) else payload
+        val daily = payload
         val raw = buildJsonObject {
             put("applicationId", applicationId); put("exportedAt", payload.getValue("exportedAt"))
             put("conversations", if ("chat" in modules) payload.getValue("conversations") else JsonArray(emptyList()))
