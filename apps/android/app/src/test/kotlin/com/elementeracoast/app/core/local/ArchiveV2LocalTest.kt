@@ -1,6 +1,7 @@
 package com.elementeracoast.app.core.local
 
 import com.elementeracoast.app.core.remote.RemoteProfile
+import com.elementeracoast.app.core.remote.RemoteCacheStore
 import java.io.File
 import java.nio.file.Files
 import org.junit.Assert.*
