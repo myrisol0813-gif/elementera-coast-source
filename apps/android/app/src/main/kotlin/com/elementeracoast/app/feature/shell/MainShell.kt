@@ -100,6 +100,7 @@ fun MainShell(
     val snackbar = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     var openPendingMemoryOnLanding by remember { mutableStateOf(false) }
+    var openModelBoxOnLanding by rememberSaveable { mutableStateOf(false) }
     var showThemeWardrobe by remember { mutableStateOf(false) }
     var showWindowContext by rememberSaveable { mutableStateOf(false) }
     val defaultSnowLetterVisuals = remember { SnowLetterVisualSettings() }
@@ -142,7 +143,7 @@ fun MainShell(
                     onSelectSearchHit = { hit -> closeDrawerThen { onSelectSearchHit(hit) } },
                     onRenameConversation = onRenameConversation,
                     onDeleteConversation = onDeleteConversation,
-                    onOpenFeature = { destination -> closeDrawerThen { onOpenFeature(destination) } },
+                    onOpenFeature = { destination -> closeDrawerThen { openModelBoxOnLanding = false; onOpenFeature(destination) } },
                     onCycleTheme = { closeDrawerThen { showThemeWardrobe = true } }
                 )
             }
@@ -216,9 +217,10 @@ fun MainShell(
                             devHands = devHands,
                             archive = archive,
                             openMemoryPending = openPendingMemoryOnLanding,
+                            openModelBoxInitially = openModelBoxOnLanding,
                             onMemoryPendingConsumed = { openPendingMemoryOnLanding = false },
                             messages = state.messages,
-                            onBackToChat = onBackToChat,
+                            onBackToChat = { openModelBoxOnLanding = false; onBackToChat() },
                             onOpenSearchHit = onSelectSearchHit,
                             onRefresh = onRefresh,
                             onUpdateModelPartnerAvatar = onUpdateModelPartnerAvatar,
@@ -262,8 +264,8 @@ fun MainShell(
                 chatGpt = chatGpt,
                 onChatGptConnect = onChatGptConnect,
                 onChatGptRefresh = onChatGptRefresh,
-                onChatGptProbe = onChatGptProbe,
-                localMode = state.localMode
+                localMode = state.localMode,
+                onOpenModelBox = { onDismissModels(); openModelBoxOnLanding = true; onOpenFeature(FeatureDestination.Wolf) }
             )
         }
         if (showThemeWardrobe) {
