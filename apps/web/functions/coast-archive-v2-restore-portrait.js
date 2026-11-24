@@ -50,7 +50,7 @@ export async function restoreArchivePortrait(db,sessionId,manifest,module,record
  check(identical||current&&current.body===''&&current.revision===1&&current.write_enabled===1&&current.created_at===current.updated_at&&!existingCandidates.length&&!existingRevisions.length,'target portrait already has content or history; never overwrite');
  if(confirm===true&&!identical){
    // Fail the whole batch if the blank target changed after the read.
-   const guard=db.prepare('INSERT INTO '+table+" (id,body,write_enabled,revision,created_at,updated_at) SELECT 'global','',1,1,0,0 WHERE NOT EXISTS (SELECT 1 FROM "+table+" WHERE id='global' AND body='' AND revision=1 AND write_enabled=1 AND created_at=? AND updated_at=?) OR EXISTS(SELECT 1 FROM "+table+"_candidates) OR EXISTS(SELECT 1 FROM "+table+"_revisions)").bind(current.created_at,current.updated_at);
+   const guard=db.prepare('INSERT INTO '+table+" (id,body,write_enabled,revision,created_at,updated_at) SELECT 'global',NULL,1,1,0,0 WHERE NOT EXISTS (SELECT 1 FROM "+table+" WHERE id='global' AND body='' AND revision=1 AND write_enabled=1 AND created_at=? AND updated_at=?) OR EXISTS(SELECT 1 FROM "+table+"_candidates) OR EXISTS(SELECT 1 FROM "+table+"_revisions)").bind(current.created_at,current.updated_at);
    const statements=[guard,db.prepare('UPDATE '+table+" SET body=?,write_enabled=?,revision=?,created_at=?,updated_at=? WHERE id='global'").bind(root.body,root.write_enabled,root.revision,root.created_at,root.updated_at)];
    for(const {target,fields,v,kind} of rows)if(kind!==module)statements.push(db.prepare('INSERT INTO '+target+' ('+fields.join(',')+') VALUES ('+fields.map(()=>'?').join(',')+')').bind(...fields.map(k=>v[k])));
    await db.batch(statements);
