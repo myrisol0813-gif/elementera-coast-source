@@ -152,11 +152,17 @@ internal fun ChatRecordsScreen(
             }
         }
         item {
-            WolfRow("导入海岸包", "当前兼容 V1 迁移包 · 兼容导出也在此处") {
+            WolfRow("导入海岸包", "V2 试验归档 · V1 兼容导入与导出") {
                 if (!busy) transferOpen = !transferOpen
             }
         }
-        if (transferOpen) item { TransferPanel(archive, localMode, transferAllowed && !busy, onSnackbar) }
+        if (transferOpen) item {
+            val operations = remember(archive, localMode, context) { (archive as? DefaultGlobalArchiveRepository)?.archiveV2(context, localMode) }
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (operations != null) ArchiveV2Panel(operations, localMode, transferAllowed && !busy, onSnackbar)
+                TransferPanel(archive, localMode, transferAllowed && !busy, onSnackbar)
+            }
+        }
         item {
             Text(if (localMode) "本机只读取设备已有模块，不访问后端。完整归档和大容量恢复仍在建设。" else "两种全局归档共用服务器完整包；离线 ZIP 只读。完整恢复和大容量传输仍在建设。访客隐私与凭据不进入归档。",
                 color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
