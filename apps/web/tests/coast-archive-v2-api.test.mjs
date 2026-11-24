@@ -28,3 +28,16 @@ test('owner API stages, resumes, validates and cancels objects without live writ
  assert.equal((await call(item)).status,404);
  assert.equal(db.database.prepare('SELECT COUNT(*) AS n FROM coast_archive_chunks').get().n,0);
 });
+
+test('archive failure reports only fixed operation and safe reason, never database contents or record identity',async()=>{
+ const db={prepare(){throw Error('D1_ERROR: no such column: private_column_secret');}};
+ const env={COAST_CHAT_DB:db},owner={v:2};
+ const response=await routeArchiveV2(new Request(origin+'/api/archive/v2/records/chat/private-record-id'),env,owner);
+ assert.equal(response.status,500);
+ const error=(await response.json()).error;
+ assert.equal(error.stage,'records:chat:detail');
+ assert.equal(error.reason,'schema_column');
+ assert.match(error.message,/records:chat:detail/);
+ assert.match(error.reference,/^[a-f0-9]{8}$/);
+ assert.doesNotMatch(JSON.stringify(error),/private_column_secret|private-record-id/);
+});
