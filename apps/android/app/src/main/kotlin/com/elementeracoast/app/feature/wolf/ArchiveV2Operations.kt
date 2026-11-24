@@ -66,7 +66,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
         val m=input.manifest;val objects=m.objects.associateBy { it.objectSha256 }
         buildList {
             for(r in m.records){
-                if(!(r.module=="chat"&&m.applicationId==BuildConfig.APPLICATION_ID)&&!(r.module=="library"&&r.id.startsWith("library_books:"))&&r.module !in setOf("calendar","worldbook","model_profile"))continue
+                if(!(r.module=="chat"&&m.applicationId==BuildConfig.APPLICATION_ID)&&!(r.module=="library"&&r.id.startsWith("library_books:"))&&r.module !in setOf("calendar","worldbook","model_profile")&&!(m.applicationId==BuildConfig.APPLICATION_ID&&r.module in setOf("memory_entries","memory_pockets","user_portrait","self_portrait")))continue
                 val d=objects.getValue(r.recordObject)
                 if(d.size>1800000)continue
                 val value=Json.parseToJsonElement(input.stage.verify(d,1800000).readText()).jsonObject
@@ -79,8 +79,8 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
                     val id=data.getValue("id").jsonPrimitive.content
                     val identity="library_books:"+ArchiveV2Chunks.digest(JsonArray(listOf(JsonPrimitive(id))).toString().encodeToByteArray())
                     if(r.id==identity&&Regex("[A-Za-z0-9_.:-]{1,160}").matches(id))add(Choice("book",id,data.getValue("title").jsonPrimitive.content))
-                }else if(r.module in setOf("calendar","worldbook","model_profile")&&kind==r.module){
-                    add(Choice(r.module,r.id,data["title"]?.jsonPrimitive?.contentOrNull?:"模型资料"))
+                }else if(r.module in setOf("calendar","worldbook","model_profile","memory_entries","memory_pockets","user_portrait","self_portrait")&&kind==r.module){
+                    add(Choice(r.module,r.id,data["title"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }?:when(r.module){"user_portrait"->"用户画像及历史";"self_portrait"->"自我画像及历史";"memory_pockets"->"待确认候选";"memory_entries"->"记忆";else->"模型资料"}))
                 }
             }
         }
