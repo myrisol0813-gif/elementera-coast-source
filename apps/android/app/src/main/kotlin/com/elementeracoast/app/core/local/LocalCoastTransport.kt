@@ -1,6 +1,7 @@
 package com.elementeracoast.app.core.local
 
 import com.elementeracoast.app.core.remote.*
+import com.elementeracoast.app.BuildConfig
 import java.time.Instant
 import java.util.UUID
 import kotlinx.serialization.KSerializer
@@ -76,7 +77,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 val b = body(r)
                 val room = b.str("room_type").orEmpty().takeIf { it in setOf("main", "radio", "lighthouse") } ?: "main"
                 val c = RemoteConversation(id(), b.str("title").orEmpty().trim().ifBlank { "新聊天" }, room, now(), now())
-                cache.putHistory(c.id, RemoteHistory(conversationId = c.id))
+                cache.putHistory(c.id, RemoteHistory(conversationId = c.id, updatedAt = c.updatedAt ?: now()))
                 cache.putConversations(listOf(c) + cache.conversations())
                 return ok(r, "conversation" to element(RemoteConversation.serializer(), c))
             }
@@ -184,6 +185,31 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if (method == "PATCH") return ok(r, "entry" to calendar.save(cid, body(r)))
             if (method == "DELETE") { calendar.delete(cid); return ok(r, "deleted" to JsonPrimitive(true), "id" to JsonPrimitive(cid)) }
         }
+        if (path == "/api/transfer/v1" && method == "GET") {
+            val data = LocalBackupArchive.capture(store, BuildConfig.APPLICATION_ID)
+            return ok(r, "bundle" to json.parseToJsonElement(LocalBackupArchive.encode(data).decodeToString()))
+        }
+        if (path in setOf("/api/transfer/v1/preview", "/api/transfer/v1/import") && method == "POST") {
+            try {
+                val b = body(r)
+                val bundle = b.getValue("bundle").toString().encodeToByteArray()
+                val modules = b.getValue("modules").jsonArray.map { it.jsonPrimitive.content }.toSet()
+                val committing = path.endsWith("/import")
+                if (committing && b["confirm"]?.jsonPrimitive?.booleanOrNull != true)
+                    return failure(r, 400, "confirmation_required", "请确认将资料写入本机。")
+                val report = if (committing) LocalTransferRestore.restore(bundle, BuildConfig.APPLICATION_ID, modules, store)
+                    else LocalTransferRestore.preview(bundle, BuildConfig.APPLICATION_ID, modules, store)
+                return ok(r, (if (committing) "result" else "preview") to buildJsonObject {
+                    put("source", report.source); put("target", "local"); put("can_commit", true)
+                    put("unsupported_modules", JsonArray(report.unsupportedModules.map(::JsonPrimitive)))
+                    report.counts.forEach { (key, value) ->
+                        putJsonObject(key) { put("ready", value.ready); put("existing", value.existing); put("conflicts", value.conflicts); put("blocked", JsonArray(emptyList())) }
+                    }
+                })
+            } catch (error: IllegalArgumentException) {
+                return failure(r, 400, "invalid_transfer", error.message?.take(240) ?: "数据包未通过校验。")
+            }
+        }
         if (path == "/api/export/v1-snapshot" && method == "GET") {
             val snapshot = buildJsonObject {
                 put("format", "elementera-coast-v1-snapshot")
@@ -249,7 +275,8 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if (method == "GET") return ok(r, "moments" to array(RemoteDailyMoment.serializer(), all))
             if (method == "POST") {
                 val b = json.decodeFromJsonElement(RemoteDailyMomentCreateRequest.serializer(), body(r))
-                val m = RemoteDailyMoment(id = id(), date = b.date, text = b.text, status = b.status, createdAt = now(), updatedAt = now())
+                val timestamp = now()
+                val m = RemoteDailyMoment(id = id(), date = b.date, text = b.text, status = b.status, createdAt = timestamp, updatedAt = timestamp, publishedAt = timestamp, likes = emptyList())
                 cache.putDailyMoments(listOf(m) + all)
                 return ok(r, "moment" to element(RemoteDailyMoment.serializer(), m))
             }
@@ -265,11 +292,19 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val next = when {
                 segments.size == 4 && method == "PATCH" -> {
                     val b = json.decodeFromJsonElement(RemoteDailyMomentPatchRequest.serializer(), body(r))
-                    m.copy(date = b.date ?: m.date, text = b.text ?: m.text)
+                    m.copy(date = b.date ?: m.date, text = b.text ?: m.text, reason = b.reason ?: m.reason)
                 }
                 segments.size == 5 && segments[4] == "like" && method in setOf("PUT", "DELETE") -> {
                     val liked = method == "PUT"
-                    m.copy(liked = liked, likeCount = (m.likeCount + (if (liked) 1 else 0) - (if (m.liked) 1 else 0)).coerceAtLeast(0))
+                    val count = (m.likeCount + (if (liked) 1 else 0) - (if (m.liked) 1 else 0)).coerceAtLeast(0)
+                    // A legacy aggregate is not evidence of who liked or when.
+                    val known = m.likes ?: if (m.likeCount == 0 && !m.liked) emptyList() else null
+                    val likes = if (known != null) {
+                        val previous = known.firstOrNull { it.actor == "owner" }
+                        known.filterNot { it.actor == "owner" } +
+                            if (liked) listOf(previous ?: RemoteDailyLike("owner", now())) else emptyList()
+                    } else if (count == 0 && !liked) emptyList() else null
+                    m.copy(liked = liked, likeCount = count, likes = likes)
                 }
                 segments.size == 5 && segments[4] == "comments" && method == "POST" ->
                     m.copy(comments = m.comments + RemoteDailyComment(id(), text = body(r).str("text").orEmpty(), createdAt = now()))

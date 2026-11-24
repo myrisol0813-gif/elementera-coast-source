@@ -52,7 +52,8 @@ internal fun ChatRecordsScreen(
     onActionLogged: (String, String, String) -> Unit,
     onSnackbar: (String) -> Unit,
     localMode: Boolean = false,
-    nativeSettings: WolfState? = null
+    nativeSettings: WolfState? = null,
+    transferAllowed: Boolean = true
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -130,6 +131,7 @@ internal fun ChatRecordsScreen(
     }
 
     LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { TransferPanel(archive, localMode, transferAllowed && !busy, onSnackbar) }
         item { Text("防丢导出", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) }
         if (!localMode) item {
             WolfRow("导出完整海岸包", if (busy) "正在导出……" else "与 PWA 同源 · 包含附件及语音原件；大包建议使用 PWA") {

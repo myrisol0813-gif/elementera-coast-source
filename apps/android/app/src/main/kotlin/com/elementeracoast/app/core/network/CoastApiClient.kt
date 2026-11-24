@@ -114,6 +114,23 @@ class CoastApiClient(
         runCatching { execute(builder.build()) { Unit } }
     }
 
+    suspend fun transferExport(): JsonObject = jsonRequestElement(Request.Builder().url(config.url("/api/transfer/v1")).get().build())
+        .jsonObject.getValue("bundle").jsonObject
+
+    suspend fun transferPreview(bundle: JsonObject, modules: Set<String>): JsonObject = transferWrite(bundle, modules, false)
+    suspend fun transferImport(bundle: JsonObject, modules: Set<String>): JsonObject = transferWrite(bundle, modules, true)
+
+    private suspend fun transferWrite(bundle: JsonObject, modules: Set<String>, commit: Boolean): JsonObject {
+        val value = buildJsonObject {
+            put("bundle", bundle)
+            put("modules", kotlinx.serialization.json.JsonArray(modules.sorted().map { kotlinx.serialization.json.JsonPrimitive(it) }))
+            if (commit) put("confirm", true)
+        }
+        val suffix = if (commit) "import" else "preview"
+        return jsonRequestElement(Request.Builder().url(config.url("/api/transfer/v1/$suffix"))
+            .post(jsonBody(value.toString())).build()).jsonObject.getValue(if (commit) "result" else "preview").jsonObject
+    }
+
     suspend fun getFullArchive(): JsonElement {
         val envelope = jsonRequestElement(
             Request.Builder().url(config.url("/api/export/full-archive")).get().build()

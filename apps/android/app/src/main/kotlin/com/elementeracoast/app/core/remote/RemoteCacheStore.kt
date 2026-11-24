@@ -7,7 +7,8 @@ import kotlinx.serialization.json.Json
 
 class RemoteCacheStore(
     private val persistence: LocalPersistence,
-    private val json: Json = Json { ignoreUnknownKeys = true; explicitNulls = false; encodeDefaults = false }
+    private val json: Json = Json { ignoreUnknownKeys = true; explicitNulls = false; encodeDefaults = false },
+    private val strictReads: Boolean = false
 ) {
     fun conversations(): List<RemoteConversation> = decode(KEY_CONVERSATIONS, ListSerializer(RemoteConversation.serializer())) ?: emptyList()
     fun putConversations(value: List<RemoteConversation>) = put(KEY_CONVERSATIONS, ListSerializer(RemoteConversation.serializer()), value)
@@ -54,7 +55,7 @@ class RemoteCacheStore(
     private fun <T> decode(key: String, serializer: kotlinx.serialization.KSerializer<T>): T? {
         val raw = persistence.get(key)
         if (raw.isBlank()) return null
-        return runCatching { json.decodeFromString(serializer, raw) }.getOrNull()
+        return if (strictReads) json.decodeFromString(serializer, raw) else runCatching { json.decodeFromString(serializer, raw) }.getOrNull()
     }
 
     private fun <T> put(key: String, serializer: kotlinx.serialization.KSerializer<T>, value: T) {

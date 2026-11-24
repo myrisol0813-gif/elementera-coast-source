@@ -41,30 +41,63 @@ object NativeWorkspace {
             .edit().putBoolean(KEY, local).commit()
 }
 
-/** Separate app-private, atomic file storage; never shares online cache keys/files. */
-class FileLocalPersistence(private val root: File) : LocalPersistence {
+/** One authoritative generation. Restore writes into a private staged directory, then switches a single atomic pointer. */
+class FileLocalPersistence(private val root: File, private val allowTransactions: Boolean = true) : LocalPersistence {
+    private val generationName = Regex("generation-[0-9a-f-]{36}")
+    private val keyName = Regex("[0-9a-f]{64}")
+    private fun ensureRoot() { check(root.isDirectory || root.mkdirs()) { "无法创建本机存储目录" } }
+    private fun pointer() = AtomicFile(File(root, "active-generation"))
+    private fun activeRoot(): File {
+        ensureRoot()
+        val name = try { pointer().readFully().toString(Charsets.UTF_8) }
+        catch (_: FileNotFoundException) { return root }
+        check(generationName.matches(name)) { "本机资料目录索引损坏；未回退到旧资料。" }
+        return File(root, name).also { check(it.isDirectory) { "本机资料目录缺失；未回退到旧资料。" } }
+    }
     private fun file(key: String): AtomicFile {
-        check(root.isDirectory || root.mkdirs()) { "无法创建本机存储目录" }
         val name = MessageDigest.getInstance("SHA-256").digest(key.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it.toInt() and 255) }
-        return AtomicFile(File(root, name))
+        return AtomicFile(File(activeRoot(), name))
     }
-
+    private fun writeAtomic(target: AtomicFile, bytes: ByteArray) {
+        val stream = target.startWrite()
+        try { stream.write(bytes); target.finishWrite(stream) }
+        catch (error: Exception) { target.failWrite(stream); throw error }
+        check(target.readFully().contentEquals(bytes)) { "本机写入校验失败。" }
+    }
     @Synchronized override fun get(key: String, default: String): String =
         try { file(key).readFully().toString(Charsets.UTF_8) }
         catch (_: FileNotFoundException) { default }
+    @Synchronized override fun put(key: String, value: String) = writeAtomic(file(key), value.toByteArray(Charsets.UTF_8))
+    @Synchronized override fun remove(key: String) { file(key).delete() }
+    @Synchronized override fun <T> readConsistent(block: (LocalPersistence) -> T): T = block(this)
 
-    @Synchronized override fun put(key: String, value: String) {
-        val target = file(key)
-        val stream = target.startWrite()
+    @Synchronized override fun <T> atomic(block: (LocalPersistence) -> T): T {
+        check(allowTransactions) { "不允许嵌套恢复事务。" }
+        val old = activeRoot()
+        val stage = File(root, "generation-" + java.util.UUID.randomUUID())
+        check(stage.mkdir()) { "无法创建本机恢复暂存目录。" }
         try {
-            stream.write(value.toByteArray(Charsets.UTF_8))
-            target.finishWrite(stream)
+            val names = requireNotNull(old.listFiles()) { "无法读取本机存储目录。" }
+                .map { it.name.removeSuffix(".bak").removeSuffix(".new") }
+                .filter(keyName::matches).distinct()
+            for (name in names) {
+                val original = AtomicFile(File(old, name))
+                val value = try { original.readFully() }
+                catch (_: FileNotFoundException) { continue }
+                writeAtomic(AtomicFile(File(stage, name)), value)
+            }
+            val result = block(FileLocalPersistence(stage, allowTransactions = false))
+            writeAtomic(pointer(), stage.name.toByteArray(Charsets.UTF_8))
+            check(activeRoot() == stage) { "恢复索引未生效。" }
+            // Retain the immediately previous generation; other abandoned stages are not authorities.
+            root.listFiles()?.filter { it.isDirectory && generationName.matches(it.name) && it != old && it != stage }
+                ?.forEach { runCatching { it.deleteRecursively() } }
+            return result
         } catch (error: Exception) {
-            target.failWrite(stream)
+            // Never remove a stage if pointer publication may have succeeded.
+            if (runCatching { activeRoot() != stage }.getOrDefault(false)) runCatching { stage.deleteRecursively() }
             throw error
         }
     }
-
-    @Synchronized override fun remove(key: String) { file(key).delete() }
 }

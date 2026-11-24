@@ -104,6 +104,7 @@ fun WolfScreen(
                     archive = archive,
                     localMode = shellState.localMode,
                     nativeSettings = state,
+                    transferAllowed = !shellState.isStreaming && !shellState.isFinalizing && !shellState.historyLoading && !shellState.attachmentUploading,
                     onImportMessages = onImportMessages,
                     onActionLogged = onActionLogged,
                     onSnackbar = onSnackbar

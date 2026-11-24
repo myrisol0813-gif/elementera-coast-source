@@ -75,7 +75,11 @@ data class RemoteConversation(
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
     val source: String = "coast",
-    @SerialName("source_window_id") val sourceWindowId: String? = null
+    @SerialName("source_window_id") val sourceWindowId: String? = null,
+    @SerialName("deleted_at") val deletedAt: String? = null,
+    @SerialName("title_manual") val titleManual: Boolean = false,
+    @SerialName("title_generated_at") val titleGeneratedAt: String? = null,
+    @SerialName("title_model_id") val titleModelId: String? = null
 )
 
 @Serializable
@@ -160,7 +164,11 @@ data class RemoteVariant(
     @SerialName("errorDetail") val errorDetail: String? = null,
     val attachments: List<RemoteAttachment> = emptyList(),
     @SerialName("furniture_runs") val furnitureRuns: List<RemoteFurnitureRun> = emptyList(),
-    @SerialName("desk_slip") val deskSlip: RemoteDeskSlip? = null
+    @SerialName("desk_slip") val deskSlip: RemoteDeskSlip? = null,
+    val usage: RemoteModelUsage? = null,
+    @SerialName("input_type") val inputType: String? = null,
+    @SerialName("source_model_label") val sourceModelLabel: String? = null,
+    @SerialName("dogtalk_snapshot_id") val dogtalkSnapshotId: String? = null
 )
 
 @Serializable
