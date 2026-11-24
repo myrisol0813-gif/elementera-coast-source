@@ -25,9 +25,14 @@ export const archiveV2Transport=Object.freeze({
   attachmentPage:(cursor='',limit=50)=>requestJson(base+'/inventory/attachments?'+new URLSearchParams({cursor,limit})),
   dogtalkPage:(kind='snapshots',cursor='',limit=50)=>requestJson(base+'/inventory/dogtalk?'+new URLSearchParams({kind,cursor,limit})),
   attachment:(conversation,id)=>requestJson(base+'/attachments/'+segment(conversation)+'/'+segment(id)),
-  async attachmentChunk(conversation,id,descriptor,index){
+  validateManifest:manifest=>requestJson(base+'/manifest/validate',{method:'POST',body:JSON.stringify(manifest)}),
+  attachmentChunk:(conversation,id,descriptor,index)=>readChunk('/attachments/'+segment(conversation)+'/'+segment(id),descriptor,index),
+  voiceChunk:(id,descriptor,index)=>readChunk('/voice/'+segment(id),descriptor,index),
+  libraryCoverChunk:(id,descriptor,index)=>readChunk('/library-cover/'+segment(id),descriptor,index)
+});
+async function readChunk(prefix,descriptor,index){
     if(!Number.isSafeInteger(index)||index<0||index>=descriptor.chunks.length)throw Error('invalid archive chunk index');
-    const path=base+'/attachments/'+segment(conversation)+'/'+segment(id)+'/chunks/'+index+'?'+new URLSearchParams({object_sha256:descriptor.object_sha256});
+    const path=base+prefix+'/chunks/'+index+'?'+new URLSearchParams({object_sha256:descriptor.object_sha256});
     const response=await fetch(path,{credentials:'same-origin',cache:'no-store'});
     if(!response.ok)throw Error('attachment chunk request failed: '+response.status);
     const expected=Math.min(1048576,descriptor.size-index*1048576);
@@ -39,4 +44,3 @@ export const archiveV2Transport=Object.freeze({
     if(offset!==expected||digest!==descriptor.chunks[index])throw Error('attachment chunk integrity mismatch');
     return bytes;
   }
-});
