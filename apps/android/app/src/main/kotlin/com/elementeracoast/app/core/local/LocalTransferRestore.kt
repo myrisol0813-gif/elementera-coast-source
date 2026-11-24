@@ -3,7 +3,7 @@ package com.elementeracoast.app.core.local
 import com.elementeracoast.app.core.remote.*
 import kotlinx.serialization.json.*
 
-internal data class LocalRestoreCount(val ready: Int, val existing: Int, val conflicts: Int)
+internal data class LocalRestoreCount(val ready: Int, val existing: Int, val conflicts: Int, val archivedOnly: Int = 0)
 internal data class LocalRestorePreview(
     val source: String, val counts: Map<String, LocalRestoreCount>, val unsupportedModules: Set<String>
 )
