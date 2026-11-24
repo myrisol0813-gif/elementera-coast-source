@@ -13,6 +13,11 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonUnquotedLiteral
 
 @OptIn(ExperimentalSerializationApi::class)
 @KeepGeneratedSerializer
@@ -58,9 +63,19 @@ object RemoteDeskSlipWireSerializer : KSerializer<RemoteDeskSlip> {
         return view.copy(archivedJson = raw)
     }
 
+    // JsonPrimitive's default serializer can parse numbers as Double/Long and
+    // change their spelling or precision. Preserve validated JSON number tokens.
+    private fun exactNumbers(element: JsonElement): JsonElement = when (element) {
+        is JsonObject -> JsonObject(element.mapValues { exactNumbers(it.value) })
+        is JsonArray -> JsonArray(element.map(::exactNumbers))
+        is JsonPrimitive -> if (element != JsonNull && !element.isString && element.content != "true" && element.content != "false") {
+            JsonUnquotedLiteral(element.content)
+        } else element
+    }
+
     override fun serialize(encoder: Encoder, value: RemoteDeskSlip) {
         val output = encoder as? JsonEncoder ?: throw SerializationException("Desk receipt requires JSON")
-        output.encodeJsonElement(value.archivedJson ?: projection.encodeToJsonElement(typed, value))
+        output.encodeJsonElement(exactNumbers(value.archivedJson ?: projection.encodeToJsonElement(typed, value)))
     }
 }
 
