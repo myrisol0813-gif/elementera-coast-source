@@ -46,6 +46,10 @@ class LocalCoastTransport(private val store: LocalPersistence,
         }
     }
 
+    fun uploadAttachment(cid:String,name:String,mime:String,bytes:ByteArray):RemoteAttachment=synchronized(this){
+        require(conversationExists(cid)){"附件所属窗口不存在。"}
+        store.atomic{LocalAttachmentStore(it).upload(cid,name,mime,bytes)}
+    }
     private fun now() = Instant.now().toString()
     private fun id() = UUID.randomUUID().toString()
     private fun body(request: Request): JsonObject {
@@ -118,11 +122,18 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 return ok(r, "source" to JsonPrimitive("local"), "history" to element(RemoteHistory.serializer(), h))
             }
         }
-        if(path.startsWith("/api/chat/attachments/")&&method=="GET"&&r.url.pathSegments.size==4){
+        if(path.startsWith("/api/chat/attachments/")&&r.url.pathSegments.size==4){
             val cid=r.url.queryParameter("conversation_id").orEmpty()
             if(!conversationExists(cid))return missing(r)
             val id=r.url.pathSegments.last();val originals=LocalAttachmentStore(store)
             val original=originals.entries().firstOrNull{it.metadata["id"]?.jsonPrimitive?.content==id&&it.metadata["conversation_id"]?.jsonPrimitive?.content==cid}?:return missing(r)
+            if(method=="DELETE"){
+                val used=cache.history(cid)?.turns.orEmpty().any{t->(t.user.variants+t.assistant.variantsByUserVariant.values.flatten()).any{v->v.attachments.any{it.id==id}}}
+                require(!used){"原件仍被历史消息引用，不能删除。"}
+                store.atomic{LocalAttachmentStore(it).remove(cid,id)}
+                return ok(r)
+            }
+            if(method!="GET")return unsupported(r)
             val bytes=originals.bytes(original)
             return Response.Builder().request(r).protocol(Protocol.HTTP_1_1).code(200).message("OK").body(bytes.toResponseBody(original.metadata.getValue("mime").jsonPrimitive.content.toMediaType())).build()
         }
@@ -139,10 +150,9 @@ class LocalCoastTransport(private val store: LocalPersistence,
         if (path == "/api/chat/native-context" && method == "POST") {
             val request = json.decodeFromJsonElement(RemoteChatRequest.serializer(), body(r))
             if (!conversationExists(request.conversationId)) return missing(r)
-            if (request.attachmentIds.isNotEmpty()) return unsupported(r)
             val budget = request.settings["contextBudget"]?.toLongOrNull()?.coerceAtLeast(1800) ?: 18000
             val room=cache.conversations().first { it.id==request.conversationId }.roomType
-            val prepared=knowledge.context(request.messages,budget.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),if(room=="main")"main_chat" else room,request.conversationId)
+            val prepared=knowledge.context(request.messages,budget.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),if(room=="main")"main_chat" else room,request.conversationId,request.attachmentIds)
             return response(r, 200, element(RemoteNativeChatContext.serializer(), RemoteNativeChatContext(
                 ok = true,
                 modelMessages = array(RemoteChatMessage.serializer(), prepared.messages),

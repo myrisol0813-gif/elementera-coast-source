@@ -24,10 +24,9 @@ internal class LocalDirectChatRepository(
     ): Flow<ChatProgress> = flow {
         val (provider, model) = try { providers.resolve(modelId) } catch (_: Exception) { null }
             ?: throw CoastApiException(CoastApiErrorKind.Model, "local_provider_missing", "请在模型箱配置供应商并选择本机模型。")
-        if (ChatSyncMapper.activeAttachmentIds(historyWithUser, turnId).isNotEmpty())
-            throw CoastApiException(CoastApiErrorKind.Request, "local_attachment_pending", "本机附件推理尚未接入。")
+        val attachmentIds=ChatSyncMapper.activeAttachmentIds(historyWithUser,turnId)
         val messages = ChatSyncMapper.contextMessages(historyWithUser, turnId, recentTurns)
-        val prepared=try{knowledge.context(messages,contextBudget,knowledge.surfaceFor(conversationId),conversationId)}catch(e:IllegalArgumentException){
+        val prepared=try{knowledge.context(messages,contextBudget,knowledge.surfaceFor(conversationId),conversationId,attachmentIds)}catch(e:IllegalArgumentException){
             throw CoastApiException(CoastApiErrorKind.Request,"local_context_budget",e.message.orEmpty())
         }
         var content = ""

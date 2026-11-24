@@ -12,6 +12,7 @@ internal class LocalKnowledgeStore(store:LocalPersistence) {
     private val memory=LocalMemoryStore(store)
     private val portraits=LocalPortraitStore(store)
     private val soil=LocalSoilStore(store)
+    private val attachments=LocalAttachmentStore(store)
     fun instructions()=cache.customInstructions()
     fun saveInstructions(request:RemoteCustomInstructionsPutRequest):RemoteCustomInstructions {
         require(request.content.length<=32000&&request.updatedBy.length in 1..80&&request.source.length in 1..80){"自定义指令或来源字段超限。"}
@@ -54,7 +55,9 @@ internal class LocalKnowledgeStore(store:LocalPersistence) {
     }
     fun surfaceFor(conversationId:String):String=cache.conversations().firstOrNull{it.id==conversationId}?.roomType?.let{if(it=="main")"main_chat" else it}?:error("本机窗口不存在。")
     data class Context(val messages:List<RemoteChatMessage>,val receipt:RemoteDeskSlip)
-    fun context(messages:List<RemoteChatMessage>,budget:Int,surface:String,conversationId:String=""):Context {
+    fun context(input:List<RemoteChatMessage>,budget:Int,surface:String,conversationId:String="",attachmentIds:List<String> = emptyList()):Context {
+        val attachmentContext=attachments.textContext(conversationId,attachmentIds,input)
+        val messages=attachmentContext.messages
         val instructions=instructions()?.content.orEmpty()
         val current=messages.lastOrNull{it.role=="user"}?.content.orEmpty()
         val maxChars=budget.coerceAtLeast(1800).toLong()*3
@@ -79,7 +82,8 @@ internal class LocalKnowledgeStore(store:LocalPersistence) {
         val chars=delivered.sumOf{it.content.length.toLong()}
         require(chars<=maxChars){"本机上下文、完整画像、世界书与记忆超过预算，未截断、未发送。"}
         return Context(delivered,RemoteDeskSlip(
-            summary="本机自定义指令、完整画像、世界书、已确认记忆（关键词检索）、思维壤与近期文字；附件尚未接入",
+            summary="本机自定义指令、完整画像、世界书、已确认记忆（关键词检索）、思维壤与近期文字；附件按本轮回执递入",
+            attachments=attachmentContext.receipt.takeIf{attachmentIds.isNotEmpty()},
             customInstructions=RemoteDeskCustomInstructions(status=if(instructions.isEmpty())"未设置" else "已递给",delivered=instructions.isNotEmpty(),empty=instructions.isEmpty(),length=instructions.length,content=instructions),
             userPortrait=portraitReceipt("用户画像",userPortrait),
             globalExcerpt=portraitReceipt("自我画像",selfPortrait),

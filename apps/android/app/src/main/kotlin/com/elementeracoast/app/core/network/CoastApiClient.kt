@@ -358,6 +358,12 @@ class CoastApiClient(
         if (bytes.size > 8 * 1024 * 1024) {
             throw CoastApiException(CoastApiErrorKind.Request, "file_too_large", "附件超过当前 8 MB 限制。", 413)
         }
+        config.localTransport?.let{local->
+            return kotlinx.coroutines.withContext(Dispatchers.IO){
+                try{local.uploadAttachment(conversationId,name,mime,bytes)}
+                catch(e:IllegalArgumentException){throw CoastApiException(CoastApiErrorKind.Request,"local_attachment_invalid",e.message.orEmpty())}
+            }
+        }
         val mediaType = runCatching { mime.ifBlank { "application/octet-stream" }.toMediaType() }
             .getOrElse { "application/octet-stream".toMediaType() }
         val body = MultipartBody.Builder()

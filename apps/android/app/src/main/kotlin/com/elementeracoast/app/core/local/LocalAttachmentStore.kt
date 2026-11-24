@@ -28,6 +28,40 @@ internal class LocalAttachmentStore(private val store:LocalPersistence){
         require(bytes(original).contentEquals(data))
         writeIndex(rows+original)
     }
+    fun upload(cid:String,name:String,mime:String,data:ByteArray):RemoteAttachment{
+        val id=java.util.UUID.randomUUID().toString();val now=System.currentTimeMillis()
+        val normalizedMime=mime.trim().lowercase(java.util.Locale.ROOT).ifBlank{"application/octet-stream"}
+        val kind=if(normalizedMime in setOf("image/png","image/jpeg","image/webp"))"image" else "file"
+        val meta=buildJsonObject{put("id",id);put("conversation_id",cid);put("turn_id",JsonNull);put("kind",kind);put("name",name.trim().ifBlank{"附件"});put("mime",normalizedMime);put("size",data.size);put("created_at",now);put("updated_at",now)}
+        publish(Original(meta,ArchiveV2Chunks.digest(data)),data)
+        return RemoteAttachment(id=id,type=kind,name=meta.str("name"),mime=normalizedMime,size=data.size.toLong(),storageKey="local:"+id,createdAt=java.time.Instant.ofEpochMilli(now).toString())
+    }
+    fun remove(cid:String,id:String):Boolean{
+        val rows=entries();val row=rows.firstOrNull{it.metadata.str("conversation_id")==cid&&it.metadata.str("id")==id}?:return false
+        writeIndex(rows-row);store.remove(key(id));return true
+    }
+    data class TextContext(val messages:List<RemoteChatMessage>,val receipt:RemoteDeskAttachments)
+    fun textContext(cid:String,ids:List<String>,messages:List<RemoteChatMessage>):TextContext{
+        require(ids.size<=12&&ids.distinct().size==ids.size){"每轮附件最多12个，不能重复。"}
+        if(ids.isEmpty())return TextContext(messages,RemoteDeskAttachments())
+        val available=entries().filter{it.metadata.str("conversation_id")==cid}.associateBy{it.metadata.str("id")}
+        val items=mutableListOf<RemoteDeskAttachmentItem>();val content=mutableListOf<String>()
+        for(id in ids){
+            val r=requireNotNull(available[id]){"本轮附件不存在或不属于本窗口。"}
+            val mime=r.metadata.str("mime");val name=r.metadata.str("name")
+            val suffix=name.substringAfterLast('.',"").lowercase(java.util.Locale.ROOT)
+            require(mime.startsWith("text/")||mime in setOf("application/json","application/xml")||suffix in setOf("txt","md","markdown","json","csv","tsv","xml","yaml","yml","toml","ini","py","js","ts","kt","java","css","html","sql","log","sh","rs","go","c","cpp")){"本机目前仅支持 UTF-8 文本附件推理；图片和其他原件可以保存但本轮不能发送给模型。"}
+            val bytes=bytes(r);require(bytes.size<=1024*1024){"文本附件超过 1 MiB 读取上限。"}
+            val text=bytes.decodeToString(throwOnInvalidSequence=true)
+            require(!text.contains('\u0000')){"附件不是有效文本。"}
+            items.add(RemoteDeskAttachmentItem(id=id,name=name,type=r.metadata.str("kind"),mode="text"))
+            content.add("附件："+name+"\n"+text)
+        }
+        val index=messages.indexOfLast{it.role=="user"};require(index>=0){"附件缺少本轮用户消息。"}
+        val next=messages.toMutableList()
+        next[index]=next[index].copy(content=next[index].content+"\n\n"+content.joinToString("\n\n"))
+        return TextContext(next,RemoteDeskAttachments(uploaded=ids.size,deliveredToModel=items.size,delivered=items))
+    }
     fun deleteConversation(cid:String){
         val rows=entries();val removed=rows.filter{it.metadata.str("conversation_id")==cid}
         writeIndex(rows-removed.toSet())
