@@ -208,7 +208,7 @@ internal class LocalSideRecords(private val store:LocalPersistence) {
             for(k in listOf("chapter_index","paragraph_index","start_offset","end_offset"))if(v[k]!=null&&v[k]!=JsonNull)require(v.number(k) in 0..Int.MAX_VALUE.toLong())
             if(limit(r.kind)>0)require(r.digest!=null&&hex.matches(r.digest)&&size(r) in 1..limit(r.kind))else require(r.digest==null)
             when(r.kind){
-                "voice"->{require(v.str("source").length<=160&&v.str("voice_id").length<=180&&v.str("text").length<=2400)}
+                "voice"->{require(v.str("source").length<=160&&v.str("voice_id").length<=180&&v.str("text").length<=2400&&v.optional("model_label")?.length?.let{it<=180}!=false)}
                 "vault_treasures"->{require(v.str("kind") in setOf("text","soil","audio","image","file")&&v.str("source_key")==v.str("kind")+":"+v.str("conversation_id")+":"+v.str("source_id")&&v.str("notes").length<=1200&&v.str("excerpt").length<=12000&&v.str("role") in setOf("user","assistant"));val p=Json.parseToJsonElement(v.str("selections_json")).jsonArray.map{it.jsonPrimitive.int};require(p.size<=40&&p==p.distinct().sorted()&&p.all{it>=0})}
                 "vault_media_labels"->require(v.str("source_key").startsWith("image:")&&v.str("source_key").length<=327&&v.str("display_name").length in 1..120&&v.str("display_name").trim()==v.str("display_name")&&v.str("display_name").none{it.code<32||it.code==127})
                 "library_books"->require(v.str("title").length in 1..160&&v.str("title").isNotBlank()&&v.str("format") in setOf("epub","txt"))

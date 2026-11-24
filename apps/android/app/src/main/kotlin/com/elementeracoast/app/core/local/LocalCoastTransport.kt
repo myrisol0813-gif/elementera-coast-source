@@ -123,7 +123,9 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if (method == "PUT") {
                 val h = json.decodeFromJsonElement(RemoteHistory.serializer(), body(r))
                     .copy(conversationId = cid, updatedAt = now())
-                store.atomic{staged->LocalAttachmentStore(staged).linkHistory(cid,h);RemoteCacheStore(staged).putHistory(cid,h)}
+                val originals=LocalAttachmentStore(store)
+                if(originals.needsHistoryLink(cid,h))store.atomic{staged->LocalAttachmentStore(staged).linkHistory(cid,h);RemoteCacheStore(staged).putHistory(cid,h)}
+                else{originals.linkHistory(cid,h);cache.putHistory(cid,h)}
                 return ok(r, "source" to JsonPrimitive("local"), "history" to element(RemoteHistory.serializer(), h))
             }
         }

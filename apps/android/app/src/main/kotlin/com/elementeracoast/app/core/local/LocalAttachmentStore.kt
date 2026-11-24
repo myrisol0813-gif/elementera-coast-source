@@ -36,6 +36,10 @@ internal class LocalAttachmentStore(private val store:LocalPersistence){
         publish(Original(meta,ArchiveV2Chunks.digest(data)),data)
         return RemoteAttachment(id=id,type=kind,name=meta.str("name"),mime=normalizedMime,size=data.size.toLong(),storageKey="chat-attachment:"+id,createdAt=java.time.Instant.ofEpochMilli(now).toString())
     }
+    fun needsHistoryLink(cid:String,history:RemoteHistory):Boolean{
+        val linked=entries().filter{it.metadata.str("conversation_id")==cid}.associateBy{it.metadata.str("id")}
+        return history.turns.any{t->(t.user.variants+t.assistant.variantsByUserVariant.values.flatten()).any{v->v.attachments.any{a->linked[a.id]?.metadata?.get("turn_id")==JsonNull}}}
+    }
     fun linkHistory(cid:String,history:RemoteHistory){
         val rows=entries();val lookup=rows.associateBy{it.metadata.str("id")}
         val turnMap=mutableMapOf<String,String>()
