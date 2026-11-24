@@ -5,7 +5,7 @@ import { escapeHtml,timestampLabel } from '../core/dom.js';
 const APP='com.elementeracoast.source';
 const line=(title,body)=>'<div class="feature-row static"><span><strong>'+escapeHtml(title)+'</strong><small>'+escapeHtml(body)+'</small></span></div>';
 const action=(key,label,disabled)=>'<button class="primary-wide" type="button" data-action="settings:transfer-v2-'+key+'" '+(disabled?'disabled':'')+'>'+escapeHtml(label)+'</button>';
-const labels={chat:'聊天',attachments:'附件',voice:'语音',dogtalk_records:'私人草稿',dogtalk_snapshots:'历史快照',thinking_soil:'思维壤',thinking_soil_history:'思维壤历史',memory_entries:'记忆',memory_pockets:'候选',calendar:'日历',daily:'日常',model_profile:'模型资料',user_portrait:'用户画像',self_portrait:'自我画像',worldbook:'世界书',custom_instructions:'自定义',vault:'拾潮',library:'书房',appearance:'外观',tools:'工具'};
+const labels={chat:'聊天',attachments:'附件',voice:'语音',dogtalk_records:'私人草稿',dogtalk_snapshots:'历史快照',thinking_soil:'思维壤',thinking_soil_history:'思维壤历史',memory_entries:'记忆',memory_pockets:'候选',calendar:'日历',daily:'日常',model_profile:'模型资料',user_portrait:'用户画像',self_portrait:'自我画像',worldbook:'世界书',custom_instructions:'自定义',vault:'拾潮',library:'书房',appearance:'外观',tools:'工具历史（脱敏）'};
 export function createV2Transfer({router,toast,chat}){
   let incoming=null,choices=[],selected='',preview=null,result=null,session=null,uploaded=false,busy=false,failure='',progress='',revision=0;
   const current=()=>router.current()?.name==='settings-transfer';
@@ -60,14 +60,14 @@ export function createV2Transfer({router,toast,chat}){
         if(['backend','local'].includes(data.manifest.workspace)){
           const objects=new Map(data.manifest.objects.map(d=>[d.object_sha256,d]));
           for(const r of data.manifest.records){
-            if(data.manifest.workspace==='local'&&(!['chat','calendar','daily','model_profile','worldbook','custom_instructions','memory_entries','memory_pockets','user_portrait','self_portrait','thinking_soil','thinking_soil_history'].includes(r.module)||(['custom_instructions','memory_entries','memory_pockets','user_portrait','self_portrait','thinking_soil','thinking_soil_history'].includes(r.module)&&data.manifest.application_id!==APP)))continue;
+            if(data.manifest.workspace==='local'&&(!['chat','calendar','daily','model_profile','worldbook','custom_instructions','memory_entries','memory_pockets','user_portrait','self_portrait','thinking_soil','thinking_soil_history','tools'].includes(r.module)||(['custom_instructions','memory_entries','memory_pockets','user_portrait','self_portrait','thinking_soil','thinking_soil_history','tools'].includes(r.module)&&data.manifest.application_id!==APP)))continue;
             if(data.manifest.workspace==='backend'&&!(r.module==='chat'&&data.manifest.application_id===APP)&&!(r.module==='library'&&r.id.startsWith('library_books:'))&&!['calendar','worldbook','model_profile'].includes(r.module)&&!(data.manifest.application_id===APP&&['memory_entries','memory_pockets','user_portrait','self_portrait','daily','vault','custom_instructions'].includes(r.module)))continue;
             const d=objects.get(r.record_object);if(!d||d.size>1800000)continue;
             const raw=new Uint8Array(d.size);let at=0;
             for await(const b of data.objectChunks(d)){raw.set(b,at);at+=b.length;}
             const v=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw));
             if(data.manifest.workspace==='local'){
-              const kinds={local_chat:'chat',local_calendar:'calendar',local_moment:'daily',local_diary:'daily',local_daily_profile:'daily',local_model_profile:'model_profile',worldbook:'worldbook',custom_instructions:'custom_instructions',memory_entries:'memory_entries',memory_pockets:'memory_pockets',user_portrait:'user_portrait',self_portrait:'self_portrait',thinking_soil:'thinking_soil',thinking_soil_history:'thinking_soil_history'};
+              const kinds={local_chat:'chat',local_calendar:'calendar',local_moment:'daily',local_diary:'daily',local_daily_profile:'daily',local_model_profile:'model_profile',worldbook:'worldbook',custom_instructions:'custom_instructions',memory_entries:'memory_entries',memory_pockets:'memory_pockets',user_portrait:'user_portrait',self_portrait:'self_portrait',thinking_soil:'thinking_soil',thinking_soil_history:'thinking_soil_history',tools:'tools'};
               if(kinds[v.kind]===r.module)options.push({key:'local:'+r.module+':'+r.id,kind:r.module,id:r.id,local:true,title:String(v.data?.conversation?.title||v.data?.title||v.data?.text||labels[r.module]).slice(0,100)});
               continue;
             }

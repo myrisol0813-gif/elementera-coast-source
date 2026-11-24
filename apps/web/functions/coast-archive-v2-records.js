@@ -1,3 +1,4 @@
+import { safeToolPage } from './coast-archive-v2-tool-audit.js';
 import { ensureChatSchema } from './chat-store.js';
 import { ensureMemorySchema } from './memory-store/memory-schema.js';
 import { MEMORY_OWNER_ID } from './memory-store/memory-normalize.js';
@@ -18,8 +19,9 @@ const modules={
   model_profile:{ensure:ensureChatSchema,sql:"SELECT user_id AS id,assistant_avatar_dataurl,current_chat_model,current_image_model,model_box_json,updated_at FROM chat_profiles WHERE user_id='owner'",key:"user_id"},
   voice:{ensure:ensureVoiceSchema,sql:"SELECT v.id,v.conversation_id,v.turn_id,v.message_id,v.source,v.model_label,v.voice_id,v.text,v.audio_bytes,v.created_at FROM coast_voice_clips v WHERE v.conversation_id IN ("+active+")"}
 };
-export const RECORD_MODULES=Object.freeze(Object.keys(modules));
+export const RECORD_MODULES=Object.freeze([...Object.keys(modules),'tools']);
 export async function archiveRecordPage(db,module,{cursor='',limit=20}={}){
+  if(module==='tools')return safeToolPage(db,{cursor,limit});
   check(Object.hasOwn(modules,module),'unsupported record module');
   check(cursor===''||id.test(cursor),'invalid archive cursor');
   check(Number.isInteger(limit)&&limit>=1&&limit<=100,'invalid archive page size');
