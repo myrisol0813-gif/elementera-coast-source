@@ -78,7 +78,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,all
             busy=true;open.launch(arrayOf("application/zip","application/octet-stream"))
         }
         if(busy)Text(status.ifBlank { "处理中…" },style=MaterialTheme.typography.bodySmall)
-        Text(if(localMode)"当前仅支持本机来源 ZIP 的四个已有模块；云端 ZIP 请保留原件。" else "支持同应用云端聊天组与两版云端书房逐本恢复；不会恢复整个包。上传会暂存所有归档对象。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(if(localMode)"当前仅支持本机来源 ZIP 的四个已有模块；云端 ZIP 请保留原件。" else "支持同应用云端聊天组、书房、日历、世界书与模型资料；不会恢复整个包。上传会暂存所有归档对象。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
     val input=incoming?:return
     val available=operations.localModules(input.manifest)
@@ -102,17 +102,18 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,all
                     val label=v2Labels[m.module]?:m.module
                     if(m.module in available) Row(verticalAlignment=Alignment.CenterVertically){
                         Checkbox(m.module in selected,enabled=!busy&&preview==null,onCheckedChange={selected=if(it)selected+m.module else selected-m.module});Text("$label · "+m.count)
-                    } else Text("$label · "+m.count+" · "+if(m.coverage=="unavailable")"未采集" else if(m.module=="chat"&&choices.any { it.kind=="chat" })"可逐窗口恢复" else if(m.module=="library"&&choices.any { it.kind=="book" })"可逐本恢复" else "本次不恢复")
+                    } else Text("$label · "+m.count+" · "+if(m.coverage=="unavailable")"未采集" else if(m.module=="chat"&&choices.any { it.kind=="chat" })"可逐窗口恢复" else if(m.module=="library"&&choices.any { it.kind=="book" })"可逐本恢复" else if(choices.any { it.kind==m.module })"可逐项恢复" else "本次不恢复")
                 }
                 if(!localMode&&choices.isNotEmpty()) {
                     Text("选择一项资料：")
                     choices.forEach { item->Row(verticalAlignment=Alignment.CenterVertically){
-                        RadioButton(chosen==item,enabled=!busy&&preview==null,onClick={chosen=item});Text((if(item.kind=="book")"书房 · " else "聊天 · ")+item.title)
+                        RadioButton(chosen==item,enabled=!busy&&preview==null,onClick={chosen=item});Text((if(item.kind=="book")"书房" else v2Labels[item.kind]?:item.kind)+" · "+item.title)
                     }}
                 }
                 preview?.let { p->
                     Text(if(committed)"已确认写入；请重新打开海岸刷新资料。" else "预检通过。只写入所选记录，不覆盖已存在的资料。")
                     if(localMode)p.forEach { (k,v)->if(v is JsonObject)Text((v2Labels[k]?:k)+" · 新增 "+v["ready"]+" · 已有 "+v["existing"]+" · 冲突 "+v["conflicts"]) }
+                    else if(p["scope"]?.jsonPrimitive?.contentOrNull=="record_only")Text("新增 "+p["ready"]+" · 已有 "+p["existing"])
                     else if(p["scope"]?.jsonPrimitive?.contentOrNull=="book_only")Text("章节 "+p["chapters"]+" · 批注 "+p["notes"])
                     else Text("聊天："+p["turns"]+" 轮 · 附件 "+p["attachments"]+" · 语音 "+p["voices"]+" · 思维壤 "+p["soils"]+" · 快照 "+p["snapshots"])
                 }
