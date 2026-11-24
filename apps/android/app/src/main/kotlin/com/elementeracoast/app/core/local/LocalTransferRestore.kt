@@ -140,6 +140,15 @@ internal object LocalTransferRestore {
             declared - availableModules(payload, applicationId)), merged)
     }
 
+    internal fun plannedParents(bytes:ByteArray,applicationId:String,modules:Set<String>,store:LocalPersistence):Pair<Set<String>,Set<String>>{
+        val payload=CoastTransferCodec.decode(bytes)
+        val incoming=decodeSelected(payload,applicationId,modules).conversations
+        val existing=LocalBackupArchive.capture(store,applicationId).conversations.associateBy{it.conversation.id}
+        val ids=incoming.map{it.conversation.id}.toSet()
+        val conflicts=incoming.filter{existing[it.conversation.id]?.let{old->old!=it}==true}.map{it.conversation.id}.toSet()
+        return (existing.keys+ids) to conflicts
+    }
+
     fun preview(bytes: ByteArray, applicationId: String, modules: Set<String>, store: LocalPersistence): LocalRestorePreview {
         val payload = CoastTransferCodec.decode(bytes)
         return store.readConsistent { plan(payload, applicationId, modules, it).preview }

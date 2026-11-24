@@ -78,7 +78,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,localMode:Boolean,all
             busy=true;open.launch(arrayOf("application/zip","application/octet-stream"))
         }
         if(busy)Text(status.ifBlank { "处理中…" },style=MaterialTheme.typography.bodySmall)
-        Text(if(localMode)"本机与云端 ZIP 支持聊天、日历、模型资料、日常、世界书和自定义指令；原始身份资料需同版本。其他原件请保留。" else "支持云端聊天组、书房、日历、世界书、模型资料、同应用记忆、画像、日常、拾潮和自定义；本机 ZIP 可恢复兼容记录，不会恢复整个包。上传会暂存所有归档对象。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(if(localMode)"本机与云端 ZIP 支持聊天、日历、模型资料、日常、世界书、自定义指令、记忆与待确认袋；原始身份资料需同版本。其他原件请保留。" else "支持云端聊天组、书房、日历、世界书、模型资料、同应用记忆、画像、日常、拾潮和自定义；本机 ZIP 可恢复兼容记录，不会恢复整个包。上传会暂存所有归档对象。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
     val input=incoming?:return
     val available=operations.localModules(input.manifest)

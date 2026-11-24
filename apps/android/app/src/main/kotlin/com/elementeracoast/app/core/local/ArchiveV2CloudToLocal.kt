@@ -10,7 +10,7 @@ internal object ArchiveV2CloudToLocal {
     private fun JsonObject.string(key:String)=getValue(key).jsonPrimitive.content
     private fun iso(v:JsonElement):JsonElement=if(v==JsonNull)JsonNull else JsonPrimitive(Instant.ofEpochMilli(v.jsonPrimitive.long).toString())
     private fun verifyKeys(v:JsonObject,keys:Set<String>){require(v.keys==keys){"云端记录字段不兼容，未恢复。"}}
-    fun convert(manifest:ArchiveV2Manifest,stage:ArchiveV2Stage,selection:Set<String>):ByteArray {
+    fun convert(manifest:ArchiveV2Manifest,stage:ArchiveV2Stage,selection:Set<String>,allSelected:Set<String> = selection):ByteArray {
         ArchiveV2Manifests.validate(manifest)
         require(manifest.workspace=="backend"&&manifest.applicationId in setOf("com.elementeracoast.app","com.elementeracoast.source")&&selection.isNotEmpty()&&supportedModules.containsAll(selection))
         require(selection.all { k->manifest.modules.any { it.module==k&&it.coverage!="unavailable" } })
@@ -22,7 +22,7 @@ internal object ArchiveV2CloudToLocal {
         val dailyRows=mutableListOf<ArchiveV2Daily.Row>()
         for(r in chosen){
             require(r.mediaObjects.isEmpty()&&(r.module in setOf("calendar","daily")||r.dependencies.isEmpty())){"此记录关联目标本机暂不能恢复的资料。"}
-            if(r.module=="chat")require(manifest.records.none { it.module !in selection&&"chat/"+r.id in it.dependencies }){"窗口有关联原件、思维壤或其他资料，本机暂不能完整恢复。"}
+            if(r.module=="chat")require(manifest.records.none { it.module !in allSelected&&"chat/"+r.id in it.dependencies }){"窗口有关联原件、思维壤或其他资料，本机暂不能完整恢复。"}
             val d=objects.getValue(r.recordObject)
             val raw=Json.parseToJsonElement(stage.verify(d,CoastTransferCodec.MAX_BYTES.toLong()).readBytes().decodeToString(throwOnInvalidSequence=true)).jsonObject
             verifyKeys(raw,setOf("kind","data"));require(r.module=="daily"||raw.string("kind")==r.module)

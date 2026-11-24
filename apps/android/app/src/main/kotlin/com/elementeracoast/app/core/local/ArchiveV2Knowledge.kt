@@ -7,7 +7,7 @@ import java.time.Instant
 /** These modules already have a real editable local store. Use the cloud's
  * canonical V2 record shape in both directions, not a parallel backup schema. */
 internal object ArchiveV2Knowledge {
-    val modules=setOf("custom_instructions","worldbook")
+    val modules=setOf("custom_instructions","worldbook")+LocalMemoryStore.modules
     data class Row(val module:String,val id:String,val data:JsonObject)
     private fun identity(module:String,id:String)=module+":"+ArchiveV2Chunks.digest(JsonArray(listOf(JsonPrimitive(id))).toString().encodeToByteArray())
     private fun stamp(value:String?)=Instant.parse(requireNotNull(value)).toEpochMilli().also{require(it>=0)}
@@ -31,23 +31,32 @@ internal object ArchiveV2Knowledge {
             put("priority",v.priority);put("scan_depth",v.scanDepth);put("inject_position","before_memory");put("enabled",if(v.enabled)1 else 0);put("scope",v.scope);put("visitor_safe",if(v.visitorSafe)1 else 0)
             put("created_at",stamp(v.createdAt));put("updated_at",stamp(v.updatedAt))
         }))
+        val memory=LocalMemoryStore(store).snapshot()
+        for((module,records) in listOf("memory_entries" to memory.entries,"memory_pockets" to memory.pockets)){
+            records.filter{it["deleted_at"]==JsonNull}.forEach{result.add(Row(module,it.str("id"),it))}
+        }
         return result
     }
     fun read(manifest:ArchiveV2Manifest,stage:ArchiveV2Stage,selection:Set<String>,app:String):List<Row>{
-        require("custom_instructions" !in selection||manifest.applicationId==app){"自定义指令原始身份暂需同版本恢复。"}
+        require(selection.intersect(LocalMemoryStore.modules+setOf("custom_instructions")).isEmpty()||manifest.applicationId==app){"记忆及自定义指令原始身份暂需同版本恢复。"}
         val objects=manifest.objects.associateBy{it.objectSha256}
         return manifest.records.filter{it.module in selection}.map{r->
-            require(r.dependencies.isEmpty()&&r.mediaObjects.isEmpty())
+            require(r.mediaObjects.isEmpty())
             val d=objects.getValue(r.recordObject)
             require(d.size<=1800000)
             val raw=Json.parseToJsonElement(stage.verify(d,1800000).readBytes().decodeToString(throwOnInvalidSequence=true)).jsonObject
             require(raw.keys==setOf("kind","data")&&raw.str("kind")==r.module)
             val v=raw.getValue("data").jsonObject
-            require(r.id==identity(r.module,v.str("id")))
+            if(r.module in LocalMemoryStore.modules){
+                LocalMemoryStore.validateRow(v,r.module=="memory_pockets")
+                require(v["deleted_at"]==JsonNull&&r.id==v.str("id"))
+                val cid=v["conversation_id"]?.jsonPrimitive?.contentOrNull
+                require(r.dependencies==if(cid==null)emptyList() else listOf("chat/"+cid))
+            }else require(r.dependencies.isEmpty()&&r.id==identity(r.module,v.str("id")))
             Row(r.module,r.id,v)
         }
     }
-    fun apply(rows:List<Row>,selection:Set<String>,store:LocalPersistence,write:Boolean):Map<String,LocalRestoreCount>{
+    fun apply(rows:List<Row>,selection:Set<String>,store:LocalPersistence,write:Boolean,parents:Set<String>,conflictingParents:Set<String>):Map<String,LocalRestoreCount>{
         val cache=RemoteCacheStore(store,strictReads=true)
         val counts=linkedMapOf<String,LocalRestoreCount>()
         if("custom_instructions" in selection){
@@ -78,6 +87,25 @@ internal object ArchiveV2Knowledge {
             val merged=old+fresh;LocalKnowledgeStore.validateWorldbook(merged)
             counts["worldbook"]=LocalRestoreCount(fresh.size,existing.size,existing.count{byId[it.id]!=it})
             if(write){cache.putWorldbookEntries(merged);require(cache.worldbookEntries()==merged)}
+        }
+        if(selection.any{it in LocalMemoryStore.modules}){
+            val memory=LocalMemoryStore(store);val old=memory.snapshot()
+            fun merge(module:String,existing:List<JsonObject>):List<JsonObject>{
+                if(module !in selection)return existing
+                val incoming=rows.filter{it.module==module}.map{it.data}
+                val byId=existing.associateBy{it.str("id")}
+                val fresh=incoming.filter{it.str("id") !in byId}
+                val matched=incoming.filter{it.str("id") in byId}
+                for(v in fresh){
+                    val parent=v["conversation_id"]?.jsonPrimitive?.contentOrNull
+                    require(parent==null||parent in parents&&parent !in conflictingParents){"记忆关联原窗口缺失或存在内容冲突。"}
+                }
+                counts[module]=LocalRestoreCount(fresh.size,matched.size,matched.count{byId[it.str("id")]!=it})
+                return existing+fresh
+            }
+            val next=LocalMemoryStore.Snapshot(merge("memory_entries",old.entries),merge("memory_pockets",old.pockets))
+            LocalMemoryStore.validate(next)
+            if(write)memory.write(next)
         }
         return counts
     }
