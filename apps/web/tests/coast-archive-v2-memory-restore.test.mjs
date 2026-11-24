@@ -40,3 +40,32 @@ test('owner memory and pocket exact restore, target vector indexes reset, confli
  await dst.prepare("UPDATE memory_entries SET content='target revision' WHERE id=?").bind(entry.id).run();
  await assert.rejects(()=>restoreArchiveRecord(dst,s.id,m,'memory_entries',entry.id,true),/never overwrite/);
 });
+
+test('legacy memory pocket schema upgrades in place before archive reads, preserving old rows and provenance',async()=>{
+ const src=new D1Database(),c=await createConversation(src,'legacy fixture','main');
+ const p=await createPocket(src,{conversation_id:c.id,source_type:'soil',source_text:'旧候选原文',fingerprint:'legacy-fixture'});
+ // A deployed database can predate these five columns even though a fresh
+ // CREATE TABLE already defines them. A new binding simulates a cold start.
+ for(const column of ['source_model','source_window','source_time','tag','migration_status']){
+   src.database.exec('ALTER TABLE memory_pockets DROP COLUMN '+column);
+ }
+ const reopened={prepare:src.prepare.bind(src),batch:src.batch.bind(src)};
+ const first=(await archiveRecordPage(reopened,'memory_pockets')).items.find(row=>row.id===p.id);
+ assert.ok(first);
+ assert.equal(first.source_text,'旧候选原文');
+ assert.equal(first.fingerprint,'legacy-fixture');
+ assert.equal(first.source_model,'');
+ assert.equal(first.source_window,'');
+ assert.equal(first.source_time,null);
+ assert.equal(first.tag,'');
+ assert.equal(first.migration_status,'');
+ await reopened.prepare("UPDATE memory_pockets SET source_model=?,source_window=?,source_time=?,tag=?,migration_status=? WHERE id=?").bind('fixture-model','fixture-window',123,'fixture-tag','fixture-status',p.id).run();
+ const cold={prepare:src.prepare.bind(src),batch:src.batch.bind(src)};
+ const second=(await archiveRecordPage(cold,'memory_pockets')).items.find(row=>row.id===p.id);
+ assert.equal(second.source_model,'fixture-model');
+ assert.equal(second.source_window,'fixture-window');
+ assert.equal(second.source_time,123);
+ assert.equal(second.tag,'fixture-tag');
+ assert.equal(second.migration_status,'fixture-status');
+ assert.equal(second.source_text,'旧候选原文');
+});
