@@ -18,8 +18,9 @@ const keys=(v,allowed)=>require(obj(v)&&Object.keys(v).every(k=>allowed.includes
 function stable(v){if(Array.isArray(v))return v.map(stable);if(obj(v))return Object.fromEntries(Object.keys(v).sort().map(k=>[k,stable(v[k])]));return v;}
 const equal=(a,b)=>JSON.stringify(stable(a))===JSON.stringify(stable(b));
 const all=async(db,sql)=>(await db.prepare(sql).all()).results||[];
-const config=app=>app===publicApp?{owner:'owner',partner:'model_partner',avatar:'owner_avatar_dataurl',partnerAvatar:'model_partner_avatar_dataurl',name:'model_partner_display_name',ownerName:'屋主',apiName:'前端 API ✦'}:{owner:'xiaohan',partner:'myri',avatar:'xiaohan_avatar_dataurl',partnerAvatar:'myri_avatar_dataurl',name:'myri_display_name',ownerName:'小寒',apiName:'海岸 API ✦'};
-function author(v,c){if(['owner','xiaohan'].includes(v))return c.owner;if(['model_partner','myri'].includes(v))return c.partner;require(['api','mcp'].includes(v),'日常作者或点赞者无效。');return v;}
+const wire={owner:'owner',partner:'model_partner',avatar:'owner_avatar_dataurl',partnerAvatar:'model_partner_avatar_dataurl',name:'model_partner_display_name',ownerName:'屋主',apiName:'前端 API ✦'};
+const config=()=>wire;
+function author(v,c){require([c.owner,c.partner,'api','mcp'].includes(v),'日常作者或点赞者无效。');return v;}
 function json(raw,fallback){if(raw==null||raw==='')return fallback;try{return JSON.parse(raw);}catch{throw new TransferError('invalid_daily_transfer','日常原始 JSON 已损坏，未生成不完整记录。');}}
 function usage(v){
   if(v==null)return null;
@@ -65,7 +66,7 @@ function diary(row,c){
 }
 function profile(row,origin,c){
   if(row==null)return null;
-  const o=config(origin);keys(row,[o.avatar,o.partnerAvatar,'moment_cover_dataurl',o.name,'updated_at']);
+  const o=wire;keys(row,[o.avatar,o.partnerAvatar,'moment_cover_dataurl',o.name,'updated_at']);
   const image=(v,max)=>{text(v,max);require(!v||/^data:image\/(png|jpe?g|webp);base64,/i.test(v),'日常头像或封面格式无效。');return v;};
   const name=text(row[o.name],80,true);require(name.trim()===name&&!/[\r\n\t]/.test(name),'日常显示名称无效。');
   require(row.updated_at!=null,'日常资料缺少更新时间，未伪造历史时间。');
@@ -75,7 +76,7 @@ function fromDB(row,c){
   return {id:row.id,date:row.date,author:row.author,source:row.source,text:row.text,conversation_id:row.conversation_id,source_turn_id:row.source_turn_id,tool_call_id:row.tool_call_id,actor:row.actor,
     surface:row.surface,model_label:row.model_label,model_nickname:row.model_nickname,symbol:row.symbol,display_author:row.display_author,created_at:iso(row.created_at),updated_at:iso(row.updated_at)};
 }
-export async function exportDailyTransfer(db,app){
+async function readDailyTransfer(db,app){
   await ensureDailySchema(db);const c=config(app);
   const [moments,diaries,comments,likes,profiles]=await Promise.all([
     all(db,'SELECT * FROM daily_moments ORDER BY created_at DESC,id'),
@@ -92,14 +93,20 @@ export async function exportDailyTransfer(db,app){
     const list=likeMap.get(row.id)||[];
     return moment({...fromDB(row,c),status:row.status,reason:row.reason,published_at:optionalTime(row.published_at),comments:commentMap.get(row.id)||[],likes:list,like_count:list.length,liked:list.some(v=>v.actor===c.owner)},c);
   }),diaries:diaries.map(row=>diary({...fromDB(row,c),weather:row.weather||'未标注',mood:row.mood||'未标注',tags:json(row.tags_json,[])},c)),
-  dailyProfile:p?profile({[c.avatar]:p[c.avatar],[c.partnerAvatar]:p[c.partnerAvatar],moment_cover_dataurl:p.moment_cover_dataurl,[c.name]:p[c.name],updated_at:iso(p.updated_at)},app,c):null};
+  dailyProfile:p?profile({[wire.avatar]:p[c.avatar],[wire.partnerAvatar]:p[c.partnerAvatar],moment_cover_dataurl:p.moment_cover_dataurl,[wire.name]:p[c.name],updated_at:iso(p.updated_at)},app,c):null};
+}
+export async function exportDailyTransfer(db,app){
+  const data=await readDailyTransfer(db,app),c=config(app);
+  const p=data.dailyProfile;
+  return {moments:data.moments.map(row=>moment(row,wire)),diaries:data.diaries.map(row=>diary(row,wire)),
+    dailyProfile:p?{[wire.avatar]:p[c.avatar],[wire.partnerAvatar]:p[c.partnerAvatar],moment_cover_dataurl:p.moment_cover_dataurl,[wire.name]:p[c.name],updated_at:p.updated_at}:null};
 }
 const commonColumns=['id','date','author','source','text','conversation_id','source_turn_id','tool_call_id','actor','surface','model_label','model_nickname','symbol','display_author','created_at','updated_at'];
 function insert(db,table,cols,values){return db.prepare('INSERT INTO '+table+' ('+cols.join(',')+') VALUES ('+cols.map(()=>'?').join(',')+')').bind(...values);}
 function commonValues(row){return commonColumns.map(k=>k==='created_at'||k==='updated_at'?time(row[k]):row[k]);}
 export async function prepareDailyTransfer(db,payload,app){
   require([privateApp,publicApp].includes(payload.applicationId),'未知版本的日常身份结构，未写入。');
-  const c=config(app), current=await exportDailyTransfer(db,app);
+  const c=config(app), current=await readDailyTransfer(db,app);
   const report={ready:0,existing:0,conflicts:0,blocked:[]}, statements=[];
   const existingMoments=new Map(current.moments.map(v=>[v.id,v])), existingDiaries=new Map(current.diaries.map(v=>[v.id,v]));
   const commentIds=new Set(current.moments.flatMap(v=>v.comments.map(x=>x.id)));
