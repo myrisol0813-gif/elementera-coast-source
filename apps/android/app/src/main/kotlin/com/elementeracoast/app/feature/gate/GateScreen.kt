@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -47,6 +49,7 @@ fun GateScreen(
     onEnterLocal: (() -> Unit)? = null
 ) {
     var localSelected by rememberSaveable { mutableStateOf(false) }
+    var confirmLocal by rememberSaveable { mutableStateOf(false) }
     val motion = rememberCoastGateMotion()
     val density = LocalDensity.current
 
@@ -130,7 +133,7 @@ fun GateScreen(
                         modifier = Modifier.width(GateVisualTokens.PasswordWidth)
                             .clip(RoundedCornerShape(22.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .65f))
-                            .clickable(enabled = gateEnabled, onClick = onEnterLocal)
+                            .clickable(enabled = gateEnabled) { confirmLocal = true }
                             .padding(vertical = 18.dp),
                         color = MaterialTheme.colorScheme.onBackground,
                         textAlign = TextAlign.Center,
@@ -185,6 +188,13 @@ fun GateScreen(
         }
 
     }
+    if (confirmLocal && onEnterLocal != null) AlertDialog(
+        onDismissRequest = { confirmLocal = false },
+        title = { Text("关于本机模式") },
+        text = { Text("卸载 APP 或清除应用数据会删除本机资料，不会自动同步到服务器。请定期前往屋主设置 → 聊天记录 → 防丢导出保存副本。当前导出不是完整可恢复备份，请勿据此卸载。") },
+        confirmButton = { TextButton(onClick = { confirmLocal = false; onEnterLocal() }) { Text("确认进入") } },
+        dismissButton = { TextButton(onClick = { confirmLocal = false }) { Text("返回") } }
+    )
 }
 
 @Composable

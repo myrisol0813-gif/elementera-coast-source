@@ -104,7 +104,7 @@ internal fun CoastTopBar(
                         )
                         Spacer(Modifier.width(CoastChatTokens.TopBarModelGap))
                         Text(
-                            if (state.localMode) "本机模式 · 仅记录" else modelDisplayName(state.currentModel),
+                            if (state.localMode && state.currentModel.isBlank()) "本机模式 · 未选模型" else modelDisplayName(state.currentModel),
                             modifier = Modifier.widthIn(max = CoastChatTokens.TopBarModelMaxWidth),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium.copy(

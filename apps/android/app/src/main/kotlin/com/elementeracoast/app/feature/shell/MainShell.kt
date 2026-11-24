@@ -261,7 +261,8 @@ fun MainShell(
                 chatGpt = chatGpt,
                 onChatGptConnect = onChatGptConnect,
                 onChatGptRefresh = onChatGptRefresh,
-                onChatGptProbe = onChatGptProbe
+                onChatGptProbe = onChatGptProbe,
+                localMode = state.localMode
             )
         }
         if (showThemeWardrobe) {

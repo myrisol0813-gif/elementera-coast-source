@@ -48,7 +48,8 @@ internal fun ChatRecordsScreen(
     archive: GlobalArchiveRepository,
     onImportMessages: (List<ChatMessage>) -> Unit,
     onActionLogged: (String, String, String) -> Unit,
-    onSnackbar: (String) -> Unit
+    onSnackbar: (String) -> Unit,
+    localMode: Boolean = false
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -110,7 +111,7 @@ internal fun ChatRecordsScreen(
     LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("防丢导出", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) }
         item {
-            WolfRow("全局 JSON", if (busy) "正在读取全局快照……" else "V1 全局快照 · 与 Web 同一数据源") {
+            WolfRow("全局 JSON", if (busy) "正在读取全局快照……" else if (localMode) "本机快照 · 目前仅已实现模块" else "V1 全局快照 · 与 Web 同一数据源") {
                 launchGlobal("json")
             }
         }
@@ -139,7 +140,7 @@ internal fun ChatRecordsScreen(
         }
         item {
             Text(
-                "全局 JSON 与全局 HTML 都直接读取 /api/export/v1-snapshot：聊天窗口、整理当前对话的纸条、记忆、全局摘录与修改记录、世界书、自定义指令、模型后端返回原文、工具摘要、附件索引、搜索摘要和版本信息共用一份来源。附件二进制不会塞进 HTML。",
+                if (localMode) "本机导出直接读取设备资料，不访问后端；当前包含聊天、手动日记和资料，不含 API Key、OAuth 凭据、附件原文件及未移植模块；尚不能完整恢复。" else "全局 JSON 与全局 HTML 都直接读取 /api/export/v1-snapshot：聊天窗口、整理当前对话的纸条、记忆、全局摘录与修改记录、世界书、自定义指令、模型后端返回原文、工具摘要、附件索引、搜索摘要和版本信息共用一份来源。附件二进制不会塞进 HTML。",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall
             )
