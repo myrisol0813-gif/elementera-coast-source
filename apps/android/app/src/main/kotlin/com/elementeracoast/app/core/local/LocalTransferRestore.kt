@@ -19,11 +19,12 @@ internal object LocalTransferRestore {
         val sameEdition = origin == applicationId && localSource
         val knownEditions = setOf("com.elementeracoast.app", "com.elementeracoast.source")
         val crossEdition = localSource && origin in knownEditions && applicationId in knownEditions
-        // Model profile has an identical portable schema in both editions, with no provider credentials.
-        // Daily identity fields differ and require a separate explicit adapter.
+        // Known local editions have a reversible daily identity adapter below.
+        // Cloud daily data still requires a lossless server adapter.
         val supported = when {
             sameEdition -> CoastTransferCodec.supportedModules
-            crossEdition || !localSource -> setOf("chat", "calendar", "model_profile")
+            crossEdition -> CoastTransferCodec.supportedModules
+            !localSource -> setOf("chat", "calendar", "model_profile")
             else -> setOf("chat", "calendar")
         }
         return declared.intersect(supported)
@@ -45,18 +46,49 @@ internal object LocalTransferRestore {
         }
     }
 
+    private fun adaptLocalDaily(payload: JsonObject, applicationId: String): JsonObject {
+        val origin = payload.getValue("applicationId").jsonPrimitive.content
+        if (origin == applicationId || payload.getValue("workspace").jsonPrimitive.content != "local") return payload
+        val toPublic = applicationId == "com.elementeracoast.source"
+        val privateFields = listOf("xiaohan_avatar_dataurl", "myri_avatar_dataurl", "myri_display_name")
+        val publicFields = listOf("owner_avatar_dataurl", "model_partner_avatar_dataurl", "model_partner_display_name")
+        val fields = if (toPublic) privateFields.zip(publicFields).toMap() else publicFields.zip(privateFields).toMap()
+        val authors = if (toPublic) mapOf("xiaohan" to "owner", "myri" to "model_partner")
+            else mapOf("owner" to "xiaohan", "model_partner" to "myri")
+        fun author(value: JsonElement): JsonElement {
+            val item = value.jsonObject
+            val old = item["author"] ?: return item
+            val next = authors[old.jsonPrimitive.content] ?: return item
+            return JsonObject(item + ("author" to JsonPrimitive(next)))
+        }
+        val profile = payload.getValue("dailyProfile")
+        val nextProfile = if (profile == JsonNull) JsonNull else {
+            val entries = profile.jsonObject.entries.map { (key, value) -> (fields[key] ?: key) to value }
+            require(entries.map { it.first }.distinct().size == entries.size) { "日常资料身份字段冲突。" }
+            JsonObject(entries.toMap())
+        }
+        val moments = JsonArray(payload.getValue("moments").jsonArray.map { raw ->
+            val item = author(raw).jsonObject
+            val comments = item["comments"] ?: return@map item
+            JsonObject(item + ("comments" to JsonArray(comments.jsonArray.map(::author))))
+        })
+        return JsonObject(payload + mapOf("dailyProfile" to nextProfile, "moments" to moments,
+            "diaries" to JsonArray(payload.getValue("diaries").jsonArray.map(::author))))
+    }
+
     private fun decodeSelected(payload: JsonObject, applicationId: String, modules: Set<String>): LocalBackupPayload {
         require(modules.isNotEmpty() && availableModules(payload, applicationId).containsAll(modules)) {
             "请选择目标已支持且数据包中包含的模块。"
         }
+        val daily = if ("daily" in modules) adaptLocalDaily(payload, applicationId) else payload
         val raw = buildJsonObject {
             put("applicationId", applicationId); put("exportedAt", payload.getValue("exportedAt"))
             put("conversations", if ("chat" in modules) payload.getValue("conversations") else JsonArray(emptyList()))
             put("calendar", if ("calendar" in modules) payload.getValue("calendar") else JsonArray(emptyList()))
             put("profile", if ("model_profile" in modules) payload.getValue("profile") else JsonNull)
-            put("dailyProfile", if ("daily" in modules) payload.getValue("dailyProfile") else JsonNull)
-            put("moments", if ("daily" in modules) payload.getValue("moments") else JsonArray(emptyList()))
-            put("diaries", if ("daily" in modules) payload.getValue("diaries") else JsonArray(emptyList()))
+            put("dailyProfile", if ("daily" in modules) daily.getValue("dailyProfile") else JsonNull)
+            put("moments", if ("daily" in modules) daily.getValue("moments") else JsonArray(emptyList()))
+            put("diaries", if ("daily" in modules) daily.getValue("diaries") else JsonArray(emptyList()))
         }
         val data = json.decodeFromJsonElement(LocalBackupPayload.serializer(), raw)
         verifyMeaningful(raw, json.encodeToJsonElement(LocalBackupPayload.serializer(), data), "payload")
