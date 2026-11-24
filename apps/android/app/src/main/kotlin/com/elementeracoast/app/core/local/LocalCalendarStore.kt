@@ -108,5 +108,30 @@ internal class LocalCalendarStore(private val persistence: LocalPersistence) {
         write(entries.filterNot { it.text("id") == id })
     }
 
-    companion object { private const val KEY = "local.calendar.entries.v1" }
+    companion object {
+        private const val KEY = "local.calendar.entries.v1"
+
+        /** Validate portable records using the same date/anniversary rules as the editor. No writes. */
+        fun validateBackup(rows: JsonArray) {
+            val validator = LocalCalendarStore(MemoryLocalPersistence())
+            val ids = mutableSetOf<String>()
+            rows.forEach { value ->
+                val row = value.jsonObject
+                require(row.keys.all { it in setOf("id", "day", "occurrence_day", "title", "body", "kind", "recurrence", "author", "source", "created_at", "updated_at", "anniversary") })
+                val id = with(validator) { row.text("id") }
+                require(id.matches(Regex("[A-Za-z0-9_.:-]{1,160}")) && ids.add(id))
+                val date = validator.day(with(validator) { row.text("day") })
+                val title = with(validator) { row.text("title") }
+                val body = with(validator) { row.text("body") }
+                val kind = with(validator) { row.text("kind") }
+                val recurrence = with(validator) { row.text("recurrence") }
+                require(title.isNotBlank() && title.length <= 120 && body.length <= 4000)
+                require(kind in setOf("event", "note") && recurrence in setOf("none", "yearly"))
+                require(row["created_at"]?.jsonPrimitive?.longOrNull != null && row["updated_at"]?.jsonPrimitive?.longOrNull != null)
+                validator.anniversary(row["anniversary"])?.let { ann ->
+                    require(date == ann.calendarDay && kind == "event" && recurrence == ann.recurrence)
+                }
+            }
+        }
+    }
 }
