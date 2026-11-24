@@ -3,7 +3,6 @@ package com.elementeracoast.app.core.local
 import com.elementeracoast.app.core.remote.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import java.security.MessageDigest
 import java.time.Instant
 
 /** Portable records, not a dump of arbitrary persistence keys or account storage. */
@@ -20,14 +19,6 @@ internal data class LocalBackupPayload(
     val moments: List<RemoteDailyMoment>,
     val diaries: List<RemoteDailyDiary>,
     val calendar: JsonArray
-)
-
-@Serializable
-private data class LocalBackupEnvelope(
-    val format: String,
-    val version: Int,
-    val sha256: String,
-    val payload: JsonObject
 )
 
 internal data class LocalBackupPreview(
@@ -47,9 +38,9 @@ internal data class LocalBackupPreview(
  * Decode/preview deliberately perform no writes; the restore transaction is separate.
  */
 internal object LocalBackupArchive {
-    const val FORMAT = "elementera-coast-local-backup"
-    const val VERSION = 1
-    const val MAX_BYTES = 64 * 1024 * 1024
+    const val FORMAT = CoastTransferCodec.FORMAT
+    const val VERSION = CoastTransferCodec.VERSION
+    const val MAX_BYTES = CoastTransferCodec.MAX_BYTES
     val included = listOf("chat_histories_and_variants", "model_profile", "daily_profile", "moments", "diaries", "calendar")
     val excluded = listOf("provider_credentials", "oauth_credentials", "server_credentials", "provider_configuration",
         "device_appearance_and_settings", "local_background_font_files", "model_echo", "attachments_and_voice",
@@ -71,21 +62,40 @@ internal object LocalBackupArchive {
     fun encode(payload: LocalBackupPayload): ByteArray {
         validate(payload)
         val value = json.encodeToJsonElement(LocalBackupPayload.serializer(), payload).jsonObject
-        val envelope = LocalBackupEnvelope(FORMAT, VERSION, digest(value), value)
-        val bytes = json.encodeToString(LocalBackupEnvelope.serializer(), envelope).toByteArray(Charsets.UTF_8)
-        require(bytes.size <= MAX_BYTES) { "本机备份超过 64 MiB；未截断原始资料。" }
-        return bytes
+        return CoastTransferCodec.encode(buildJsonObject {
+            putJsonObject("source") { put("application", payload.applicationId); put("mode", "local") }
+            put("exported_at", payload.exportedAt)
+            putJsonObject("modules") {
+                putJsonObject("chat") { put("conversations", value.getValue("conversations")) }
+                put("model_profile", value.getValue("profile"))
+                putJsonObject("daily") {
+                    put("profile", value.getValue("dailyProfile")); put("moments", value.getValue("moments")); put("diaries", value.getValue("diaries"))
+                }
+                putJsonObject("calendar") { put("entries", value.getValue("calendar")) }
+            }
+            put("excluded_modules", JsonArray(excluded.map(::JsonPrimitive)))
+        })
     }
 
+    // Full local restore decoder; cross-edition daily identities need an explicit mapping before restore.
+    // Common chat-only transfer is read separately, without this edition restriction.
     fun decode(bytes: ByteArray, applicationId: String): LocalBackupPayload {
-        require(bytes.isNotEmpty() && bytes.size <= MAX_BYTES) { "备份文件大小无效（最多 64 MiB）。" }
-        val envelope = json.decodeFromString(LocalBackupEnvelope.serializer(), bytes.decodeToString(throwOnInvalidSequence = true))
-        require(envelope.format == FORMAT && envelope.version == VERSION) { "不支持的本机备份格式或版本。" }
-        require(envelope.sha256 == digest(envelope.payload)) { "备份完整性校验失败。" }
-        val data = json.decodeFromJsonElement(LocalBackupPayload.serializer(), envelope.payload)
-        require(data.applicationId == applicationId) { "此版本仅支持同一应用版本系列的本机备份。" }
-        validate(data)
-        return data
+        val payload = CoastTransferCodec.decode(bytes)
+        val source = payload.getValue("source").jsonObject
+        require(source.getValue("application").jsonPrimitive.content == applicationId && source.getValue("mode").jsonPrimitive.content == "local") {
+            "完整本机模块恢复暂需同应用；通用聊天迁移另走模块选择。"
+        }
+        val modules = payload.getValue("modules").jsonObject
+        require(modules.keys == setOf("chat", "model_profile", "daily", "calendar"))
+        val daily = modules.getValue("daily").jsonObject
+        val value = buildJsonObject {
+            put("applicationId", applicationId); put("exportedAt", payload.getValue("exported_at"))
+            put("conversations", modules.getValue("chat").jsonObject.getValue("conversations"))
+            put("profile", modules.getValue("model_profile"))
+            put("dailyProfile", daily.getValue("profile")); put("moments", daily.getValue("moments")); put("diaries", daily.getValue("diaries"))
+            put("calendar", modules.getValue("calendar").jsonObject.getValue("entries"))
+        }
+        return json.decodeFromJsonElement(LocalBackupPayload.serializer(), value).also(::validate)
     }
 
     fun preview(incoming: LocalBackupPayload, existing: LocalBackupPayload): LocalBackupPreview {
@@ -131,13 +141,4 @@ internal object LocalBackupArchive {
         LocalCalendarStore.validateBackup(data.calendar)
     }
 
-    private fun canonical(value: JsonElement): JsonElement = when (value) {
-        is JsonObject -> JsonObject(value.entries.sortedBy { it.key }.associate { it.key to canonical(it.value) })
-        is JsonArray -> JsonArray(value.map(::canonical))
-        else -> value
-    }
-
-    private fun digest(value: JsonObject): String =
-        MessageDigest.getInstance("SHA-256").digest(canonical(value).toString().toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it.toInt() and 255) }
 }
