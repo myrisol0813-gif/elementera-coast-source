@@ -18,12 +18,11 @@ internal object LocalTransferRestore {
         val localSource = payload.getValue("workspace").jsonPrimitive.content == "local"
         val sameEdition = origin == applicationId && localSource
         val knownEditions = setOf("com.elementeracoast.app", "com.elementeracoast.source")
-        val crossEdition = localSource && origin in knownEditions && applicationId in knownEditions
-        // Known local editions have a reversible daily identity adapter below.
-        // Cloud daily data still requires a lossless server adapter.
+        val knownOrigin = origin in knownEditions && applicationId in knownEditions
+        // Known editions share a reversible daily identity adapter for both workspaces.
         val supported = when {
             sameEdition -> CoastTransferCodec.supportedModules
-            crossEdition -> CoastTransferCodec.supportedModules
+            knownOrigin -> CoastTransferCodec.supportedModules
             !localSource -> setOf("chat", "calendar", "model_profile")
             else -> setOf("chat", "calendar")
         }
@@ -46,9 +45,9 @@ internal object LocalTransferRestore {
         }
     }
 
-    private fun adaptLocalDaily(payload: JsonObject, applicationId: String): JsonObject {
+    private fun adaptDaily(payload: JsonObject, applicationId: String): JsonObject {
         val origin = payload.getValue("applicationId").jsonPrimitive.content
-        if (origin == applicationId || payload.getValue("workspace").jsonPrimitive.content != "local") return payload
+        if (origin == applicationId) return payload
         val toPublic = applicationId == "com.elementeracoast.source"
         val privateFields = listOf("xiaohan_avatar_dataurl", "myri_avatar_dataurl", "myri_display_name")
         val publicFields = listOf("owner_avatar_dataurl", "model_partner_avatar_dataurl", "model_partner_display_name")
@@ -57,9 +56,13 @@ internal object LocalTransferRestore {
             else mapOf("owner" to "xiaohan", "model_partner" to "myri")
         fun author(value: JsonElement): JsonElement {
             val item = value.jsonObject
-            val old = item["author"] ?: return item
-            val next = authors[old.jsonPrimitive.content] ?: return item
-            return JsonObject(item + ("author" to JsonPrimitive(next)))
+            val updated = item.toMutableMap()
+            for (key in listOf("author", "actor")) {
+                val old = item[key]?.jsonPrimitive?.contentOrNull ?: continue
+                val next = authors[old] ?: continue
+                updated[key] = JsonPrimitive(next)
+            }
+            return JsonObject(updated)
         }
         val profile = payload.getValue("dailyProfile")
         val nextProfile = if (profile == JsonNull) JsonNull else {
@@ -69,8 +72,10 @@ internal object LocalTransferRestore {
         }
         val moments = JsonArray(payload.getValue("moments").jsonArray.map { raw ->
             val item = author(raw).jsonObject
-            val comments = item["comments"] ?: return@map item
-            JsonObject(item + ("comments" to JsonArray(comments.jsonArray.map(::author))))
+            val next = item.toMutableMap()
+            (item["comments"] as? JsonArray)?.let { next["comments"] = JsonArray(it.map(::author)) }
+            (item["likes"] as? JsonArray)?.let { next["likes"] = JsonArray(it.map(::author)) }
+            JsonObject(next)
         })
         return JsonObject(payload + mapOf("dailyProfile" to nextProfile, "moments" to moments,
             "diaries" to JsonArray(payload.getValue("diaries").jsonArray.map(::author))))
@@ -80,7 +85,7 @@ internal object LocalTransferRestore {
         require(modules.isNotEmpty() && availableModules(payload, applicationId).containsAll(modules)) {
             "请选择目标已支持且数据包中包含的模块。"
         }
-        val daily = if ("daily" in modules) adaptLocalDaily(payload, applicationId) else payload
+        val daily = if ("daily" in modules) adaptDaily(payload, applicationId) else payload
         val raw = buildJsonObject {
             put("applicationId", applicationId); put("exportedAt", payload.getValue("exportedAt"))
             put("conversations", if ("chat" in modules) payload.getValue("conversations") else JsonArray(emptyList()))
