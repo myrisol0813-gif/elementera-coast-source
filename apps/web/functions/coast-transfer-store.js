@@ -158,6 +158,7 @@ async function prepare(db,envelope,selection) {
     result.chat.ready++;
   }
   seen.clear();
+  const usedCalendarToolIds = new Set((await db.prepare('SELECT tool_call_id FROM coast_calendar_entries_v2 WHERE tool_call_id IS NOT NULL').all()).results.map(r=>r.tool_call_id));
   for (const row of selection.includes('calendar')?payload.calendar:[]) {
     require(validId(row?.id)&&!seen.has(row.id),'数据包内日历 ID 重复或无效。');seen.add(row.id);
     if (existingCalendar.has(row.id)) {
@@ -166,6 +167,10 @@ async function prepare(db,envelope,selection) {
       continue;
     }
     try { validatedCalendar(row); } catch(e) { if (!(e instanceof TransferError)) throw e; result.calendar.blocked.push({id:row.id,reason:e.message}); continue; }
+    if (row.tool_call_id != null) {
+      if (usedCalendarToolIds.has(row.tool_call_id)) { result.calendar.blocked.push({id:row.id,reason:'日历工具调用 ID 已存在；原记录保留。'}); continue; }
+      usedCalendarToolIds.add(row.tool_call_id);
+    }
     const a=row.anniversary;
     statements.push(db.prepare(`INSERT INTO coast_calendar_entries_v2 (id,day,kind,title,body,recurrence,author,source,model_label,tool_call_id,created_at,updated_at,anniversary_start_day,anniversary_mode,anniversary_target_days,anniversary_pinned) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(row.id,row.day,row.kind,row.title,row.body,row.recurrence,row.author==='owner'?OWNER_AUTHOR:ASSISTANT_AUTHOR,row.source||'manual',row.model_label??null,row.tool_call_id??null,stamp(row.created_at),stamp(row.updated_at),a?.startDay??null,a?.mode??null,a?.targetDays??null,a?.pinned?1:0));
     result.calendar.ready++;
