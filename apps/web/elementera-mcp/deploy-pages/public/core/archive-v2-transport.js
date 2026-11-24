@@ -7,6 +7,12 @@ const objects=(id)=>sessions+'/'+segment(id)+'/objects';
 const object=(id,hash)=>objects(id)+'/'+segment(hash);
 export const archiveV2Transport=Object.freeze({
   capabilities:()=>requestJson(base),
+  recordPage:(module,cursor='',limit=20)=>requestJson(base+'/records/'+segment(module)+'?'+new URLSearchParams({cursor,limit})),
+  detailPage:(kind,cursor='',limit=20)=>requestJson(base+'/details/'+segment(kind)+'?'+new URLSearchParams({cursor,limit})),
+  chat:id=>requestJson(base+'/records/chat/'+segment(id)),
+  voice:id=>requestJson(base+'/voice/'+segment(id)),
+  libraryCover:id=>requestJson(base+'/library-cover/'+segment(id)),
+  preflight:(id,manifest)=>requestJson(sessions+'/'+segment(id)+'/preflight',{method:'POST',body:JSON.stringify(manifest)}),
   createSession:()=>requestJson(sessions,{method:'POST'}),
   listSessions:()=>requestJson(sessions),
   cancelSession:id=>requestJson(sessions+'/'+segment(id),{method:'DELETE'}),
