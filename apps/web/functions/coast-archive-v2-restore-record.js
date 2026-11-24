@@ -1,3 +1,4 @@
+import { SOIL_MODULES,restoreArchiveSoil } from './coast-archive-v2-restore-soil.js';
 import { restoreArchiveLocalRecord } from './coast-archive-v2-restore-local.js';
 import { prepareArchiveVault } from './coast-archive-v2-restore-vault.js';
 import { restoreArchiveDaily } from './coast-archive-v2-restore-daily.js';
@@ -26,6 +27,7 @@ const specs={
 };
 const roles={owner:'owner',assistant:'assistant'};
 export async function restoreArchiveRecord(db,sessionId,manifest,module,recordId,confirm=false){
+ if(SOIL_MODULES.includes(module))return restoreArchiveSoil(db,sessionId,manifest,module,recordId,confirm);
  const localKnowledge=manifest?.workspace==='local'&&['worldbook','custom_instructions',...MEMORY_RESTORE_MODULES,...PORTRAIT_RESTORE_MODULES].includes(module);
  if(manifest?.workspace==='local'&&!localKnowledge)return restoreArchiveLocalRecord(db,sessionId,manifest,module,recordId,confirm);
  if(module==='daily')return restoreArchiveDaily(db,sessionId,manifest,recordId,confirm);

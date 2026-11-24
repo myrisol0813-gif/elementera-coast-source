@@ -20,7 +20,7 @@ export async function prepareArchiveVoice(db,row,descriptor,source,{conversation
 }
 const soilFields='conversation_id,current_text,hand_seeds_json,do_not_repeat,pocket_candidates_json,afterthoughts_json,memory_candidates_json,seed_candidates_json,user_portrait_candidate_json,self_portrait_candidate_json,manual_locked,auto_refresh_enabled,organized_through_turn_id,source_assistant_id,tool_call_ids_json,revision,created_at,updated_at,actor,surface,model_label,model_nickname,symbol,display_author,source_conversation_id,source_turn_id,tool_call_id'.split(',');
 const snapshotFields='conversation_id,turn_id,assistant_message_id,current_text,afterthoughts_json,revision,model_label,display_author,created_at'.split(',');
-export async function prepareArchiveSoil(db,recordId,kind,row,{conversationId,turns,variantTurns}){
+export async function prepareArchiveSoil(db,recordId,kind,row,{conversationId,turns,variantTurns,allowExisting=false}){
   check(['thinking_soil','thinking_soil_history'].includes(kind)&&row.conversation_id===conversationId,'soil conversation mismatch');
   const history=kind==='thinking_soil_history',names=history?snapshotFields:soilFields;
   check(columns(row,names)&&typeof row.current_text==='string'&&stamp(row.created_at)&&Number.isSafeInteger(row.revision)&&row.revision>=1,'invalid soil fields');
@@ -30,10 +30,10 @@ export async function prepareArchiveSoil(db,recordId,kind,row,{conversationId,tu
   await ensureMemorySchema(db);
   if(history){
     check(turns.has(row.turn_id)&&variantTurns.get(row.assistant_message_id)===row.turn_id,'soil historical source missing');
-    check(!await db.prepare('SELECT conversation_id FROM conversation_soil_snapshots WHERE conversation_id=? AND assistant_message_id=?').bind(conversationId,row.assistant_message_id).first(),'soil snapshot already exists');
+    check(allowExisting||!await db.prepare('SELECT conversation_id FROM conversation_soil_snapshots WHERE conversation_id=? AND assistant_message_id=?').bind(conversationId,row.assistant_message_id).first(),'soil snapshot already exists');
     return [insert(db,'conversation_soil_snapshots',names,row)];
   }
   check(stamp(row.updated_at)&&[0,1].includes(row.manual_locked)&&[0,1].includes(row.auto_refresh_enabled),'invalid soil settings');
-  check(!await db.prepare('SELECT conversation_id FROM conversation_soils WHERE conversation_id=?').bind(conversationId).first(),'soil already exists');
+  check(allowExisting||!await db.prepare('SELECT conversation_id FROM conversation_soils WHERE conversation_id=?').bind(conversationId).first(),'soil already exists');
   return [insert(db,'conversation_soils',names,row)];
 }
