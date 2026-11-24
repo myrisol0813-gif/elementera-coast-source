@@ -11,13 +11,13 @@ internal class LocalKnowledgeStore(store:LocalPersistence) {
     fun instructions()=cache.customInstructions()
     fun saveInstructions(request:RemoteCustomInstructionsPutRequest):RemoteCustomInstructions {
         require(request.content.length<=32000&&request.updatedBy.length in 1..80&&request.source.length in 1..80){"自定义指令或来源字段超限。"}
-        return RemoteCustomInstructions(content=request.content,updatedAt=Instant.now().toString(),updatedBy=request.updatedBy,source=request.source).also(cache::putCustomInstructions)
+        return RemoteCustomInstructions(content=request.content,updatedAt=Instant.ofEpochMilli(System.currentTimeMillis()).toString(),updatedBy=request.updatedBy,source=request.source).also(cache::putCustomInstructions)
     }
     fun entries()=cache.worldbookEntries().sortedWith(compareByDescending<RemoteWorldbookEntry>{it.priority}.thenBy{it.title}.thenBy{it.id})
     fun saveWorldbook(id:String?,v:RemoteWorldbookEntryWriteRequest):RemoteWorldbookEntry {
         val all=entries()
         val old=id?.let { key->all.firstOrNull{it.id==key}?:throw LocalCalendarError("worldbook_not_found","词条不存在。",404) }
-        val now=Instant.now().toString()
+        val now=Instant.ofEpochMilli(System.currentTimeMillis()).toString()
         val row=RemoteWorldbookEntry(id=id?:"world_"+UUID.randomUUID(),title=v.title.trim(),content=v.content.trim(),keywords=v.keywords.map(String::trim).filter(String::isNotBlank).distinct(),
             useRegex=v.useRegex,caseSensitive=v.caseSensitive,constantActive=v.constantActive,priority=v.priority,scanDepth=v.scanDepth,enabled=v.enabled,scope=v.scope,visitorSafe=v.visitorSafe,createdAt=old?.createdAt?:now,updatedAt=now)
         val next=all.filterNot{it.id==row.id}+row
@@ -28,13 +28,13 @@ internal class LocalKnowledgeStore(store:LocalPersistence) {
     fun disableWorldbook(id:String) {
         val all=entries()
         require(all.any{it.id==id}){"词条不存在。"}
-        cache.putWorldbookEntries(all.map{if(it.id==id)it.copy(enabled=false,updatedAt=Instant.now().toString())else it})
+        cache.putWorldbookEntries(all.map{if(it.id==id)it.copy(enabled=false,updatedAt=Instant.ofEpochMilli(System.currentTimeMillis()).toString())else it})
     }
     data class Match(val entry:RemoteWorldbookEntry,val keywords:List<String>,val by:String)
     fun match(input:String,messages:List<RemoteChatMessage>,surface:String="main_chat",limit:Int=6,allowedScopes:List<String> = emptyList()):List<Match> {
         // No visitor endpoint in local mode; never use a caller-controlled scope to expose visitor content.
         require(surface!="mailbox_visitor")
-        val available=entries().filter{it.enabled&&it.scope!="visitor"&&if(allowedScopes.isNotEmpty())it.scope in allowedScopes else it.scope in setOf("owner","both",surface)}
+        val available=entries().filter{it.enabled&&it.scope!="visitor"&&(if(allowedScopes.isNotEmpty())it.scope in allowedScopes else it.scope in setOf("owner","both",surface))}
         fun triggers(e:RemoteWorldbookEntry,text:String)=e.keywords.filter { key->
             if(e.useRegex)Regex(key,if(e.caseSensitive)emptySet()else setOf(RegexOption.IGNORE_CASE)).containsMatchIn(text)
             else text.contains(key,ignoreCase=!e.caseSensitive)
