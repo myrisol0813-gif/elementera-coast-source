@@ -1965,3 +1965,11 @@
   color: var(--text);
   font: inherit;
 }
+
+/* Native details: local help, no route changes or event-spine bypass. */
+.coast-feature-head-actions { display: flex; align-items: center; gap: 5px; }
+.coast-feature-guide { display: inline-flex; position: relative; flex: none; }
+.coast-feature-guide > summary { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: var(--muted); background: var(--surface-soft); cursor: pointer; list-style: none; font-size: 14px; }
+.coast-feature-guide > summary::-webkit-details-marker { display: none; }
+.coast-feature-guide-panel { position: fixed; right: max(12px, var(--safe-right)); top: calc(var(--topbar-height) + var(--safe-top) + 6px); z-index: 100; width: min(320px, calc(100vw - 24px)); max-height: 65vh; overflow: auto; box-sizing: border-box; border-radius: 17px; background: var(--bg); color: var(--text); box-shadow: 0 6px 26px #0003; padding: 16px; font-size: 13px; line-height: 1.7; white-space: normal; }
+.coast-feature-guide-panel strong { display: block; margin-bottom: 7px; }

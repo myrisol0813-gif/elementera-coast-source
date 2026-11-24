@@ -19,6 +19,10 @@ It may be useful if you are exploring:
 - early MCP / OpenAI-compatible interface experiments;
 - the process of turning a private long-term conversation workspace into a public source release.
 
+## 使用说明 / User guide
+
+[中文功能使用手册](docs/USER_GUIDE.zh-CN.md) — 工作区、聊天入口、记忆、模型箱、纪念日、文件库和导出范围。应用内相关页的问号也可打开短说明。
+
 ## Quick testing
 
 There are two different ways to try this repository. They are intentionally not the same.
@@ -613,7 +617,7 @@ The source Native client now includes the original owner calendar, Tidal Library
 
 ## Current feature status (0.2.21-source)
 
-The current Source Android Gradle identity is `0.2.21-source` (`versionCode=23`), and the Source PWA cache is `coast-source-app-27`.
+The current Source Android Gradle identity is `0.2.21-source` (`versionCode=23`), and the Source PWA cache is `coast-source-app-28`.
 
 ### Thought Soil v2
 
@@ -629,7 +633,7 @@ The backend rechecks the canonical conversation settings before model assembly. 
 
 The current PWA has a **「这个窗口」** settings sheet for Reality, short reply mode, thought soil and the landing letter. Its Reality controls are limited to date, local time, and the next seven days of calendar entries; weather and Native-only device fields are intentionally absent so they cannot delay a browser chat turn. The mobile reading surface uses a compact 14px reading size, the main top-bar title is 16px, and the conversation drawer is pinned to the app viewport with its content as the dedicated vertical scroll area.
 
-The current Source PWA cache is `coast-source-app-27`.
+The current Source PWA cache is `coast-source-app-28`.
 
 ### Native appearance
 
@@ -821,7 +825,7 @@ You should expect to fork, rename, configure, simplify, and replace parts of it 
 
 ## Project status
 
-The repository began with `v0.1-source`; its current main-branch Android source identity is `0.2.21-source` (`versionCode=23`) and the PWA cache is `coast-source-app-27`. The published Source Visitor QA APK remains a disposable-signed, offline-only inspection build; live self-hosting requires separate configuration.
+The repository began with `v0.1-source`; its current main-branch Android source identity is `0.2.21-source` (`versionCode=23`) and the PWA cache is `coast-source-app-28`. The published Source Visitor QA APK remains a disposable-signed, offline-only inspection build; live self-hosting requires separate configuration.
 
 It remains a reference implementation rather than a mature framework or hosted product. Current feature status is documented above; older milestones and superseded QA flows are kept in [docs/SOURCE_RELEASE_HISTORY.md](docs/SOURCE_RELEASE_HISTORY.md).
 
@@ -837,7 +841,7 @@ The Coast Vault continues to use the canonical owner-authorized media index and 
 
 Native clips the scrolling list to its own content viewport and gives the search paper enough bottom room for its four category pills. The title bar remains unchanged. Audio continues to have a compact player, an expandable full transcript, and an independently persisted note; audio closing does not intentionally restart playback.
 
-Android: `0.2.21-source` (versionCode 23); Source PWA: `coast-source-app-27`. Visitor APKs use disposable QA certificates and are offline-only; they do not validate a self-hosted backend or provide reliable in-place upgrades. No legacy-heart migration or paid audio generation was added.
+Android: `0.2.21-source` (versionCode 23); Source PWA: `coast-source-app-28`. Visitor APKs use disposable QA certificates and are offline-only; they do not validate a self-hosted backend or provide reliable in-place upgrades. No legacy-heart migration or paid audio generation was added.
 
 ## Source Native 0.2.19 · Paper-gallery Vault
 

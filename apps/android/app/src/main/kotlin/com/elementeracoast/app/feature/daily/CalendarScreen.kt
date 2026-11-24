@@ -10,9 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -21,27 +18,21 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.put
 import java.time.LocalDate
 import java.time.YearMonth
 
 private fun JsonObject.value(name: String): String = this[name]?.jsonPrimitive?.contentOrNull.orEmpty()
 private fun JsonObject.kind(): String = value("kind")
 private fun JsonObject.day(): String = value("occurrence_day")
-private fun inputDate(day: LocalDate): String = day.toString()
 
 @Composable
 fun CalendarScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Unit) {
@@ -51,8 +42,7 @@ fun CalendarScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Unit
     var busy by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<JsonObject?>(null) }
     var formOpen by remember { mutableStateOf(false) }
-    var deleteCandidate by remember { mutableStateOf<JsonObject?>(null) }
-    val scope = rememberCoroutineScope()
+    var revision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
 
     suspend fun refresh() {
         busy = true
@@ -63,7 +53,7 @@ fun CalendarScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Unit
             onSnackbar("日历读取失败：${error.message}")
         } finally { busy = false }
     }
-    LaunchedEffect(month) { refresh() }
+    LaunchedEffect(month, revision) { refresh() }
     val visible = entries.filter { it.day() == day.toString() }
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 12.dp)) {
@@ -119,8 +109,9 @@ fun CalendarScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Unit
             items(visible, key = { it.value("id") }) { item ->
                 DailySurfaceCard(onClick = { editing = item; formOpen = true }) {
                     Text(item.value("title"), fontWeight = FontWeight.SemiBold)
-                    Text("${if (item.kind() == "note") "随记" else "日程"} · ${if (item.value("author") == "owner") "屋主" else "模型伙伴"}" +
-                        if (item.value("recurrence") == "yearly") " · 每年重复" else "",
+                    Text("${if (item["anniversary"] is JsonObject) "纪念日" else if (item.kind() == "note") "随记" else "日程"} · ${if (item.value("author") == "owner") "屋主" else "模型伙伴"}" +
+                        (if (item.value("recurrence") == "yearly") " · 每年重复" else "") +
+                        (if ((item["anniversary"] as? JsonObject)?.get("pinned")?.toString() == "true") " · 侧栏展示" else ""),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (item.value("body").isNotEmpty()) Text(item.value("body"), style = MaterialTheme.typography.bodyMedium)
@@ -128,70 +119,13 @@ fun CalendarScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Unit
             }
         }
     }
-    if (formOpen) {
-        val existing = editing
-        var date by remember(existing) { mutableStateOf(existing?.value("day") ?: inputDate(day)) }
-        var title by remember(existing) { mutableStateOf(existing?.value("title").orEmpty()) }
-        var body by remember(existing) { mutableStateOf(existing?.value("body").orEmpty()) }
-        var kind by remember(existing) { mutableStateOf(existing?.kind() ?: "event") }
-        var recurrence by remember(existing) { mutableStateOf(existing?.value("recurrence") ?: "none") }
-        AlertDialog(
-            onDismissRequest = { formOpen = false },
-            title = { Text(if (existing == null) "记下一天" else "修改日历记录") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    DailyField("公历日期 · YYYY-MM-DD", date, { date = it }, maxLines = 1)
-                    DailyField("标题 · 最多 120 字", title, { title = it.take(120) })
-                    DailyField("内容 · 最多 4000 字", body, { body = it.take(4000) }, minLines = 4, maxLines = 9)
-                    TextButton(onClick = { kind = if (kind == "event") "note" else "event" }) {
-                        Text("类型：${if (kind == "event") "日程 / 纪念日" else "当天随记"} · 点击切换")
-                    }
-                    TextButton(onClick = { recurrence = if (recurrence == "none") "yearly" else "none" }) {
-                        Text("重复：${if (recurrence == "yearly") "每年" else "不重复"} · 点击切换")
-                    }
-                    if (existing != null) TextButton(onClick = { deleteCandidate = existing; formOpen = false }) { Text("删除记录") }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val parsed = runCatching { LocalDate.parse(date) }.getOrNull()
-                    if (parsed == null || parsed.year !in 1900..2200 || title.isBlank()) {
-                        onSnackbar("请填写有效的公历日期和标题。")
-                    } else {
-                        scope.launch {
-                            try {
-                                repository.saveCalendar(existing?.value("id"),
-                                    buildJsonObject {
-                                        put("day", date); put("title", title); put("body", body)
-                                        put("kind", kind); put("recurrence", recurrence)
-                                    })
-                                formOpen = false
-                                day = parsed
-                                month = YearMonth.from(parsed)
-                                refresh()
-                                onSnackbar("这页公历记录已经收好。")
-                            } catch (error: Exception) { onSnackbar("保存日历失败：${error.message}") }
-                        }
-                    }
-                }) { Text("保存") }
-            },
-            dismissButton = { TextButton(onClick = { formOpen = false }) { Text("取消") } },
-            shape = RoundedCornerShape(22.dp)
-        )
-    }
-    deleteCandidate?.let { item ->
-        AlertDialog(onDismissRequest = { deleteCandidate = null },
-            title = { Text("删除这条日历记录？") },
-            text = { Text(item.value("title")) },
-            confirmButton = { TextButton(onClick = {
-                val id = item.value("id")
-                deleteCandidate = null
-                scope.launch {
-                    try { repository.deleteCalendar(id); refresh() }
-                    catch(error: Exception) { onSnackbar("删除失败：${error.message}") }
-                }
-            }) { Text("确认删除") } },
-            dismissButton = { TextButton(onClick = { deleteCandidate = null }) { Text("取消") } }
-        )
-    }
+    if (formOpen) CalendarEntryEditor(repository, editing, day,
+        onDismiss = { formOpen = false },
+        onChanged = { saved ->
+            formOpen = false
+            saved?.calendarText("day")?.let { value ->
+                day = LocalDate.parse(value); month = YearMonth.from(day)
+            }
+            revision++
+        }, onSnackbar = onSnackbar)
 }

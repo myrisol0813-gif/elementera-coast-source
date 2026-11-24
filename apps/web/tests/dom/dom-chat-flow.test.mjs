@@ -16,7 +16,9 @@ export async function runChatPrelude() {
   assert.equal(localStorage.getItem('ec.currentConversationId'), null);
   assert.equal(document.querySelectorAll('#coastStatus').length, 1);
   assert.equal(document.querySelectorAll('#mainRooms').length, 1);
-  assert.match(document.querySelector('#coastStatus').textContent, /Project age\s+\d+\s+天/);
+  await waitFor(() => document.querySelector('[data-action="calendar:anniversary-edit"]'));
+  assert.match(document.querySelector('#coastStatus').textContent, /测试纪念日\d+日/);
+  assert.ok(document.querySelector('[data-action="calendar:anniversary-new"]'));
   assert.ok(document.querySelectorAll('svg.icon').length >= 15);
   assert.equal(document.querySelector('#newChatButton svg').getAttribute('viewBox'), '0 0 32 32');
   assert.equal(document.querySelector('[data-action="settings:wolf"] svg').getAttribute('viewBox'), '0 0 24 24');
