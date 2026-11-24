@@ -5,7 +5,7 @@ const BASE='/api/transfer/v1';
 const FILE_LIMIT=64*1024*1024;
 const CLOUD_LIMIT=8*1024*1024;
 const labels={chat:'聊天窗口',calendar:'日历与纪念日',daily:'日记与动态',model_profile:'模型资料'};
-const supported=['chat','calendar','model_profile'];
+const supported=['chat','calendar','daily','model_profile'];
 const bytes=s=>new TextEncoder().encode(s);
 async function hash(s){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes(s)))].map(x=>x.toString(16).padStart(2,'0')).join('');}
 async function readBundle(file){
@@ -21,7 +21,7 @@ async function selectedBundle(payload,selected){
   const value={...payload,includedModules:[...selected],
     conversations:selected.has('chat')?payload.conversations:[],
     calendar:selected.has('calendar')?payload.calendar:[],
-    moments:[],diaries:[],profile:selected.has('model_profile')?payload.profile:null,dailyProfile:null};
+    moments:selected.has('daily')?payload.moments:[],diaries:selected.has('daily')?payload.diaries:[],profile:selected.has('model_profile')?payload.profile:null,dailyProfile:selected.has('daily')?payload.dailyProfile:null};
   const payload_json=JSON.stringify(value);
   const bundle={format:'elementera-coast-transfer',version:1,sha256:await hash(payload_json),payload_json};
   if(bytes(JSON.stringify({bundle,modules:[...selected],confirm:true})).length>CLOUD_LIMIT) throw Error('所选数据超过云端单次 8 MiB 上限；未上传。');
@@ -41,7 +41,7 @@ export function createTransferSettings({router,toast,chat}){
   router.subscribe(({current:next,previous})=>{if(previous?.name==='settings-transfer'&&next?.name!=='settings-transfer')reset();});
   router.register('settings-transfer',()=>{
     let content=section('可迁移数据包',line('当前目的地：在线海岸','导入写入已登录的云端。不会覆盖已有记录；原文件保留。')+
-      action('export','导出云端聊天、日历与模型资料',busy)+action('choose','选择数据包',busy));
+      action('export','导出云端可迁移资料',busy)+action('choose','选择数据包',busy));
     if(payload){
       content+=section('选择模块',line('来源',payload.workspace==='local'?'本机海岸':'在线海岸')+payload.includedModules.map(k=>{
         const allowed=supported.includes(k);
