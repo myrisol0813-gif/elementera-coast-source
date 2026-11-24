@@ -46,5 +46,9 @@ for (const name of ['calendar', 'tidal_library']) {
   assert.match(source, new RegExp(name.replace('_', '[_]')));
   assert.match(source, new RegExp(name === 'calendar' ? 'calendarEntries' : 'exportLibrary'));
 }
-assert.match(settings, /snapshotDataSection\('公历日历', snapshot\.calendar\)/);
-assert.match(settings, /snapshotDataSection\('书房', snapshot\.tidal_library\)/);
+const { buildOfflineArchive } = await import('../elementera-mcp/deploy-pages/public/features/offline-archive.js');
+const zip = buildOfflineArchive({calendar:{entries:[{title:'日历归档验收'}]},tidal_library:{books:[{title:'书籍归档验收'}]}});
+const html = new TextDecoder().decode(await zip.blob.arrayBuffer());
+assert.ok(html.includes('calendar') && html.includes('日历归档验收'));
+assert.ok(html.includes('tidal_library') && html.includes('书籍归档验收'));
+assert.match(settings, /buildOfflineArchive\(archive/);
