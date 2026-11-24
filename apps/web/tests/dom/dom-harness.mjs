@@ -1,3 +1,6 @@
+import { D1Database } from '../d1-helper.mjs';
+import { createCalendarEntry, listCalendarEntries, updateCalendarEntry, deleteCalendarEntry } from '../../functions/calendar-store.js';
+import { anniversaryStatus } from '../../functions/calendar-anniversary.js';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -164,10 +167,24 @@ function response(value, status = 200) {
   return new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
+const calendarDb = new D1Database();
+await createCalendarEntry(calendarDb, { day: '2024-01-01', title: '测试纪念日', anniversary: { startDay: '2024-01-01', mode: 'elapsed', pinned: true } });
 globalThis.fetch = async (input, options = {}) => {
   const url = new URL(String(input), 'http://coast.test');
   const method = options.method || 'GET';
   const body = options.body ? JSON.parse(options.body) : {};
+  if (url.pathname === '/api/calendar/entries') {
+    if (method === 'POST') return response({ ok: true, entry: await createCalendarEntry(calendarDb, body) }, 201);
+    const pinned = url.searchParams.get('pinned') === '1';
+    const entries = await listCalendarEntries(calendarDb, { month: url.searchParams.get('month') || '', pinned });
+    const today = url.searchParams.get('today');
+    return response({ ok: true, entries: pinned && today ? entries.map(entry => ({ ...entry, status: anniversaryStatus(entry.anniversary, today) })) : entries });
+  }
+  if (url.pathname.startsWith('/api/calendar/entries/')) {
+    const id = url.pathname.split('/').at(-1);
+    if (method === 'PATCH') return response({ ok: true, entry: await updateCalendarEntry(calendarDb, id, body) });
+    if (method === 'DELETE') return response({ ok: true, ...await deleteCalendarEntry(calendarDb, id) });
+  }
   if (url.pathname === '/api/worldbook') return response({ ok: true, entries: worldbookEntries });
   if (url.pathname === '/api/worldbook/test-match') return response({ ok: true, matches: [] });
   if (url.pathname === '/api/workbench/tools') return response({ ok: true, tools: [{ tool_key: 'memory.search', display_name: '检索记忆' }] });

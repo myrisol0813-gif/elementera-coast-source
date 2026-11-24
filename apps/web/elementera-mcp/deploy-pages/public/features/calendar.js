@@ -60,6 +60,7 @@ export function createCalendar({ router, toast }) {
       void loadPinned();
       scheduleDateRollover();
     }, Math.max(100, next.getTime() - Date.now()));
+    pinnedTimer?.unref?.(); // Node DOM test harness; browser timers are numbers.
   }
 
   async function load() {
