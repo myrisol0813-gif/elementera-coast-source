@@ -57,9 +57,9 @@ class LocalTransferRestoreTest {
             put("applicationId", "com.elementeracoast.app"); put("workspace", "local"); put("exportedAt", time)
             putJsonArray("includedModules") { add("daily") }
             put("conversations", JsonArray(emptyList())); put("calendar", JsonArray(emptyList())); put("profile", JsonNull)
-            put("dailyProfile", Json.parseToJsonElement("""{"myri_display_name":"原来的名字"}"""))
-            put("moments", Json.parseToJsonElement("""[{"id":"m1","author":"xiaohan","text":"旧动态","display_author":"原来的署名","comments":[{"id":"c1","author":"myri","text":"旧评论"}]}]"""))
-            put("diaries", Json.parseToJsonElement("""[{"id":"d1","author":"myri","text":"旧日记"}]"""))
+            put("dailyProfile", Json.parseToJsonElement("""{"model_partner_display_name":"原来的名字"}"""))
+            put("moments", Json.parseToJsonElement("""[{"id":"m1","author":"owner","text":"旧动态","display_author":"原来的署名","comments":[{"id":"c1","author":"model_partner","text":"旧评论"}]}]"""))
+            put("diaries", Json.parseToJsonElement("""[{"id":"d1","author":"model_partner","text":"旧日记"}]"""))
         }
         val local = MemoryLocalPersistence()
         LocalTransferRestore.restore(CoastTransferCodec.encode(payload), "com.elementeracoast.source", setOf("daily"), local)
@@ -78,7 +78,7 @@ class LocalTransferRestoreTest {
             putJsonArray("includedModules") { add("daily") }
             put("conversations", JsonArray(emptyList())); put("calendar", JsonArray(emptyList()))
             put("profile", JsonNull); put("dailyProfile", JsonNull); put("diaries", JsonArray(emptyList()))
-            put("moments", Json.parseToJsonElement("""[{"id":"m-cloud","author":"myri","actor":"myri","text":"旧云端动态","reason":"保留","tool_call_id":"call1","published_at":"2026-11-24T12:00:00Z","liked":true,"like_count":2,"likes":[{"actor":"xiaohan","created_at":"2026-11-24T12:00:00Z"},{"actor":"myri","created_at":"2026-11-24T12:00:01Z"}]}]"""))
+            put("moments", Json.parseToJsonElement("""[{"id":"m-cloud","author":"model_partner","actor":"model_partner","text":"旧云端动态","reason":"保留","tool_call_id":"call1","published_at":"2026-11-24T12:00:00Z","liked":true,"like_count":2,"likes":[{"actor":"owner","created_at":"2026-11-24T12:00:00Z"},{"actor":"model_partner","created_at":"2026-11-24T12:00:01Z"}]}]"""))
         }
         val local = MemoryLocalPersistence()
         val bundle = CoastTransferCodec.encode(payload)
