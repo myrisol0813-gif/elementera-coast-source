@@ -2,7 +2,13 @@ import { collectArchiveV2 } from './archive-v2-collect.js';
 
 // Export directly to a user-selected file when supported. Mobile browsers use
 // an origin-private temporary file rather than retaining the entire ZIP in JS.
-export async function saveArchiveV2({applicationId,filename,onProgress}){
+let active=false;
+export async function saveArchiveV2(options){
+  if(active)throw Error('已有归档导出正在进行。');
+  active=true;
+  try{return await writeArchive(options);}finally{active=false;}
+}
+async function writeArchive({applicationId,filename,onProgress}){
   let handle,root,tempName,writable,finished=false;
   try{
     if(typeof globalThis.showSaveFilePicker==='function'){
