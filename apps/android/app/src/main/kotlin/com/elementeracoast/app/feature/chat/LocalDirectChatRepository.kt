@@ -26,7 +26,7 @@ internal class LocalDirectChatRepository(
             ?: throw CoastApiException(CoastApiErrorKind.Model, "local_provider_missing", "请在模型箱配置供应商并选择本机模型。")
         val attachmentIds=ChatSyncMapper.activeAttachmentIds(historyWithUser,turnId)
         val messages = ChatSyncMapper.contextMessages(historyWithUser, turnId, recentTurns)
-        val prepared=try{knowledge.context(messages,contextBudget,knowledge.surfaceFor(conversationId),conversationId,attachmentIds,turnId,crossWindow.toRemote())}catch(e:IllegalArgumentException){
+        val prepared=try{knowledge.context(messages,contextBudget,knowledge.surfaceFor(conversationId),conversationId,attachmentIds,turnId,crossWindow.toRemote(),realityContext)}catch(e:IllegalArgumentException){
             throw CoastApiException(CoastApiErrorKind.Request,"local_context_budget",e.message.orEmpty())
         }
         var content = ""

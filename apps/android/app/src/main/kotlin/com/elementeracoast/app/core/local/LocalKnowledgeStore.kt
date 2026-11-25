@@ -55,7 +55,7 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence) {
     }
     fun surfaceFor(conversationId:String):String=cache.conversations().firstOrNull{it.id==conversationId}?.roomType?.let{if(it=="main")"main_chat" else it}?:error("本机窗口不存在。")
     data class Context(val messages:List<RemoteChatMessage>,val receipt:RemoteDeskSlip,val imageParts:List<JsonObject> = emptyList())
-    fun context(input:List<RemoteChatMessage>,budget:Int,surface:String,conversationId:String="",attachmentIds:List<String> = emptyList(),turnId:String="",crossWindow:RemoteCrossWindowRequest?=null):Context {
+    fun context(input:List<RemoteChatMessage>,budget:Int,surface:String,conversationId:String="",attachmentIds:List<String> = emptyList(),turnId:String="",crossWindow:RemoteCrossWindowRequest?=null,reality:RemoteRealityContext=RemoteRealityContext()):Context {
         val attachmentContext=attachments.attachmentContext(conversationId,attachmentIds,input)
         val messages=attachmentContext.messages
         val instructions=instructions()?.content.orEmpty()
@@ -82,6 +82,11 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence) {
         val dogtalk=LocalDogtalkStore(store).pending(conversationId,surface,turnId)
         val cross = LocalCrossWindow(store).select(conversationId, crossWindow)
         if (cross.text.isNotEmpty()) delivered.add(RemoteChatMessage("system", cross.text))
+        val settings=cache.history(conversationId)?.contextSettings?:com.elementeracoast.app.core.model.ConversationContextSettings()
+        val real=localReality(store,settings,reality)
+        val responseMode=localResponseMode(settings)
+        if(real.delivered)delivered.add(RemoteChatMessage("system","现实注入\n"+real.context))
+        if(responseMode.delivered)delivered.add(RemoteChatMessage("system",responseMode.context))
         val contextMessages=messages.toMutableList()
         if(dogtalk!=null){val at=contextMessages.indexOfLast{it.role=="user"};require(at>=0);contextMessages[at]=contextMessages[at].copy(content=contextMessages[at].content+"\n\n"+dogtalk.text)}
         delivered.addAll(contextMessages)
@@ -93,6 +98,7 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence) {
             dogtalk=RemoteDeskDogtalk(status=if(dogtalk==null)"未递给" else "已递给",delivered=dogtalk!=null,context=dogtalk?.text.orEmpty()),
             summary="本机自定义指令、完整画像、世界书、已确认记忆（关键词检索）、思维壤与近期文字；附件按本轮回执递入",
             crossWindow=cross.receipt,
+            realityContext=real,responseMode=responseMode,
             attachments=attachmentContext.receipt.takeIf{attachmentIds.isNotEmpty()},
             customInstructions=RemoteDeskCustomInstructions(status=if(instructions.isEmpty())"未设置" else "已递给",delivered=instructions.isNotEmpty(),empty=instructions.isEmpty(),length=instructions.length,content=instructions),
             userPortrait=portraitReceipt("用户画像",userPortrait),
@@ -102,7 +108,7 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence) {
                 entries=matches.map{RemoteDeskWorldbookItem(title=it.entry.title,id=it.entry.id,matchedKeywords=it.keywords,content=it.entry.content,scope=it.entry.scope,matchedBy=it.by,delivered=true,deliveredText=it.entry.content)}),
             relatedMemory=RemoteDeskMemory(status=if(memories.isEmpty())"未命中" else "已递给",confirmationStatus="仅已确认的 active 记录",count=memories.size,
                 items=memories.mapIndexed{i,e->RemoteDeskMemoryItem(title=e.title,id=e.id,entryType=e.entryType,tag=e.tag,sourceModel=e.sourceModel,sourceWindow=e.sourceWindow,sourceDate=e.sourceDate,reason="本机关键词命中",lifeCore=e.lifeCore,usageHint=e.usageHint,avoidHint=e.avoidHint,content=e.content,deliveredText=memoryText[i])}),
-            contextBudget=RemoteDeskContextBudget(estimatedTokens=((chars+2)/3).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),comfortCeiling=budget.coerceAtLeast(1800),sourcesPreserved=listOf("recent_context")+(if(cross.receipt.delivered)listOf("cross_window")else emptyList())+(if(instructions.isEmpty())emptyList()else listOf("custom_instructions"))+(if(matches.isEmpty())emptyList()else listOf("worldbook"))+(if(memories.isEmpty())emptyList()else listOf("related_memory"))+(if(userPortrait.isEmpty())emptyList()else listOf("user_portrait"))+(if(selfPortrait.isEmpty())emptyList()else listOf("global_excerpt")),userPortrait=if(userPortrait.isEmpty())"empty" else "full",globalExcerpt=if(selfPortrait.isEmpty())"empty" else "full")
+            contextBudget=RemoteDeskContextBudget(estimatedTokens=((chars+2)/3).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),comfortCeiling=budget.coerceAtLeast(1800),sourcesPreserved=listOf("recent_context")+(if(real.delivered)listOf("reality_context")else emptyList())+(if(responseMode.delivered)listOf("response_mode")else emptyList())+(if(soilContext.isNotEmpty())listOf("thinking_soil")else emptyList())+(if(cross.receipt.delivered)listOf("cross_window")else emptyList())+(if(instructions.isEmpty())emptyList()else listOf("custom_instructions"))+(if(matches.isEmpty())emptyList()else listOf("worldbook"))+(if(memories.isEmpty())emptyList()else listOf("related_memory"))+(if(userPortrait.isEmpty())emptyList()else listOf("user_portrait"))+(if(selfPortrait.isEmpty())emptyList()else listOf("global_excerpt")),userPortrait=if(userPortrait.isEmpty())"empty" else "full",globalExcerpt=if(selfPortrait.isEmpty())"empty" else "full")
         ),attachmentContext.imageParts)
     }
     private fun portraitReceipt(label:String,body:String)=RemoteDeskGlobalExcerpt(label=label,status=if(body.isEmpty())"未设置" else "已递给",delivered=body.isNotEmpty(),injection=if(body.isEmpty())"none" else "full",estimatedTokens=(body.length+2)/3,length=body.length,content=body)
