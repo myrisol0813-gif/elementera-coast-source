@@ -24,7 +24,8 @@ interface ThoughtSoilRepository {
 
 class DefaultThoughtSoilRepository(
     private val api: CoastApiClient,
-    private val plan: ChatGptPlanRepository? = null
+    private val plan: ChatGptPlanRepository? = null,
+    private val localOrganizer: (suspend (String, String) -> Unit)? = null
 ) : ThoughtSoilRepository {
     override suspend fun load(conversationId: String): ThoughtSoilSnapshot {
         val response = api.getThoughtSoilResponse(conversationId)
@@ -54,10 +55,9 @@ class DefaultThoughtSoilRepository(
     }
 
     override suspend fun organizeAfterReply(conversationId: String, modelId: String): ThoughtSoilSnapshot {
-        if (com.elementeracoast.app.core.local.NativeWorkspace.isLocal) {
-            val saved=load(conversationId)
-            require(!saved.autoRefreshEnabled||saved.manualLocked){"本机自动整理尚未接入，原思维壤已保留。"}
-            return saved
+        if (localOrganizer != null) {
+            localOrganizer.invoke(conversationId, modelId)
+            return load(conversationId)
         }
         if (modelId.startsWith("chatgpt-plan:")) {
             val account = requireNotNull(plan) { "请先连接 ChatGPT 套餐再整理思维壤。" }

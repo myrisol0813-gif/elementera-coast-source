@@ -74,8 +74,9 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence) {
         val memoryText=memories.map{e->listOf("记忆 · "+e.title,"生命核："+e.lifeCore,e.content,e.usageHint.takeIf{it.isNotBlank()}?.let{"使用时机："+it}.orEmpty(),e.avoidHint.takeIf{it.isNotBlank()}?.let{"勿误用："+it}.orEmpty()).filter{it.isNotBlank()}.joinToString("\n")}
         memoryText.forEach{delivered.add(RemoteChatMessage("system",it))}
         val soilRow=soil.current(conversationId)
-        val soilText=soilRow?.get("current_text")?.jsonPrimitive?.contentOrNull.orEmpty()
-        val after=soilRow?.get("afterthoughts_json")?.jsonPrimitive?.contentOrNull?.let{Json.parseToJsonElement(it).jsonArray.map{v->v.jsonPrimitive.content}}.orEmpty()
+        val soilEnabled=soilRow?.get("auto_refresh_enabled")?.jsonPrimitive?.int==1
+        val soilText=soilRow?.takeIf{soilEnabled}?.get("current_text")?.jsonPrimitive?.contentOrNull.orEmpty()
+        val after=soilRow?.takeIf{soilEnabled}?.get("afterthoughts_json")?.jsonPrimitive?.contentOrNull?.let{Json.parseToJsonElement(it).jsonArray.map{v->v.jsonPrimitive.content}}.orEmpty()
         val soilContext=(listOf(soilText)+after).filter{it.isNotBlank()}.joinToString("\n")
         if(soilContext.isNotEmpty())delivered.add(RemoteChatMessage("system","思维壤\n"+soilContext))
         val dogtalk=LocalDogtalkStore(store).pending(conversationId,surface,turnId)
@@ -96,7 +97,7 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence) {
             customInstructions=RemoteDeskCustomInstructions(status=if(instructions.isEmpty())"未设置" else "已递给",delivered=instructions.isNotEmpty(),empty=instructions.isEmpty(),length=instructions.length,content=instructions),
             userPortrait=portraitReceipt("用户画像",userPortrait),
             globalExcerpt=portraitReceipt("自我画像",selfPortrait),
-            thinkingSoil=RemoteDeskThinkingSoil(status=if(soilContext.isEmpty())"未设置" else "已递给",enabled=soilRow?.get("auto_refresh_enabled")?.jsonPrimitive?.int==1,delivered=soilContext.isNotEmpty(),empty=soilContext.isEmpty(),context=soilContext,currentText=soilText,afterthoughts=after,afterthoughtsCount=after.size),
+            thinkingSoil=RemoteDeskThinkingSoil(status=if(soilRow!=null&&!soilEnabled)"已关闭" else if(soilContext.isEmpty())"未设置" else "已递给",enabled=soilEnabled,delivered=soilContext.isNotEmpty(),empty=soilContext.isEmpty(),context=soilContext,currentText=soilText,afterthoughts=after,afterthoughtsCount=after.size),
             worldbook=RemoteDeskWorldbook(status=if(matches.isEmpty())"未命中" else "已递给",matchedCount=matches.size,deliveredCount=matches.size,matchedTitles=matches.map{it.entry.title},deliveredTitles=matches.map{it.entry.title},
                 entries=matches.map{RemoteDeskWorldbookItem(title=it.entry.title,id=it.entry.id,matchedKeywords=it.keywords,content=it.entry.content,scope=it.entry.scope,matchedBy=it.by,delivered=true,deliveredText=it.entry.content)}),
             relatedMemory=RemoteDeskMemory(status=if(memories.isEmpty())"未命中" else "已递给",confirmationStatus="仅已确认的 active 记录",count=memories.size,

@@ -1108,7 +1108,7 @@ class CoastShellViewModel(
                             }
                         }
                         if (!isChatGptPlanModel(progress.modelId)) refreshGeneratedTitle(conversationId, titleUserText, partial)
-                        if (!localMode) organizeThoughtSoilAfterReply(conversationId, progress.modelId)
+                        organizeThoughtSoilAfterReply(conversationId, progress.modelId)
                     }
                 }
             }
