@@ -29,7 +29,7 @@ class LocalToolWriteTest {
         call("c2","create_diary","""{"date":"2026-11-25","text":"模型日记"}""")
         call("c3","calendar_create","""{"date":"2026-11-25","title":"模型事项"}""")
         call("c4","library_write",buildJsonObject{
-            put("book_id",book);put("kind","annotation");put("body","模型批注");put("chapter_index",0);put("paragraph_index",0)
+            put("action","create");put("book_id",book);put("kind","annotation");put("body","模型批注");put("chapter_index",0);put("paragraph_index",0)
         }.toString())
         call("c5","memory_write_candidate","""{"title":"候选","content":"尚未确认","destination":"memory"}""")
         assertEquals("model_partner",cache.dailyMoments().single().author)
@@ -61,5 +61,28 @@ class LocalToolWriteTest {
         cache.putHistory(cid,cache.history(cid)!!.copy(contextSettings=ConversationContextSettings()))
         assertFalse(session.execute("c7","create_diary","""{"date":"2026-11-25","text":"权限撤销"}""").ok)
         assertEquals(1,cache.dailyDiaries().size)
+    }
+    @Test fun modelHighlightsAndEditsOnlyOwnNotes(){
+        val s=MemoryLocalPersistence();val cache=RemoteCacheStore(s);val cid="fixture";val tid="turn1"
+        cache.putConversations(listOf(RemoteConversation(cid,"窗口")))
+        cache.putHistory(cid,RemoteHistory(conversationId=cid,contextSettings=ConversationContextSettings(localModelWriteEnabled=true),
+            turns=listOf(RemoteTurn(tid,user=RemoteUserBranch(variants=listOf(RemoteVariant("u1","阅读")))))))
+        val side=LocalSideRecords(s)
+        val book=side.importBook(buildJsonObject{
+            put("title","测试书");put("format","txt");putJsonArray("chapters"){add(buildJsonObject{put("title","第一章");put("body","原文段落")})}
+        }).getValue("id").jsonPrimitive.content
+        val owner=side.writeNote(book,buildJsonObject{put("kind","annotation");put("body","屋主批注");put("chapter_index",0);put("paragraph_index",0)}).getValue("id").jsonPrimitive.content
+        val k=LocalKnowledgeStore(s);val session=k.toolSession(cid,tid,null,k.context(listOf(RemoteChatMessage("user","阅读")),18000,"main_chat",cid).receipt,"fixture-model")!!
+        fun call(i:String,input:JsonObject)=session.execute(i,"library_write",input.toString())
+        fun highlight(end:Int)=buildJsonObject{put("action","create");put("book_id",book);put("kind","highlight");put("chapter_index",0);put("paragraph_index",0);put("start_offset",0);put("end_offset",end)}
+        val created=call("1",highlight(2));assertTrue(created.output,created.ok)
+        val id=Json.parseToJsonElement(created.output).jsonObject.getValue("id").jsonPrimitive.content
+        assertEquals("原文",side.notes(book).first{it["id"]?.jsonPrimitive?.content==id}["quote"]!!.jsonPrimitive.content)
+        val bad=call("2",highlight(99));assertFalse(bad.ok);assertTrue(bad.output.contains("invalid_range"))
+        val denied=call("3",buildJsonObject{put("action","delete");put("id",owner)});assertFalse(denied.ok);assertTrue(denied.output.contains("wrong_author"))
+        assertTrue(call("4",buildJsonObject{put("action","edit");put("id",id);put("body","模型批注")}).ok)
+        assertEquals("annotation",side.notes(book).first{it["id"]?.jsonPrimitive?.content==id}["kind"]!!.jsonPrimitive.content)
+        assertTrue(call("5",buildJsonObject{put("action","delete");put("id",id)}).ok)
+        assertEquals(owner,side.notes(book).single().getValue("id").jsonPrimitive.content)
     }
 }

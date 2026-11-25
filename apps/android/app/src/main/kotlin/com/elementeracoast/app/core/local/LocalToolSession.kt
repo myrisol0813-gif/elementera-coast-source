@@ -46,7 +46,7 @@ internal class LocalToolSession private constructor(
             add(Spec("moment_comment","daily.moment_comment","评论碳硅圈","以模型身份评论指定动态。",schema(mapOf("moment_id" to string(),"text" to string(2000)),listOf("moment_id","text"))))
             add(Spec("moment_like","daily.moment_like","点赞碳硅圈","仅改变模型自己的点赞。",schema(mapOf("moment_id" to string(),"liked" to buildJsonObject{put("type","boolean")}),listOf("moment_id","liked"))))
             add(Spec("calendar_create","calendar.create","写日历","新增一条模型日历事项，不修改或删除既有事项。",schema(mapOf("date" to string(10),"title" to string(120),"body" to string(4000),"kind" to string(10)),listOf("date","title"))))
-            add(Spec("library_write","library.write","写书房笔记","新增模型自己的批注或读后感；kind=annotation 时须指定章节及段落。",schema(mapOf("book_id" to string(),"kind" to string(16),"body" to string(4000),"chapter_index" to integer(0,100000),"paragraph_index" to integer(0,100000)),listOf("book_id","kind","body"))))
+            add(Spec("library_write","library.write","写书房笔记","action=create/edit/delete；创建批注 annotation、读后感 reflection 或划线 highlight。章节、段落从0开始；划线需指定 UTF-16 start_offset（含）与 end_offset（不含），不填正文；修改或删除仅限自己的笔记 id。",schema(mapOf("action" to string(8),"id" to string(),"book_id" to string(),"kind" to string(16),"body" to string(4000),"chapter_index" to integer(0,100000),"paragraph_index" to integer(0,100000),"start_offset" to integer(0,100000),"end_offset" to integer(0,100000)),listOf("action"))))
             add(Spec("memory_write_candidate","memory.write_candidate","放入待确认袋","提出记忆或种子候选，由屋主确认，不直接写入正式记忆。",schema(mapOf("title" to string(120),"content" to string(2000),"destination" to string(8)),listOf("title","content","destination"))))
         }
     }
@@ -125,7 +125,7 @@ internal class LocalToolSession private constructor(
         }catch(_:Exception){return errorResult("工具审计未能保存；不返回本次资料。")}
         if(success)applyResult.invoke()
         applyResult={}
-        reports.add(RemoteDeskToolResult(name=name,delivered=true,content=if(success)"成功返回 "+output.toString().length+" 字符"else "未完成"))
+        reports.add(RemoteDeskToolResult(name=name,delivered=true,content=if(success)"成功返回 "+output.toString().length+" 字符"else output["message"]?.jsonPrimitive?.contentOrNull.orEmpty()))
         val run=RemoteFurnitureRun(id=auditId,toolKey=spec.key,label=spec.title,status=if(success)"success"else "error")
         return RemoteNativeToolResult(ok=success,output=output.toString(),furnitureRuns=listOf(run),deskSlip=receipt)
     }
@@ -136,15 +136,19 @@ internal class LocalToolSession private constructor(
             val input=Json.parseToJsonElement(arguments).jsonObject
             require(input.keys.all{it in spec.parameters.getValue("properties").jsonObject.keys}&&spec.parameters.getValue("required").jsonArray.all{it.jsonPrimitive.content in input})
             store.atomic{s->
-                require(allowedNow(s,spec))
+                if(!allowedNow(s,spec))throw LocalToolFailure("permission_revoked","当前窗口写入权限已关闭或窗口已变化。")
                 val value=LocalToolWrites(s,cid,turn,modelId,auditId).execute(spec.name,input)
-                require(estimated+estimate(arguments)+estimate(value.toString())+32<=toolBudget)
+                if(estimated+estimate(arguments)+estimate(value.toString())+32>toolBudget)throw LocalToolFailure("budget_exceeded","本轮工具预算不足，未保存。")
                 auditWrite(s,auditId,spec.key,start,true)
                 value
             }
-        }catch(_:Exception){
+        }catch(e:Exception){
             runCatching{store.readConsistent{s->auditWrite(s,auditId,spec.key,start,false)}}
-            buildJsonObject{put("ok",false);put("message","写入未完成：权限、资料、参数或预算不满足。")}
+            buildJsonObject{
+                put("ok",false)
+                put("code",if(e is LocalToolFailure)e.code else if(e is IllegalArgumentException)"invalid_arguments" else "write_failed")
+                put("message",if(e is LocalToolFailure)e.message.orEmpty() else if(e is IllegalArgumentException)"参数无效，请核对工具字段及取值。" else "写入失败，未保存。")
+            }
         }
         val success=output["ok"]?.jsonPrimitive?.booleanOrNull==true
         estimated+=estimate(arguments.take(12000))+estimate(output.toString())+32
