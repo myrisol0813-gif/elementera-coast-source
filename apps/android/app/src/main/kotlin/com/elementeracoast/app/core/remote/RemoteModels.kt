@@ -230,7 +230,14 @@ data class RemoteRealityContext(
     val location: RemoteRealityLocation? = null,
     @SerialName("recent_app") val recentApp: RemoteRealityApp? = null,
     @SerialName("app_usage") val appUsage: List<RemoteRealityAppUsage> = emptyList(),
-    val steps: RemoteRealitySteps? = null
+    val steps: RemoteRealitySteps? = null,
+    val weather: RemoteRealityWeather? = null
+)
+
+@Serializable
+data class RemoteRealityWeather(
+    val city: String = "",
+    val summary: String = ""
 )
 
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
