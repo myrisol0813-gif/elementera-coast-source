@@ -31,8 +31,9 @@ internal class LocalSoilOrganizer(
                 maxOutputTokens = null, maxResultChars = LocalSoilRun.MAX_RESULT).text
         } else {
             val (provider, model) = requireNotNull(providers.resolve(modelId)) { "整理模型未配置。" }
-            collectLocalSoilReply(prepared.prompt) { prompt,budget ->
-                client.stream(provider, model, listOf(RemoteChatMessage("user", prompt)), budget)
+            val policy=client.soilPolicy(provider,model)
+            collectLocalSoilReply(prepared.prompt,policy.firstBudget,policy.retryBudget,{ LocalSoilRun.validate(prepared,it) }) { prompt,budget ->
+                client.organize(provider,model,prompt,budget,policy)
             }
         }
         } catch(e:CancellationException){throw e} catch(e:LocalSoilFailure){throw e} catch(e:CoastApiException){throw LocalSoilFailure(if(e.status>0)"供应商请求失败（HTTP ${e.status}）"else "供应商整理请求或流式响应失败")} catch(_:Exception){throw LocalSoilFailure("供应商整理请求未完成")}
@@ -47,10 +48,13 @@ internal const val LOCAL_SOIL_RETRY_OUTPUT_TOKENS = 16384
 
 private class LocalSoilOutputLimit:IllegalArgumentException()
 
-/** At most two requests. Only an explicit provider length finish permits retry.
+/** At most two requests. Only an explicit length finish or invalid JSON permits retry.
  * Each attempt is isolated: no truncated JSON, candidate or cursor is committed. */
 internal suspend fun collectLocalSoilReply(
     prompt:String,
+    firstBudget:Int=LOCAL_SOIL_FIRST_OUTPUT_TOKENS,
+    retryBudget:Int=LOCAL_SOIL_RETRY_OUTPUT_TOKENS,
+    validate:(String)->Unit={},
     stream:(String,Int)->kotlinx.coroutines.flow.Flow<LocalProviderEvent>
 ):String {
     suspend fun attempt(text:String,budget:Int):String {
@@ -72,17 +76,18 @@ internal suspend fun collectLocalSoilReply(
             }
         }
         if(!complete)throw LocalSoilFailure("供应商整理流未正常完成")
-        return output.toString()
+        return output.toString().also(validate)
     }
-    return try {
-        attempt(prompt,LOCAL_SOIL_FIRST_OUTPUT_TOKENS)
+    val retryPrompt=try {
+        return attempt(prompt,firstBudget)
     }catch(_:LocalSoilOutputLimit){
-        try {
-            attempt(prompt+"\n上一次输出达到供应商上限。请减少重复与非必要候选，尽快返回完整闭合的 JSON。保留真正需要承接的内容。",LOCAL_SOIL_RETRY_OUTPUT_TOKENS)
-        }catch(_:LocalSoilOutputLimit){
-            throw LocalSoilFailure("供应商达到整理输出上限（已尝试 8192 / 16384 token）")
-        }
+        prompt+"\n上一次输出达到供应商上限。请减少重复与非必要候选，尽快返回完整闭合的 JSON。保留真正需要承接的内容。"
+    }catch(e:LocalSoilFailure){
+        if(e.detail!="整理回包格式不符合约定")throw e
+        prompt+"\n上一次输出不是合法整理 JSON。请只返回一个完整 JSON 对象，不要解释。"
     }
+    return try{attempt(retryPrompt,retryBudget)}
+    catch(_:LocalSoilOutputLimit){throw LocalSoilFailure("供应商达到整理输出上限（已尝试 $firstBudget / $retryBudget token）")}
 }
 
 /** Pure preparation and validated canonical persistence shared by both inference paths. */
@@ -204,6 +209,7 @@ internal object LocalSoilRun {
         put("revision",row.getValue("revision"));put("model_label",row.str("model_label"))
         put("display_author",row.str("display_author"));put("created_at",now)
     }
+    fun validate(p:Prepared,raw:String) { try{parse(p,raw)}catch(_:Exception){throw LocalSoilFailure("整理回包格式不符合约定")} }
     fun commit(store:LocalPersistence,p:Prepared,raw:String) {
         val result=try{parse(p,raw)}catch(_:Exception){throw LocalSoilFailure("整理回包格式不符合约定")}
         // Ordinary soil-only replies need one atomic file write, not a clone of all attachments.
