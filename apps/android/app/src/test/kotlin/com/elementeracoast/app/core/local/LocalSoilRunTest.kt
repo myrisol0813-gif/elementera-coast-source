@@ -46,4 +46,22 @@ class LocalSoilRunTest {
         assertEquals(disabled,LocalSoilStore(s).read())
         assertNull(LocalSoilRun.prepare(s,cid,model))
     }
+
+    @Test fun organizedRecordsRoundTripThroughExistingArchive() {
+        val s=fixture();LocalSoilRun.commit(s,LocalSoilRun.prepare(s,cid,model)!!,result)
+        val dir=java.nio.file.Files.createTempDirectory("local-organized-archive").toFile()
+        try {
+            val app="com.elementeracoast.source"
+            val zip=java.io.File(dir,"organized.zip")
+            val manifest=ArchiveV2Local.export(s,app,zip)
+            val stage=ArchiveV2Stage(dir,"verified")
+            assertEquals(manifest,ArchiveV2ZipReader.stage(zip,stage))
+            val dest=MemoryLocalPersistence()
+            ArchiveV2Local.restore(manifest,stage,setOf("chat","thinking_soil","thinking_soil_history","memory_entries","memory_pockets","self_portrait"),app,dest,true)
+            assertEquals(LocalSoilStore(s).read(),LocalSoilStore(dest).read())
+            assertEquals(LocalMemoryStore(s).snapshot(),LocalMemoryStore(dest).snapshot())
+            assertEquals(LocalPortraitStore(s).read("self_portrait"),LocalPortraitStore(dest).read("self_portrait"))
+            assertNull(LocalSoilRun.prepare(dest,cid,model))
+        } finally { dir.deleteRecursively() }
+    }
 }
