@@ -103,6 +103,9 @@ jobs:
           apk=source-release/elementera-coast-source-v${{ steps.version_gate.outputs.base_version }}-release.apk
           # Sign original unsigned Release exactly once, never double-sign Debug.
           bash scripts/sign-source-release.sh "$unsigned_apk" "$apk"
+          limit_mib=$(sed -nE 's/^internal const val MAX_APK = ([0-9]+)L \* 1024 \* 1024$/\1/p' app/src/main/kotlin/com/elementeracoast/app/feature/wolf/LocalGithubUpdater.kt)
+          [[ "$limit_mib" =~ ^[1-9][0-9]*$ ]]
+          [[ $(stat -c %s "$apk") -le $((limit_mib * 1024 * 1024)) ]] || { echo "Signed APK exceeds updater limit" >&2; exit 1; }
           build_tools="$(find "${ANDROID_HOME}/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           badging="$("${build_tools}/aapt" dump badging "$apk")"
           line="$(printf '%s\n' "$badging" | sed -n '1p')"

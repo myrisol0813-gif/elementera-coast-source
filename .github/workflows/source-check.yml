@@ -90,6 +90,9 @@ jobs:
           test -s "$unsigned_apk"
           bash scripts/sign-disposable-qa.sh "$unsigned_apk" "$signed_apk"
           test -s "$signed_apk"
+          limit_mib=$(sed -nE 's/^internal const val MAX_APK = ([0-9]+)L \* 1024 \* 1024$/\1/p' app/src/main/kotlin/com/elementeracoast/app/feature/wolf/LocalGithubUpdater.kt)
+          [[ "$limit_mib" =~ ^[1-9][0-9]*$ ]]
+          [[ $(stat -c %s "$signed_apk") -le $((limit_mib * 1024 * 1024)) ]] || { echo "Signed APK exceeds updater limit" >&2; exit 1; }
           build_tools="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           "$build_tools/apksigner" verify --verbose --min-sdk-version 23 "$signed_apk" >/dev/null
           badging="$("$build_tools/aapt" dump badging "$signed_apk" | sed -n '1p')"
