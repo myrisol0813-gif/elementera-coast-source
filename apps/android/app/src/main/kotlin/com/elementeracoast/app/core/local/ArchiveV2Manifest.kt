@@ -23,6 +23,42 @@ data class ArchiveV2ManifestSummary(val bytes: Long, val records: Int, val objec
 object ArchiveV2Manifests {
     val modules = listOf("chat","attachments","dogtalk_records","dogtalk_snapshots","voice","memory_entries","memory_pockets","thinking_soil","thinking_soil_history","calendar","daily","model_profile","user_portrait","self_portrait","worldbook","custom_instructions","vault","library","appearance","tools")
     private val id = Regex("[A-Za-z0-9_.:-]{1,200}")
+    /** Match cloud restore group boundaries, then include declared dependencies.
+     * Never include unrelated archive objects; each choice gets its own staging session. */
+    fun forRestore(m:ArchiveV2Manifest,kind:String,recordId:String):ArchiveV2Manifest{
+        require(kind!="appearance")
+        val module=if(kind=="book")"library" else kind
+        val rootId=if(kind=="book")"library_books:"+ArchiveV2Chunks.digest(kotlinx.serialization.json.JsonArray(listOf(kotlinx.serialization.json.JsonPrimitive(recordId))).toString().encodeToByteArray()) else recordId
+        val rootKey="$module/$rootId"
+        val indexed=m.records.associateBy { it.module+"/"+it.id }
+        require(rootKey in indexed){"所选资料不在归档清单中。"}
+        val keep=linkedSetOf(rootKey)
+        val chatChildren=setOf("attachments","voice","dogtalk_records","dogtalk_snapshots","thinking_soil","thinking_soil_history")
+        for(r in m.records){
+            val companion=when(kind){
+                "chat"->r.module in chatChildren&&rootKey in r.dependencies
+                "book"->r.module=="library"&&rootKey in r.dependencies
+                "daily"->r.module=="daily"&&rootKey in r.dependencies
+                "user_portrait","self_portrait"->r.module==module
+                else->false
+            }
+            if(companion)keep.add(r.module+"/"+r.id)
+        }
+        val pending=java.util.ArrayDeque(keep)
+        while(pending.isNotEmpty())for(dep in indexed.getValue(pending.removeFirst()).dependencies){
+            require(dep in indexed&&indexed.getValue(dep).module!="appearance"){"归档依赖不完整。"}
+            if(keep.add(dep))pending.addLast(dep)
+        }
+        val rows=m.records.filter { it.module+"/"+it.id in keep }
+        val used=rows.flatMap { listOf(it.recordObject)+it.mediaObjects }.toSet()
+        val counts=rows.groupingBy { it.module }.eachCount()
+        val result=m.copy(records=rows,objects=m.objects.filter { it.objectSha256 in used },modules=m.modules.map {
+            val count=counts[it.module]?:0
+            it.copy(coverage=if(count==0)"unavailable" else "partial",count=count)
+        })
+        validate(result)
+        return result
+    }
     fun validate(m: ArchiveV2Manifest,maxBytes: Long=3L*1024*1024*1024,maxObjects: Int=8192,maxRecords: Int=100000): ArchiveV2ManifestSummary {
         require(m.format=="elementera-coast-archive" && m.version==2 && m.workspace in setOf("local","backend") &&
             m.applicationId in setOf("com.elementeracoast.app","com.elementeracoast.source"))
