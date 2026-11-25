@@ -1,3 +1,8 @@
+import java.io.File
+import java.security.MessageDigest
+import java.net.URI
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -116,8 +121,8 @@ val prepareCoastEmbedding by tasks.registering {
     doLast {
         val target = coastEmbeddingAssets.get().asFile.resolve("coast-embedding")
         target.mkdirs()
-        fun digest(file: java.io.File): String {
-            val md = java.security.MessageDigest.getInstance("SHA-256")
+        fun digest(file: File): String {
+            val md = MessageDigest.getInstance("SHA-256")
             file.inputStream().use { input ->
                 val buffer = ByteArray(65536)
                 while (true) {
@@ -134,7 +139,7 @@ val prepareCoastEmbedding by tasks.registering {
             if (file.isFile && digest(file) == expected) continue
             val temp = target.resolve(name + ".tmp")
             try {
-                val connection = java.net.URI("https://huggingface.co/Xenova/bge-small-zh-v1.5/resolve/$coastEmbeddingRevision/$remote").toURL().openConnection()
+                val connection = URI("https://huggingface.co/Xenova/bge-small-zh-v1.5/resolve/$coastEmbeddingRevision/$remote").toURL().openConnection()
                 connection.connectTimeout = 30000
                 connection.readTimeout = 90000
                 connection.setRequestProperty("User-Agent", "Coast-Android-build/1.0")
@@ -150,7 +155,7 @@ val prepareCoastEmbedding by tasks.registering {
                     }
                 } }
                 check(digest(temp) == expected) { "Embedding asset SHA256 mismatch: $name" }
-                java.nio.file.Files.move(temp.toPath(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
             } finally { temp.delete() }
         }
     }
