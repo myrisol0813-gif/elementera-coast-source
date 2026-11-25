@@ -7,6 +7,7 @@ import {
   createEntry,
   createPocket,
   listEntries,
+  patchEntry,
   readCustomInstructions,
   resolvePocket,
   writeCustomInstructions,
@@ -44,7 +45,7 @@ const db = new D1Database();
 const conversationA = await createConversation(db, '主聊天');
 const conversationB = await createConversation(db, '施工窗');
 
-assert.deepEqual(MEMORY_TAGS, ['关系', '历史锚点', '偏好', '人物档案', '世界观', '工程技术']);
+assert.deepEqual(MEMORY_TAGS, ['关系', '历史锚点', '偏好', '人物档案', '工程技术']);
 assert.equal(MEMORY_TAGS.includes('待整理'), false, '待整理只能是迁移状态');
 
 const relationship = await createEntry(db, {
@@ -77,7 +78,7 @@ const engineering = await createEntry(db, {
   source_time: '2026-08-30',
   tag: '工程技术',
 });
-await createEntry(db, {
+const legacySeed = await createEntry(db, {
   entry_type: 'seed',
   scope: 'conversation',
   conversation_id: conversationA.id,
@@ -86,8 +87,14 @@ await createEntry(db, {
   source_model: 'o3',
   source_window: '主聊天',
   source_time: '2026-08-29',
-  tag: '世界观',
+  tag: '偏好',
 });
+// Existing database data must remain visible and editable without reclassification.
+db.database.prepare('UPDATE memory_entries SET tag = ?, memory_tags_json = ? WHERE id = ?').run('世界观', JSON.stringify(['世界观']), legacySeed.id);
+await assert.rejects(() => createEntry(db, { entry_type: 'seed', title: '新记录', life_core: '测试', tag: '世界观' }), e => e.type === 'invalid_memory_tag');
+await assert.rejects(() => createEntry(db, { entry_type: 'seed', title: '新记录', life_core: '测试', tag: '海岸世界观' }), e => e.type === 'invalid_memory_tag');
+assert.equal((await patchEntry(db, legacySeed.id, { content: '历史记录补充' })).entry.tag, '世界观');
+assert.equal((await patchEntry(db, legacySeed.id, { tag: '世界观' })).entry.tag, '世界观');
 await createEntry(db, {
   entry_type: 'memory',
   scope: 'conversation',
@@ -111,6 +118,9 @@ assert.deepEqual(seedLibrary.facets.models, ['o3']);
 assert.deepEqual(seedLibrary.facets.windows, ['主聊天']);
 assert.deepEqual(seedLibrary.facets.tags, ['世界观']);
 assert.deepEqual(seedLibrary.facets.times, ['2026-08-29']);
+assert.equal((await listEntries(db, { entry_type: 'seed', tag: '世界观' })).entries[0].id, legacySeed.id);
+assert.equal((await patchEntry(db, legacySeed.id, { tag: '偏好' })).entry.tag, '偏好');
+await assert.rejects(() => patchEntry(db, legacySeed.id, { tag: '世界观' }), e => e.type === 'invalid_memory_tag');
 
 const filtered = await listEntries(db, {
   entry_type: 'memory',
@@ -151,6 +161,7 @@ await assert.rejects(
   () => resolvePocket(db, pocket.id, { action: 'memory' }),
   (error) => error.type === 'invalid_memory_tag',
 );
+await assert.rejects(() => resolvePocket(db, pocket.id, { action: 'memory', tag: '世界观' }), e => e.type === 'invalid_memory_tag');
 const pocketResult = await resolvePocket(db, pocket.id, {
   action: 'memory',
   tag: '历史锚点',

@@ -31,5 +31,7 @@ export function section(title, body) {
 }
 
 export function tagOptions(selected = '') {
-  return `<option value="">请选择</option>${MEMORY_TAGS.map((tag) => `<option value="${escapeAttribute(tag)}" ${selected === tag ? 'selected' : ''}>${escapeHtml(tag)}</option>`).join('')}`;
+  const historical = ['世界观', '海岸世界观'].includes(selected)
+    ? `<option value="${escapeAttribute(selected)}" selected>${escapeHtml(selected)}（历史标签）</option>` : '';
+  return `<option value="">请选择</option>${historical}${MEMORY_TAGS.map((tag) => `<option value="${escapeAttribute(tag)}" ${selected === tag ? 'selected' : ''}>${escapeHtml(tag)}</option>`).join('')}`;
 }

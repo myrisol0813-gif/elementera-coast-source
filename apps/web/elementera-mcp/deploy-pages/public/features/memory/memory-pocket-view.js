@@ -28,7 +28,7 @@ export function createPocketViews({ currentPockets }) {
       ${pocket.source_excerpt ? `<p><strong>来源：</strong>${escapeHtml(pocket.source_excerpt)}</p>` : ''}
       ${usageHint ? `<p><strong>使用时机：</strong>${escapeHtml(usageHint)}</p>` : ''}
       ${avoidHint ? `<p><strong>勿误用：</strong>${escapeHtml(avoidHint)}</p>` : ''}
-      <label class="memory-pocket-tag">六签<select data-memory-tag>${tagOptions(selectedTag)}</select></label>
+      <label class="memory-pocket-tag">正式标签<select data-memory-tag>${tagOptions(selectedTag)}</select></label>
       <p class="feature-note">只有确认后才会进入记忆库或种子库。种子是可生长方向，不是已确认事实。</p>
       ${provenance}
       <div class="button-row">

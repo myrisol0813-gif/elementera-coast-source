@@ -21,10 +21,11 @@ export const MEMORY_TAGS = Object.freeze([
   '历史锚点',
   '偏好',
   '人物档案',
-  '世界观',
   '工程技术',
 ]);
 const MEMORY_TAG_SET = new Set(MEMORY_TAGS);
+const RETIRED_MEMORY_TAGS = new Set(['世界观', '海岸世界观']);
+export const isRetiredMemoryTag = tag => RETIRED_MEMORY_TAGS.has(tag);
 export const MAX_SOURCE_MODEL = 120;
 export const MAX_SOURCE_WINDOW = 180;
 export const MAX_CUSTOM_INSTRUCTIONS = 32000;
@@ -136,7 +137,6 @@ export function mappedLegacyTag(value) {
       ['历史锚点', ['history', '历史', '锚点', '纪念']],
       ['偏好', ['preference', '偏好', '喜欢', '不喜欢']],
       ['人物档案', ['profile', '人物', '档案', '形象', '身份']],
-      ['世界观', ['worldbook', 'coast', '世界观', '项目世界观', '设定']],
       ['工程技术', ['engineering', 'technical', '工程', '技术', '代码', '部署', 'mcp']],
     ];
     const matched = aliases.find(([, words]) => words.some((word) => normalized.includes(word)));
@@ -161,8 +161,17 @@ export function sourceDate(value) {
     : '';
 }
 
+// Read historical labels without granting permission to create them again.
+export function storedMemoryTag(rowTag, legacyTags = []) {
+  const tag = clip(rowTag, 40);
+  if (isRetiredMemoryTag(tag)) return tag;
+  if (tag) return normalizeMemoryTag(tag);
+  const historical = memoryTags(legacyTags).find(isRetiredMemoryTag);
+  return historical || mappedLegacyTag(legacyTags);
+}
+
 export function entryIndexFromRow(row, reference, legacyTags) {
-  const tag = normalizeMemoryTag(row.tag, { allowEmpty: true }) || mappedLegacyTag(legacyTags);
+  const tag = storedMemoryTag(row.tag, legacyTags);
   const sourceModel = clip(
     row.source_model
       || reference.source_model

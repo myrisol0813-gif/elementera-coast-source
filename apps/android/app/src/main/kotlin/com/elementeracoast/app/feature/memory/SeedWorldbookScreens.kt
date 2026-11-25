@@ -184,6 +184,9 @@ private fun SeedEditor(seed: MemoryEntry?, onDismiss: () -> Unit, onSave: (Memor
                 ChoiceRow("dormant", status == "dormant") { status = "dormant" }
                 ChoiceRow("active", status == "active") { status = "active" }
                 Text("正式标签", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+                if (seed?.tag in setOf("世界观", "海岸世界观")) {
+                    Text("原标签：${seed?.tag}（历史标签，可保留或重新分类）", style = MaterialTheme.typography.bodySmall)
+                }
                 canonicalMemoryTags.forEach { candidate -> ChoiceRow(candidate, tag == candidate) { tag = candidate } }
                 WolfTextField("模型", sourceModel, { sourceModel = it })
                 WolfTextField("窗口", sourceWindow, { sourceWindow = it })

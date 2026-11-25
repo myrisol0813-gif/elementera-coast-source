@@ -16,7 +16,7 @@ export function availableFilterKinds() {
 }
 
 export function filterValues(kind, facets = {}) {
-  if (kind === 'tag') return MEMORY_TAGS;
+  if (kind === 'tag') return [...new Set([...MEMORY_TAGS, ...(Array.isArray(facets.tags) ? facets.tags : [])])];
   const config = MEMORY_FILTER_KINDS[kind];
   return config && Array.isArray(facets[config.facetKey]) ? facets[config.facetKey] : [];
 }

@@ -17,7 +17,17 @@ class LocalMemoryArchiveTest {
             val old=store.snapshot().entries.single()
             store.save(saved.id,RemoteMemoryEntryWriteRequest("memory","海浪","原始生命核",content="原始内容",status="active",tag="历史锚点",sourceTime="2025-08-13"))
             assertEquals(old["source_time"],store.snapshot().entries.single()["source_time"])
-            val seed=store.save(null,RemoteMemoryEntryWriteRequest("seed","海浪","未确认构想",status="dormant",tag="海岸世界观"))
+            assertTrue(runCatching{store.save(null,RemoteMemoryEntryWriteRequest("seed","海浪","未确认构想",status="dormant",tag="世界观"))}.isFailure)
+            assertTrue(runCatching{store.save(null,RemoteMemoryEntryWriteRequest("seed","海浪","未确认构想",status="dormant",tag="海岸世界观"))}.isFailure)
+            val seed=store.save(null,RemoteMemoryEntryWriteRequest("seed","海浪","未确认构想",status="dormant",tag="偏好"))
+            // Fixture represents an existing record restored from an old archive, not a new write.
+            val snapshot=store.snapshot()
+            store.write(snapshot.copy(entries=snapshot.entries.map{row->
+                if(row.str("id")==seed.id) JsonObject(row+mapOf("tag" to JsonPrimitive("世界观"),"memory_tags_json" to JsonPrimitive("[\"世界观\"]"))) else row
+            }))
+            assertEquals("世界观",store.entries("seed").single().tag)
+            store.save(seed.id,RemoteMemoryEntryWriteRequest("seed","海浪","未确认构想",status="dormant",tag="世界观"))
+            assertEquals("世界观",store.entries("seed").single().tag)
             assertEquals(setOf(saved.id,seed.id),store.recall("今天看海浪","").map{it.id}.toSet())
             assertTrue(store.recall("不相关词汇","").isEmpty())
             assertTrue(store.recall("未确认构想","",explicit=true).any{it.id==seed.id})
@@ -45,6 +55,8 @@ class LocalMemoryArchiveTest {
             ArchiveV2Local.restore(manifest,stage,selected,app,target,true)
             val restored=LocalMemoryStore(target)
             assertEquals(store.snapshot(),restored.snapshot())
+            assertTrue(runCatching{restored.resolve("candidate1",RemoteMemoryPocketResolveRequest("memory",tag="世界观"))}.isFailure)
+            assertEquals("世界观",restored.entries("seed").single().tag)
             val resolved=restored.resolve("candidate1",RemoteMemoryPocketResolveRequest("memory",tag="关系"))
             assertEquals("confirmed",resolved.pocket.status)
             assertEquals(resolved.entry!!.id,restored.recall("海鸥",cid).single().id)

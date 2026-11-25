@@ -205,6 +205,9 @@ private fun MemoryEditor(entry: MemoryEntry?, onDismiss: () -> Unit, onSave: (Me
                 WolfTextField("使用时机", usageHint, { usageHint = it })
                 WolfTextField("勿误用", avoidHint, { avoidHint = it })
                 Text("正式标签", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+                if (entry?.tag in setOf("世界观", "海岸世界观")) {
+                    Text("原标签：${entry?.tag}（历史标签，可保留或重新分类）", style = MaterialTheme.typography.bodySmall)
+                }
                 canonicalMemoryTags.forEach { candidate -> ChoiceRow(candidate, tag == candidate) { tag = candidate } }
                 Text("保护级别", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
                 ChoiceRow("ordinary", memoryLevel == "ordinary") { memoryLevel = "ordinary" }
