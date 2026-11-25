@@ -44,7 +44,9 @@ export async function listArchiveSessions(db){
   return (await db.prepare('SELECT s.id,s.created_at,s.expires_at,COALESCE(SUM(o.size),0) AS reserved_bytes,COUNT(o.object_hash) AS objects FROM coast_archive_sessions s LEFT JOIN coast_archive_objects o ON o.session_id=s.id GROUP BY s.id ORDER BY s.created_at').all()).results;
 }
 export async function cancelArchiveSession(db,id){
-  await session(db,id,{expired:true});
+  // Already reaped/cancelled sessions are safe to close again.
+  check(typeof id==='string'&&idPattern.test(id),'invalid session id');
+  await ensureArchiveStage(db);
   // Explicit deletion also works in SQLite test environments with foreign keys disabled.
   await db.batch([
     db.prepare('DELETE FROM coast_archive_chunks WHERE session_id=?').bind(id),
