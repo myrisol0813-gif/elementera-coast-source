@@ -64,6 +64,7 @@ internal class LocalSemanticIndex(
         check(directory.isDirectory||directory.mkdirs()){"无法创建派生索引"}
         directory.listFiles()?.filter{it.isFile&&it.name.matches(Regex("[0-9a-f]{64}\\.vec"))&&it.name.removeSuffix(".vec") !in keys}
             ?.forEach{it.delete()}
+        if(docs.isEmpty()){state="语义索引就绪";return}
         if(encoder==null)inference.withLock{if(!closed.get()&&encoder==null)encoder=factory()}
         val engine=encoder?:return
         state="语义索引建立中"

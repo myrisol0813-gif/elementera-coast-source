@@ -48,7 +48,13 @@ jobs:
               for name, digest in expected.items():
                   assert hashlib.sha256(z.read(name)).hexdigest() == digest, name
               assert "assets/coast-embedding/NOTICE.txt" in z.namelist()
-              assert any(n.startswith("lib/arm64-v8a/") and "onnxruntime" in n for n in z.namelist())
+              native = [n for n in z.infolist() if n.filename.startswith("lib/") and "onnxruntime" in n.filename]
+              assert native
+              assert {n.filename.split("/")[1] for n in native} >= {"arm64-v8a", "armeabi-v7a", "x86_64", "x86"}
+              assert all(n.compress_type == zipfile.ZIP_DEFLATED for n in native), "Native libraries not compressed"
+              for abi in sorted({n.filename.split("/")[1] for n in native}):
+                  files = [n for n in native if n.filename.split("/")[1] == abi]
+                  print(f"ORT {abi}: {sum(n.compress_size for n in files)} bytes in APK; {sum(n.file_size for n in files)} bytes extracted")
           PY
       - name: Verify real Android CPU inference in the packaged app
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0

@@ -74,6 +74,9 @@ android {
         buildConfig = true
     }
     packaging {
+        // Compress native libraries in the downloadable APK; Android extracts the matching ABI at install.
+        // Preserve all upstream supported ABIs and the same signed package identity.
+        jniLibs.useLegacyPackaging = true
         resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}", "/META-INF/DEPENDENCIES")
     }
 }

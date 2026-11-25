@@ -46,6 +46,11 @@ object NativeWorkspace {
 /** One authoritative generation. Restore writes into a private staged directory, then switches a single atomic pointer. */
 class FileLocalPersistence(private val root: File, private val allowTransactions: Boolean = true) : LocalPersistence {
     internal var semanticIndex:LocalSemanticIndex? = null
+    private var memoryTouched = false
+    private fun memoryChanged(key:String) {
+        if(key!=LocalMemoryStore.KEY)return
+        if(allowTransactions)semanticIndex?.requestRefresh() else memoryTouched=true
+    }
     private val generationName = Regex("generation-[0-9a-f-]{36}")
     private val keyName = Regex("[0-9a-f]{64}")
     private fun ensureRoot() { check(root.isDirectory || root.mkdirs()) { "无法创建本机存储目录" } }
@@ -73,11 +78,11 @@ class FileLocalPersistence(private val root: File, private val allowTransactions
         catch (_: FileNotFoundException) { default }
     @Synchronized override fun put(key: String, value: String) {
         writeAtomic(file(key), value.toByteArray(Charsets.UTF_8))
-        if(key==LocalMemoryStore.KEY)semanticIndex?.requestRefresh()
+        memoryChanged(key)
     }
-    @Synchronized override fun remove(key: String) { file(key).delete() }
+    @Synchronized override fun remove(key: String) { file(key).delete();memoryChanged(key) }
     @Synchronized override fun getBinary(key:String):ByteArray?=try{file(key).readFully()}catch(_:FileNotFoundException){null}
-    @Synchronized override fun putBinary(key:String,value:ByteArray)=writeAtomic(file(key),value)
+    @Synchronized override fun putBinary(key:String,value:ByteArray){writeAtomic(file(key),value);memoryChanged(key)}
     @Synchronized override fun <T> readConsistent(block: (LocalPersistence) -> T): T = block(this)
 
     @Synchronized override fun <T> atomic(block: (LocalPersistence) -> T): T {
@@ -95,13 +100,14 @@ class FileLocalPersistence(private val root: File, private val allowTransactions
                 catch (_: FileNotFoundException) { continue }
                 writeAtomic(AtomicFile(File(stage, name)), value)
             }
-            val result = block(FileLocalPersistence(stage, allowTransactions = false))
+            val stagedStore = FileLocalPersistence(stage, allowTransactions = false)
+            val result = block(stagedStore)
             writeAtomic(pointer(), stage.name.toByteArray(Charsets.UTF_8))
             check(activeRoot() == stage) { "恢复索引未生效。" }
             // Retain the immediately previous generation; other abandoned stages are not authorities.
             root.listFiles()?.filter { it.isDirectory && generationName.matches(it.name) && it != old && it != stage }
                 ?.forEach { runCatching { it.deleteRecursively() } }
-            semanticIndex?.requestRefresh()
+            if(stagedStore.memoryTouched)semanticIndex?.requestRefresh()
             return result
         } catch (error: Exception) {
             // Never remove a stage if pointer publication may have succeeded.
