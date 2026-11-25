@@ -43,9 +43,11 @@ interface RealityContextSource {
 
 class AndroidRealityContextSource(
     context: Context,
-    private val persistence: LocalPersistence
+    private val persistence: LocalPersistence,
+    private val localWeatherEnabled:Boolean=false
 ) : RealityContextSource {
     private val app = context.applicationContext
+    private val localWeather=com.elementeracoast.app.core.local.LocalWeatherSource()
 
     override suspend fun capture(settings: ConversationContextSettings): RemoteRealityContext =
         withContext(Dispatchers.IO) {
@@ -58,7 +60,8 @@ class AndroidRealityContextSource(
                 location = if (clean.has(RealityContextFields.LOCATION)) coarseLocation() else null,
                 recentApp = if (wantsUsage && hasUsageAccess(app)) recentApp() else null,
                 appUsage = if (clean.has(RealityContextFields.APP_USAGE) && hasUsageAccess(app)) appUsageToday() else emptyList(),
-                steps = if (clean.has(RealityContextFields.STEPS)) stepsToday() else null
+                steps = if (clean.has(RealityContextFields.STEPS)) stepsToday() else null,
+                weather = if(localWeatherEnabled&&clean.has(RealityContextFields.WEATHER)) localWeather.read(clean.weatherCity) else null
             )
         }
 

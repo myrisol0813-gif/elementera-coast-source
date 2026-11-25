@@ -67,7 +67,7 @@ fun CrossWindowPane(
 
     Column(modifier = modifier.fillMaxWidth()) {
         if (keywordOnly && com.elementeracoast.app.core.local.NativeWorkspace.isLocal) {
-            CrossWindowNote("本机目前支持手动跨窗口选取；模型自主关键词检索尚未接入。")
+            CrossWindowNote("本机的模型自主跨窗口权限在「这个窗口」中设置；此处手动选取只用于本轮。")
             return@Column
         }
         if (keywordOnly) {
@@ -106,7 +106,7 @@ fun CrossWindowPane(
         )
         Spacer(Modifier.height(8.dp))
         when (state.mode) {
-            CrossWindowMode.Off, CrossWindowMode.Keyword -> CrossWindowNote("本轮关闭跨窗口原文读取。")
+            CrossWindowMode.Off, CrossWindowMode.Keyword -> CrossWindowNote(if(com.elementeracoast.app.core.local.NativeWorkspace.isLocal)"未手动选取；常态权限以「这个窗口」设置为准。" else "本轮关闭跨窗口原文读取。")
             CrossWindowMode.ModelDecides -> CrossWindowNote("本轮只开放取信工具，不提前塞入其他窗口正文。模型没有调用时，不会读取。")
             CrossWindowMode.Manual -> ManualSources(state, onChange)
         }

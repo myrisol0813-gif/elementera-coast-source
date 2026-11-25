@@ -29,6 +29,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
     private val portraits = LocalPortraitStore(store)
     private val soil = LocalSoilStore(store)
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
+    private val toolSessions=linkedMapOf<String,LocalToolSession>()
     private val media = "application/json; charset=utf-8".toMediaType()
 
     override fun intercept(chain: Interceptor.Chain): Response = synchronized(this) {
@@ -215,12 +216,27 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if (!conversationExists(request.conversationId)) return missing(r)
             val budget = request.settings["contextBudget"]?.toLongOrNull()?.coerceAtLeast(1800) ?: 18000
             val room=cache.conversations().first { it.id==request.conversationId }.roomType
-            val prepared=knowledge.context(request.messages,budget.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),if(room=="main")"main_chat" else room,request.conversationId,request.attachmentIds,request.sourceTurnId.orEmpty(),request.crossWindow)
+            val prepared=knowledge.context(request.messages,budget.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),if(room=="main")"main_chat" else room,request.conversationId,request.attachmentIds,request.sourceTurnId.orEmpty(),request.crossWindow,request.realityContext?:RemoteRealityContext())
+            val session=knowledge.toolSession(request.conversationId,request.sourceTurnId,request.crossWindow,prepared.receipt,request.model)
+            val key=request.conversationId+":"+request.messageId
+            toolSessions.remove(key)
+            if(session!=null){require(request.messageId.isNotBlank());while(toolSessions.size>=8)toolSessions.remove(toolSessions.keys.first());toolSessions[key]=session}
             return response(r, 200, element(RemoteNativeChatContext.serializer(), RemoteNativeChatContext(
                 ok = true,
+                tools = session?.tools?:JsonArray(emptyList()),
                 modelMessages = localMultimodalMessages(prepared.messages,prepared.imageParts),
-                deskSlip = prepared.receipt
+                deskSlip = session?.receipt?:prepared.receipt
             )).jsonObject)
+        }
+        if (path == "/api/chat/native-tool" && method == "POST") {
+            val b=body(r)
+            val request=json.decodeFromJsonElement(RemoteChatRequest.serializer(),b)
+            val session=toolSessions[request.conversationId+":"+request.messageId]
+                ?:return failure(r,403,"local_tool_session_missing","本轮没有已授权的本机工具会话。")
+            val call=b.getValue("tool_call").jsonObject
+            val fn=call.getValue("function").jsonObject
+            val result=session.execute(call.str("id").orEmpty(),fn.str("name").orEmpty(),fn.str("arguments").orEmpty())
+            return response(r,200,element(RemoteNativeToolResult.serializer(),result).jsonObject)
         }
         if (path == "/api/chat/native-echo" && method == "POST") {
             val b = body(r)
@@ -228,6 +244,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val mid = b.str("message_id").orEmpty()
             if (!conversationExists(cid) || mid.isBlank()) return missing(r)
             val snapshot = b["snapshot"] ?: return unsupported(r)
+            toolSessions.remove(cid+":"+mid)
             store.put("local.echo." + cid + "." + mid, snapshot.toString())
             return ok(r)
         }

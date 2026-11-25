@@ -28,6 +28,9 @@ export function normalizeContextSettings(value = {}) {
       .map((item) => String(item || '').trim())
       .filter((item) => REALITY_CONTEXT_FIELDS.has(item)))],
     short_reply_mode: raw.short_reply_mode === true,
+    ...(raw.cross_window_auto === true ? { cross_window_auto: true } : {}),
+    ...(raw.local_model_tools_enabled === true ? { local_model_tools_enabled: true } : {}),
+    ...(raw.local_model_write_enabled === true ? { local_model_write_enabled: true } : {}),
     weather_city: String(raw.weather_city || '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80),
   };
 }

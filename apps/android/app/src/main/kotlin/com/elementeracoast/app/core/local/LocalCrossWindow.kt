@@ -1,6 +1,7 @@
 package com.elementeracoast.app.core.local
 
 import com.elementeracoast.app.core.remote.*
+import kotlinx.serialization.json.*
 
 /** Index visible active branches in this local workspace; no server fallback. */
 internal class LocalCrossWindow(store: LocalPersistence) {
@@ -20,7 +21,7 @@ internal class LocalCrossWindow(store: LocalPersistence) {
     fun sources(currentId: String): RemoteCrossWindowSourcesResponse {
         require(cache.conversations().any { it.id == currentId }) { "当前本机窗口不存在。" }
         return RemoteCrossWindowSourcesResponse(ok = true, description = "手动选择的旧消息仅用于本轮。",
-            sources = cache.conversations().filterNot { it.id == currentId }.map { c ->
+            sources = cache.conversations().filter { it.id != currentId && it.deletedAt == null }.map { c ->
                 val messages = items(c.id)
                 val turns = messages.groupBy { it.turn }.values.map { group ->
                     RemoteCrossWindowTurn(group.first().turn, group.first().number, group.map { item ->
@@ -33,6 +34,21 @@ internal class LocalCrossWindow(store: LocalPersistence) {
                     readable = messages.isNotEmpty(), disabledReason = if (messages.isEmpty()) "暂无可选文字" else "", turns = turns)
             })
     }
+    fun keyword(currentId:String, query:String):List<Pair<RemoteCrossWindowMessageSelection,kotlinx.serialization.json.JsonObject>> {
+        require(query.trim().length in 1..160)
+        val q=query.trim()
+        return cache.conversations().asSequence().filter{it.id!=currentId&&it.deletedAt==null}
+            .sortedByDescending{it.updatedAt}.flatMap{c->items(c.id).asSequence().mapNotNull{item->
+                val at=item.variant.content.indexOf(q,ignoreCase=true)
+                if(at<0)return@mapNotNull null
+                val from=(at-65).coerceAtLeast(0)
+                val excerpt=item.variant.content.substring(from,(from+180).coerceAtMost(item.variant.content.length))
+                RemoteCrossWindowMessageSelection(c.id,item.variant.id) to kotlinx.serialization.json.buildJsonObject{
+                    put("conversation_id",c.id);put("message_id",item.variant.id);put("title",c.title)
+                    put("turn_id",item.turn);put("role",item.role);put("preview",excerpt);put("length",item.variant.content.length)
+                }
+            }}.take(10).toList()
+    }
     data class Selection(val text: String, val receipt: RemoteDeskCrossWindow)
     fun select(currentId: String, request: RemoteCrossWindowRequest?): Selection {
         val mode = request?.mode ?: "off"
@@ -41,7 +57,7 @@ internal class LocalCrossWindow(store: LocalPersistence) {
         val selected = request?.messages.orEmpty().distinct()
         if (selected.isEmpty()) return Selection("", RemoteDeskCrossWindow(mode = "manual", status = "未选消息"))
         require(selected.none { it.conversationId == currentId }) { "请从其他窗口选取消息。" }
-        val conversations = cache.conversations().associateBy { it.id }
+        val conversations = cache.conversations().filter{it.deletedAt==null}.associateBy { it.id }
         val sources = mutableListOf<RemoteDeskCrossWindowSource>()
         val groups = mutableListOf<RemoteDeskCrossWindowMessages>()
         var turns = 0
