@@ -10,6 +10,9 @@ import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.elementeracoast.app.BuildConfig
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
+import java.io.InputStream
+import java.io.OutputStream
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import okhttp3.OkHttpClient
@@ -21,7 +24,33 @@ import java.util.concurrent.TimeUnit
 
 private const val RELEASE_REPO = "myrisol0813-gif/elementera-coast-source"
 private const val SOURCE_CHANNEL = true
-private const val MAX_APK = 80L * 1024 * 1024
+internal const val MAX_APK = 256L * 1024 * 1024
+
+/** Bounded streaming transfer; hashes only bytes actually written. */
+internal fun streamApk(
+    input: InputStream, output: OutputStream, expectedLength: Long,
+    expectedSha: String, max: Long = MAX_APK, checkActive: () -> Unit = {}
+) {
+    require(expectedLength >= -1 && max > 0)
+    if (expectedLength > max) throw IOException("安装包超过 256 MiB 下载上限。")
+    val digest = MessageDigest.getInstance("SHA-256")
+    val buffer = ByteArray(64 * 1024)
+    var total = 0L
+    while (true) {
+        checkActive()
+        val count = input.read(buffer)
+        if (count < 0) break
+        if (count == 0) continue
+        if (count.toLong() > max - total) throw IOException("安装包超过下载大小上限。")
+        output.write(buffer, 0, count)
+        digest.update(buffer, 0, count)
+        total += count
+    }
+    checkActive()
+    if (total == 0L || (expectedLength >= 0 && total != expectedLength)) throw IOException("安装包下载不完整。")
+    val actual = digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
+    require(actual == expectedSha) { "APK SHA-256 校验失败，已停止安装。" }
+}
 
 internal data class GithubReleaseAssets(val tag: String, val apk: String, val notes: String, val order: Long)
 internal data class LocalRelease(val assets: GithubReleaseAssets, val version: String, val code: Int, val sha: String)
@@ -89,12 +118,25 @@ internal class LocalGithubUpdater {
     }
     suspend fun download(context: Context, release: LocalRelease): File = withContext(Dispatchers.IO) {
         require(release.code > BuildConfig.VERSION_CODE) { "当前版本无需更新。" }
-        val bytes = get(asset(release.assets, release.assets.apk), MAX_APK)
-        require(digest(bytes) == release.sha) { "APK SHA-256 校验失败，已停止安装。" }
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
-        val file = File(dir, release.assets.apk)
-        file.writeBytes(bytes)
+        require(dir.isDirectory) { "无法创建更新下载目录。" }
+        val file = File.createTempFile("update-", ".apk", dir)
+        val scope = this
         try {
+            client.newCall(Request.Builder().url(asset(release.assets, release.assets.apk))
+                .header("Accept", "application/octet-stream").build()).execute().use { response ->
+                if (!response.isSuccessful) throw IOException("GitHub 请求失败（HTTP ${response.code}）。")
+                val body = response.body ?: throw IOException("GitHub 未返回安装包。")
+                val length = body.contentLength()
+                if (length > MAX_APK) throw IOException("安装包超过 256 MiB 下载上限。")
+                if (length > dir.usableSpace) throw IOException("设备存储空间不足，无法下载安装包。")
+                body.byteStream().use { input ->
+                    file.outputStream().buffered().use { output ->
+                        streamApk(input, output, length, release.sha) { scope.ensureActive() }
+                    }
+                }
+            }
+            scope.ensureActive()
             val pm = context.packageManager
             @Suppress("DEPRECATION")
             val flags = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
@@ -109,6 +151,7 @@ internal class LocalGithubUpdater {
             val new = signatures(archive)
             require(old.isNotEmpty() && old == new) { "签名与本机不一致，不能覆盖安装。请保留旧应用及本机资料。" }
             if (SOURCE_CHANNEL) require(new == setOf("3e021e11f05b619d603543929e07edd32a037323478a9abfdfe5b405ce6fca59")) { "开源发行签名不一致。" }
+            scope.ensureActive()
             file
         } catch (e: Exception) { file.delete(); throw e }
     }
