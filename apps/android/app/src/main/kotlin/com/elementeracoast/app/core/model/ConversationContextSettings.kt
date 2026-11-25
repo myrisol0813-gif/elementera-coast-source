@@ -27,7 +27,9 @@ data class ConversationContextSettings(
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     @SerialName("cross_window_auto") val crossWindowAuto: Boolean = false,
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
-    @SerialName("local_model_tools_enabled") val localModelToolsEnabled: Boolean = false
+    @SerialName("local_model_tools_enabled") val localModelToolsEnabled: Boolean = false,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("local_model_write_enabled") val localModelWriteEnabled: Boolean = false
 ) {
     fun normalized(): ConversationContextSettings = copy(
         realityFields = realityFields.filter(RealityContextFields.all::contains).distinct(),

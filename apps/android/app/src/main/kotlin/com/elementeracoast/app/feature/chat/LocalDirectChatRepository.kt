@@ -29,7 +29,7 @@ internal class LocalDirectChatRepository(
         val prepared=try{knowledge.context(messages,contextBudget,knowledge.surfaceFor(conversationId),conversationId,attachmentIds,turnId,crossWindow.toRemote(),realityContext)}catch(e:IllegalArgumentException){
             throw CoastApiException(CoastApiErrorKind.Request,"local_context_budget",e.message.orEmpty())
         }
-        val session=try{knowledge.toolSession(conversationId,turnId,crossWindow.toRemote(),prepared.receipt)}catch(e:IllegalArgumentException){throw CoastApiException(CoastApiErrorKind.Request,"local_tool_budget",e.message.orEmpty())}
+        val session=try{knowledge.toolSession(conversationId,turnId,crossWindow.toRemote(),prepared.receipt,modelId)}catch(e:IllegalArgumentException){throw CoastApiException(CoastApiErrorKind.Request,"local_tool_budget",e.message.orEmpty())}
         val runs=mutableListOf<com.elementeracoast.app.core.remote.RemoteFurnitureRun>()
         var content = ""
         var completed = false

@@ -103,7 +103,7 @@ internal class LocalSideRecords(private val store:LocalPersistence) {
         return buildJsonObject{put("book_id",id);put("has_cover",true);put("size",data.size);put("mime",mime)}
     }
     fun deleteBook(id:String){book(id);save(rows().filterNot{it.kind=="library_books"&&it.id==identity("library_books",buildJsonObject{put("id",id)})||it.data.optional("book_id")==id})}
-    fun writeNote(id:String,input:JsonObject):JsonObject{
+    fun writeNote(id:String,input:JsonObject,author:String="owner",cid:String?=null,turn:String?=null):JsonObject{
         book(id);val kind=input.optional("kind")?:"annotation";val now=System.currentTimeMillis()
         val chapter=if(kind=="reflection")null else input.getValue("chapter_index").jsonPrimitive.int
         val paragraph=if(kind=="reflection")null else input.getValue("paragraph_index").jsonPrimitive.int
@@ -111,7 +111,7 @@ internal class LocalSideRecords(private val store:LocalPersistence) {
         val start=input["start_offset"]?.jsonPrimitive?.intOrNull;val end=input["end_offset"]?.jsonPrimitive?.intOrNull
         require((start==null)==(end==null));val quote=if(start==null)text else requireNotNull(text).substring(start,requireNotNull(end))
         val row=Row("library_notes",buildJsonObject{
-            put("id",UUID.randomUUID().toString());put("book_id",id);put("chapter_index",chapter?.let(::JsonPrimitive)?:JsonNull);put("paragraph_index",paragraph?.let(::JsonPrimitive)?:JsonNull);put("quote",quote?.let(::JsonPrimitive)?:JsonNull);put("kind",kind);put("body",input.optional("body").orEmpty().trim());put("author","owner");put("source","manual");put("conversation_id",JsonNull);put("source_turn_id",JsonNull);put("created_at",now);put("updated_at",now);put("start_offset",start?.let(::JsonPrimitive)?:JsonNull);put("end_offset",end?.let(::JsonPrimitive)?:JsonNull)
+            put("id",UUID.randomUUID().toString());put("book_id",id);put("chapter_index",chapter?.let(::JsonPrimitive)?:JsonNull);put("paragraph_index",paragraph?.let(::JsonPrimitive)?:JsonNull);put("quote",quote?.let(::JsonPrimitive)?:JsonNull);put("kind",kind);put("body",input.optional("body").orEmpty().trim());put("author",author);put("source",if(author=="owner")"manual"else "chat_tool");put("conversation_id",cid?.let(::JsonPrimitive)?:JsonNull);put("source_turn_id",turn?.let(::JsonPrimitive)?:JsonNull);put("created_at",now);put("updated_at",now);put("start_offset",start?.let(::JsonPrimitive)?:JsonNull);put("end_offset",end?.let(::JsonPrimitive)?:JsonNull)
         })
         val next=rows()+row;validateLibrary(next,emptyMap());save(next);return wireNote(row.data)
     }

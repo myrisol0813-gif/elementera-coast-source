@@ -217,7 +217,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val budget = request.settings["contextBudget"]?.toLongOrNull()?.coerceAtLeast(1800) ?: 18000
             val room=cache.conversations().first { it.id==request.conversationId }.roomType
             val prepared=knowledge.context(request.messages,budget.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),if(room=="main")"main_chat" else room,request.conversationId,request.attachmentIds,request.sourceTurnId.orEmpty(),request.crossWindow,request.realityContext?:RemoteRealityContext())
-            val session=knowledge.toolSession(request.conversationId,request.sourceTurnId,request.crossWindow,prepared.receipt)
+            val session=knowledge.toolSession(request.conversationId,request.sourceTurnId,request.crossWindow,prepared.receipt,request.model)
             val key=request.conversationId+":"+request.messageId
             toolSessions.remove(key)
             if(session!=null){require(request.messageId.isNotBlank());while(toolSessions.size>=8)toolSessions.remove(toolSessions.keys.first());toolSessions[key]=session}

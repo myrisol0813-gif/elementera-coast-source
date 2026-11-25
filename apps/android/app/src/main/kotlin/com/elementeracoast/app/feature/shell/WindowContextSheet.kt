@@ -186,6 +186,9 @@ internal fun WindowContextSheet(
                     SettingSwitchRow(title = "本机模型工具", note = "允许模型读取本机记忆、日常、日历、书房与拾潮等资料",
                         checked = settings.localModelToolsEnabled, enabled = usable,
                         onCheckedChange = { onSettingsChange(settings.copy(localModelToolsEnabled=it)) })
+                    SettingSwitchRow(title = "本机模型写入", note = "允许模型新增日记、动态、批注、日历事项与待确认记忆；不会直接确认记忆",
+                        checked = settings.localModelWriteEnabled, enabled = usable,
+                        onCheckedChange = { onSettingsChange(settings.copy(localModelWriteEnabled=it)) })
                 }
                 SettingSwitchRow(
                     title = "短句模式",

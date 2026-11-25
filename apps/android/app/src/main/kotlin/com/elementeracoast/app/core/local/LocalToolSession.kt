@@ -11,6 +11,8 @@ internal class LocalToolSession private constructor(
     private val turn:String,
     private val crossAllowed:Boolean,
     private val readAllowed:Boolean,
+    private val writeAllowed:Boolean,
+    private val modelId:String,
     base:RemoteDeskSlip
 ) {
     private data class Spec(val name:String,val key:String,val title:String,val description:String,val parameters:JsonObject)
@@ -36,6 +38,15 @@ internal class LocalToolSession private constructor(
             add(Spec("list_daily_moments","daily.moments.list","读碳硅圈","读取最近的本机动态，最多8条。",schema()))
             add(Spec("list_daily_diaries","daily.diaries.list","读日记","读取最近的本机日记，最多8条。",schema()))
             add(Spec("worldbook_list","worldbook.list","翻世界书","按关键词查找当前屋主可读的词条。",schema(mapOf("query" to string()),listOf("query"))))
+        }
+        if(writeAllowed){
+            add(Spec("create_moment","daily.create_moment","写碳硅圈","以模型身份新增正式动态。",schema(mapOf("date" to string(10),"text" to string(4000)),listOf("date","text"))))
+            add(Spec("create_diary","daily.create_diary","写日记","以模型身份新增日记。",schema(mapOf("date" to string(10),"text" to string(6000),"weather" to string(80),"mood" to string(80),"tags" to array(string(80),12)),listOf("date","text"))))
+            add(Spec("moment_comment","daily.moment_comment","评论碳硅圈","以模型身份评论指定动态。",schema(mapOf("moment_id" to string(),"text" to string(2000)),listOf("moment_id","text"))))
+            add(Spec("moment_like","daily.moment_like","点赞碳硅圈","仅改变模型自己的点赞。",schema(mapOf("moment_id" to string(),"liked" to buildJsonObject{put("type","boolean")}),listOf("moment_id","liked"))))
+            add(Spec("calendar_create","calendar.create","写日历","新增一条模型日历事项，不修改或删除既有事项。",schema(mapOf("date" to string(10),"title" to string(120),"body" to string(4000),"kind" to string(10)),listOf("date","title"))))
+            add(Spec("library_write","library.write","写书房笔记","新增模型自己的批注或读后感；kind=annotation 时须指定章节及段落。",schema(mapOf("book_id" to string(),"kind" to string(16),"body" to string(4000),"chapter_index" to integer(0,100000),"paragraph_index" to integer(0,100000)),listOf("book_id","kind","body"))))
+            add(Spec("memory_write_candidate","memory.write_candidate","放入待确认袋","提出记忆或种子候选，由屋主确认，不直接写入正式记忆。",schema(mapOf("title" to string(120),"content" to string(2000),"destination" to string(8)),listOf("title","content","destination"))))
         }
     }
     val tools=JsonArray(specs.map{spec->buildJsonObject{
@@ -66,13 +77,14 @@ internal class LocalToolSession private constructor(
         val cache=RemoteCacheStore(s,strictReads=true)
         val h=cache.history(cid)?:return false
         if(cache.conversations().none{it.id==cid&&it.deletedAt==null}||h.turns.none{it.id==turn})return false
-        return (!crossAllowed||h.contextSettings.crossWindowAuto)&&(!readAllowed||h.contextSettings.localModelToolsEnabled)
+        return (!crossAllowed||h.contextSettings.crossWindowAuto)&&(!readAllowed||h.contextSettings.localModelToolsEnabled)&&(!writeAllowed||h.contextSettings.localModelWriteEnabled)
     }
     fun execute(callId:String,name:String,arguments:String):RemoteNativeToolResult {
         val spec=specs.firstOrNull{it.name==name}?:return errorResult("工具未授权。")
         if(calls>=8||callId.isBlank()||!seenCalls.add(callId))return errorResult("工具次数上限或重复调用。")
         calls++
         val start=System.currentTimeMillis()
+        if(name in WRITE_NAMES)return executeWrite(spec,arguments,start)
         var success=false
         var output=buildJsonObject{put("ok",false);put("message","工具没有执行。")}
         try {
@@ -110,6 +122,38 @@ internal class LocalToolSession private constructor(
         reports.add(RemoteDeskToolResult(name=name,delivered=true,content=if(success)"成功返回 "+output.toString().length+" 字符"else "未完成"))
         val run=RemoteFurnitureRun(id=auditId,toolKey=spec.key,label=spec.title,status=if(success)"success"else "error")
         return RemoteNativeToolResult(ok=success,output=output.toString(),furnitureRuns=listOf(run),deskSlip=receipt)
+    }
+    private fun executeWrite(spec:Spec,arguments:String,start:Long):RemoteNativeToolResult {
+        val auditId=UUID.randomUUID().toString()
+        val output=try {
+            require(arguments.length<=12000)
+            val input=Json.parseToJsonElement(arguments).jsonObject
+            require(input.keys.all{it in spec.parameters.getValue("properties").jsonObject.keys}&&spec.parameters.getValue("required").jsonArray.all{it.jsonPrimitive.content in input})
+            store.atomic{s->
+                require(allowedNow(s))
+                val value=LocalToolWrites(s,cid,turn,modelId,auditId).execute(spec.name,input)
+                require(estimated+estimate(arguments)+estimate(value.toString())+32<=original.contextBudget.comfortCeiling)
+                auditWrite(s,auditId,spec.key,start,true)
+                value
+            }
+        }catch(_:Exception){
+            runCatching{store.readConsistent{s->auditWrite(s,auditId,spec.key,start,false)}}
+            buildJsonObject{put("ok",false);put("message","写入未完成：权限、资料、参数或预算不满足。")}
+        }
+        val success=output["ok"]?.jsonPrimitive?.booleanOrNull==true
+        estimated+=estimate(arguments.take(12000))+estimate(output.toString())+32
+        reports.add(RemoteDeskToolResult(name=spec.name,delivered=true,content=if(success)"已保存 · "+output["id"]?.jsonPrimitive?.contentOrNull.orEmpty()else "未完成"))
+        return RemoteNativeToolResult(ok=success,output=output.toString(),deskSlip=receipt,
+            furnitureRuns=listOf(RemoteFurnitureRun(id=auditId,toolKey=spec.key,label=spec.title,status=if(success)"success"else "error")))
+    }
+    private fun auditWrite(s:LocalPersistence,id:String,key:String,start:Long,success:Boolean){
+        val audit=LocalToolAudit(s)
+        val room=RemoteCacheStore(s,strictReads=true).conversations().first{it.id==cid}.roomType
+        audit.write(audit.read()+buildJsonObject{
+            put("id",id);put("tool_key",key);put("actor","native_model_partner")
+            put("room_scope",if(room=="main")"main_chat"else room);put("conversation_id",cid)
+            put("status",if(success)"success"else "error");put("created_at",start);put("finished_at",System.currentTimeMillis().coerceAtLeast(start))
+        })
     }
     fun requireContinuationBudget(history:List<JsonElement>) {
         // Image bytes were already charged at the fixed estimate in the prepared receipt.
@@ -179,12 +223,14 @@ internal class LocalToolSession private constructor(
     }
     private fun JsonObject.filterMetadata()=JsonObject(filterKeys{it !in setOf("reading_logs","progress")})
     companion object {
-        fun open(store:LocalPersistence,cid:String,turn:String,request:RemoteCrossWindowRequest?,base:RemoteDeskSlip):LocalToolSession?{
+        private val WRITE_NAMES=setOf("create_moment","create_diary","moment_comment","moment_like","calendar_create","library_write","memory_write_candidate")
+        fun open(store:LocalPersistence,cid:String,turn:String,request:RemoteCrossWindowRequest?,base:RemoteDeskSlip,modelId:String=""):LocalToolSession?{
             val h=RemoteCacheStore(store,strictReads=true).history(cid)?:return null
             val cross=h.contextSettings.crossWindowAuto&&request?.mode=="model_decides"
             val tools=h.contextSettings.localModelToolsEnabled
-            if(!cross&&!tools)return null
-            return LocalToolSession(store,cid,turn,cross,tools,base)
+            val write=h.contextSettings.localModelWriteEnabled&&modelId.isNotBlank()
+            if(!cross&&!tools&&!write)return null
+            return LocalToolSession(store,cid,turn,cross,tools,write,modelId,base)
         }
     }
 }

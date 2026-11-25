@@ -160,7 +160,7 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                                 val fn=item["function"] as? JsonObject
                                 fn?.get("name")?.jsonPrimitive?.contentOrNull?.let{parts.name.append(it)}
                                 fn?.get("arguments")?.jsonPrimitive?.contentOrNull?.let{parts.arguments.append(it)}
-                                require(parts.id.length<=240&&parts.name.length<=160&&parts.arguments.length<=6000)
+                                require(parts.id.length<=240&&parts.name.length<=160&&parts.arguments.length<=12000)
                             }
                             (choice["finish_reason"] as? JsonPrimitive)?.contentOrNull?.let{reason=it}
                         }
