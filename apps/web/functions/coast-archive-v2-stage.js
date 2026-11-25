@@ -23,8 +23,17 @@ async function session(db,id,{expired=false}={}){
   check(expired||row.expires_at>Date.now(),'archive session expired; cancel to release space',410);
   return row;
 }
-export async function createArchiveSession(db){
+// Reap only expired staging sessions, never live archive or chat tables.
+export async function reapExpiredArchiveSessions(db,now=Date.now()){
   await ensureArchiveStage(db);
+  await db.batch([
+    db.prepare('DELETE FROM coast_archive_chunks WHERE session_id IN (SELECT id FROM coast_archive_sessions WHERE expires_at<=?)').bind(now),
+    db.prepare('DELETE FROM coast_archive_objects WHERE session_id IN (SELECT id FROM coast_archive_sessions WHERE expires_at<=?)').bind(now),
+    db.prepare('DELETE FROM coast_archive_sessions WHERE expires_at<=?').bind(now)
+  ]);
+}
+export async function createArchiveSession(db){
+  await reapExpiredArchiveSessions(db);
   const id=crypto.randomUUID(),now=Date.now();
   const r=await db.prepare('INSERT INTO coast_archive_sessions (id,created_at,expires_at) SELECT ?,?,? WHERE (SELECT COUNT(*) FROM coast_archive_sessions)<?').bind(id,now,now+STAGING_LIMITS.ttlMs,STAGING_LIMITS.sessions).run();
   check(r.meta.changes===1,'archive staging session quota reached; cancel unused sessions',409);
@@ -35,7 +44,9 @@ export async function listArchiveSessions(db){
   return (await db.prepare('SELECT s.id,s.created_at,s.expires_at,COALESCE(SUM(o.size),0) AS reserved_bytes,COUNT(o.object_hash) AS objects FROM coast_archive_sessions s LEFT JOIN coast_archive_objects o ON o.session_id=s.id GROUP BY s.id ORDER BY s.created_at').all()).results;
 }
 export async function cancelArchiveSession(db,id){
-  await session(db,id,{expired:true});
+  // Already reaped/cancelled sessions are safe to close again.
+  check(typeof id==='string'&&idPattern.test(id),'invalid session id');
+  await ensureArchiveStage(db);
   // Explicit deletion also works in SQLite test environments with foreign keys disabled.
   await db.batch([
     db.prepare('DELETE FROM coast_archive_chunks WHERE session_id=?').bind(id),

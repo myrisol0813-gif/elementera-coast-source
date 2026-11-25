@@ -10,7 +10,7 @@ import { MODULES,encodeRecordObject,validateArchiveManifest } from '../functions
 test('manifest requires explicit coverage, all record objects and dependencies',async()=>{
  const {descriptor}=await encodeRecordObject({id:'c',text:'archive fixture'});
  const r={module:'chat',id:'c',record_object:descriptor.object_sha256,media_objects:[],dependencies:[]};
- const m={format:'elementera-coast-archive',version:2,workspace:'backend',application_id:'com.elementeracoast.app',exported_at:'2026-01-01T00:00:00Z',modules:MODULES.map(module=>({module,coverage:module==='chat'?'complete':'unavailable',count:module==='chat'?1:0})),records:[r],objects:[descriptor]};
+ const m={format:'elementera-coast-archive',version:2,workspace:'backend',application_id:'com.elementeracoast.source',exported_at:'2026-01-01T00:00:00Z',modules:MODULES.map(module=>({module,coverage:module==='chat'?'complete':'unavailable',count:module==='chat'?1:0})),records:[r],objects:[descriptor]};
  assert.equal((await validateArchiveManifest(m)).declaredComplete,false);
  for(const bad of [{...m,modules:m.modules.slice(1)},{...m,records:[{...r,dependencies:['chat/missing']}]},{...m,objects:[descriptor,descriptor]},{...m,objects:[]}])await assert.rejects(()=>validateArchiveManifest(bad));
 });
@@ -34,4 +34,17 @@ test('owner record pages preserve source text, raw chat history and original voi
  const v=await readArchiveVoice(db,'v1');assert.deepEqual([...v.chunks[0]],[1,2,3]);
  assert.equal((await archiveRecordPage(db,'voice')).items[0].id,'v1');
  await assert.rejects(()=>archiveRecordPage(db,'mailbox_messages'));
+});
+
+test('selected cloud upload excludes unrelated book, includes exact chat media and dependencies',async()=>{
+ const {selectedArchiveManifest}=await import('../elementera-mcp/deploy-pages/public/features/settings-archive-v2.js');
+ const objects=await Promise.all([1,2,3,4,5].map(i=>encodeRecordObject({i})));
+ const [c,a,media,book,other]=objects.map(x=>x.descriptor);
+ const records=[{module:'chat',id:'c',record_object:c.object_sha256,media_objects:[],dependencies:[]},{module:'attachments',id:'a',record_object:a.object_sha256,media_objects:[media.object_sha256],dependencies:['chat/c']},{module:'library',id:'other-book',record_object:book.object_sha256,media_objects:[],dependencies:[]},{module:'chat',id:'other',record_object:other.object_sha256,media_objects:[],dependencies:[]}];
+ const m={format:'elementera-coast-archive',version:2,workspace:'local',application_id:'com.elementeracoast.source',exported_at:'2026-01-01T00:00:00Z',modules:MODULES.map(module=>({module,coverage:records.some(r=>r.module===module)?'partial':'unavailable',count:records.filter(r=>r.module===module).length})),records,objects:objects.map(x=>x.descriptor)};
+ const subset=await selectedArchiveManifest(m,{kind:'chat',id:'c'});
+ assert.deepEqual(subset.records.map(r=>r.id),['c','a']);
+ assert.deepEqual(subset.objects,[c,a,media]);
+ assert.equal(subset.modules.find(r=>r.module==='library').coverage,'unavailable');
+ assert.equal((await validateArchiveManifest(subset)).records,2);
 });

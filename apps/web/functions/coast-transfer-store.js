@@ -97,21 +97,38 @@ export function validatedChat(row,{verifiedMediaGroup=false}={}) {
     if (v.message_source === 'owner_web') v.message_source = WEB_MESSAGE_SOURCE;
     // Native uses explicit null/default fields, which the server omits. Compare meaningful values below.
   }
-  const normalized = normalizeState(h2);
+  // The native local runtime has historically stored a receipt for each
+  // reply. Preserve original receipts that the ordinary online latest-only
+  // policy would discard, explicitly marking only those archived variants.
+  let normalized = normalizeState(h2);
+  const byId = new Map(normalized.turns.flatMap(t=>Object.values(t.assistant.variantsByUserVariant).flat()).map(v=>[v.id,v]));
+  let retained=false;
+  for(const t of h2.turns) for(const v of Object.values(t.assistant.variantsByUserVariant).flat()){
+    if(object(v.desk_slip)&&byId.has(v.id)&&!byId.get(v.id).desk_slip){
+      v.archive_retained_desk_slip=true;retained=true;
+    }
+  }
+  if(retained)normalized=normalizeState(h2);
+  // Do not echo arbitrary JSON keys from an uploaded archive in client errors.
+  const safePath = path => {
+    const allowed = new Set(['history','turns','user','assistant','variants','variantsByUserVariant','activeByUserVariant','active','id','content','created_at','updated_at','context_settings','reality_enabled','reality_fields','short_reply_mode','weather_city','version','liked','favorite','hidden','model_id','finish_reason','generation_source','message_source','display_author','errorDetail','attachments','furniture_runs','desk_slip','archive_retained_desk_slip','usage','input_type','source_model_label','dogtalk_snapshot_id','turn_type','prompt_tokens','completion_tokens','total_tokens']);
+    const parts=path.split('.').map(x=>x.replace(/\[\]/g,''));
+    return parts.every(x=>allowed.has(x)||/^\d{1,2}$/.test(x)) ? path : '未识别字段';
+  };
   const compare = (raw, next, path = '') => {
     if (raw === null || raw === '' || raw === false || (Array.isArray(raw) && raw.length === 0)) {
       if (next === undefined || identical(raw,next)) return;
     }
     if (object(raw)) {
-      require(object(next), '目标不能完整保留字段：'+path);
+      require(object(next), '目标不能完整保留字段：'+safePath(path));
       for (const [key,value] of Object.entries(raw)) {
         if (key === 'conversation_id' && path === 'history') continue;
         compare(value,next[key],path+'.'+key);
       }
     } else if (Array.isArray(raw)) {
-      require(Array.isArray(next) && raw.length === next.length,'目标不能完整保留数组：'+path);
+      require(Array.isArray(next) && raw.length === next.length,'目标不能完整保留数组：'+safePath(path));
       raw.forEach((v,i)=>compare(v,next[i],path+'[]'));
-    } else require(identical(raw,next), '目标不能完整保留字段：'+path);
+    } else require(identical(raw,next), '目标不能完整保留字段：'+safePath(path));
   };
   compare(h2, normalized, 'history');
   require(byteLength(JSON.stringify(normalized)) <= 1800000, '目标数据库单窗口记录超过安全大小，未截断。');
