@@ -41,3 +41,21 @@ test('archive failure reports only fixed operation and safe reason, never databa
  assert.match(error.reference,/^[a-f0-9]{8}$/);
  assert.doesNotMatch(JSON.stringify(error),/private_column_secret|private-record-id/);
 });
+
+test('creating a session reaps expired staging bytes but preserves active sessions',async()=>{
+ const db=new D1Database(),env={COAST_CHAT_DB:db},owner={v:2};
+ const call=(path,method='GET',body)=>routeApi(new Request(origin+'/api/archive/v2'+path,{method,headers:{Origin:origin},...(body===undefined?{}:{body})}),env,owner);
+ const expired=(await (await call('/sessions','POST')).json()).session.id;
+ const active=(await (await call('/sessions','POST')).json()).session.id;
+ const bytes=new Uint8Array([4,5,6]),descriptor=await describeObject(bytes.length,[await digestBytes(bytes)]);
+ for(const sid of [expired,active]){
+   const base='/sessions/'+sid+'/objects';
+   assert.equal((await call(base,'POST',JSON.stringify(descriptor))).status,200);
+   assert.equal((await call(base+'/'+descriptor.object_sha256+'/chunks/0','PUT',bytes)).status,200);
+ }
+ await db.prepare('UPDATE coast_archive_sessions SET expires_at=? WHERE id=?').bind(1,expired).run();
+ assert.equal((await call('/sessions','POST')).status,201);
+ assert.equal((await call('/sessions/'+expired+'/objects/'+descriptor.object_sha256)).status,404);
+ assert.equal((await call('/sessions/'+active+'/objects/'+descriptor.object_sha256)).status,200);
+ assert.equal(db.database.prepare('SELECT COUNT(*) AS n FROM coast_archive_chunks').get().n,1);
+});
