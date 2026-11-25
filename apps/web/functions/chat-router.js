@@ -14,6 +14,7 @@ import {
   ChatAttachmentError,
   applyChatAttachmentsToMessages,
   attachmentDeskReceipt,
+  attachmentReceiptOnFailure,
   deleteChatAttachment,
   getChatAttachmentRecord,
   resolveChatAttachmentsForModel,
@@ -436,7 +437,7 @@ function streamFormalChat(request, env, input, assembled, metadataContext, dogta
         }
         if (error?.name !== 'AbortError') {
           const failedSlip = withRuntimeDeskSlip(failedCrossWindowDeskSlip(assembled, error), {
-            attachments: attachmentReceipt,
+            attachments: attachmentReceiptOnFailure(attachmentReceipt, error),
             serverTools,
           });
           if (failedSlip?.cross_window?.mode !== 'off' || attachmentReceipt) {
@@ -553,7 +554,7 @@ async function formalChat(request, env) {
     await saveModelEcho(env, conversationId, messageId, safeFailureMetadata(value.model, requestSettings, { error }));
     if (error instanceof ModelRequestError) {
       const failedSlip = withRuntimeDeskSlip(failedCrossWindowDeskSlip(assembled, error), {
-        attachments: attachmentReceipt,
+        attachments: attachmentReceiptOnFailure(attachmentReceipt, error),
       });
       error.details = {
         ...(error.details && typeof error.details === 'object' ? error.details : {}),

@@ -3,6 +3,7 @@ import { createConversation } from '../functions/chat-store.js';
 import {
   applyChatAttachmentsToMessages,
   attachmentDeskReceipt,
+  attachmentReceiptOnFailure,
   deleteChatAttachment,
   getChatAttachmentRecord,
   listChatAttachmentMetadata,
@@ -48,6 +49,15 @@ assert.equal(receipt.uploaded, 3);
 assert.equal(receipt.delivered_to_model, 2);
 assert.equal(receipt.vision.images_delivered, 1);
 assert.equal(receipt.not_delivered[0].reason, 'file_type_unsupported');
+const rejected = attachmentReceiptOnFailure(receipt, { type: 'context_window_estimate_exceeded', details: { continuation: false } });
+assert.equal(rejected.uploaded, 3);
+assert.equal(rejected.delivered_to_model, 0);
+assert.equal(rejected.delivered.length, 0);
+assert.equal(rejected.not_delivered.length, 3);
+assert.equal(rejected.vision.images_delivered, 0);
+assert.equal(receipt.delivered_to_model, 2, 'original receipt stays intact');
+assert.equal(attachmentReceiptOnFailure(receipt, { type: 'context_window_estimate_exceeded', details: { continuation: true } }), receipt,
+  'a stopped continuation does not erase attachments delivered in the first request');
 
 const fileOnly = applyChatAttachmentsToMessages(
   [{ role: 'user', content: '总结' }],

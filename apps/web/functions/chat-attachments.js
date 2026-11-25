@@ -439,3 +439,17 @@ export function attachmentDeskReceipt(resolved) {
     vision: resolved.vision || { supported: false, images_delivered: 0 },
   };
 }
+
+/** A preflight rejection is not a delivery. Keep the original uploads intact. */
+export function attachmentReceiptOnFailure(receipt, error) {
+  if (!receipt || error?.type !== 'context_window_estimate_exceeded' || error?.details?.continuation !== false) return receipt;
+  return {
+    ...receipt,
+    delivered_to_model: 0,
+    delivered: [],
+    not_delivered: [...(receipt.not_delivered || []), ...(receipt.delivered || []).map(item => ({
+      ...item, reason: '预计超出模型目录容量，未发送',
+    }))],
+    vision: { ...receipt.vision, images_delivered: 0 },
+  };
+}
