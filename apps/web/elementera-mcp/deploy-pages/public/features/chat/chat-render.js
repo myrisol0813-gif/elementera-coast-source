@@ -180,7 +180,7 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
     const guideHost = document.getElementById('chatFeatureGuide');
     const roomGuide = runtime.conversations.find(c => c.id === conversationId)?.room_type || 'main';
     if (guideHost && guideHost.dataset.room !== roomGuide) {
-      guideHost.innerHTML = guideMarkup(roomGuide);
+      guideHost.innerHTML = guideMarkup(roomGuide) || guideMarkup('main');
       guideHost.dataset.room = roomGuide;
     }
     const preview = runtime.searchPreview?.get(conversationId);
