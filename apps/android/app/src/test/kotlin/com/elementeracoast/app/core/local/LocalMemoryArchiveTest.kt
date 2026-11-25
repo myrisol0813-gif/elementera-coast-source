@@ -23,7 +23,7 @@ class LocalMemoryArchiveTest {
             // Fixture represents an existing record restored from an old archive, not a new write.
             val snapshot=store.snapshot()
             store.write(snapshot.copy(entries=snapshot.entries.map{row->
-                if(row.str("id")==seed.id) JsonObject(row+mapOf("tag" to JsonPrimitive("世界观"),"memory_tags_json" to JsonPrimitive("[\"世界观\"]"))) else row
+                if(row.getValue("id").jsonPrimitive.content==seed.id) JsonObject(row+mapOf("tag" to JsonPrimitive("世界观"),"memory_tags_json" to JsonPrimitive("[\"世界观\"]"))) else row
             }))
             assertEquals("世界观",store.entries("seed").single().tag)
             store.save(seed.id,RemoteMemoryEntryWriteRequest("seed","海浪","未确认构想",status="dormant",tag="世界观"))
