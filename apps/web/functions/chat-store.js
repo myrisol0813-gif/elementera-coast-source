@@ -191,7 +191,7 @@ function normalizeVariant(value = {}, prefix = 'variant') {
     ...(sourceModelLabel ? { source_model_label: sourceModelLabel } : {}),
     ...(furnitureRuns.length ? { furniture_runs: furnitureRuns } : {}),
     ...(attachments.length ? { attachments } : {}),
-    ...(deskSlip ? { desk_slip: deskSlip } : {}),
+    ...(deskSlip ? { desk_slip: deskSlip, ...(value.archive_retained_desk_slip === true ? { archive_retained_desk_slip: true } : {}) } : {}),
     ...(errorDetail ? { errorDetail } : {}),
   };
 }
@@ -248,7 +248,7 @@ function keepCurrentDeskSlip(turns) {
   for (const turn of turns) {
     for (const assistants of Object.values(turn?.assistant?.variantsByUserVariant || {})) {
       for (const variant of assistants) {
-        if (variant !== current) delete variant.desk_slip;
+        if (variant !== current && variant.archive_retained_desk_slip !== true) delete variant.desk_slip;
       }
     }
   }
@@ -445,6 +445,26 @@ export async function deleteConversation(db, id) {
   return conversationFromRow(await conversationRow(db, conversationId));
 }
 
+// Imported historical desk receipts are immutable evidence. A client that
+// does not yet understand the archive flag must not erase a retained receipt
+// when updating the same message. Explicitly deleted variants stay deleted.
+async function carryArchiveDeskSlips(db, conversationId, state) {
+  const row = await first(db, 'SELECT state_json FROM conversation_states WHERE conversation_id = ?', [conversationId]);
+  if (!row?.state_json) return;
+  const old = normalizeState(JSON.parse(row.state_json));
+  const retained = new Map();
+  for (const turn of old.turns) for (const v of Object.values(turn.assistant.variantsByUserVariant).flat()) {
+    if (v.archive_retained_desk_slip === true && v.desk_slip) retained.set(v.id, v.desk_slip);
+  }
+  if (!retained.size) return;
+  for (const turn of state.turns) for (const v of Object.values(turn.assistant.variantsByUserVariant).flat()) {
+    if (retained.has(v.id)) {
+      v.desk_slip = retained.get(v.id);
+      v.archive_retained_desk_slip = true;
+    }
+  }
+}
+
 async function writeStateRow(db, conversationId, state, timestamp = nowMs()) {
   await run(db, `INSERT INTO conversation_states (conversation_id, state_json, updated_at)
     VALUES (?, ?, ?)
@@ -473,6 +493,7 @@ export async function writeConversationState(db, id, value) {
   const conversationId = sanitizeId(id, 'conversation');
   await requireActiveConversation(db, conversationId);
   const state = normalizeState(value);
+  await carryArchiveDeskSlips(db, conversationId, state);
   const timestamp = nowMs();
   await writeStateRow(db, conversationId, state, timestamp);
   await run(db, `UPDATE conversations SET updated_at = ?
@@ -572,6 +593,7 @@ export async function writeLandingExchange(db, id, value = {}) {
   }
 
   const state = normalizeState(value.state);
+  await carryArchiveDeskSlips(db, conversationId, state);
   const timestamp = nowMs();
   const createdAt = iso(timestamp);
   const turnId = sanitizeId(crypto.randomUUID(), 'landing_turn');
