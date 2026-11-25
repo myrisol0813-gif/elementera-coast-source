@@ -109,6 +109,11 @@ export function buildModelCatalog(raw) {
   };
 }
 
+export function cachedCatalogModel(id) {
+  if (!catalogCache || catalogExpiresAt <= Date.now()) return null;
+  return Object.values(catalogCache.groups || {}).flat().find(item => item.id === id) || null;
+}
+
 export async function fetchModelCatalog(env, force = false) {
   const now = Date.now();
   if (!force && catalogCache && catalogExpiresAt > now) return catalogCache;

@@ -27,6 +27,14 @@ export function createTools({ storage, router, toast, memory }) {
     return `<label class="control-item number-item"><h3>${escapeHtml(title)}</h3><input type="number" name="${name}" data-input="tools:setting"${change} min="${min}"${maxAttr} step="${step}" inputmode="numeric" value="${escapeAttribute(value)}"><p>${escapeHtml(note)}</p></label>`;
   }
 
+  function budgetRow() {
+    const automatic = Number(storage.read().runControl.contextBudget) === 0;
+    return `<div class="control-item"><h3>上下文 token budget</h3><div class="choice-list">
+      <button type="button" class="choice-pill" aria-pressed="${automatic}" data-action="tools:budget-auto">自动${automatic ? ' · 当前' : ''}</button>
+      <button type="button" class="choice-pill" aria-pressed="${!automatic}" data-action="tools:budget-manual">手动${!automatic ? ' · 当前' : ''}</button>
+      </div><p>自动：依据模型目录容量预留输出与工具空间；未知容量使用 18000 的舒服区间，不代表模型真实上限。</p></div>`
+      + (automatic ? '' : numberRow('contextBudget', '手动预算', CONTEXT_BUDGET_MIN, null, 100, '最小1800，无固定应用上限；已知目录容量时按估算输入范围分配。', 'context-budget'));
+  }
   function noteRow(title, note) {
     return `<div class="control-item"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(note)}</p></div>`;
   }
@@ -41,7 +49,7 @@ export function createTools({ storage, router, toast, memory }) {
       subtitle: '回答长度、流式输出、记忆召回与世界书',
       className: 'run-control',
       body: `<p class="feature-note">最近聊天轮数与上下文 token budget 都保存在本机；前端提供推荐值，但不设置人为上限。</p>
-        ${group('上下文舒服区间', numberRow('recentTurns', '最近聊天轮数', 1, null, 1, '默认 8；常用可试 8 / 12 / 20。没有应用层上限，实际可递入量取决于当前窗口历史、token budget 与模型上下文窗口。', 'recent-turns') + numberRow('contextBudget', '上下文 token budget', CONTEXT_BUDGET_MIN, null, 100, '默认 6000；推荐从 6000 / 12000 / 20000 起调。没有应用层上限；最终仍受模型与 provider 的真实 context window 限制。', 'context-budget'))}
+        ${group('上下文舒服区间', numberRow('recentTurns', '最近聊天轮数', 1, null, 1, '默认 8；常用可试 8 / 12 / 20。没有应用层上限，实际可递入量取决于当前窗口历史、token budget 与模型上下文窗口。', 'recent-turns') + budgetRow())}
         ${group('输出偏好', choiceRow('outputLength', '回答长度', '“偏短”最多 700 tokens；“自然”和“长信”使用下方上限。') + numberRow('maxOutputTokens', '最大输出 token', 64, 65536, 64, '这是单次回复允许生成的最高值，不代表每次一定用满；自动标题固定为 40。') + choiceRow('creativity', '表达倾向'))}
         ${group('生成方式', choiceRow('streamingEnabled', '流式输出', '开启后普通聊天走真实流式输出；登岛信继续使用稳定 JSON 路径。'))}
         ${group('整理当前对话的纸条与记忆', numberRow('soilBudget', '当前对话纸条最多字数', 300, 4000, 100, '过长时只做普通截断。') + noteRow('当前对话纸条整理频率', '每个完成轮次自动整理一次。') + numberRow('seedCooldownTurns', '线索冷却轮数', 0, 8, 1, '同一条已召回记忆在冷却轮次内不重复递入。') + numberRow('memoryLimit', '本轮记忆召回上限', 0, 12, 1, '还会由舒服区间继续裁纸。'))}
@@ -53,6 +61,14 @@ export function createTools({ storage, router, toast, memory }) {
   router.register('basic-settings', basicSettingsView);
 
   function handleAction(name) {
+    if (name === 'budget-auto' || name === 'budget-manual') {
+      storage.update(state => {
+        const prior = Number(state.runControl.contextBudget);
+        if (name === 'budget-auto') state.runControl.contextBudget = 0;
+        else if (prior === 0) state.runControl.contextBudget = CONTEXT_BUDGET_DEFAULT;
+      });
+      return router.refresh();
+    }
     if (name === 'basic-settings') return router.open('basic-settings');
     if (name === 'clear-soil') return memory.clearSoil().then((cleared) => {
       if (cleared) toast('当前整理当前对话的纸条已清空。');
@@ -112,6 +128,11 @@ export function createTools({ storage, router, toast, memory }) {
       return;
     }
     if (name === 'context-budget') {
+      if (target.value.trim() === '') {
+        target.value = String(positiveInteger(storage.read().runControl.contextBudget, CONTEXT_BUDGET_DEFAULT, CONTEXT_BUDGET_MIN));
+        toast('手动预算不可留空；原设置已保留。请选择自动模式以自动分配。');
+        return;
+      }
       commitNumber(target, {
         field: 'contextBudget', fallback: CONTEXT_BUDGET_DEFAULT, min: CONTEXT_BUDGET_MIN, label: '上下文 token budget', unit: ' tokens',
       });

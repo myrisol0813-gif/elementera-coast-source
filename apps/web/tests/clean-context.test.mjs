@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createConversation } from '../functions/chat-store.js';
 import { assembleCleanContext } from '../functions/context-assemble-clean.js';
 import { trimContextToComfortRange } from '../functions/context-comfort-range.js';
+import { resolveContextBudget } from '../functions/context-budget.js';
 import { createEntry, writeSoil } from '../functions/memory-store.js';
 import { createWorldbookEntry } from '../functions/worldbook.js';
 import { D1Database } from './d1-helper.mjs';
@@ -83,4 +84,10 @@ assert.ok(comfort.trimmedCount > 0);
 assert.ok(comfort.kept.memory < 14 || comfort.kept.worldbook < 10);
 assert.equal(Object.hasOwn(comfort.kept, 'touch'), false);
 
+const automaticBudget = resolveContextBudget({ contextBudget: 0, maxOutputTokens: 8000 }, { context_length: 128000, top_provider: { context_length: 64000 } }, []);
+assert.equal(automaticBudget.ceiling, 55744);
+assert.equal(resolveContextBudget({ contextBudget: 12000 }, { context_length: 64000 }, []).ceiling, 12000);
+assert.equal(resolveContextBudget({ contextBudget: 0 }, null, []).ceiling, 18000);
+assert.match(resolveContextBudget({ contextBudget: 0 }, null, []).note, /不是模型真实上限/);
+assert.throws(() => resolveContextBudget({ contextBudget: 0, maxOutputTokens: 8000 }, { context_length: 8192 }, []), e => e.type === 'context_window_too_small');
 console.log('clean-context: ok');

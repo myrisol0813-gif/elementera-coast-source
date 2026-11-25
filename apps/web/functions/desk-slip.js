@@ -119,7 +119,7 @@ export function createDeskSlip({
   dogtalk = false, dogtalkContext = '', crossWindow = null, workbenchPrompt = false, workbenchPromptText = '',
   reality = null, responseMode = null, modelVisibleTools = [], backendTools = [],
   toolGroups = {}, furniture = [], toolResults = [], trimmedCount = 0,
-  estimatedTokens = 0, comfortCeiling = 0, exceedsComfortCeiling = false,
+  estimatedTokens = 0, comfortCeiling = 0, exceedsComfortCeiling = false, budgetNote = '',
 } = {}) {
   const privateDetails = Boolean(ownerVisible);
   const selectedModelTools = uniqueTools(modelVisibleTools); const availableBackendTools = uniqueTools(backendTools);
@@ -150,7 +150,7 @@ export function createDeskSlip({
   const deliveredToolResults = results.filter((item) => item.delivered && item.content);
   const workbenchStatus = usedFurniture.length || deliveredToolResults.length ? '已动用' : workbenchPrompt ? '已递给' : '未递给';
   return {
-    summary: '本轮递给模型', comfort,
+    summary: '本轮递给模型', comfort: [budgetNote, exceedsComfortCeiling ? '完整核心资料超出舒服区间，未静默截断' : comfort].filter(Boolean).join('；'),
     current_message: { label: '当前消息', description: DESCRIPTIONS.current_message, status: '已递给', delivered: true, content: privateDetails ? String(currentMessage ?? '') : '' },
     recent_context: { label: '最近上下文', description: DESCRIPTIONS.recent_context, status: recent.length ? '已递给' : '未递给', status_detail: `${recent.filter((message) => message.role === 'user').length} 轮`, turns: recent.filter((message) => message.role === 'user').length, current_message_separate: true, messages: privateDetails ? recent : [] },
     custom_instructions: { label: '核心自定义', description: DESCRIPTIONS.custom_instructions, status: customInstructionsDelivered && customFilled ? '已递给' : '未递给', delivered: Boolean(customInstructionsDelivered && customFilled), empty: !customFilled, length: customFilled ? customText.length : 0, content: privateDetails && customInstructionsDelivered && customFilled ? customText : '' },
