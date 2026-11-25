@@ -85,4 +85,25 @@ class LocalToolWriteTest {
         assertTrue(call("5",buildJsonObject{put("action","delete");put("id",id)}).ok)
         assertEquals(owner,side.notes(book).single().getValue("id").jsonPrimitive.content)
     }
+    @Test fun portraitProposalRemainsPendingAndHonorsBothSwitches(){
+        val s=MemoryLocalPersistence();val cache=RemoteCacheStore(s);val cid="portrait";val tid="turn1"
+        cache.putConversations(listOf(RemoteConversation(cid,"窗口")))
+        cache.putHistory(cid,RemoteHistory(conversationId=cid,contextSettings=ConversationContextSettings(localModelWriteEnabled=true),
+            turns=listOf(RemoteTurn(tid,user=RemoteUserBranch(variants=listOf(RemoteVariant("u1","记录")))))))
+        val knowledge=LocalKnowledgeStore(s)
+        fun session()=knowledge.toolSession(cid,tid,null,knowledge.context(listOf(RemoteChatMessage("user","记录")),18000,"main_chat",cid).receipt,"fixture-model")!!
+        val args="""{"proposed_body":"完整的候选正文","reason":"值得长期保留"}"""
+        assertFalse(session().execute("0","global_excerpt_propose",args).ok)
+        LocalSoilStore(s).patch(cid,buildJsonObject{put("auto_refresh_enabled",true)})
+        val enabled=session()
+        val result=enabled.execute("1","global_excerpt_propose",args)
+        assertTrue(result.output,result.ok)
+        val store=LocalPortraitStore(s)
+        assertEquals("",store.body("self_portrait"))
+        assertEquals(1,store.read("self_portrait")!!.candidates.size)
+        store.patch("self_portrait",buildJsonObject{put("write_enabled",false)})
+        assertFalse(enabled.execute("2","global_excerpt_propose",args).ok)
+        assertEquals(1,store.read("self_portrait")!!.candidates.size)
+    }
+
 }
