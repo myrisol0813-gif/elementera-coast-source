@@ -71,7 +71,7 @@ data class CoastBackendGraph(
                 conversations = DefaultConversationRepository(api, cache, titleRemote),
                 profile = DefaultProfileRepository(api, cache),
                 chat = if (config.localTransport != null) LocalDirectChatRepository(chatRepository, LocalProviderStore(context), LocalKnowledgeStore(persistence)) else chatRepository,
-                reality = AndroidRealityContextSource(context.applicationContext, persistence),
+                reality = AndroidRealityContextSource(context.applicationContext, persistence,config.localTransport!=null),
                 thoughtSoil = DefaultThoughtSoilRepository(api, chatGptPlan,
                     if (config.localTransport != null) LocalSoilOrganizer(persistence, LocalProviderStore(context), chatGptPlan)::organize else null),
                 daily = DefaultDailyRepository(api, cache),
