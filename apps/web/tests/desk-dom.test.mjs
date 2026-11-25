@@ -59,7 +59,7 @@ for (const scope of ['conversation', 'radio', 'lighthouse', 'global']) {
 }
 for (const action of ['revision_supplement', 'revision_replace', 'revision_new_version', 'revision_downgrade', 'confirm_pocket']) assert.equal(memoryCluster.includes(action), false);
 for (const action of ['data-destination="memory"', 'data-destination="seed"', 'memory:pocket-discard']) assert.ok(memoryCluster.includes(action));
-for (const tag of ['关系', '历史锚点', '偏好', '人物档案', '世界观', '工程技术']) assert.ok(memoryCluster.includes(`'${tag}'`));
+for (const tag of ['关系', '历史锚点', '偏好', '人物档案', '工程技术']) assert.ok(memoryCluster.includes(`'${tag}'`));
 assert.match(memoryCluster, /记忆修订候选/);
 assert.match(memoryCluster, /旧版保留/);
 assert.match(memoryCluster, /memory-retrieval-card/);
@@ -74,7 +74,7 @@ assert.match(memoryCluster, /chip-chevron/);
 assert.equal(memoryCluster.includes('⌄'), false, '筛选气泡不再使用贴字的字符三角');
 for (const label of ['日期', '模型', '窗口', '标签']) assert.ok(memoryCluster.includes(`label: '${label}'`));
 for (const label of ['全部标签', '全部日期', '全部模型', '全部窗口', '暂无日期', '暂无模型', '暂无窗口']) assert.ok(memoryCluster.includes(label));
-assert.match(memoryCluster, /if \(kind === 'tag'\) return MEMORY_TAGS/);
+assert.match(memoryCluster, /if \(kind === 'tag'\) return \[\.\.\.new Set\(\[\.\.\.MEMORY_TAGS/);
 assert.match(memoryCluster, /params\.set\(config\.param, activeValue\)/);
 assert.match(memoryCluster, /resetDimensionFilters\(runtime\)/);
 assert.equal(memoryCluster.includes('memory-filter-disclosure'), false);
