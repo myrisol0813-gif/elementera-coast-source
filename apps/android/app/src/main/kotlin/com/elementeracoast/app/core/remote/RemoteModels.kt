@@ -173,7 +173,8 @@ data class RemoteVariant(
     val usage: RemoteModelUsage? = null,
     @SerialName("input_type") val inputType: String? = null,
     @SerialName("source_model_label") val sourceModelLabel: String? = null,
-    @SerialName("dogtalk_snapshot_id") val dogtalkSnapshotId: String? = null
+    @SerialName("dogtalk_snapshot_id") val dogtalkSnapshotId: String? = null,
+    @SerialName("archive_retained_desk_slip") val archiveRetainedDeskSlip: Boolean = false
 )
 
 @Serializable
