@@ -1,6 +1,7 @@
 import { OPENROUTER_CHAT_URL, OPENROUTER_REFERER } from './model-constants.js';
 import { openRouterKey } from './model-catalog.js';
 import { prepareFormalChat } from './model-payload.js';
+import { assertWireInputBudget } from '../context-budget.js';
 import { SseParseError, parseSseEventBlock } from '../stream-format.js';
 import {
   ModelRequestError,
@@ -280,6 +281,7 @@ export async function performFormalChat(env, input = {}, {
 } = {}) {
   const prepared = await prepareFormalChat(env, input, allowSystem);
   const webSearch = createWebSearchTracker(input, prepared);
+  assertWireInputBudget(prepared.payload);
   const upstream = await requestOpenRouter(env, prepared.payload, 'Elementera Coast Formal Chat');
   webSearch.observe(upstream);
   const choice = upstream?.choices?.[0] || {};
@@ -314,10 +316,9 @@ export async function performFormalChatWithTools(env, input = {}, {
   let messages = [...prepared.payload.messages];
 
   while (true) {
-    const upstream = await requestOpenRouter(env, {
-      ...prepared.payload,
-      messages,
-    }, 'Elementera Coast Formal Chat');
+    const payload = { ...prepared.payload, messages };
+    assertWireInputBudget(payload, undefined, providerCalls.length > 0);
+    const upstream = await requestOpenRouter(env, payload, 'Elementera Coast Formal Chat');
     providerCalls.push(upstream);
     webSearch.observe(upstream);
     usage = addUsage(usage, upstream?.usage);
@@ -414,6 +415,7 @@ export async function* performFormalChatStream(env, input = {}, {
         stream: true,
         stream_options: { include_usage: true },
       };
+      assertWireInputBudget(payload, undefined, completedToolCalls > 0);
       const response = await requestOpenRouterStream(env, payload, 'Elementera Coast Formal Chat', signal);
       let finishReason = null;
       let providerDone = false;

@@ -35,3 +35,40 @@ export async function contextBudgetForModel(env, settings, model, tools) {
   }
   return resolveContextBudget(settings, entry, tools);
 }
+
+/** Estimate the actual request, not base64 length or only the pre-attachment text.
+ * Image token usage depends on provider/model; 2048 per image is an estimate,
+ * not a promise of the actual billed vision cost. */
+export function estimateWireInputTokens(payload = {}) {
+  const estimatePart = part => part?.type === 'text'
+    ? estimateContextTokens(part.text || '')
+    : part?.type === 'image_url' ? 2048 : estimateContextTokens(JSON.stringify(part || {}));
+  const messages = Array.isArray(payload.messages) ? payload.messages : [];
+  const tools = Array.isArray(payload.tools) ? payload.tools : [];
+  return messages.reduce((total, message) => {
+    const content = Array.isArray(message?.content)
+      ? message.content.reduce((sum, part) => sum + estimatePart(part), 0)
+      : estimateContextTokens(message?.content || '');
+    const calls = message?.tool_calls ? estimateContextTokens(JSON.stringify(message.tool_calls)) : 0;
+    return total + content + calls + 4;
+  }, 0) + (tools.length ? estimateContextTokens(JSON.stringify(tools)) : 0);
+}
+
+export function assertWireInputBudget(payload, modelEntry = cachedCatalogModel(payload.model), continuation = false) {
+  const windows = [modelEntry?.context_length, modelEntry?.top_provider?.context_length]
+    .map(Number).filter(n => Number.isSafeInteger(n) && n > 0);
+  const estimate = estimateWireInputTokens(payload);
+  if (!windows.length) return estimate;
+  const window = Math.min(...windows);
+  const output = Number(payload.max_completion_tokens ?? payload.max_tokens ?? 8000);
+  const limit = window - (Number.isFinite(output) && output > 0 ? output : 8000) - 256;
+  if (estimate > limit) {
+    throw new ModelRequestError('context_window_estimate_exceeded',
+      continuation
+        ? '工具执行后的完整输入预计超过模型目录容量；已停止续请求，已成功执行的工具不会自动撤销。'
+        : '完整消息、附件及工具定义预计超过模型目录容量；未发送给模型，请减少附件或降低输出上限。',
+      400, { estimated_input_tokens: estimate, estimated_input_limit: Math.max(0, limit),
+        directory_context_length: window, continuation });
+  }
+  return estimate;
+}
