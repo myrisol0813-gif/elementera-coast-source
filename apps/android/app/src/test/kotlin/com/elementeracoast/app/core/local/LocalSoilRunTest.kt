@@ -64,4 +64,21 @@ class LocalSoilRunTest {
             assertNull(LocalSoilRun.prepare(dest,cid,model))
         } finally { dir.deleteRecursively() }
     }
+
+    @Test fun fencedMinimalResultAndDistinctFailureReasons(){
+        val s=fixture();val p=LocalSoilRun.prepare(s,cid,model)!!
+        val before=LocalSoilStore(s).read()
+        val error=runCatching{LocalSoilRun.commit(s,p,"invalid")}.exceptionOrNull() as LocalSoilFailure
+        assertEquals("整理回包格式不符合约定",error.detail)
+        assertEquals(before,LocalSoilStore(s).read())
+        LocalSoilRun.commit(s,p,"```JSON\n{\"current_text\":\"纸条\",\"afterthoughts\":[]}\n```")
+        assertEquals("纸条",LocalSoilStore(s).read().current.single()["current_text"]!!.jsonPrimitive.content)
+        assertTrue(LocalMemoryStore(s).pockets(cid).isEmpty())
+    }
+    @Test fun qianfanAlwaysThinkingModelHasRoomForActualResult(){
+        val p=LocalProviderConfig("p","test","https://qianfan.baidubce.com/v2","test-key")
+        assertEquals(16384,localSoilOutputBudget(p,"ernie-5.5-flash-preview"))
+        assertEquals(3200,localSoilOutputBudget(p,"other-model"))
+        assertEquals(3200,localSoilOutputBudget(p.copy(baseUrl="https://provider.example/v1"),"ernie-5.5-flash-preview"))
+    }
 }

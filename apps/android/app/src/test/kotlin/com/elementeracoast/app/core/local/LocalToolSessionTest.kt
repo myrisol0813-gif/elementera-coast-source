@@ -73,6 +73,6 @@ class LocalToolSessionTest {
         val p=LocalProviderConfig("p","Test","https://provider.example/v1","test-key",listOf("test/model"))
         val events=LocalProviderClient(http).streamWithTools(p,"test/model",listOf(RemoteChatMessage("user","hi")),128,emptyList(),session).toList()
         assertEquals(2,n);assertTrue(events.any{it is LocalProviderEvent.Tool&&it.result.ok})
-        assertEquals(LocalProviderEvent.Done("stop"),events.last())
+        assertEquals("stop",(events.last() as LocalProviderEvent.Done).reason)
     }
 }
