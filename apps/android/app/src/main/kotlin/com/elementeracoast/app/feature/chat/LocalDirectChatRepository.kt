@@ -44,7 +44,7 @@ internal class LocalDirectChatRepository(
                     if (content.isBlank()) throw CoastApiException(CoastApiErrorKind.Model, "local_empty_reply", "供应商没有返回可显示的文字。")
                     val next = ChatSyncMapper.appendAssistant(
                         history = ChatSyncMapper.clearUserFailure(historyWithUser, turnId), turnId = turnId,
-                        content = content, modelId = modelId, finishReason = event.reason,furnitureRuns=runs,deskSlip=session?.receipt?:prepared.receipt)
+                        content = content, modelId = modelId, finishReason = event.reason,furnitureRuns=runs,deskSlip=session?.receipt?:prepared.receipt,modelEcho=event.metadata)
                     val saved = history.persistHistory(conversationId, next)
                     completed = true
                     emit(ChatProgress.Completed(saved, modelId, event.reason,TurnDeskMapper.toUi(session?.receipt?:prepared.receipt)))

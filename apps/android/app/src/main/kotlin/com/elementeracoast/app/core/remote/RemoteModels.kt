@@ -171,6 +171,7 @@ data class RemoteVariant(
     @SerialName("furniture_runs") val furnitureRuns: List<RemoteFurnitureRun> = emptyList(),
     @SerialName("desk_slip") @Serializable(with = RemoteDeskSlipWireSerializer::class) val deskSlip: RemoteDeskSlip? = null,
     val usage: RemoteModelUsage? = null,
+    @SerialName("model_echo") val modelEcho: RemoteModelMetadata? = null,
     @SerialName("input_type") val inputType: String? = null,
     @SerialName("source_model_label") val sourceModelLabel: String? = null,
     @SerialName("dogtalk_snapshot_id") val dogtalkSnapshotId: String? = null,
