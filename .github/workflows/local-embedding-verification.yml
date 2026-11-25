@@ -1,0 +1,86 @@
+name: Local embedding model verification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/local-embedding-verification.yml'
+      - '**/core/local/**'
+      - '**/app/build.gradle.kts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-embedding:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install reference inference dependencies
+        run: python -m pip install --disable-pip-version-check numpy==1.26.4 onnxruntime==1.20.1 tokenizers==0.21.0
+      - name: Verify pinned weights and run synthetic Chinese retrieval
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import pathlib
+          import tempfile
+          import urllib.request
+          import numpy as np
+          import onnxruntime as ort
+          from tokenizers import Tokenizer
+
+          revision = "75c43b069aac4d136ba6bc1122f995fedcfd2781"
+          base = f"https://huggingface.co/Xenova/bge-small-zh-v1.5/resolve/{revision}/"
+          expected = "15b717c382bcb518ba457b93ea6850ede7f4f1cd8937454aa06972366cd19bcc"
+          with tempfile.TemporaryDirectory() as temp:
+              root = pathlib.Path(temp)
+              for remote, local, maximum in (
+                  ("onnx/model_quantized.onnx", "model.onnx", 30_000_000),
+                  ("tokenizer.json", "tokenizer.json", 1_000_000),
+                  ("vocab.txt", "vocab.txt", 1_000_000),
+              ):
+                  req = urllib.request.Request(base + remote, headers={"User-Agent": "Coast-model-verification/1.0"})
+                  with urllib.request.urlopen(req, timeout=90) as response:
+                      payload = response.read(maximum + 1)
+                  if not payload or len(payload) > maximum:
+                      raise RuntimeError(f"Unexpected asset size for {remote}")
+                  digest = hashlib.sha256(payload).hexdigest()
+                  print(f"{remote}: {len(payload)} bytes, SHA256={digest}", flush=True)
+                  if local == "model.onnx" and digest != expected:
+                      raise RuntimeError("Model weight SHA256 mismatch")
+                  (root / local).write_bytes(payload)
+
+              tokenizer = Tokenizer.from_file(str(root / "tokenizer.json"))
+              tokenizer.enable_truncation(max_length=512)
+              session = ort.InferenceSession(str(root / "model.onnx"), providers=["CPUExecutionProvider"])
+              names = {item.name for item in session.get_inputs()}
+              print("ONNX inputs:", sorted(names), "outputs:", [item.name for item in session.get_outputs()])
+              def encode(text):
+                  item = tokenizer.encode(text)
+                  feed = {
+                      "input_ids": np.asarray([item.ids], dtype=np.int64),
+                      "attention_mask": np.asarray([item.attention_mask], dtype=np.int64),
+                      "token_type_ids": np.asarray([item.type_ids], dtype=np.int64),
+                  }
+                  raw = session.run(None, {name: feed[name] for name in names})[0]
+                  assert raw.ndim == 3 and raw.shape[0] == 1 and raw.shape[2] == 512, raw.shape
+                  vector = raw[0, 0].astype(np.float64)
+                  norm = np.linalg.norm(vector)
+                  assert np.isfinite(vector).all() and norm > 0
+                  return vector / norm
+
+              fixtures = [
+                  ("下雨时怎样避免被淋湿", "出门前记得拿一把雨伞。", "这本食谱介绍番茄炒鸡蛋。"),
+                  ("如何保存旧照片", "把相片扫描成数字文件，再做好备份。", "公交车站附近有一家水果店。"),
+              ]
+              for query, relevant, irrelevant in fixtures:
+                  q = encode("为这个句子生成表示以用于检索相关文章：" + query)
+                  positive = float(q @ encode(relevant))
+                  negative = float(q @ encode(irrelevant))
+                  print(f"relevant={positive:.4f}, irrelevant={negative:.4f}", flush=True)
+                  assert positive > negative, "Synthetic semantic ranking failed"
+          PY
