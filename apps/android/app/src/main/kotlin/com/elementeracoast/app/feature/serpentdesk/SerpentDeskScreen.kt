@@ -23,6 +23,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.elementeracoast.app.feature.shell.FeatureGuideButton
+import com.elementeracoast.app.feature.shell.FeatureGuides
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.elementeracoast.app.feature.actionlog.ActionLogScreen
@@ -77,11 +79,10 @@ fun SerpentDeskScreen(
 @Composable
 private fun SerpentDeskHome(onOpenTool: (SerpentDeskTool) -> Unit) {
     Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp)) {
-        Text(
-            "模型工作台",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("模型工作台", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            FeatureGuideButton(FeatureGuides.tools)
+        }
         Text(
             "模型伙伴的工作台",
             color = MaterialTheme.colorScheme.onSurfaceVariant,

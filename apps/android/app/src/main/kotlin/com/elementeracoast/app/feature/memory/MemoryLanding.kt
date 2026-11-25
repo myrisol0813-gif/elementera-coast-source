@@ -66,11 +66,11 @@ fun MemoryLanding(
 
     val subtitle = when (tab) {
         MemoryTab.Memory -> "记忆库 · 已经确认的长期纸条"
-        MemoryTab.Seed -> "种子库 · 未完成但有生长性的意象，不是已确认事实"
+        MemoryTab.Seed -> "种子库 · 可继续生长的意象与灵感"
         MemoryTab.UserPortrait -> "用户画像 · 模型如何长期认识当前用户"
         MemoryTab.GlobalExcerpt -> "自我画像 · 模型如何长期认识自己"
-        MemoryTab.Worldbook -> "世界书 · 专有名词按关键词出现，不和记忆库混放"
-        MemoryTab.Instructions -> "自定义指令 · 独立的单份 active 文档"
+        MemoryTab.Worldbook -> "世界书 · 设定与关键词"
+        MemoryTab.Instructions -> "自定义指令 · 长期参考背景与要求"
     }
     val action = when (tab) {
         MemoryTab.Memory, MemoryTab.Seed, MemoryTab.Worldbook -> "新增"
@@ -85,7 +85,14 @@ fun MemoryLanding(
     Column(Modifier.fillMaxSize()) {
         FeaturePageTopBar(
             title = "记忆",
-            guide = when (tab) { MemoryTab.Worldbook -> FeatureGuides.worldbook; else -> FeatureGuides.memory },
+            guide = when (tab) {
+                MemoryTab.Memory -> FeatureGuides.memory
+                MemoryTab.Seed -> FeatureGuides.seeds
+                MemoryTab.UserPortrait -> FeatureGuides.userPortrait
+                MemoryTab.GlobalExcerpt -> FeatureGuides.selfPortrait
+                MemoryTab.Worldbook -> FeatureGuides.worldbook
+                MemoryTab.Instructions -> FeatureGuides.instructions
+            },
             subtitle = subtitle,
             onBack = {
                 pendingCreate = null
