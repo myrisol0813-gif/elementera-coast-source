@@ -116,11 +116,12 @@ export function createV2Transfer({router,toast,chat}){
     if(name==='v2-clear')return operate(async()=>{await reset();});
     if(name==='v2-preview'&&incoming&&selected&&!result)return operate(async token=>{
       const choice=choices.find(r=>r.key===selected);if(!choice)throw Error('请选择资料');
-      if(session&&stagedChoice!==choice.key){
-        await api.cancelSession(session);session=null;stagedChoice='';stagedManifest=null;uploaded=false;
+      if(stagedChoice!==choice.key){
+        if(session)await api.cancelSession(session);
+        session=null;stagedChoice='';stagedManifest=null;uploaded=false;
       }
-      if(!stagedManifest)stagedManifest=await selectedArchiveManifest(incoming.manifest,choice);
-      if(!session){session=(await api.createSession()).session.id;stagedChoice=choice.key;}
+      if(!stagedManifest){stagedManifest=await selectedArchiveManifest(incoming.manifest,choice);stagedChoice=choice.key;}
+      if(!session)session=(await api.createSession()).session.id;
       if(!uploaded){
         progress='本次上传 '+stagedManifest.records.length+' 项 · '+stagedManifest.objects.reduce((n,o)=>n+o.size,0)+' 字节';
         let n=0;
