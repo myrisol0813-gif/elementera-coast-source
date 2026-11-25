@@ -113,13 +113,17 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
             "；已用：" + (usage?.let { "USD " + it } ?: "未返回") + "。这不是账户总余额。"
     }
 
-    private var soilCatalog:Pair<Long,JsonObject>?=null
+    private data class SoilCatalog(val providerId:String,val readAt:Long,val body:JsonObject?)
+    @Volatile private var soilCatalog:SoilCatalog?=null
     internal suspend fun soilPolicy(p:LocalProviderConfig,model:String):LocalSoilPolicy {
         if(!LocalSoilPolicy.isOpenRouter(p))return LocalSoilPolicy()
         val now=System.currentTimeMillis()
-        val cached=soilCatalog?.takeIf{now-it.first in 0..600000}?.second
-        val catalog=cached?:try{get(p,"/models").also{soilCatalog=now to it}}
-            catch(e:CancellationException){throw e}catch(_:Exception){null}
+        val cached=soilCatalog?.takeIf{it.providerId==p.id&&now-it.readAt in 0..(if(it.body==null)60000L else 600000L)}
+        val catalog=if(cached!=null)cached.body else {
+            val fetched=try{get(p,"/models")}catch(e:CancellationException){throw e}catch(_:Exception){null}
+            soilCatalog=SoilCatalog(p.id,now,fetched)
+            fetched
+        }
         return LocalSoilPolicy.forProvider(p,model,catalog)
     }
 

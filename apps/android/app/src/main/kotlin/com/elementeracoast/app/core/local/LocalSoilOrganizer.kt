@@ -169,8 +169,11 @@ internal object LocalSoilRun {
     private data class Parsed(val current: String, val after: JsonArray, val candidates: Map<String,List<Candidate>>, val portraits: Map<String,Proposal>)
     private fun parse(p: Prepared, raw: String): Parsed {
         require(raw.length <= MAX_RESULT) { "整理结果超限。" }
-        val clean = raw.trim().let { val fence=Regex("(?is)^```(?:json)?\\s*([\\s\\S]*?)\\s*```$").matchEntire(it);fence?.groupValues?.get(1)?.trim()?:it }
-        val obj = Json.parseToJsonElement(clean).jsonObject
+        val clean=raw.trim()
+        // Permit a short wrapper, but never rescue a nested object from a truncated root.
+        val start=clean.indexOf('{');val end=clean.lastIndexOf('}')
+        require(start in 0..240 && end>=start && clean.length-end-1<=240)
+        val obj=Json.parseToJsonElement(clean.substring(start,end+1)).jsonObject
         require(obj.keys.all{it in textFields}&&obj.keys.containsAll(setOf("current_text","afterthoughts"))) { "整理结果字段不完整。" }
         val current = strictText(obj["current_text"],4000)
         val after = JsonArray(array(obj["afterthoughts"],7).map { JsonPrimitive(strictText(it,2000)) }.filter { it.content.isNotBlank() })

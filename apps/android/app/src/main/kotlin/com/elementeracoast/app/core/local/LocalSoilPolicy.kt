@@ -11,8 +11,9 @@ internal data class LocalSoilPolicy(
     val efforts:List<String> = emptyList(),
     val outputLimit:Int?=null
 ) {
-    val lowEffort:String? get() = listOf("none","minimal","low").firstOrNull { it in efforts }
-        ?: if("reasoning" in parameters && efforts.isEmpty()) "minimal" else null
+    val lowEffort:String? get() = if("reasoning" !in parameters) null else
+        listOf("none","minimal","low").firstOrNull { it in efforts }
+            ?: if(efforts.isEmpty()) "minimal" else null
     val firstBudget:Int get() = bounded(if(lowEffort!=null)3200 else LOCAL_SOIL_FIRST_OUTPUT_TOKENS)
     val retryBudget:Int get() = bounded(LOCAL_SOIL_RETRY_OUTPUT_TOKENS)
     private fun bounded(n:Int)=minOf(n,outputLimit?:n)

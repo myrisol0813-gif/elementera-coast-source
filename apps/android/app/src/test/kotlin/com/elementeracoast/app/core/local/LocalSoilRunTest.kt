@@ -107,4 +107,19 @@ class LocalSoilRunTest {
         }}.isFailure)
         assertEquals(listOf(8192),budgets)
     }
+    @Test fun wrapperAndInvalidJsonRetryPreserveCompleteRoot()=kotlinx.coroutines.runBlocking{
+        val s=fixture();val prepared=LocalSoilRun.prepare(s,cid,model)!!
+        val before=LocalSoilStore(s).read()
+        val budgets=mutableListOf<Int>()
+        val raw=collectLocalSoilReply("fixture",3200,8192,{LocalSoilRun.validate(prepared,it)}){_,budget->
+            budgets.add(budget)
+            val body=if(budgets.size==1)"""{"outer":{"current_text":"不得救出内部对象","afterthoughts":[]}"""
+                else """整理结果：{"current_text":"完整纸条","afterthoughts":[]}"""
+            kotlinx.coroutines.flow.flowOf(LocalProviderEvent.Delta(body),LocalProviderEvent.Done("stop"))
+        }
+        assertEquals(listOf(3200,8192),budgets)
+        assertEquals(before,LocalSoilStore(s).read())
+        LocalSoilRun.commit(s,prepared,raw)
+        assertEquals("完整纸条",LocalSoilStore(s).read().current.single()["current_text"]!!.jsonPrimitive.content)
+    }
 }

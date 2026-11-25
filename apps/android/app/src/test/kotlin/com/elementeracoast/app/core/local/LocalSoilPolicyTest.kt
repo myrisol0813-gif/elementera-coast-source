@@ -19,6 +19,7 @@ class LocalSoilPolicyTest {
         assertEquals("json_schema",p.options().getValue("response_format").jsonObject.getValue("type").jsonPrimitive.content)
         val unknown=LocalSoilPolicy.forProvider(provider,"unknown",catalog)
         assertTrue(unknown.options().isEmpty());assertEquals(8192,unknown.firstBudget)
+        assertEquals(8192,LocalSoilPolicy(efforts=listOf("low")).firstBudget)
         val other=LocalSoilPolicy.forProvider(provider.copy(baseUrl="https://example.com/v1"),"fixture",catalog)
         assertFalse(other.nonStreaming);assertTrue(other.options().isEmpty())
     }
