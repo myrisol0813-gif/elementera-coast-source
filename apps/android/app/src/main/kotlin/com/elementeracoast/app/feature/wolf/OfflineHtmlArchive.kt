@@ -67,6 +67,7 @@ internal object OfflineHtmlArchive {
                     v["attachments"].arr().forEach { a -> val item=a.obj();val m=attachments[conversation.str("id")+":"+item.str("id")]
                         append(if(m!=null)mediaHtml(m,"../") else "<p>原件未归档："+esc(item.str("name"))+"</p>") }
                     v["desk_slip"]?.takeUnless { it==JsonNull }?.let { append("<details><summary>历史回执</summary><pre>"+esc(it.toString())+"</pre></details>") }
+                    if(v["usage"]!=null||v["model_echo"]!=null)append("<details><summary>模型回波与用量</summary><pre>"+esc(JsonObject(v.filterKeys{it in setOf("usage","model_echo")}).toString())+"</pre></details>")
                     append("</article>")
                 }
                 val rows=buildString {

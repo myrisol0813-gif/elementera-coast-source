@@ -51,8 +51,10 @@ class LocalProviderClientTest {
             }
         }
         assertEquals(listOf("test/model"), c.models(p))
-        assertEquals(listOf(LocalProviderEvent.Delta("hello"), LocalProviderEvent.Done("stop")),
-            c.stream(p, "test/model", listOf(RemoteChatMessage("user", "hi")), 128).toList())
+        val events=c.stream(p, "test/model", listOf(RemoteChatMessage("user", "hi")), 128).toList()
+        assertEquals(LocalProviderEvent.Delta("hello"),events.first())
+        assertEquals("stop",(events.last() as LocalProviderEvent.Done).reason)
+        assertNull((events.last() as LocalProviderEvent.Done).metadata!!.usage)
         assertEquals(listOf("/v1/models", "/v1/chat/completions"), requests)
     }
 

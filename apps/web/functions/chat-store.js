@@ -85,12 +85,44 @@ function normalizeAttachments(value) {
   }).filter(Boolean);
 }
 
-function normalizeUsage(value) {
+function normalizeUsage(value, allowPartial = false) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const fields = ['prompt_tokens', 'completion_tokens', 'total_tokens'];
-  const values = fields.map((field) => Number(value[field]));
-  if (!values.every((number) => Number.isFinite(number) && number >= 0)) return null;
-  return Object.fromEntries(fields.map((field, index) => [field, Math.trunc(values[index])]));
+  const required = ['prompt_tokens', 'completion_tokens', 'total_tokens'];
+  const counts = [...required, 'reasoning_tokens', 'cached_tokens', 'cache_write_tokens'];
+  const out = {};
+  for (const key of counts) {
+    const n = value[key];
+    if (typeof n === 'number' && Number.isFinite(n) && n >= 0) out[key] = Math.trunc(n);
+  }
+  if (!allowPartial && !required.every(key => key in out)) return null;
+  for (const key of ['cache_discount', 'cost']) {
+    if (typeof value[key] === 'number' && Number.isFinite(value[key])) out[key] = value[key];
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+// Local echoes travel with the variant; only explicitly supported, redacted metadata fields.
+function normalizePortableEcho(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const out = {};
+  const redact = s => s.replace(/Bearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, 'Bearer [REDACTED]')
+    .replace(/\b(?:sk-|or-v1-)[A-Za-z0-9_-]{8,}/gi, '[REDACTED]')
+    .replace(/bce-v3\/[A-Za-z0-9_./-]+/gi, '[REDACTED]')
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[REDACTED]');
+  for (const [key, limit] of Object.entries({provider:180, requested_model:180, resolved_model:180,
+    reasoning_text:16000, reasoning_summary:8000, finish_reason:120, native_finish_reason:120})) {
+    if (typeof value[key] === 'string' && value[key]) out[key] = redact(value[key]).slice(0, limit);
+  }
+  if (Object.keys(out).length === 0) return null;
+  out.reasoning_status = out.reasoning_text || out.reasoning_summary ? 'returned' : 'not_returned';
+  if (typeof value.is_stream === 'boolean') out.is_stream = value.is_stream;
+  if (value.request && typeof value.request === 'object') {
+    const req = {};
+    if (typeof value.request.max_tokens === 'number' && Number.isSafeInteger(value.request.max_tokens) && value.request.max_tokens > 0) req.max_tokens = value.request.max_tokens;
+    if (typeof value.request.stream === 'boolean') req.stream = value.request.stream;
+    if (Object.keys(req).length) out.request = req;
+  }
+  return out;
 }
 
 export function normalizeContextSettings(value = {}) {
@@ -165,7 +197,8 @@ function normalizeVariant(value = {}, prefix = 'variant') {
     .slice(0, MAX_CONTENT);
   const finishReason = String(value.finish_reason || '').trim().slice(0, 80);
   const modelId = String(value.model_id || '').trim().slice(0, 180);
-  const usage = normalizeUsage(value.usage);
+  const modelEcho = prefix.startsWith("user") ? null : normalizePortableEcho(value.model_echo);
+  const usage = normalizeUsage(value.usage, !!modelEcho);
   const generationSource = GENERATION_SOURCES.has(value.generation_source) ? value.generation_source : '';
   const dogtalkSnapshotId = value.dogtalk_snapshot_id
     ? sanitizeId(value.dogtalk_snapshot_id, 'dogtalk_snapshot')
@@ -186,6 +219,7 @@ function normalizeVariant(value = {}, prefix = 'variant') {
     ...(value.input_type === 'landing_letter' ? { input_type: 'landing_letter' } : {}),
     ...(modelId ? { model_id: modelId } : {}),
     ...(usage ? { usage } : {}),
+    ...(modelEcho ? { model_echo: modelEcho } : {}),
     ...(finishReason ? { finish_reason: finishReason } : {}),
     ...(generationSource ? { generation_source: generationSource } : {}),
     ...(dogtalkSnapshotId ? { dogtalk_snapshot_id: dogtalkSnapshotId } : {}),

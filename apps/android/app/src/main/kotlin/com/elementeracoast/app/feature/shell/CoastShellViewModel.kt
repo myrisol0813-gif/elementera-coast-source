@@ -1011,7 +1011,9 @@ class CoastShellViewModel(
                 handleBackendError(error, "当前对话纸条整理失败", keepAuthenticatedOnNetworkError = true)
             } else {
                 _state.update { it.copy(snackbarMessage =
-                    if (isChatGptPlanModel(modelId))
+                    if (localMode && error is com.elementeracoast.app.core.local.LocalSoilFailure)
+                        "当前对话纸条整理失败：${error.detail}；原纸条保留。"
+                    else if (isChatGptPlanModel(modelId))
                         "ChatGPT 套餐整理失败；原纸条保留，不会调用另一模型供应商。"
                     else "当前对话纸条整理失败；本轮回复已保存，可以继续聊天。"
                 ) }

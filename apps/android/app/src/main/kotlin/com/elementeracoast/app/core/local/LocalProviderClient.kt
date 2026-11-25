@@ -21,7 +21,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 sealed interface LocalProviderEvent {
     data class Delta(val text: String) : LocalProviderEvent
-    data class Done(val reason: String) : LocalProviderEvent
+    data class Done(val reason: String, val metadata: com.elementeracoast.app.core.remote.RemoteModelMetadata? = null) : LocalProviderEvent
     data class Tool(val id:String,val name:String,val result:com.elementeracoast.app.core.remote.RemoteNativeToolResult):LocalProviderEvent
 }
 
@@ -118,13 +118,16 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
 
     internal fun streamWithTools(p:LocalProviderConfig, model:String, messages:List<RemoteChatMessage>,maxTokens:Int,imageParts:List<JsonObject>,session:LocalToolSession?):Flow<LocalProviderEvent> = callbackFlow {
         val history=localMultimodalMessages(messages,imageParts).toMutableList()
+        val echo=LocalProviderEcho(p,model,maxTokens)
         val active=java.util.concurrent.atomic.AtomicReference<okhttp3.Call?>()
         val reader=launch(Dispatchers.IO) {
             try {
                 for(round in 0..8){
                     val payload=buildJsonObject {
                         put("model",model);put("stream",true)
-                        val official=normalizeLocalProviderUrl(p.baseUrl).toHttpUrl().host=="api.openai.com"
+                        val host=normalizeLocalProviderUrl(p.baseUrl).toHttpUrl().host
+                        val official=host=="api.openai.com"
+                        if(host in setOf("api.openai.com","openrouter.ai","qianfan.baidubce.com"))put("stream_options",buildJsonObject{put("include_usage",true)})
                         put(if(official)"max_completion_tokens"else "max_tokens",maxTokens.coerceIn(64,65536))
                         put("messages",JsonArray(history))
                         if(session!=null){put("tools",session.completionsTools);put("tool_choice",if(round==8)"none"else "auto")}
@@ -145,6 +148,7 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                             if(data.isBlank())continue
                             val chunk=json.parseToJsonElement(data).jsonObject
                             if(chunk["error"]!=null&&chunk["error"]!=JsonNull)throw CoastApiException(CoastApiErrorKind.Model,"local_provider_error","供应商在生成过程中返回错误。")
+                            echo.observe(chunk) // usage-only final chunks may have an empty choices array
                             val choice=(chunk["choices"] as? JsonArray)?.firstOrNull() as? JsonObject?:continue
                             val delta=choice["delta"] as? JsonObject
                             (delta?.get("content") as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotEmpty)?.let{
@@ -166,10 +170,12 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                         }
                     }
                     active.compareAndSet(call,null)
+                    echo.endRound()
                     if(!done&&reason==null)throw CoastApiException(CoastApiErrorKind.Stream,"local_stream_incomplete","供应商回复流提前结束。")
                     if(pending.isEmpty()){
                         if(reason in setOf("tool_calls","function_call"))throw CoastApiException(CoastApiErrorKind.Model,"local_tool_format","供应商未返回完整的工具调用。")
-                        send(LocalProviderEvent.Done(reason?:"stop"));close();return@launch
+                        val finish=reason?:"stop"
+                        send(LocalProviderEvent.Done(finish,echo.metadata(finish)));close();return@launch
                     }
                     if(session==null||round==8||reason!="tool_calls")throw CoastApiException(CoastApiErrorKind.Model,"local_tool_limit","本机工具调用超限或协议不完整。")
                     require(pending.values.all{it.id.isNotBlank()&&it.name.isNotBlank()})

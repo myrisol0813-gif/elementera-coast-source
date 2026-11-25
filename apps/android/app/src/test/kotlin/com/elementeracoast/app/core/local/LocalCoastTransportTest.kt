@@ -117,4 +117,18 @@ class LocalCoastTransportTest {
             """{"turns":[{"id":"t1","user":{"variants":[{"id":"u1","content":"问题"}]}}]}""").first)
         assertFalse(invoke("call3","cross_window_keyword_search","""{"query":"旧信"}""").second.getValue("ok").jsonPrimitive.boolean)
     }
+
+    @Test fun localEchoReadsHistoricalAndActualMetadataWithoutNetwork(){
+        val local=MemoryLocalPersistence();val a=client(local)
+        val id=call(a,"/api/chat/conversations","POST").second.getValue("conversation").jsonObject.getValue("id").jsonPrimitive.content
+        val payload="""{"turns":[{"id":"t1","user":{"variants":[{"id":"u1","content":"问题"}]},"assistant":{"variantsByUserVariant":{"0":[{"id":"a1","content":"旧回复","model_id":"fixture","finish_reason":"stop"},{"id":"a2","content":"新回复","model_echo":{"provider":"fixture.example","requested_model":"fixture","reasoning_text":"返回的摘要","finish_reason":"stop"},"usage":{"prompt_tokens":100,"cached_tokens":25,"completion_tokens":10}}]}}}]}"""
+        assertEquals(200,call(a,"/api/chat/history?conversation_id="+id,"PUT",payload).first)
+        fun get(mid:String)=call(client(local),"/api/chat/message-metadata?conversation_id="+id+"&message_id="+mid+"&include_raw=1")
+        assertEquals("not_returned",get("a1").second.getValue("status").jsonPrimitive.content)
+        val echo=get("a2");assertEquals(200,echo.first)
+        assertEquals("saved",echo.second.getValue("status").jsonPrimitive.content)
+        assertEquals(25,echo.second.getValue("metadata").jsonObject.getValue("usage").jsonObject.getValue("cached_tokens").jsonPrimitive.int)
+        assertEquals(404,get("u1").first)
+        assertEquals(404,get("missing").first)
+    }
 }

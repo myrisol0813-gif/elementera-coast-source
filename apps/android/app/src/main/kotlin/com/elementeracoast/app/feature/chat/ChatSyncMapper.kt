@@ -90,7 +90,8 @@ object ChatSyncMapper {
         errorDetail: String = "",
         furnitureRuns: List<RemoteFurnitureRun> = emptyList(),
         deskSlip: RemoteDeskSlip? = null,
-        assistantVariantId: String = nextAssistantVariantId(history, turnId)
+        assistantVariantId: String = nextAssistantVariantId(history, turnId),
+        modelEcho: com.elementeracoast.app.core.remote.RemoteModelMetadata? = null
     ): RemoteHistory {
         val turns = history.turns.map { turn ->
             if (turn.id != turnId) return@map turn
@@ -105,7 +106,9 @@ object ChatSyncMapper {
                 generationSource = "chat",
                 errorDetail = errorDetail.ifBlank { null },
                 furnitureRuns = furnitureRuns,
-                deskSlip = deskSlip
+                deskSlip = deskSlip,
+                usage = modelEcho?.usage,
+                modelEcho = modelEcho?.copy(usage=null)
             )
             turn.copy(
                 assistant = turn.assistant.copy(
