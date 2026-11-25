@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createConversation } from '../functions/chat-store.js';
 import { assembleCleanContext } from '../functions/context-assemble-clean.js';
 import { trimContextToComfortRange } from '../functions/context-comfort-range.js';
+import { resolveContextBudget, estimateWireInputTokens, assertWireInputBudget } from '../functions/context-budget.js';
 import { createEntry, writeSoil } from '../functions/memory-store.js';
 import { createWorldbookEntry } from '../functions/worldbook.js';
 import { D1Database } from './d1-helper.mjs';
@@ -83,4 +84,22 @@ assert.ok(comfort.trimmedCount > 0);
 assert.ok(comfort.kept.memory < 14 || comfort.kept.worldbook < 10);
 assert.equal(Object.hasOwn(comfort.kept, 'touch'), false);
 
+const automaticBudget = resolveContextBudget({ contextBudget: 0, maxOutputTokens: 8000 }, { context_length: 128000, top_provider: { context_length: 64000 } }, []);
+assert.equal(automaticBudget.ceiling, 55744);
+assert.equal(resolveContextBudget({ contextBudget: 12000 }, { context_length: 64000 }, []).ceiling, 12000);
+assert.equal(resolveContextBudget({ contextBudget: 0 }, null, []).ceiling, 18000);
+assert.match(resolveContextBudget({ contextBudget: 0 }, null, []).note, /不是模型真实上限/);
+assert.throws(() => resolveContextBudget({ contextBudget: 0, maxOutputTokens: 8000 }, { context_length: 8192 }, []), e => e.type === 'context_window_too_small');
+const wire = { model: 'fixture', max_tokens: 1000, messages: [{ role: 'user', content: [
+  { type: 'text', text: '汉'.repeat(2000) },
+  { type: 'image_url', image_url: { url: 'data:image/png;base64,' + 'A'.repeat(40000) } },
+] }] };
+assert.equal(estimateWireInputTokens(wire), 4052);
+assert.equal(assertWireInputBudget(wire, { context_length: 8000 }), 4052);
+assert.equal(assertWireInputBudget(wire, null), 4052);
+assert.throws(() => assertWireInputBudget(wire, { context_length: 5000 }),
+  e => e.type === 'context_window_estimate_exceeded' && e.details.continuation === false);
+assert.throws(() => assertWireInputBudget({ ...wire, messages: [...wire.messages,
+  { role: 'tool', content: '汉'.repeat(4000) }] }, { context_length: 8000 }, true),
+  e => e.type === 'context_window_estimate_exceeded' && e.details.continuation === true);
 console.log('clean-context: ok');

@@ -61,7 +61,7 @@ internal class NativeChatGptTurnRepository(
             realityContext = realityContext,
             settings = mapOf(
                 "recentTurns" to recentTurns.coerceAtLeast(1).toString(),
-                "contextBudget" to contextBudget.coerceAtLeast(1800).toString(),
+                "contextBudget" to (if(contextBudget==0)0 else contextBudget.coerceAtLeast(1800)).toString(),
                 // These remain user-visible but unsupported by the ChatGPT plan route;
                 // the provider adapter never sends forbidden max_output_tokens.
                 "outputLength" to outputLength,

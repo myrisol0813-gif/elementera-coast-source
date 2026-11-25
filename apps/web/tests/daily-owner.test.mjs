@@ -126,7 +126,7 @@ for (const label of ['碳硅圈', '日记', '宠物系统', '未来小组件']) 
 for (const retired of ['一日总结', '相册', '草稿']) {
   assert.doesNotMatch(homeWhileLoading.body, new RegExp(retired), `Daily shell revived ${retired}`);
 }
-assert.equal(homeWhileLoading.subtitle, '正在同步日常岛');
+assert.equal(homeWhileLoading.subtitle, '正在同步日常资料');
 assert.match(homeWhileLoading.body, /正在同步小组件/);
 assert.equal(pending.length, 3, 'Daily loads moments, diaries, and owner profile');
 assert.deepEqual(

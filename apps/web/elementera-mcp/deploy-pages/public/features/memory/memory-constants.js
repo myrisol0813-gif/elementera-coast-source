@@ -17,7 +17,6 @@ export const MEMORY_TAGS = Object.freeze([
   '历史锚点',
   '偏好',
   '人物档案',
-  '世界观',
   '工程技术',
 ]);
 

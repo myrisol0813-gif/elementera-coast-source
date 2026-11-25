@@ -10,6 +10,7 @@ import com.elementeracoast.app.core.local.LocalPersistence
 import com.elementeracoast.app.core.local.LocalProviderStore
 import com.elementeracoast.app.core.local.LocalKnowledgeStore
 import com.elementeracoast.app.core.local.LocalSoilOrganizer
+import com.elementeracoast.app.core.local.LocalDailyComment
 import com.elementeracoast.app.feature.chat.LocalDirectChatRepository
 import com.elementeracoast.app.core.network.CoastApiClient
 import com.elementeracoast.app.core.network.CoastApiConfig
@@ -74,7 +75,8 @@ data class CoastBackendGraph(
                 reality = AndroidRealityContextSource(context.applicationContext, persistence,config.localTransport!=null),
                 thoughtSoil = DefaultThoughtSoilRepository(api, chatGptPlan,
                     if (config.localTransport != null) LocalSoilOrganizer(persistence, LocalProviderStore(context), chatGptPlan)::organize else null),
-                daily = DefaultDailyRepository(api, cache),
+                daily = DefaultDailyRepository(api, cache,
+                    if (config.localTransport != null) LocalDailyComment(persistence, LocalProviderStore(context), chatGptPlan)::request else null),
                 memory = DefaultMemoryRepository(memoryRemote, cache),
                 dogtalk = DefaultDogtalkRepository(config, http),
                 crossWindow = DefaultCrossWindowRepository(config, http),

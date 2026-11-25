@@ -139,7 +139,7 @@ class DefaultChatRepository(
             realityContext = realityContext,
             settings = mapOf(
                 "recentTurns" to normalizedRecentTurns.toString(),
-                "contextBudget" to contextBudget.coerceAtLeast(1800).toString(),
+                "contextBudget" to (if(contextBudget==0)0 else contextBudget.coerceAtLeast(1800)).toString(),
                 "outputLength" to outputLength,
                 "maxOutputTokens" to maxOutputTokens.coerceIn(64, 65536).toString()
             ) + (effort?.let { mapOf("reasoningEffort" to it) } ?: emptyMap()),

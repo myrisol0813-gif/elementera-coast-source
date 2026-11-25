@@ -139,7 +139,7 @@ internal fun CoastTopBar(
                         modifier = Modifier.size(CoastChatTokens.TopBarActionGlyph)
                     )
                 }
-                FeatureGuideButton(FeatureGuides.room(state.activeRoomType, state.localMode), firstLocalHint = state.localMode)
+                FeatureGuideButton(FeatureGuides.room(state.activeRoomType, state.localMode), firstLocalHint = true)
                 IconButton(onClick = onMore) {
                     Icon(
                         Icons.Default.MoreHoriz,

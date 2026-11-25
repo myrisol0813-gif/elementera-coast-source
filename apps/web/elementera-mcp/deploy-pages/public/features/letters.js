@@ -59,12 +59,12 @@ export function createLetters({ storage, chat, models, router, toast }) {
     const letter = value();
     const sent = landingStatuses.get(letter.key)?.sent === true;
     return {
-      title: '登岛信',
+      title: '新居信',
       subtitle: `${letter.modelName} · 当前窗口独立保存`,
       className: 'letters-panel',
       body: `<p class="feature-note">这不是记忆库。当前窗口与当前模型独立保存；递出后，当前模型会在这个窗口里读信并回复。</p>
         <textarea id="islandLetterText" class="letter-text" rows="22">${escapeHtml(letter.islandText)}</textarea>
-        <div class="button-row"><button type="button" data-action="letters:send-island">${sent ? '重新递出登岛信' : '递出登岛信'}</button><button type="button" data-action="letters:save-island">保存</button><button type="button" data-action="letters:reset-island">恢复默认</button></div>`,
+        <div class="button-row"><button type="button" data-action="letters:send-island">${sent ? '重新递出新居信' : '递出新居信'}</button><button type="button" data-action="letters:save-island">保存</button><button type="button" data-action="letters:reset-island">恢复默认</button></div>`,
     };
   }
 
@@ -81,13 +81,13 @@ export function createLetters({ storage, chat, models, router, toast }) {
     if (name === 'open') return open();
     if (name === 'save-island') {
       write({ islandText: q('#islandLetterText')?.value || '' });
-      return toast('已保存登岛信');
+      return toast('已保存新居信');
     }
     if (name === 'send-island') {
       const letter = value();
       const islandText = q('#islandLetterText')?.value || letter.islandText;
       write({ islandText });
-      if (!islandText.trim()) return toast('请先写好登岛信。');
+      if (!islandText.trim()) return toast('请先写好新居信。');
       if (landingStatuses.get(letter.key)?.sent
         && !confirm('这会开启一个新的读信回复，不会删除旧聊天。')) return;
       const data = await chat.sendLandingLetter({
@@ -98,20 +98,20 @@ export function createLetters({ storage, chat, models, router, toast }) {
       landingStatuses.set(letter.key, data.landing || { sent: true });
       await router.close();
       if (data.soil_refresh?.ok === false) {
-        return toast('登岛信已递出，但整理当前对话的纸条整理失败，可以稍后手动整理。', 3200);
+        return toast('新居信已递出，但整理当前对话的纸条整理失败，可以稍后手动整理。', 3200);
       }
       if (data.soil_refresh?.reason === 'manual_locked') {
-        return toast('登岛信已递出；整理当前对话的纸条已手动锁定，保留原有内容。', 2800);
+        return toast('新居信已递出；整理当前对话的纸条已手动锁定，保留原有内容。', 2800);
       }
       if (data.finish_reason === 'length') {
-        return toast('登岛信已递出，但模型或供应商达到自身长度上限；可以点“重新生成”再读一次。', 3200);
+        return toast('新居信已递出，但模型或供应商达到自身长度上限；可以点“重新生成”再读一次。', 3200);
       }
-      return toast('登岛信已经递到手里。');
+      return toast('新居信已经递到手里。');
     }
     if (name === 'reset-island') {
       const letter = value();
       write({ islandText: defaultIslandLetter(letter.modelName) });
-      toast('已恢复默认登岛信');
+      toast('已恢复默认新居信');
       return router.refresh();
     }
   }

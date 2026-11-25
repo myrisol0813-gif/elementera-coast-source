@@ -477,22 +477,24 @@ const REGISTRY = Object.freeze([
     handler: async (db,input) => ({ notes: await listLibraryNotes(db,input) }),
   }),
   entry({
-    tool_key: 'library.write', display_name: '书页边写字', description: '模型伙伴 自主创建、修改或删除自己的批注与读后感。',
+    tool_key: 'library.write', display_name: '书页边写字', description: '模型伙伴 自主创建、修改或删除自己的批注、划线与读后感。',
     model_exposed: true, model_group: 'library', auth_scopes: ['write:soil'],
-    model_tool: modelTool('library_write', '在书房里写批注或读后感；允许自主改写、删除自己的文字，不能更改用户写的字。action 为 create/edit/delete。', {
+    model_tool: modelTool('library_write', '在书房里写批注或读后感；允许自主改写、删除自己的文字，不能更改用户写的字。action 为 create/edit/delete。创建划线 kind=highlight 时，章节及段落从0开始，必须填写 UTF-16 start_offset（含）和 end_offset（不含），正文留空；修改、删除仅限自己的笔记 id。', {
       properties: {
         action: { type: 'string', enum: ['create','edit','delete'] }, id: { type: 'string' },
-        book_id: { type: 'string' }, kind: { type: 'string', enum: ['annotation','reflection'] },
+        book_id: { type: 'string' }, kind: { type: 'string', enum: ['annotation','reflection','highlight'] },
         chapter_index: { type: 'integer', minimum: 0 }, paragraph_index: { type: 'integer', minimum: 0 },
+        start_offset: { type: 'integer', minimum: 0 }, end_offset: { type: 'integer', minimum: 1 },
         body: { type: 'string', maxLength: 4000 },
       }, required: ['action'],
     }),
     official_mcp: officialMcpTool({
-      order: 240, name: 'write_library_note', title: '写、修改或删除书房笔记', description: '由 模型伙伴 创建、修订或删去自己的批注和读后感；不会触碰用户的文字。',
+      order: 240, name: 'write_library_note', title: '写、修改或删除书房笔记', description: '由 模型伙伴 创建、修订或删去自己的批注、划线和读后感；不会触碰用户的文字。划线需原文段落及 UTF-16 起止位置，正文留空。',
       inputSchema: objectSchema({
         action: { type: 'string', enum: ['create','edit','delete'] }, id: { type: 'string' },
-        book_id: { type: 'string' }, kind: { type: 'string', enum: ['annotation','reflection'] },
+        book_id: { type: 'string' }, kind: { type: 'string', enum: ['annotation','reflection','highlight'] },
         chapter_index: { type: 'integer', minimum: 0 }, paragraph_index: { type: 'integer', minimum: 0 },
+        start_offset: { type: 'integer', minimum: 0 }, end_offset: { type: 'integer', minimum: 1 },
         body: { type: 'string', maxLength: 4000 }, ...MCP_MODEL_IDENTITY_PROPERTIES,
       }, ['action','model_label']),
       invoking: '正在书边留下笔迹…', invoked: '书边笔记已处理',

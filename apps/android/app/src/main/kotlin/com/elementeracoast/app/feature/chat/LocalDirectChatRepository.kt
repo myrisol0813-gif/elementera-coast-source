@@ -26,10 +26,14 @@ internal class LocalDirectChatRepository(
             ?: throw CoastApiException(CoastApiErrorKind.Model, "local_provider_missing", "请在模型箱配置供应商并选择本机模型。")
         val attachmentIds=ChatSyncMapper.activeAttachmentIds(historyWithUser,turnId)
         val messages = ChatSyncMapper.contextMessages(historyWithUser, turnId, recentTurns)
-        val prepared=try{knowledge.context(messages,contextBudget,knowledge.surfaceFor(conversationId),conversationId,attachmentIds,turnId,crossWindow.toRemote(),realityContext)}catch(e:IllegalArgumentException){
+        val switches=historyWithUser.contextSettings
+        val policy=try{client.inputBudget(provider,model,contextBudget,maxOutputTokens,switches.localModelToolsEnabled||switches.localModelWriteEnabled||switches.crossWindowAuto)}catch(e:IllegalArgumentException){
             throw CoastApiException(CoastApiErrorKind.Request,"local_context_budget",e.message.orEmpty())
         }
-        val session=try{knowledge.toolSession(conversationId,turnId,crossWindow.toRemote(),prepared.receipt,modelId)}catch(e:IllegalArgumentException){throw CoastApiException(CoastApiErrorKind.Request,"local_tool_budget",e.message.orEmpty())}
+        val prepared=try{knowledge.context(messages,policy.comfort,knowledge.surfaceFor(conversationId),conversationId,attachmentIds,turnId,crossWindow.toRemote(),realityContext,policy)}catch(e:IllegalArgumentException){
+            throw CoastApiException(CoastApiErrorKind.Request,"local_context_budget",e.message.orEmpty())
+        }
+        val session=try{knowledge.toolSession(conversationId,turnId,crossWindow.toRemote(),prepared.receipt,modelId,policy.wireLimit)}catch(e:IllegalArgumentException){throw CoastApiException(CoastApiErrorKind.Request,"local_tool_budget",e.message.orEmpty())}
         val runs=mutableListOf<com.elementeracoast.app.core.remote.RemoteFurnitureRun>()
         var content = ""
         var completed = false

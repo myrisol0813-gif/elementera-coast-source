@@ -115,11 +115,12 @@ internal class LocalSideRecords(private val store:LocalPersistence) {
         })
         val next=rows()+row;validateLibrary(next,emptyMap());save(next);return wireNote(row.data)
     }
-    fun editNote(id:String,body:String?):JsonObject{
-        val old=rows();val row=requireNotNull(old.find{it.kind=="library_notes"&&it.data.str("id")==id&&it.data.str("author")=="owner"}){"只能修改自己的笔记。"}
+    fun editNote(id:String,body:String?,author:String="owner"):JsonObject{
+        require(author in setOf("owner","assistant"))
+        val old=rows();val row=requireNotNull(old.find{it.kind=="library_notes"&&it.data.str("id")==id&&it.data.str("author")==author}){"只能修改自己的笔记。"}
         if(body==null){save(old-row);return JsonObject(emptyMap())}
-        require(row.data.str("kind")!="highlight"&&body.trim().length in 1..4000)
-        val next=row.copy(data=JsonObject(row.data+mapOf("body" to JsonPrimitive(body.trim()),"updated_at" to JsonPrimitive(System.currentTimeMillis()))))
+        require(body.trim().length in 1..4000)
+        val next=row.copy(data=JsonObject(row.data+mapOf("body" to JsonPrimitive(body.trim()),"kind" to JsonPrimitive(if(row.data.str("kind")=="highlight")"annotation" else row.data.str("kind")),"updated_at" to JsonPrimitive(System.currentTimeMillis()))))
         save(old.map{if(it.key==row.key)next else it});return wireNote(next.data)
     }
     fun treasureRows(kind:String,q:String,cid:String,tid:String,cursor:Int):JsonObject{

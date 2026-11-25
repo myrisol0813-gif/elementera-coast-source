@@ -80,7 +80,7 @@ export function createMemoryActions({
     const pocket = currentPockets().find((item) => item.id === id);
     if (!pocket) return;
     if (['memory', 'seed'].includes(action) && !MEMORY_TAGS.includes(tag)) {
-      throw new Error('请先为这张纸条选择六签之一。');
+      throw new Error('请先为这张纸条选择五个正式标签之一。');
     }
     await resolvePocketRequest(id, {
       action,

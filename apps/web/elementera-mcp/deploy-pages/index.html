@@ -16,16 +16,16 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai:wght@400&family=Noto+Serif+SC:wght@400;500;600&display=swap">
-  <link rel="stylesheet" href="/public/styles/tokens.css?v=coast-source-app-36">
-  <link rel="stylesheet" href="/public/styles/shell.css?v=coast-source-app-36">
-  <link rel="stylesheet" href="/public/styles/chat.css?v=coast-source-app-36">
-  <link rel="stylesheet" href="/public/styles/calendar.css?v=coast-source-app-36">
-  <link rel="stylesheet" href="/public/styles/library.css?v=coast-source-app-36">
-  <link rel="stylesheet" href="/public/styles/mcp-letter.css?v=coast-source-app-36">
-  <link rel="stylesheet" href="/public/styles/rikkahub.css?v=coast-source-app-36">
-  <link rel="stylesheet" href="/public/styles/features.css?v=coast-source-app-36">
-  <link rel="stylesheet" href="/public/styles/desk.css?v=coast-source-app-36">
-  <link rel="stylesheet" href="/public/styles/dev-hands.css?v=coast-source-app-36">
+  <link rel="stylesheet" href="/public/styles/tokens.css?v=coast-source-app-37">
+  <link rel="stylesheet" href="/public/styles/shell.css?v=coast-source-app-37">
+  <link rel="stylesheet" href="/public/styles/chat.css?v=coast-source-app-37">
+  <link rel="stylesheet" href="/public/styles/calendar.css?v=coast-source-app-37">
+  <link rel="stylesheet" href="/public/styles/library.css?v=coast-source-app-37">
+  <link rel="stylesheet" href="/public/styles/mcp-letter.css?v=coast-source-app-37">
+  <link rel="stylesheet" href="/public/styles/rikkahub.css?v=coast-source-app-37">
+  <link rel="stylesheet" href="/public/styles/features.css?v=coast-source-app-37">
+  <link rel="stylesheet" href="/public/styles/desk.css?v=coast-source-app-37">
+  <link rel="stylesheet" href="/public/styles/dev-hands.css?v=coast-source-app-37">
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -81,6 +81,7 @@
           <button id="refreshCoastButton" class="icon-button" type="button" data-action="chat:refresh" data-icon="refresh" aria-label="刷新前端状态"></button>
           <button id="newChatButton" class="icon-button" type="button" data-action="chat:new" data-icon="new-chat" aria-label="新建当前类型聊天"></button>
           <div id="chatFeatureGuide"><details class="coast-feature-guide"><summary aria-label="功能说明">?</summary><section class="coast-feature-guide-panel"><strong>主聊天室</strong><div>与 API 模型日常对话的空间。选择模型后即可聊天。</div></section></details></div>
+          <div id="firstFeatureHint" class="coast-first-guide" hidden><p>每个页面都有自己的使用说明，点击右上角的问号即可查看。也可以先翻翻完整的使用手册。</p><div class="coast-first-guide-actions"><button type="button" data-action="settings:dismiss-guide">知道了</button><button type="button" data-action="settings:help"><span data-icon="book"></span>看看说明书</button></div></div>
           <button id="moreButton" class="icon-button" type="button" data-action="chat:window-settings" data-icon="more" aria-label="这个窗口"></button>
         </div>
         <div id="modelQuickPicker" class="model-quick-picker" hidden></div>
@@ -135,6 +136,6 @@
     <div id="toastRoot" class="toast" role="status" aria-live="polite" hidden></div>
   </div>
 
-  <script type="module" src="/public/app.js?v=coast-source-app-36"></script>
+  <script type="module" src="/public/app.js?v=coast-source-app-37"></script>
 </body>
 </html>

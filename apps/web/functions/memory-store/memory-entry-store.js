@@ -12,7 +12,8 @@ import {
   MEMORY_OWNER_ID,
   confirmedTimestamp,
   entryIndexFromRow,
-  mappedLegacyTag,
+  storedMemoryTag,
+  isRetiredMemoryTag,
   memoryTags,
   normalizeMemoryLevel,
   normalizeMemoryTag,
@@ -190,9 +191,12 @@ export async function patchEntry(db, id, value = {}) {
   const status = value.status == null ? row.status : normalizeStatus(value.status);
   const memoryLevel = value.memory_level == null ? row.memory_level : normalizeMemoryLevel(value.memory_level, row.entry_type);
   const legacyTags = value.memory_tags == null ? parseJson(row.memory_tags_json, []) : memoryTags(value.memory_tags);
-  const tag = value.tag == null
-    ? normalizeMemoryTag(row.tag, { allowEmpty: true }) || mappedLegacyTag(legacyTags)
+  const oldTag = storedMemoryTag(row.tag, parseJson(row.memory_tags_json, []));
+  const preserveHistorical = isRetiredMemoryTag(oldTag) && (value.tag == null || value.tag === oldTag);
+  const tag = preserveHistorical ? oldTag : value.tag == null
+    ? storedMemoryTag(row.tag, legacyTags)
     : normalizeMemoryTag(value.tag, { allowEmpty: false });
+  const savedTags = preserveHistorical ? parseJson(row.memory_tags_json, []) : tag ? [tag] : legacyTags;
   const timestamp = Date.now();
   await run(db, `UPDATE memory_entries SET
     scope = 'global', conversation_id = NULL, title = ?, life_core = ?, content = ?,
@@ -204,7 +208,7 @@ export async function patchEntry(db, id, value = {}) {
     value.content == null ? row.content : clip(value.content, MAX_ENTRY_CONTENT),
     value.usage_hint == null ? row.usage_hint : clip(value.usage_hint, MAX_HINT),
     value.avoid_hint == null ? row.avoid_hint : clip(value.avoid_hint, MAX_HINT),
-    status, memoryLevel, JSON.stringify(tag ? [tag] : legacyTags),
+    status, memoryLevel, JSON.stringify(savedTags),
     value.source_model == null ? row.source_model : clip(value.source_model, MAX_SOURCE_MODEL),
     value.source_window == null ? row.source_window : clip(value.source_window, MAX_SOURCE_WINDOW),
     value.source_time == null ? (row.source_time || row.created_at) : sourceTimestamp(value.source_time),

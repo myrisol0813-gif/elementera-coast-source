@@ -194,7 +194,8 @@ class TurnDeskMapperTest {
         val attachment = receipt.sections.first { it.title == "本轮附件" }
         val search = receipt.sections.first { it.title == "本轮搜索" }
         assertTrue(attachment.status.contains("上传 2"))
-        assertTrue(attachment.details.any { it.text.contains("识图") })
+        assertTrue(attachment.details.any { it.text.contains("不代表已识别") })
+        assertTrue(attachment.details.any { it.label == "识图" && it.text.contains("当前模型支持") })
         assertTrue(attachment.details.any { it.text.contains("file_type_unsupported") })
         assertTrue(search.status.contains("已搜索"))
         assertTrue(search.details.any { it.text.contains("https://example.com") })

@@ -69,7 +69,7 @@ internal class LocalMemoryStore(private val store:LocalPersistence) {
     }
     private fun makeEntry(req:RemoteMemoryEntryWriteRequest,old:JsonObject?,now:Long):JsonObject{
         require(old==null||old.str("entry_type")==req.entryType){"不能通过编辑改变记忆类型。"}
-        require(req.tag.isEmpty()||req.tag in TAGS)
+        require(req.tag.isEmpty()||req.tag in TAGS||(old!=null&&req.tag==old.str("tag")&&req.tag in RETIRED_TAGS)){"请选择有效的正式标签；旧标签仅可保留在原记录中。"}
         val time=req.sourceTime?.takeIf{it.isNotBlank()}?.let{raw->
             runCatching{Instant.parse(raw).toEpochMilli()}.getOrElse{LocalDate.parse(raw).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()}
         }?:old?.get("source_time")?.jsonPrimitive?.longOrNull?:now
@@ -149,7 +149,8 @@ internal class LocalMemoryStore(private val store:LocalPersistence) {
     companion object{
         const val KEY="local.memory.records.v2"
         val modules=setOf("memory_entries","memory_pockets")
-        private val TAGS=setOf("关系","历史锚点","偏好","人物档案","海岸世界观","工程技术")
+        private val TAGS=setOf("关系","历史锚点","偏好","人物档案","工程技术")
+        private val RETIRED_TAGS=setOf("世界观","海岸世界观")
         private val safeId=Regex("[A-Za-z0-9_.:-]{1,160}")
         private val common="id,conversation_id,title,life_core,content,usage_hint,avoid_hint,source_type,source_ref_json,status,recall_count,last_recalled_at,memory_tags_json,supersedes_entry_id,last_confirmed_at,revision_action,source_model,source_window,source_time,tag,migration_status,created_at,updated_at,deleted_at".split(",").toSet()
         private val entryKeys=common+setOf("entry_type","scope","promoted_from_id","memory_level","user_confirmed")

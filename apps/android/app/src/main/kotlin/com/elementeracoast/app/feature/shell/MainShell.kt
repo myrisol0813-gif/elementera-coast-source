@@ -103,6 +103,34 @@ fun MainShell(
     var openModelBoxOnLanding by rememberSaveable { mutableStateOf(false) }
     var showThemeWardrobe by remember { mutableStateOf(false) }
     var showWindowContext by rememberSaveable { mutableStateOf(false) }
+    var showManual by rememberSaveable { mutableStateOf(false) }
+    var guideRequest by remember { mutableStateOf<String?>(null) }
+    fun navigateGuide(target: String) {
+        showManual = false
+        guideRequest = null
+        openModelBoxOnLanding = false
+        when (target) {
+            "main", "history", "echo", "attachments" -> if (state.activeRoomType == RoomType.Main) onBackToChat() else onOpenRoomType(RoomType.Main)
+            "radio" -> if (!state.localMode) onOpenRoomType(RoomType.Radio) else onPlaceholder("本机暂不支持共通聊天室。")
+            "lighthouse" -> if (!state.localMode) onOpenRoomType(RoomType.Lighthouse) else onPlaceholder("本机暂不支持 MCP 对话区。")
+            "window", "reality", "short", "readTools", "writeTools" -> {
+                onBackToChat()
+                showWindowContext = true
+            }
+            "drawer", "draft", "cross", "soil", "desk" -> { guideRequest = target; onBackToChat() }
+            "letter" -> onOpenFeature(FeatureDestination.IslandLetter)
+            "memory", "seeds", "pending", "userPortrait", "selfPortrait", "worldbook", "instructions" -> {
+                guideRequest = target; onOpenFeature(FeatureDestination.Memory)
+            }
+            "daily", "moments", "diary", "calendar", "vault", "collection", "library", "pets" -> {
+                guideRequest = target; onOpenFeature(FeatureDestination.Daily)
+            }
+            "tools", "toolLog" -> onOpenFeature(FeatureDestination.ActionLog)
+            "models", "codex", "provider", "settings", "profile", "appearance", "account", "basic", "backup", "diagnostics", "update" -> {
+                guideRequest = target; onOpenFeature(FeatureDestination.Wolf)
+            }
+        }
+    }
     val defaultSnowLetterVisuals = remember { SnowLetterVisualSettings() }
     var snowLetterBackgroundAlpha by rememberSaveable { mutableStateOf(defaultSnowLetterVisuals.chatBackgroundAlpha) }
     var snowLetterDecorationAlpha by rememberSaveable { mutableStateOf(defaultSnowLetterVisuals.decorationAlpha) }
@@ -130,7 +158,7 @@ fun MainShell(
         coroutineScope.launch { drawerState.close() }
     }
 
-    CompositionLocalProvider(LocalSnowLetterVisuals provides snowLetterVisuals) {
+    CompositionLocalProvider(LocalSnowLetterVisuals provides snowLetterVisuals, LocalOpenGuideManual provides { showManual = true }) {
         ModalNavigationDrawer(
             drawerState = drawerState,
             gesturesEnabled = true,
@@ -206,7 +234,9 @@ fun MainShell(
                                 openPendingMemoryOnLanding = true
                                 onOpenFeature(FeatureDestination.Memory)
                             },
-                            onPlaceholder = onPlaceholder
+                            onPlaceholder = onPlaceholder,
+                            guideTarget = guideRequest,
+                            onGuideConsumed = { guideRequest = null }
                         )
                     } else {
                         FeatureLandingScreen(
@@ -219,6 +249,8 @@ fun MainShell(
                             devHands = devHands,
                             archive = archive,
                             openMemoryPending = openPendingMemoryOnLanding,
+                            guideTarget = guideRequest,
+                            onGuideConsumed = { guideRequest = null },
                             openModelBoxInitially = openModelBoxOnLanding,
                             onMemoryPendingConsumed = { openPendingMemoryOnLanding = false },
                             messages = state.messages,
@@ -242,6 +274,7 @@ fun MainShell(
             }
         }
 
+        if (showManual) FeatureManual(state.localMode, onDismiss = { showManual = false }, onNavigate = ::navigateGuide)
         if (showWindowContext && state.activeFeature == null) {
             WindowContextSheet(
                 conversationId = state.activeConversationId,

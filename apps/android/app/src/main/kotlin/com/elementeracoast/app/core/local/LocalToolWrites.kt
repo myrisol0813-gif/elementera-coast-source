@@ -6,6 +6,8 @@ import java.time.LocalDate
 import java.util.UUID
 import kotlinx.serialization.json.*
 
+internal class LocalToolFailure(val code:String,message:String):IllegalArgumentException(message)
+
 /** Model writes use canonical local stores and retain their source; never impersonate the owner. */
 internal class LocalToolWrites(private val s:LocalPersistence,private val cid:String,private val turn:String,
     private val model:String,private val auditId:String) {
@@ -70,11 +72,49 @@ internal class LocalToolWrites(private val s:LocalPersistence,private val cid:St
                 result(key)
             }
             "library_write"->{
-                val book=input.text("book_id",160);val kind=input.text("kind",16)
-                require(kind in setOf("annotation","reflection"))
                 val side=LocalSideRecords(s)
-                val row=side.writeNote(book,JsonObject(input.filterKeys{it!="book_id"}),"assistant",cid,turn)
-                result(row.getValue("id").jsonPrimitive.content)
+                fun fail(code:String,message:String):Nothing=throw LocalToolFailure(code,message)
+                fun index(key:String):Int {
+                    val v=input[key] as? JsonPrimitive ?: fail("invalid_arguments","缺少整数参数："+key)
+                    return v.intOrNull?.takeIf{!v.isString&&it>=0} ?: fail("invalid_arguments","整数参数无效："+key)
+                }
+                when(input.text("action",8)){
+                    "create"->{
+                        val book=input.text("book_id",160);val kind=input.text("kind",16)
+                        if(kind !in setOf("annotation","reflection","highlight"))fail("invalid_kind","请选择批注、读后感或划线。")
+                        if(side.rows().none{it.kind=="library_books"&&it.data["id"]?.jsonPrimitive?.content==book})fail("book_not_found","书籍不存在，请先读取书架。")
+                        val body=input.text("body",4000,true)
+                        if((kind=="highlight"&&body.isNotEmpty())||(kind!="highlight"&&body.isEmpty()))fail("invalid_body","划线无需正文，批注或读后感需填写正文。")
+                        if(kind!="reflection"){
+                            val chapter=index("chapter_index");val paragraph=index("paragraph_index")
+                            val page=try{side.chapter(book,chapter,paragraph,1)}catch(e:IllegalArgumentException){fail("invalid_anchor","章节不存在，请先读取目录。")}
+                            val text=page.getValue("paragraphs").jsonArray.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content ?: fail("invalid_anchor","段落不存在，请先阅读原文。")
+                            if(kind=="highlight"||"start_offset" in input||"end_offset" in input){
+                                val start=index("start_offset");val end=index("end_offset")
+                                if(start>=end||end>text.length)fail("invalid_range","划线范围超出原文或为空。")
+                            }
+                        }else if(listOf("chapter_index","paragraph_index","start_offset","end_offset").any{it in input})fail("invalid_arguments","读后感不需要章节或划线范围。")
+                        val row=side.writeNote(book,JsonObject(input.filterKeys{it !in setOf("action","book_id","id")}),"assistant",cid,turn)
+                        result(row.getValue("id").jsonPrimitive.content)
+                    }
+                    "edit","delete"->{
+                        val note=input.text("id",160)
+                        val row=side.rows().firstOrNull{it.kind=="library_notes"&&it.data["id"]?.jsonPrimitive?.content==note} ?: fail("note_not_found","没有找到这条笔记。")
+                        if(row.data["author"]?.jsonPrimitive?.content!="assistant")fail("wrong_author","只能修改或删除自己的笔记。")
+                        side.editNote(note,if(input.text("action",8)=="edit")input.text("body",4000)else null,"assistant")
+                        result(note)
+                    }
+                    else->fail("invalid_action","请选择 create、edit 或 delete。")
+                }
+            }
+            "global_excerpt_propose"->{
+                val body=input.text("proposed_body",10000);val reason=input.text("reason",4000)
+                val kind=input.text("change_kind",40,true).ifBlank{"rewrite"}
+                if(kind !in setOf("append","rewrite","refine"))throw LocalToolFailure("invalid_arguments","请选择 append、rewrite 或 refine。")
+                if(LocalSoilStore(s).current(cid)?.get("auto_refresh_enabled")?.jsonPrimitive?.int!=1)
+                    throw LocalToolFailure("permission_revoked","当前窗口未开启自动整理。")
+                val candidate=LocalPortraitStore(s).proposeSelf(body,kind,reason,cid,turn,label)
+                result(candidate)
             }
             "memory_write_candidate"->{
                 val title=input.text("title",120);val content=input.text("content",2000)

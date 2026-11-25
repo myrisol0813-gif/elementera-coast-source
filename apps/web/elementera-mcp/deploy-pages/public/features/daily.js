@@ -155,7 +155,7 @@ export function createDaily({ storage, router, toast, chat }) {
     const entries = [
       ['moments', '碳硅圈', '前端内部朋友圈', 'heart'],
       ['diary', '日记', '留下今天的纸页', 'edit'],
-      ['vault', '文件库', '媒体归档与拾潮珍藏', 'book'],
+      ['vault', '文件库', '媒体归档与收藏', 'book'],
       ['calendar', '日历', '公历日程与纪念日', 'calendar'],
       ['library', '书房', '翻书、划线与批注', 'book'],
       ['pets', '宠物系统', '还在准备休憩箱', 'heart'],
@@ -163,7 +163,7 @@ export function createDaily({ storage, router, toast, chat }) {
     ];
     return {
       title: '小组件',
-      subtitle: state.sync === 'server' ? '朋友圈与日记' : '正在同步日常岛',
+      subtitle: state.sync === 'server' ? '朋友圈与日记' : '正在同步日常资料',
       className: 'daily-panel',
       body: `${syncNotice()}<section class="daily-grid">${entries.map(([route, title, subtitle, iconName]) => `<button type="button" data-action="daily:${route}"><span>${icon(iconName)}</span><strong>${title}</strong><small>${subtitle}</small></button>`).join('')}</section>`,
     };

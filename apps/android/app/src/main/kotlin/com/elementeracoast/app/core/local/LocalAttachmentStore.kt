@@ -78,7 +78,7 @@ internal class LocalAttachmentStore(private val store:LocalPersistence){
                 require(when(mime){"image/png"->sig(0,137,80,78,71,13,10,26,10);"image/jpeg"->sig(0,255,216,255);"image/webp"->sig(0,82,73,70,70)&&sig(8,87,69,66,80);else->false}){"图片 MIME 与原件不一致。"}
                 val url="data:"+mime+";base64,"+java.util.Base64.getEncoder().encodeToString(b)
                 images.add(buildJsonObject{put("type","image_url");putJsonObject("image_url"){put("url",url)}})
-                items.add(RemoteDeskAttachmentItem(id=id,name=name,type="image",mode="image"))
+                items.add(RemoteDeskAttachmentItem(id=id,name=name,type="image",mode="image",reason="图片原件已组装为 image_url；不代表模型实际理解了图片。"))
                 continue
             }
             val suffix=name.substringAfterLast('.',"").lowercase(java.util.Locale.ROOT)
@@ -92,7 +92,7 @@ internal class LocalAttachmentStore(private val store:LocalPersistence){
         val index=messages.indexOfLast{it.role=="user"};require(index>=0){"附件缺少本轮用户消息。"}
         val next=messages.toMutableList()
         if(content.isNotEmpty())next[index]=next[index].copy(content=next[index].content+"\n\n"+content.joinToString("\n\n"))
-        return AttachmentContext(next,RemoteDeskAttachments(uploaded=ids.size,deliveredToModel=items.size,delivered=items,vision=RemoteDeskAttachmentVision(supported=images.isNotEmpty(),imagesDelivered=images.size)),images)
+        return AttachmentContext(next,RemoteDeskAttachments(uploaded=ids.size,deliveredToModel=items.size,delivered=items,vision=RemoteDeskAttachmentVision(supported=false,imagesDelivered=images.size)),images)
     }
     fun deleteConversation(cid:String){
         val rows=entries();val removed=rows.filter{it.metadata.str("conversation_id")==cid}

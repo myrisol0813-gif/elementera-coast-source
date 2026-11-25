@@ -1,4 +1,5 @@
 import { trimContextToComfortRange } from './context-comfort-range.js';
+import { contextBudgetForModel } from './context-budget.js';
 import {
   crossWindowDeskSection,
   normalizeCrossWindowRequest,
@@ -51,7 +52,7 @@ function integer(value, fallback, min, max) {
 function requestSettings(value = {}) {
   return {
     recentTurns: integer(value.recentTurns, 8, 1),
-    comfortTokens: integer(value.contextBudget, 6000, 1800),
+    comfortTokens: value.contextBudget === 0 || value.contextBudget === '0' ? 18000 : integer(value.contextBudget, 6000, 1800),
     soilCharacters: integer(value.soilBudget, 1800, 300, 4000),
     worldbookEnabled: value.worldbookEnabled !== false,
     worldbookLimit: integer(value.worldbookLimit, 6, 0, 6),
@@ -196,6 +197,7 @@ export async function assembleCleanContext(env, {
   const modelVisibleTools = webSearchEnabled
     ? [...selection.modelVisibleTools, WEB_SEARCH_SERVER_TOOL]
     : selection.modelVisibleTools;
+  const budgetPolicy = await contextBudgetForModel(env, settings, model, modelVisibleTools);
   const [worldbook, directDogtalk, manualCrossWindow, reality] = await Promise.all([
     request.worldbookEnabled && request.worldbookLimit ? matchWorldbook(env.COAST_CHAT_DB, { input: query, messages: recent.slice(0, -1), surface, allowedScopes: access.worldbook, limit: request.worldbookLimit }) : Promise.resolve([]),
     OWNER_CUSTOM_INSTRUCTION_SURFACES.has(surface) ? dogtalkContext(env.COAST_CHAT_DB, { room_scope: 'conversation', conversation_id: conversationId }, query, { consume_direct: !preview }) : Promise.resolve(null),
@@ -217,7 +219,7 @@ export async function assembleCleanContext(env, {
     customInstructionsText: hasCustomInstructions ? customInstructionsText : '', userPortraitText, globalExcerptText, soilText, memoryItems, worldbookItems, dogtalkText: dogtalk?.context || '',
     crossWindowItems: manualCrossWindowItems(manualCrossWindow), workbenchText,
     realityText: reality.text, responseModeText: responseMode.text, messages: recent,
-    recentTurns, maxTokens: request.comfortTokens,
+    recentTurns, maxTokens: budgetPolicy.ceiling,
   });
   const deliveredMessages = comfort.keptMessages || comfort.modelMessages.filter((message) => message.role !== 'system');
   const currentDelivered = deliveredMessages.at(-1)?.role === 'user'; const deliveredRecent = currentDelivered ? deliveredMessages.slice(0, -1) : deliveredMessages;
@@ -242,7 +244,7 @@ export async function assembleCleanContext(env, {
     customInstructions: comfort.keptCustomInstructionsText, customInstructionsDelivered: comfort.kept.custom_instructions,
     userPortrait: comfort.keptUserPortraitText, userPortraitStatus: comfort.userPortraitStatus, userPortraitTokens: comfort.userPortraitTokens,
     globalExcerpt: comfort.keptGlobalExcerptText, globalExcerptStatus: comfort.globalExcerptStatus, globalExcerptTokens: comfort.globalExcerptTokens,
-    estimatedTokens: comfort.estimatedTokens, comfortCeiling: comfort.comfortCeiling, exceedsComfortCeiling: comfort.exceedsComfortCeiling,
+    estimatedTokens: comfort.estimatedTokens, comfortCeiling: comfort.comfortCeiling, exceedsComfortCeiling: comfort.exceedsComfortCeiling, budgetNote: budgetPolicy.note,
     soil: comfort.kept.soil, soilEnabled, soilContext: soilDesk.context,
     soilCurrentText: soilDesk.current_text, soilAfterthoughts: soilDesk.afterthoughts,
     soilMemoryCandidatesCount: soilDesk.memory_candidates_count, soilSeedCandidatesCount: soilDesk.seed_candidates_count, memoryItems: deliveredMemoryRecords,

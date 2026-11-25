@@ -1,6 +1,7 @@
 import { q } from './core/dom.js';
 import { confirmDanger, dangerConfirmationFor } from './core/danger.js';
 import { hydrateIconSlots } from './core/icons.js';
+import { showGuideHint } from './core/feature-guide.js';
 import { createActionEventOwner, createEventSpine } from './core/event-spine.js';
 import { createRouter } from './core/router.js';
 import { createStorage } from './core/storage.js';
@@ -60,8 +61,8 @@ const vault = createCoastVault({ router, chat, toast });
 const memory = createMemory({ chat, router, toast, storage });
 const models = createModels({ chat, router, toast });
 const tools = createTools({ storage, router, toast, memory });
-const settings = createSettings({ storage, shell, chat, router, toast });
 const daily = createDaily({ storage, router, toast, chat });
+const settings = createSettings({ storage, shell, chat, router, toast, memory, daily, dogtalk });
 const calendar = createCalendar({ router, toast });
 const library = createTidalLibrary({ router, toast });
 const letters = createLetters({ storage, chat, models, router, toast });
@@ -126,6 +127,7 @@ async function boot() {
   const serviceWorkerReady = registerServiceWorker();
   hydrateIconSlots();
   await eventSpine.mount({ router, shell, overlayRoot });
+  showGuideHint();
   await serviceWorkerReady;
 }
 

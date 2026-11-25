@@ -82,4 +82,17 @@ class LocalToolSessionTest {
         cache.putHistory("current",h.copy(turns=h.turns.map{t->if(t.id=="turn-now")t.copy(user=t.user.copy(variants=t.user.variants.map{it.copy(content="edited")}))else t}))
         assertFalse(tool.execute("stale","cross_window_keyword_search","""{"query":"海岸"}""").ok)
     }
+    @Test fun directoryAndRecentReadRequireCrossWindowPermissionAndRetainExactMessages(){
+        val s=fixture();val session=open(s)!!
+        val directory=session.execute("directory","cross_window_search","""{"query":"Old","limit":1}""")
+        assertTrue(directory.output,directory.ok);assertTrue(directory.output.contains("Old"));assertFalse(directory.output.contains("完整原文"))
+        assertFalse(session.receipt.crossWindow.delivered)
+        val recent=session.execute("recent","cross_window_read_recent","""{"conversation_id":"old","turns":1}""")
+        assertTrue(recent.output,recent.ok);assertTrue(recent.output.contains("x".repeat(220)));assertFalse(recent.output.contains("u-hidden"))
+        assertEquals(2,recent.deskSlip.crossWindow.deliveredToModelMessages)
+        assertFalse(session.execute("self","cross_window_read_recent","""{"conversation_id":"current","turns":1}""").ok)
+        val cache=RemoteCacheStore(s);cache.putHistory("current",cache.history("current")!!.copy(contextSettings=ConversationContextSettings()))
+        assertFalse(session.execute("revoked","cross_window_read_recent","""{"conversation_id":"old","turns":1}""").ok)
+        assertFalse(LocalToolAudit(s).read().toString().contains("完整原文"))
+    }
 }

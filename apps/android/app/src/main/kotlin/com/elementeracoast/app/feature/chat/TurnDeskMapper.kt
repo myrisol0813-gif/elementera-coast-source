@@ -256,8 +256,8 @@ internal object TurnDeskMapper {
                     add(TurnDeskDetail(
                         item.name.ifBlank { item.id.ifBlank { "附件" } },
                         when (item.mode) {
-                            "vision" -> "图片 · 已递给模型 · 识图"
-                            "text" -> "文件 · 已递给模型 · 文本读取"
+                            "vision", "image" -> "图片 · 已递给模型（不代表已识别）"
+                            "text" -> "文件 · 已递入文本"
                             else -> "已递给模型"
                         }
                     ))

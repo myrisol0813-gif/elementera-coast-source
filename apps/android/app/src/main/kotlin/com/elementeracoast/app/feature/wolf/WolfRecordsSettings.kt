@@ -105,7 +105,7 @@ internal fun ChatRecordsScreen(
 @Composable
 internal fun BasicSettingsScreen(settings: BasicSettings, store: WolfStore, onSnackbar: (String) -> Unit) {
     var recentTurnsText by remember(settings.recentTurns) { mutableStateOf(settings.recentTurns.toString()) }
-    var contextBudgetText by remember(settings.contextBudget) { mutableStateOf(settings.contextBudget.toString()) }
+    var contextBudgetText by remember(settings.contextBudget) { mutableStateOf(if(settings.contextBudget==0)"" else settings.contextBudget.toString()) }
 
     fun commitRecentTurns() {
         val parsed = recentTurnsText.toIntOrNull()
@@ -117,8 +117,14 @@ internal fun BasicSettingsScreen(settings: BasicSettings, store: WolfStore, onSn
     }
 
     fun commitContextBudget() {
+        if(settings.contextBudget==0)return
         val parsed = contextBudgetText.toIntOrNull()
-        val value = if (parsed != null && parsed >= 1800) parsed else 6000
+        if(parsed==null||parsed<1800){
+            contextBudgetText=settings.contextBudget.toString()
+            onSnackbar("手动预算需为至少1800的整数；原设置已保留。")
+            return
+        }
+        val value=parsed
         contextBudgetText = value.toString()
         if (value == settings.contextBudget) return
         store.updateBasic { it.copy(contextBudget = value) }
@@ -143,14 +149,17 @@ internal fun BasicSettingsScreen(settings: BasicSettings, store: WolfStore, onSn
                     keyboardActions = KeyboardActions(onDone = { commitRecentTurns() })
                 )
                 Text("上下文 token budget", fontWeight = FontWeight.Medium)
-                OutlinedTextField(
+                ChoiceRow("自动",settings.contextBudget==0){store.updateBasic{it.copy(contextBudget=0)}}
+                ChoiceRow("手动",settings.contextBudget!=0){if(settings.contextBudget==0)store.updateBasic{it.copy(contextBudget=6000)}}
+                if(settings.contextBudget==0) Text("依据模型目录容量预留输出及工具空间；未提供容量时采用18000的舒服区间，不代表模型真实上限。",style=MaterialTheme.typography.bodySmall)
+                if(settings.contextBudget!=0) OutlinedTextField(
                     value = contextBudgetText,
                     onValueChange = { raw -> contextBudgetText = raw.filter(Char::isDigit) },
                     modifier = Modifier.fillMaxWidth().onFocusChanged { state ->
                         if (!state.isFocused) commitContextBudget()
                     },
                     suffix = { Text("tokens") },
-                    supportingText = { Text("默认 6000；推荐从 6000 / 12000 / 20000 起调。最小 1800，不设应用层上限；最终仍受模型与 provider 的真实 context window 限制。") },
+                    supportingText = { Text("最小1800，无人为固定上限；已知模型目录容量时会限制估算输入，回执显示实际采用的预算。") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { commitContextBudget() })

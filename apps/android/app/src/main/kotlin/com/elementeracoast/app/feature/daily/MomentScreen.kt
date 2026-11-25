@@ -46,10 +46,12 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 
 @Composable
 internal fun MomentScreen(
     repository: DailyRepository,
+    selectedModel: String,
     modelPartnerAvatarDataUrl: String,
     onUpdateModelPartnerAvatar: (String) -> Unit,
     onActionLogged: (String, String, String) -> Unit,
@@ -155,10 +157,11 @@ internal fun MomentScreen(
                             modelPartnerBusyId = moment.id
                             scope.launch {
                                 try {
-                                    repository.requestModelPartnerComment(moment.id)
+                                    repository.requestModelPartnerComment(moment.id, selectedModel)
                                     onActionLogged("daily.moment.model-partner-comment", "模型伙伴留言", "前端已生成并保存 1 条真实留言")
                                     onSnackbar("模型伙伴已在前端留下回复")
                                 } catch (error: Throwable) {
+                                    if (error is CancellationException) throw error
                                     reportFailure("模型伙伴留言失败", error)
                                 } finally {
                                     modelPartnerBusyId = null
@@ -237,6 +240,7 @@ internal fun MomentScreen(
 @Composable
 internal fun MomentComposeScreen(
     repository: DailyRepository,
+    selectedModel: String,
     onActionLogged: (String, String, String) -> Unit,
     onSnackbar: (String) -> Unit,
     onDone: () -> Unit
@@ -263,10 +267,11 @@ internal fun MomentComposeScreen(
                                 val created = repository.createMoment(date, body)
                                 onActionLogged("daily.moment.write", "写了一条碳硅圈", "前端新增 1 条屋主动态")
                                 try {
-                                    repository.requestModelPartnerComment(created.id)
+                                    repository.requestModelPartnerComment(created.id, selectedModel)
                                     onActionLogged("daily.moment.model-partner-comment", "模型伙伴即时留言", "前端已生成并保存 1 条真实留言")
                                     onSnackbar("动态已发布，模型伙伴也在前端留下了回复")
                                 } catch (commentError: Throwable) {
+                                    if (commentError is CancellationException) throw commentError
                                     val detail = if (commentError is CoastApiException) commentError.message else commentError.message ?: "未知错误"
                                     onSnackbar("动态已发布；模型伙伴即时留言暂未完成：$detail")
                                 }

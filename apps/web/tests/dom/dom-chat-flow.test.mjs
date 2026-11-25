@@ -26,6 +26,19 @@ export async function runChatPrelude() {
   assert.equal(document.querySelector('#contextStatus'), null, '旧上下文状态条已删除');
   assert.equal(document.querySelector('#deskStatus')?.hidden, true, '本轮上下文预览在首次回复前不显示空壳');
 
+  // The first-use hint must open the actual manual, not only render a label.
+  const hint = document.querySelector('#firstFeatureHint');
+  assert.ok(hint && !hint.hidden, 'first-use help is visible');
+  hint.querySelector('[data-action="settings:help"]').click();
+  await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'feature-manual', 'first-use manual route');
+  assert.equal(hint.hidden, true);
+  assert.equal(localStorage.getItem('source-feature-guide-seen-v1'), '1');
+  const manual = document.querySelector('#overlayRoot');
+  assert.ok(manual.querySelectorAll('[data-action="settings:guide-target"]').length >= 35);
+  manual.querySelector('[data-key="main"][data-action="settings:guide-target"]').click();
+  await waitFor(() => !document.querySelector('#overlayRoot')?.dataset.route, 'manual returns to current main chat');
+  assert.equal(hint.hidden, true);
+
   document.querySelector('#menuButton').click();
   assert.equal(document.body.classList.contains('sidebar-open'), true, 'Shell owner opens the sidebar through Event Spine');
   document.querySelector('#sidebarClose').click();
@@ -247,7 +260,7 @@ export async function runChatTypedRooms() {
   await waitFor(() => document.querySelector('#windowContextOverlay')?.hidden === true, 'window settings closes before letter');
   await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'island-letter', 'letter route');
   assert.ok(document.querySelector('#islandLetterText').value.includes('这是 source 版本的公开占位入住信'));
-  assert.equal(document.querySelector('[data-action="letters:send-island"]').textContent, '递出登岛信');
+  assert.equal(document.querySelector('[data-action="letters:send-island"]').textContent, '递出新居信');
   const visibleUsersBeforeLetter = document.querySelectorAll('.message.user').length;
   const assistantsBeforeLetter = document.querySelectorAll('.message.assistant').length;
   const titlesBeforeLetter = titleBodies.length;
@@ -271,7 +284,7 @@ export async function runChatTypedRooms() {
   assert.match(titleBodies.at(-1).user, /^登岛信：/);
   assert.equal(titleBodies.at(-1).assistant, '我把登岛信读完了。');
   assert.equal(conversations.find((item) => item.id === landingConversationId)?.title, '测试标题');
-  assert.equal(document.querySelector('#toastRoot').textContent, '登岛信已递出，但模型或供应商达到自身长度上限；可以点“重新生成”再读一次。');
+  assert.equal(document.querySelector('#toastRoot').textContent, '新居信已递出，但模型或供应商达到自身长度上限；可以点“重新生成”再读一次。');
   assert.ok(document.querySelector('.thought-soil-entry')?.textContent.includes('1 条余思'));
   document.querySelector('.thought-soil-entry').click();
   await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'thought-soil', 'landing thought soil route');
@@ -295,14 +308,14 @@ export async function runChatTypedRooms() {
   await waitFor(() => document.querySelector('#windowContextOverlay')?.hidden === false, 'reopen window settings');
   document.querySelector('[data-action="chat:window-letter-open"]').click();
   await waitFor(() => document.querySelector('[data-action="letters:send-island"]'), 'reopen letter route');
-  assert.equal(document.querySelector('[data-action="letters:send-island"]').textContent, '重新递出登岛信');
+  assert.equal(document.querySelector('[data-action="letters:send-island"]').textContent, '重新递出新居信');
   const lockedSoil = { ...soilFor(landingConversationId), current_text: '屋主手动锁定的当前方向', afterthoughts: [], memory_candidates: [], seed_candidates: [], manual_locked: true };
   soils.set(landingConversationId, lockedSoil);
   setLandingFinishReason('stop');
   const landingCountBeforeLocked = landingBodies.length;
   document.querySelector('[data-action="letters:send-island"]').click();
   await waitFor(() => landingBodies.length === landingCountBeforeLocked + 1 && document.querySelector('#overlayRoot').hidden, 'locked landing soil readback');
-  assert.equal(document.querySelector('#toastRoot').textContent, '登岛信已递出；整理当前对话的纸条已手动锁定，保留原有内容。');
+  assert.equal(document.querySelector('#toastRoot').textContent, '新居信已递出；整理当前对话的纸条已手动锁定，保留原有内容。');
   assert.equal(soilFor(landingConversationId).current_text, '屋主手动锁定的当前方向');
   assert.equal(soilFor(landingConversationId).afterthoughts.length, 0);
   assert.ok(document.querySelector('.thought-soil-entry')?.textContent.includes('已锁定'));
@@ -315,7 +328,7 @@ export async function runChatTypedRooms() {
   const landingCountBeforeFailure = landingBodies.length;
   document.querySelector('[data-action="letters:send-island"]').click();
   await waitFor(() => landingBodies.length === landingCountBeforeFailure + 1 && document.querySelector('#overlayRoot').hidden, 'landing soil failure preserves reply');
-  assert.equal(document.querySelector('#toastRoot').textContent, '登岛信已递出，但整理当前对话的纸条整理失败，可以稍后手动整理。');
+  assert.equal(document.querySelector('#toastRoot').textContent, '新居信已递出，但整理当前对话的纸条整理失败，可以稍后手动整理。');
   assert.equal(document.querySelectorAll('.message.user').length, visibleUsersBeforeLetter);
   assert.equal(histories.get(landingConversationId).turns.length, 3, 'soil failure must not discard a saved landing reply');
 

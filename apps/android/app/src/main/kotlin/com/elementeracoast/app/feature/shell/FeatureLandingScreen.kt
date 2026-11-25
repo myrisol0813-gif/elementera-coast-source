@@ -44,12 +44,17 @@ internal fun FeatureLandingScreen(
     onLogout: () -> Unit,
     onImportMessages: (List<ChatMessage>) -> Unit,
     onLocalActionLogged: (String, String, String) -> Unit,
-    onPlaceholder: (String) -> Unit
+    onPlaceholder: (String) -> Unit,
+    guideTarget: String? = null,
+    onGuideConsumed: () -> Unit = {}
 ) {
     SnowLetterFeatureScaffold {
         when (feature) {
             FeatureDestination.Daily -> DailyLanding(
                 repository = daily,
+                selectedModel = shellState.currentModel,
+                guideTarget = guideTarget,
+                onGuideConsumed = onGuideConsumed,
                 modelPartnerAvatarDataUrl = shellState.modelPartnerAvatarDataUrl,
                 onUpdateModelPartnerAvatar = onUpdateModelPartnerAvatar,
                 onRefreshCoast = onRefresh,
@@ -60,6 +65,8 @@ internal fun FeatureLandingScreen(
             )
             FeatureDestination.Memory -> MemoryLanding(
                 repository = memory,
+                guideTarget = guideTarget,
+                onGuideConsumed = onGuideConsumed,
                 conversationId = shellState.activeConversationId,
                 openPendingInitially = openMemoryPending,
                 onPendingOpenConsumed = onMemoryPendingConsumed,
@@ -69,6 +76,8 @@ internal fun FeatureLandingScreen(
             )
             FeatureDestination.Wolf -> WolfScreen(
                 store = services.wolf,
+                guideTarget = guideTarget,
+                onGuideConsumed = onGuideConsumed,
                 openModelBoxInitially = openModelBoxInitially,
                 shellState = shellState,
                 chatGpt = chatGpt,

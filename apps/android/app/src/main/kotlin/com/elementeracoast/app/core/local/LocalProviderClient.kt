@@ -113,18 +113,24 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
             "；已用：" + (usage?.let { "USD " + it } ?: "未返回") + "。这不是账户总余额。"
     }
 
-    private data class SoilCatalog(val providerId:String,val readAt:Long,val body:JsonObject?)
-    @Volatile private var soilCatalog:SoilCatalog?=null
+    private data class ModelCatalog(val providerId:String,val baseUrl:String,val readAt:Long,val body:JsonObject?)
+    @Volatile private var modelCatalog:ModelCatalog?=null
+    private suspend fun catalog(p:LocalProviderConfig):JsonObject? {
+        val now=System.currentTimeMillis()
+        val cached=modelCatalog?.takeIf{it.providerId==p.id&&it.baseUrl==p.baseUrl&&now-it.readAt in 0..(if(it.body==null)60000L else 600000L)}
+        if(cached!=null)return cached.body
+        val fetched=try{get(p,"/models")}catch(e:CancellationException){throw e}catch(_:Exception){null}
+        modelCatalog=ModelCatalog(p.id,p.baseUrl,now,fetched)
+        return fetched
+    }
+    internal suspend fun inputBudget(p:LocalProviderConfig,model:String,requested:Int,output:Int,tools:Boolean):LocalInputBudget {
+        val data=if(requested==0||LocalSoilPolicy.isOpenRouter(p))catalog(p) else modelCatalog?.takeIf{it.providerId==p.id&&it.baseUrl==p.baseUrl}?.body
+        val entry=(data?.get("data") as? JsonArray)?.mapNotNull{it as? JsonObject}?.firstOrNull{(it["id"] as? JsonPrimitive)?.contentOrNull==model}
+        return LocalInputBudget.resolve(requested,output,tools,entry)
+    }
     internal suspend fun soilPolicy(p:LocalProviderConfig,model:String):LocalSoilPolicy {
         if(!LocalSoilPolicy.isOpenRouter(p))return LocalSoilPolicy()
-        val now=System.currentTimeMillis()
-        val cached=soilCatalog?.takeIf{it.providerId==p.id&&now-it.readAt in 0..(if(it.body==null)60000L else 600000L)}
-        val catalog=if(cached!=null)cached.body else {
-            val fetched=try{get(p,"/models")}catch(e:CancellationException){throw e}catch(_:Exception){null}
-            soilCatalog=SoilCatalog(p.id,now,fetched)
-            fetched
-        }
-        return LocalSoilPolicy.forProvider(p,model,catalog)
+        return LocalSoilPolicy.forProvider(p,model,catalog(p))
     }
 
     /** Dedicated non-streaming organization for OpenRouter. No tools or chat history. */
@@ -164,10 +170,10 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
         }
     }
 
-    fun stream(p: LocalProviderConfig, model: String, messages: List<RemoteChatMessage>, maxTokens: Int,imageParts:List<JsonObject> = emptyList()): Flow<LocalProviderEvent> =
-        streamWithTools(p,model,messages,maxTokens,imageParts,null)
+    fun stream(p: LocalProviderConfig, model: String, messages: List<RemoteChatMessage>, maxTokens: Int,imageParts:List<JsonObject> = emptyList(),temperature:Double?=null): Flow<LocalProviderEvent> =
+        streamWithTools(p,model,messages,maxTokens,imageParts,null,temperature)
 
-    internal fun streamWithTools(p:LocalProviderConfig, model:String, messages:List<RemoteChatMessage>,maxTokens:Int,imageParts:List<JsonObject>,session:LocalToolSession?):Flow<LocalProviderEvent> = callbackFlow {
+    internal fun streamWithTools(p:LocalProviderConfig, model:String, messages:List<RemoteChatMessage>,maxTokens:Int,imageParts:List<JsonObject>,session:LocalToolSession?,temperature:Double?=null):Flow<LocalProviderEvent> = callbackFlow {
         val history=localMultimodalMessages(messages,imageParts).toMutableList()
         val echo=LocalProviderEcho(p,model,maxTokens)
         val active=java.util.concurrent.atomic.AtomicReference<okhttp3.Call?>()
@@ -182,6 +188,7 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                         if(host in setOf("api.openai.com","openrouter.ai","qianfan.baidubce.com"))put("stream_options",buildJsonObject{put("include_usage",true)})
                         put(if(official)"max_completion_tokens"else "max_tokens",maxTokens.coerceIn(64,65536))
                         put("messages",JsonArray(history))
+                        temperature?.let{put("temperature",it)}
                         if(session!=null){put("tools",session.completionsTools);put("tool_choice",if(round==LocalToolSession.MAX_CALLS||callsMade>=LocalToolSession.MAX_CALLS)"none"else "auto")}
                     }
                     val call=http.newCall(request(p,"/chat/completions").header("Accept","text/event-stream").post(payload.toString().toRequestBody(media)).build())
