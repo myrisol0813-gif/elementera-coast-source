@@ -4,6 +4,7 @@ import { shortModelName } from '../core/model-format.js';
 import { createTransferSettings } from './settings-transfer.js';
 import { saveArchiveV2 } from '../core/archive-v2-save.js';
 import { buildOfflineArchive } from './offline-archive.js';
+import { GUIDE_TARGETS, manualMarkup, dismissGuideHint } from '../core/feature-guide.js';
 
 const LOADED_AT = new Date().toISOString();
 
@@ -89,8 +90,8 @@ export function createSettings({ storage, shell, chat, router, toast }) {
   router.register('wolf', () => {
     const currentModel = chat.getProfile().current_chat_model;
     return {
-      title: '屋主设置 / 屋主设置',
-      subtitle: '人类屋主设置显示资料 · 外观 · 聊天与运行设置',
+      title: '屋主设置',
+      subtitle: '显示资料 · 外观 · 聊天与运行设置',
       className: 'settings-panel',
       body: group('人类屋主设置',
         row('个人资料', '昵称、聊天署名与显示资料', 'settings:profile')
@@ -100,9 +101,15 @@ export function createSettings({ storage, shell, chat, router, toast }) {
         + row('模型箱', `当前：${shortModelName(currentModel || '未选择')}`, 'models:open')
         + row('基本设置', '回答长度、流式输出、记忆召回与世界书', 'tools:basic-settings')
         + row('版本与更新', 'PWA / Native / GitHub Release / SHA-256', 'devhands:update')
-        + row('关于与诊断', '版本、缓存、Service Worker 与当前窗口', 'settings:diagnostics')),
+        + row('关于与诊断', '版本、缓存、Service Worker 与当前窗口', 'settings:diagnostics')
+        + row('使用手册', '按页面查看说明与操作入口', 'settings:help')),
     };
   });
+
+  router.register('feature-manual', () => ({
+    title: '使用手册', subtitle: '按页面查找功能与操作入口', className: 'settings-panel',
+    body: manualMarkup(),
+  }));
 
   router.register('desk', () => ({
     title: '模型工作台',
@@ -159,8 +166,8 @@ export function createSettings({ storage, shell, chat, router, toast }) {
     title: '聊天记录',
     subtitle: '完整前端与当前窗口 · 本机导入导出',
     className: 'settings-panel',
-    body: group('海岸归档',
-      row('导出', '海岸归档 ZIP · 原件与清单', 'settings:export-v2')
+    body: group('资料归档',
+      row('导出', '归档 ZIP · 原件与清单', 'settings:export-v2')
       + row('导出 HTML', '离线阅读 ZIP · 解压后打开 index.html', 'settings:export-html')
       + row('导入', '自动识别 ZIP / 旧版迁移 JSON · 先预览再确认', 'settings:transfer-open')),
   }));
@@ -265,6 +272,24 @@ export function createSettings({ storage, shell, chat, router, toast }) {
 
   async function handleAction(name, target) {
     if (name.startsWith('transfer-')) return transfer.handle(name,target);
+    if (name === 'dismiss-guide') return dismissGuideHint();
+    if (name === 'help') {
+      dismissGuideHint();
+      return router.open('feature-manual');
+    }
+    if (name === 'guide-target') {
+      const destination = GUIDE_TARGETS[target.dataset.key];
+      if (!destination || !Object.hasOwn(GUIDE_TARGETS, target.dataset.key)) return;
+      if (destination.startsWith('room:')) {
+        await router.close();
+        return chat.openRoomType(destination.slice(5));
+      }
+      if (destination === 'window') {
+        await router.close();
+        return chat.handleAction('window-settings');
+      }
+      return router.open(destination);
+    }
     const routes = {
       wolf: 'wolf',
       desk: 'desk',

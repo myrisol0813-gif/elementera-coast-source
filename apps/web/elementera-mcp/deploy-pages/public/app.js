@@ -1,6 +1,7 @@
 import { q } from './core/dom.js';
 import { confirmDanger, dangerConfirmationFor } from './core/danger.js';
 import { hydrateIconSlots } from './core/icons.js';
+import { showGuideHint } from './core/feature-guide.js';
 import { createActionEventOwner, createEventSpine } from './core/event-spine.js';
 import { createRouter } from './core/router.js';
 import { createStorage } from './core/storage.js';
@@ -126,6 +127,7 @@ async function boot() {
   const serviceWorkerReady = registerServiceWorker();
   hydrateIconSlots();
   await eventSpine.mount({ router, shell, overlayRoot });
+  showGuideHint();
   await serviceWorkerReady;
 }
 

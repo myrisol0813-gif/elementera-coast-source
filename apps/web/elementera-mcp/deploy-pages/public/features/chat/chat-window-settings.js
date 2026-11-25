@@ -104,7 +104,7 @@ export function createChatWindowSettings({
             <p>PWA 只递入日期、时间和未来 7 天日历，保持轻量，不在聊天前等待天气或设备信息。完整现实上下文仍由 Native 提供。</p>
           </section>
 
-          <button class="window-context-letter" type="button" data-action="chat:window-letter-open">登岛信</button>
+          <button class="window-context-letter" type="button" data-action="chat:window-letter-open">新居信</button>
         </div>
       </section>`;
   }
