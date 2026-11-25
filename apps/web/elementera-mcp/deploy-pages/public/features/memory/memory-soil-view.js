@@ -110,7 +110,7 @@ export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentS
     return `<div class="thought-soil-row"><button class="thought-soil-entry" type="button"
       data-action="memory:soil-open" data-scope="conversation"
       data-conversation-id="${escapeAttribute(conversationId)}"${messageAttr}>
-      思维壤 · ${afterthoughts.length} 条余思${state}${overflowLabel} <span aria-hidden="true">›</span>
+      纸条 · ${afterthoughts.length} 条余思${state}${overflowLabel} <span aria-hidden="true">›</span>
     </button></div>`;
   }
 
@@ -189,7 +189,7 @@ export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentS
         ? afterthoughts.map(item => `<div class="feature-row static"><span><small>${escapeHtml(item)}</small></span></div>`).join('')
         : '<p>这一刻没有想留下的余思。</p>';
       return {
-        title: '思维壤 · 这一轮',
+        title: '这一轮的纸条',
         subtitle: '旧土层只供翻阅 · 不参与模型上下文',
         className: 'memory-soil',
         headerAction: '<button class="feature-head-action" type="button" data-action="memory:done">完成</button>',
@@ -200,7 +200,7 @@ export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentS
           · ${escapeHtml(memoryDate(history.created_at) || '')}</p>
           <div class="button-row"><button type="button" data-action="memory:soil-treasure-open"
              data-conversation-id="${escapeAttribute(conversationId || currentId())}"
-             data-message-id="${escapeAttribute(messageId)}">♡ 珍藏本轮思维壤</button></div>`,
+             data-message-id="${escapeAttribute(messageId)}">收藏本轮纸条</button></div>`,
       };
     }
 
@@ -230,7 +230,7 @@ export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentS
     const snapshot = (runtime.soilHistory.get(conversationId) || [])
       .find(item => item.assistant_message_id === messageId);
     if (!snapshot) return {
-      title: '旧思维壤已不在当前历史中',
+      title: '旧纸条已不在当前历史中',
       subtitle: '请从原聊天重新打开。',
       className: 'memory-soil',
       body: '<p class="feature-note">找不到对应的原位土层，没有保存新的收藏。</p>',
@@ -252,14 +252,14 @@ export function createSoilViews({ runtime, currentId, maxAfterthoughts, currentS
         + escapeHtml(segment.slice(0, 1100)) + '</small></span></label>';
     }).join('');
     return {
-      title: '拾入潮间 · 旧思维壤',
+      title: '收藏 · 历史纸条',
       subtitle: '只收藏选中的原位文字，不改变旧土层，不自动注入模型上下文。',
       className: 'memory-soil',
       body: '<form class="form-stack" data-submit="memory:soil-treasure-save"'
         + ' data-conversation-id="' + escapeAttribute(conversationId) + '"'
         + ' data-message-id="' + escapeAttribute(messageId) + '"'
         + ' data-section-count="' + segments.length + '">'
-        + '<p class="feature-note">逐段选择旧「当前」及「余思」；收藏后可在拾潮中搜索备注和回到源消息。</p>'
+        + '<p class="feature-note">逐段选择旧「当前」及「余思」；收藏后可在收藏中搜索备注和回到源消息。</p>'
         + rows
         + '<label>备注<textarea name="notes" rows="3" maxlength="1200" placeholder="用于日后关键词查找，可留空">'
         + escapeHtml(saved?.notes || '') + '</textarea></label>'

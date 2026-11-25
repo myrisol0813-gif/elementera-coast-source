@@ -45,7 +45,7 @@ export function createCoastVault({ router, chat, toast }) {
     const name = image
       ? (item.display_name || originalName || '海岸影像')
       : saved ? (item.kind === 'text' ? '文字摘录' : item.kind === 'soil'
-        ? '原位思维壤' : audio ? '语音收藏' : '媒体收藏')
+        ? '原位纸条' : audio ? '语音收藏' : '媒体收藏')
         : item.name || (audio ? '已生成语音' : '媒体');
     const primary = saved ? item.excerpt || '' : item.source_text || '';
     const favoriteId = saved ? item.id : item.treasure_id;
@@ -110,7 +110,7 @@ export function createCoastVault({ router, chat, toast }) {
     }
     const title = '<div class="coast-vault-meta"><strong>' + escapeHtml(name)
       + '</strong><small>' + escapeHtml(audio ? '声音' : item.kind === 'file'
-        ? '文件' : item.kind === 'soil' ? '旧思维壤' : '文字') + '</small></div>';
+        ? '文件' : item.kind === 'soil' ? '历史纸条' : '文字') + '</small></div>';
     if (audio) {
       return '<article class="coast-vault-card coast-vault-audio" data-vault-index="' + index + '">'
         + '<div class="coast-vault-player">' + mediaPreview(item)
@@ -190,7 +190,7 @@ export function createCoastVault({ router, chat, toast }) {
       + '<button type="button" data-action="vault:mode" data-mode="basic"'
       + (mode === 'basic' ? ' aria-current="page"' : '') + '>基本文件库</button>'
       + '<button type="button" data-action="vault:mode" data-mode="treasures"'
-      + (mode === 'treasures' ? ' aria-current="page"' : '') + '>拾潮</button></nav>';
+      + (mode === 'treasures' ? ' aria-current="page"' : '') + '>收藏</button></nav>';
     const searchForm = '<form data-submit="vault:search" class="coast-vault-search">'
       + '<span class="coast-vault-search-title">检索</span>'
       + '<div class="coast-vault-query-row"><input type="search" name="q" maxlength="100" value="'
@@ -205,15 +205,15 @@ export function createCoastVault({ router, chat, toast }) {
     const itemsHtml = items.length ? groupedCards(mode === 'treasures')
       : '<p class="coast-vault-empty">'
         + escapeHtml(message || (mode === 'basic' ? '还没有能够读取的已保存媒体。'
-          : '还没有符合条件的拾潮记录。')) + '</p>';
+          : '还没有符合条件的收藏记录。')) + '</p>';
     const migration = mode === 'treasures'
       ? '<p class="coast-vault-hint"><button type="button" class="coast-vault-next"'
-        + ' data-action="vault:legacy">检查旧红心 · 确认后迁入拾潮</button>'
+        + ' data-action="vault:legacy">检查旧红心 · 确认后迁入收藏</button>'
         + ' 只增补旧助手红心，不删除旧标记或覆盖新备注；请先完成完整 JSON 备份。</p>'
       : '';
     return {
-      title: '海岸文件库',
-      subtitle: mode === 'basic' ? '自动归集真实媒体 · 不收录聊天文字' : '拾潮 · 只收录你主动珍藏的东西',
+      title: '文件库',
+      subtitle: mode === 'basic' ? '自动归集真实媒体 · 不收录聊天文字' : '收藏 · 只收录你主动珍藏的东西',
       className: 'daily-panel coast-vault-panel',
       body: modeBar + searchForm + migration + itemsHtml + (next
         ? '<button type="button" class="coast-vault-next" data-action="vault:more" data-cursor="' +
@@ -251,7 +251,7 @@ export function createCoastVault({ router, chat, toast }) {
       };
       const preview = await inspect(false);
       if (!preview.count) {
-        toast('没有检测到需要扫描的旧助手红心；已有拾潮收藏不受影响。');
+        toast('没有检测到需要扫描的旧助手红心；已有收藏收藏不受影响。');
         return;
       }
       // Real D1 writes must only follow an explicit owner-triggered preview

@@ -74,8 +74,8 @@ export const FEATURE_GUIDES = Object.freeze({
     "日历：添加日程、随记及纪念日，选择起始日期和计算方式。开启侧栏展示后可从侧栏查看与编辑。"
   ],
   "vault": [
-    "文件库与收藏",
-    "文件库：分类查看已保存的图片、语音与附件，可查找并返回来源。\n收藏：保存喜欢的文字、纸条与媒体，可添加备注或取消收藏；取消收藏不删除原件。"
+    "文件库",
+    "小组件 → 文件库 → 基本文件库：分类查看已保存的图片、语音与附件，查找并返回来源。"
   ],
   "library": [
     "书房",
@@ -111,7 +111,7 @@ export const FEATURE_GUIDES = Object.freeze({
   ],
   "basic": [
     "基本设置",
-    "屋主设置 → 基本设置：调整生成偏好、记忆召回与世界书。实际输入、输出受模型与供应商能力限制。"
+    "屋主设置 → 基本设置：自动预算按模型目录容量分配，未知时采用 18000 的舒服区间；手动可自行填写数值。调整输出、记忆召回与世界书。"
   ],
   "account": [
     "账户",
@@ -132,26 +132,58 @@ export const FEATURE_GUIDES = Object.freeze({
   "rooms": [
     "主聊天室",
     "与所选模型日常对话的空间。\n顶部模型名称：选择聊天模型。\n右上角 ···：设置当前窗口的现实上下文、短句模式、自动整理纸条与新居信。\n输入框左侧加号：添加图片或文件。\n输入区上方的上下文状态条：查看本轮实际递入资料；尚无回执时不会显示。\n侧栏搜索：查找窗口及历史原文。"
+  ],
+  "reality": [
+    "现实上下文",
+    "右上角 ··· → 这个窗口 → 现实上下文：选择日期、时间与未来七天日历。只有已启用且成功取得的资料会递给模型。"
+  ],
+  "short": [
+    "短句模式",
+    "右上角 ··· → 这个窗口 → 短句模式：闲聊优先简短回应，深度讨论仍可自然展开。"
+  ],
+  "history": [
+    "历史纸条",
+    "聊天消息下方的历史纸条：回看对应轮次的整理内容，可收藏喜欢的部分。没有历史纸条时，先完成一轮整理。"
+  ],
+  "draft": [
+    "私人草稿",
+    "输入区的「屋主 · 私人草稿 / 跨窗口」：填写草稿并选择本轮阅读方式。保存草稿不等于授权模型读取。"
+  ],
+  "cross": [
+    "跨窗口回忆",
+    "输入区的「屋主 · 私人草稿 / 跨窗口」→ 跨窗口读取：选取旧消息或允许模型自行查找。手动选择仅本轮生效；不自动开启权限。"
+  ],
+  "echo": [
+    "模型回波",
+    "输入区上方状态条：打开本轮上下文预览，查看模型、用量及预算。估算与供应商实际返回分开显示。"
+  ],
+  "collection": [
+    "收藏",
+    "小组件 → 文件库 → 收藏：查找主动保存的文字、纸条、图片、语音及附件，添加备注或返回来源。取消收藏不删除原件。"
+  ],
+  "pets": [
+    "宠物系统",
+    "小组件 → 宠物系统：当前仍在准备，尚无可用的养成操作。"
   ]
 });
 export const GUIDE_TARGETS = Object.freeze({
   "main": "room:main",
   "radio": "room:radio",
   "lighthouse": "room:lighthouse",
-  "window": "window",
-  "soil": "thought-soil",
+  "window": "chat:window-settings",
+  "soil": "chat:window-soil-open",
   "desk": "desk-slip",
-  "letter": "window",
-  "memory": "memory",
-  "seeds": "memory",
-  "pending": "memory-pockets",
-  "userPortrait": "user-portrait",
-  "selfPortrait": "global-excerpt",
-  "instructions": "memory",
+  "letter": "chat:window-letter-open",
+  "memory": "memory:memory",
+  "seeds": "memory:seed",
+  "pending": "memory:pending",
+  "userPortrait": "memory:user-portrait",
+  "selfPortrait": "memory:global-excerpt",
+  "instructions": "memory:custom",
   "worldbook": "desk-worldbook",
-  "daily": "daily-home",
-  "moments": "moments",
-  "diary": "diary",
+  "daily": "daily:home",
+  "moments": "daily:moments",
+  "diary": "daily:diary",
   "calendar": "calendar",
   "vault": "vault-home",
   "library": "library-home",
@@ -167,7 +199,15 @@ export const GUIDE_TARGETS = Object.freeze({
   "backup": "settings-chat-records",
   "diagnostics": "settings-diagnostics",
   "update": "dev-hands-update",
-  "rooms": "room:main"
+  "rooms": "room:main",
+  "reality": "chat:window-settings",
+  "short": "chat:window-settings",
+  "history": "chat:window-soil-open",
+  "draft": "drawer:dogtalk",
+  "cross": "drawer:cross",
+  "echo": "desk-slip",
+  "collection": "vault:treasures",
+  "pets": "pets"
 });
 const GUIDE_GROUPS = [
   [
@@ -177,8 +217,14 @@ const GUIDE_GROUPS = [
       "radio",
       "lighthouse",
       "window",
+      "reality",
+      "short",
       "soil",
+      "history",
+      "draft",
+      "cross",
       "desk",
+      "echo",
       "letter"
     ]
   ],
@@ -202,7 +248,9 @@ const GUIDE_GROUPS = [
       "diary",
       "calendar",
       "vault",
-      "library"
+      "collection",
+      "library",
+      "pets"
     ]
   ],
   [
@@ -240,6 +288,42 @@ export function showGuideHint() {
   try { if (localStorage.getItem(HINT_KEY) === '1') return; } catch {}
   hint.hidden = false;
 }
+export async function openGuideTarget(key, { router, chat, memory, daily, dogtalk, toast }) {
+  if (!Object.hasOwn(GUIDE_TARGETS, key)) return;
+  const target = GUIDE_TARGETS[key];
+  const arg = { dataset: {} };
+  const current = chat.getCurrentConversationId();
+  if (target.startsWith('room:')) {
+    const type = target.slice(5);
+    await router.close();
+    if (chat.getCurrentConversation()?.room_type === type) return;
+    return chat.openRoomType(type);
+  }
+  if (target.startsWith('chat:') || target.startsWith('drawer:') || target === 'memory:pending' || target === 'desk-slip') {
+    if (!current) return toast('请先进入一个聊天窗口。');
+  }
+  if (target.startsWith('chat:')) {
+    await router.close();
+    return chat.handleAction(target.slice(5), arg);
+  }
+  if (target.startsWith('drawer:')) {
+    await router.close();
+    const tab = target.slice(7);
+    const panel = [...document.querySelectorAll('[data-dogtalk-composer]')].find(node => node.dataset.conversationId === current);
+    const button = panel?.querySelector(`[data-action="dogtalk:tab"][data-tab="${tab}"]`);
+    if (!button) return toast('当前窗口没有可用的草稿抽屉。');
+    return dogtalk.handleAction('tab', button);
+  }
+  if (target.startsWith('memory:')) {
+    const scope = target.slice(7);
+    if (['memory','seed','custom'].includes(scope)) return memory.handleAction('open', { dataset: { scope } });
+    return memory.handleAction(scope === 'pending' ? 'pockets' : scope, arg);
+  }
+  if (target.startsWith('daily:')) return daily.handleAction(target.slice(6), arg);
+  if (target === 'vault:treasures') return router.open('vault-home', { mode: 'treasures' });
+  if (target === 'pets') return router.open('daily-placeholder', { title: '宠物系统' });
+  return router.open(target);
+}
 export function manualMarkup() {
   return GUIDE_GROUPS.map(([group, keys]) => '<section class="feature-group"><h2>' + escapeHtml(group)
     + '</h2><div class="feature-card">' + keys.map(key => {
@@ -263,6 +347,7 @@ const ROUTE_GUIDES = Object.freeze({
   settings: 'settings', wolf: 'settings', toolroom: 'toolLog', desk: 'tools',
   'settings-profile': 'profile', 'settings-appearance': 'appearance', 'basic-settings': 'basic',
   'settings-account': 'account', 'settings-chat-records': 'backup', 'settings-diagnostics': 'diagnostics',
+  'island-letter': 'letter', 'settings-theme': 'appearance', 'settings-font': 'appearance', 'settings-bubble': 'appearance', 'settings-accent': 'appearance',
   'dev-hands-home': 'devHands', 'dev-hands-logs': 'devHands', 'dev-hands-update': 'update',
 });
 export function guideMarkup(key) {

@@ -4,7 +4,7 @@ import { shortModelName } from '../core/model-format.js';
 import { createTransferSettings } from './settings-transfer.js';
 import { saveArchiveV2 } from '../core/archive-v2-save.js';
 import { buildOfflineArchive } from './offline-archive.js';
-import { GUIDE_TARGETS, manualMarkup, dismissGuideHint } from '../core/feature-guide.js';
+import { openGuideTarget, manualMarkup, dismissGuideHint } from '../core/feature-guide.js';
 
 const LOADED_AT = new Date().toISOString();
 
@@ -63,7 +63,7 @@ export function auditFullArchiveCompleteness(archive) {
   if (!archive?.coast_vault ||
       archive.coast_vault.basic_media?.complete !== true ||
       archive.coast_vault.treasures?.complete !== true) {
-    warnings.push('基本文件库或拾潮索引缺失或存在未导出的分页');
+    warnings.push('基本文件库或收藏索引缺失或存在未导出的分页');
   }
   const attachmentCount = Number(archive?.attachments?.count) || 0;
   const attachments = archive?.attachments?.payloads;
@@ -83,7 +83,7 @@ export function auditFullArchiveCompleteness(archive) {
   return warnings;
 }
 
-export function createSettings({ storage, shell, chat, router, toast }) {
+export function createSettings({ storage, shell, chat, router, toast, memory, daily, dogtalk }) {
   const preferences = () => storage.read().preferences;
   const transfer = createTransferSettings({ router, toast, chat });
 
@@ -93,7 +93,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
       title: '屋主设置',
       subtitle: '显示资料 · 外观 · 聊天与运行设置',
       className: 'settings-panel',
-      body: group('人类屋主设置',
+      body: group('屋主设置',
         row('个人资料', '昵称、聊天署名与显示资料', 'settings:profile')
         + row('外观', '主题、文字气质、用户气泡与重点色', 'settings:appearance')
         + row('账户', '当前登录状态与主动退出', 'settings:account')
@@ -277,19 +277,7 @@ export function createSettings({ storage, shell, chat, router, toast }) {
       dismissGuideHint();
       return router.open('feature-manual');
     }
-    if (name === 'guide-target') {
-      const destination = GUIDE_TARGETS[target.dataset.key];
-      if (!destination || !Object.hasOwn(GUIDE_TARGETS, target.dataset.key)) return;
-      if (destination.startsWith('room:')) {
-        await router.close();
-        return chat.openRoomType(destination.slice(5));
-      }
-      if (destination === 'window') {
-        await router.close();
-        return chat.handleAction('window-settings');
-      }
-      return router.open(destination);
-    }
+    if (name === 'guide-target') return openGuideTarget(target.dataset.key, { router, chat, memory, daily, dogtalk, toast });
     const routes = {
       wolf: 'wolf',
       desk: 'desk',

@@ -57,7 +57,7 @@ assert.match(lettersSource, /defaultIslandLetter/);
 assert.match(lettersSource, /chat\.sendLandingLetter/);
 assert.match(indexSource, /aria-label="这个窗口"/);
 assert.match(windowSettingsSource, /window-letter-open/);
-assert.match(windowSettingsSource, />登岛信<\/button>/);
+assert.match(windowSettingsSource, />新居信<\/button>/);
 assert.match(workerSource, /\/public\/content\/island-letter\.js/);
 assert.equal(workerSource.includes('/public/content/letters.js'), false);
 
