@@ -37,6 +37,7 @@ internal class LocalSoilOrganizer(
                         require(output.length + event.text.length <= LocalSoilRun.MAX_RESULT) { "整理结果超限。" }
                         output.append(event.text)
                     }
+                    is LocalProviderEvent.Tool -> error("整理不允许调用工具。")
                     is LocalProviderEvent.Done -> {
                         require(event.reason == "stop") { "整理结果未正常结束。" }
                         complete = true

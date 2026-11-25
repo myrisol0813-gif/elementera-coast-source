@@ -80,7 +80,10 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence) {
         val soilContext=(listOf(soilText)+after).filter{it.isNotBlank()}.joinToString("\n")
         if(soilContext.isNotEmpty())delivered.add(RemoteChatMessage("system","思维壤\n"+soilContext))
         val dogtalk=LocalDogtalkStore(store).pending(conversationId,surface,turnId)
-        val cross = LocalCrossWindow(store).select(conversationId, crossWindow)
+        val cross = if(crossWindow?.mode=="model_decides"){
+            require(cache.history(conversationId)?.contextSettings?.crossWindowAuto==true){"跨窗口自主检索未授权。"}
+            LocalCrossWindow.Selection("",RemoteDeskCrossWindow(mode="model_decides",status="已开放 · 未调用"))
+        }else LocalCrossWindow(store).select(conversationId,crossWindow)
         if (cross.text.isNotEmpty()) delivered.add(RemoteChatMessage("system", cross.text))
         val settings=cache.history(conversationId)?.contextSettings?:com.elementeracoast.app.core.model.ConversationContextSettings()
         val real=localReality(store,settings,reality)
@@ -111,6 +114,7 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence) {
             contextBudget=RemoteDeskContextBudget(estimatedTokens=((chars+2)/3).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),comfortCeiling=budget.coerceAtLeast(1800),sourcesPreserved=listOf("recent_context")+(if(real.delivered)listOf("reality_context")else emptyList())+(if(responseMode.delivered)listOf("response_mode")else emptyList())+(if(soilContext.isNotEmpty())listOf("thinking_soil")else emptyList())+(if(cross.receipt.delivered)listOf("cross_window")else emptyList())+(if(instructions.isEmpty())emptyList()else listOf("custom_instructions"))+(if(matches.isEmpty())emptyList()else listOf("worldbook"))+(if(memories.isEmpty())emptyList()else listOf("related_memory"))+(if(userPortrait.isEmpty())emptyList()else listOf("user_portrait"))+(if(selfPortrait.isEmpty())emptyList()else listOf("global_excerpt")),userPortrait=if(userPortrait.isEmpty())"empty" else "full",globalExcerpt=if(selfPortrait.isEmpty())"empty" else "full")
         ),attachmentContext.imageParts)
     }
+    fun toolSession(cid:String,turn:String,request:RemoteCrossWindowRequest?,receipt:RemoteDeskSlip)=LocalToolSession.open(store,cid,turn,request,receipt)
     private fun portraitReceipt(label:String,body:String)=RemoteDeskGlobalExcerpt(label=label,status=if(body.isEmpty())"未设置" else "已递给",delivered=body.isNotEmpty(),injection=if(body.isEmpty())"none" else "full",estimatedTokens=(body.length+2)/3,length=body.length,content=body)
     companion object {
         fun validateWorldbook(rows:List<RemoteWorldbookEntry>){

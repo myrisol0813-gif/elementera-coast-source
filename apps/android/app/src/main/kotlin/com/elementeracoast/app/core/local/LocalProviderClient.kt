@@ -22,6 +22,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 sealed interface LocalProviderEvent {
     data class Delta(val text: String) : LocalProviderEvent
     data class Done(val reason: String) : LocalProviderEvent
+    data class Tool(val id:String,val name:String,val result:com.elementeracoast.app.core.remote.RemoteNativeToolResult):LocalProviderEvent
 }
 
 /** Only sends to the explicitly selected provider; no cookies, redirects, Coast fallback or raw logs. */
@@ -112,47 +113,86 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
             "；已用：" + (usage?.let { "USD " + it } ?: "未返回") + "。这不是账户总余额。"
     }
 
-    fun stream(p: LocalProviderConfig, model: String, messages: List<RemoteChatMessage>, maxTokens: Int,imageParts:List<JsonObject> = emptyList()): Flow<LocalProviderEvent> = callbackFlow {
-        val payload = buildJsonObject {
-            put("model", model)
-            put("stream", true)
-            val official = normalizeLocalProviderUrl(p.baseUrl).toHttpUrl().host == "api.openai.com"
-            put(if (official) "max_completion_tokens" else "max_tokens", maxTokens.coerceIn(64, 65536))
-            put("messages", localMultimodalMessages(messages,imageParts))
-        }
-        val call = http.newCall(request(p, "/chat/completions").header("Accept", "text/event-stream")
-            .post(payload.toString().toRequestBody(media)).build())
-        val reader = launch(Dispatchers.IO) {
+    fun stream(p: LocalProviderConfig, model: String, messages: List<RemoteChatMessage>, maxTokens: Int,imageParts:List<JsonObject> = emptyList()): Flow<LocalProviderEvent> =
+        streamWithTools(p,model,messages,maxTokens,imageParts,null)
+
+    internal fun streamWithTools(p:LocalProviderConfig, model:String, messages:List<RemoteChatMessage>,maxTokens:Int,imageParts:List<JsonObject>,session:LocalToolSession?):Flow<LocalProviderEvent> = callbackFlow {
+        val history=localMultimodalMessages(messages,imageParts).toMutableList()
+        val active=java.util.concurrent.atomic.AtomicReference<okhttp3.Call?>()
+        val reader=launch(Dispatchers.IO) {
             try {
-                call.execute().use { response ->
-                    if (!response.isSuccessful) throw failure(response.code)
-                    val source = response.body?.source() ?: error("missing body")
-                    var reason: String? = null
-                    var done = false
-                    while (!source.exhausted()) {
-                        val line = source.readUtf8Line() ?: break
-                        if (!line.startsWith("data:")) continue
-                        val data = line.substringAfter("data:").trim()
-                        if (data == "[DONE]") { done = true; break }
-                        if (data.isBlank()) continue
-                        val chunk = json.parseToJsonElement(data).jsonObject
-                        if (chunk["error"] != null && chunk["error"] != JsonNull)
-                            throw CoastApiException(CoastApiErrorKind.Model, "local_provider_error", "供应商在生成过程中返回错误。")
-                        val choice = (chunk["choices"] as? JsonArray)?.firstOrNull() as? JsonObject ?: continue
-                        val delta = (choice["delta"] as? JsonObject)?.get("content") as? JsonPrimitive
-                        delta?.contentOrNull?.takeIf(String::isNotEmpty)?.let { send(LocalProviderEvent.Delta(it)) }
-                        (choice["finish_reason"] as? JsonPrimitive)?.contentOrNull?.let { reason = it }
+                for(round in 0..8){
+                    val payload=buildJsonObject {
+                        put("model",model);put("stream",true)
+                        val official=normalizeLocalProviderUrl(p.baseUrl).toHttpUrl().host=="api.openai.com"
+                        put(if(official)"max_completion_tokens"else "max_tokens",maxTokens.coerceIn(64,65536))
+                        put("messages",JsonArray(history))
+                        if(session!=null){put("tools",session.completionsTools);put("tool_choice",if(round==8)"none"else "auto")}
                     }
-                    if (!done && reason == null) throw CoastApiException(CoastApiErrorKind.Stream, "local_stream_incomplete", "供应商回复流提前结束。")
-                    if (reason == "tool_calls" || reason == "function_call") throw CoastApiException(CoastApiErrorKind.Model, "local_tools_pending", "本机工具执行尚未接入。")
-                    send(LocalProviderEvent.Done(reason ?: "stop"))
+                    val call=http.newCall(request(p,"/chat/completions").header("Accept","text/event-stream").post(payload.toString().toRequestBody(media)).build())
+                    active.set(call)
+                    var reason:String?=null;var done=false
+                    val pending=sortedMapOf<Int,ToolParts>()
+                    val roundText=StringBuilder()
+                    call.execute().use{response->
+                        if(!response.isSuccessful)throw failure(response.code)
+                        val source=response.body?.source()?:error("missing body")
+                        while(!source.exhausted()){
+                            val line=source.readUtf8Line()?:break
+                            if(!line.startsWith("data:"))continue
+                            val data=line.substringAfter("data:").trim()
+                            if(data=="[DONE]"){done=true;break}
+                            if(data.isBlank())continue
+                            val chunk=json.parseToJsonElement(data).jsonObject
+                            if(chunk["error"]!=null&&chunk["error"]!=JsonNull)throw CoastApiException(CoastApiErrorKind.Model,"local_provider_error","供应商在生成过程中返回错误。")
+                            val choice=(chunk["choices"] as? JsonArray)?.firstOrNull() as? JsonObject?:continue
+                            val delta=choice["delta"] as? JsonObject
+                            (delta?.get("content") as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotEmpty)?.let{
+                                roundText.append(it);send(LocalProviderEvent.Delta(it))
+                            }
+                            (delta?.get("tool_calls") as? JsonArray)?.forEach{raw->
+                                require(session!=null)
+                                val item=raw.jsonObject
+                                val index=item["index"]?.jsonPrimitive?.intOrNull?:0
+                                require(index in 0..7)
+                                val parts=pending.getOrPut(index){ToolParts()}
+                                item["id"]?.jsonPrimitive?.contentOrNull?.let{parts.id.append(it)}
+                                val fn=item["function"] as? JsonObject
+                                fn?.get("name")?.jsonPrimitive?.contentOrNull?.let{parts.name.append(it)}
+                                fn?.get("arguments")?.jsonPrimitive?.contentOrNull?.let{parts.arguments.append(it)}
+                                require(parts.id.length<=240&&parts.name.length<=160&&parts.arguments.length<=6000)
+                            }
+                            (choice["finish_reason"] as? JsonPrimitive)?.contentOrNull?.let{reason=it}
+                        }
+                    }
+                    active.compareAndSet(call,null)
+                    if(!done&&reason==null)throw CoastApiException(CoastApiErrorKind.Stream,"local_stream_incomplete","供应商回复流提前结束。")
+                    if(pending.isEmpty()){
+                        if(reason in setOf("tool_calls","function_call"))throw CoastApiException(CoastApiErrorKind.Model,"local_tool_format","供应商未返回完整的工具调用。")
+                        send(LocalProviderEvent.Done(reason?:"stop"));close();return@launch
+                    }
+                    if(session==null||round==8||reason!="tool_calls")throw CoastApiException(CoastApiErrorKind.Model,"local_tool_limit","本机工具调用超限或协议不完整。")
+                    require(pending.values.all{it.id.isNotBlank()&&it.name.isNotBlank()})
+                    val calls=pending.values.map{part->buildJsonObject{
+                        put("id",part.id.toString());put("type","function")
+                        put("function",buildJsonObject{put("name",part.name.toString());put("arguments",part.arguments.toString())})
+                    }}
+                    history.add(buildJsonObject{put("role","assistant");put("content",if(roundText.isEmpty())JsonNull else JsonPrimitive(roundText.toString()));put("tool_calls",JsonArray(calls))})
+                    for(part in pending.values){
+                        val result=session.execute(part.id.toString(),part.name.toString(),part.arguments.toString())
+                        history.add(buildJsonObject{put("role","tool");put("tool_call_id",part.id.toString());put("content",result.output)})
+                        send(LocalProviderEvent.Tool(part.id.toString(),part.name.toString(),result))
+                    }
+                    session.requireContinuationBudget(history)
                 }
-                close()
-            } catch (e: CancellationException) { throw e }
-            catch (e: CoastApiException) { close(e) }
-            catch (_: Exception) { close(CoastApiException(CoastApiErrorKind.Stream, "local_provider_stream", "模型连接中断或返回格式不兼容。")) }
+            }catch(e:CancellationException){throw e}
+            catch(e:CoastApiException){close(e)}
+            catch(_:Exception){close(CoastApiException(CoastApiErrorKind.Stream,"local_provider_stream","模型连接中断、工具预算超限或返回格式不兼容。"))}
         }
-        awaitClose { call.cancel(); reader.cancel() }
+        awaitClose{active.getAndSet(null)?.cancel();reader.cancel()}
+    }
+    private class ToolParts {
+        val id=StringBuilder();val name=StringBuilder();val arguments=StringBuilder()
     }
 }
 
