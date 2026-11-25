@@ -33,6 +33,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchive
     var chosen by remember { mutableStateOf<ArchiveV2Operations.Choice?>(null) }
     var session by remember { mutableStateOf<String?>(null) }
     var uploaded by remember { mutableStateOf(false) }
+    var stagedChoice by remember { mutableStateOf<ArchiveV2Operations.Choice?>(null) }
     var preview by remember { mutableStateOf<JsonObject?>(null) }
     var committed by remember { mutableStateOf(false) }
     var failure by remember { mutableStateOf("") }
@@ -61,7 +62,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchive
                 val input=operations.open(uri)
                 choices=operations.cloudChoices(input);chosen=choices.firstOrNull()
                 incoming=input;selected=operations.localModules(input.manifest)
-                session=null;uploaded=false;preview=null;committed=false;failure=""
+                session=null;stagedChoice=null;uploaded=false;preview=null;committed=false;failure=""
             }catch(e:CancellationException){throw e}catch(e:Exception){onSnackbar("无法读取 V2 ZIP：格式、空间或完整性校验失败。")}
             finally{busy=false}
         }
@@ -97,7 +98,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchive
         scope.launch {
             try {
                 session?.let { operations.cancelSession(it) }
-                input.close();incoming=null;choices=emptyList();chosen=null;session=null;preview=null;uploaded=false;failure=""
+                input.close();incoming=null;choices=emptyList();chosen=null;session=null;stagedChoice=null;preview=null;uploaded=false;failure=""
             }catch(e:CancellationException){throw e}catch(e:Exception){failure="暂存清理未完成，请重试。"}
             finally{busy=false}
         }
@@ -115,7 +116,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchive
                     } else Text("$label · "+m.count+" · "+if(m.coverage=="unavailable")"未采集" else if(m.module=="chat"&&choices.any { it.kind=="chat" })"可逐窗口恢复" else if(m.module=="library"&&choices.any { it.kind=="book" })"可逐本恢复" else if(choices.any { it.kind==m.module })"可逐项恢复" else "本次不恢复")
                 }
                 if(!localMode&&choices.isNotEmpty()) {
-                    Text("选择一项资料：")
+                    Text("选择一项资料：仅上传所选项目及其归档依赖。")
                     choices.forEach { item->Row(verticalAlignment=Alignment.CenterVertically){
                         RadioButton(chosen==item,enabled=!busy&&preview==null,onClick={chosen=item});Text((if(item.kind=="book")"书房" else v2Labels[item.kind]?:item.kind)+" · "+item.title)
                     }}
@@ -145,9 +146,20 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchive
                         val confirm=preview!=null
                         if(localMode)preview=operations.localRestore(input,selected,confirm)
                         else {
-                            val sid=session?:operations.createSession().also { session=it }
-                            if(!uploaded){val p=operations.upload(input,sid){n->scope.launch { status="已上传 $n 个新分块" }};require(p["ready_for_byte_verification"]?.jsonPrimitive?.booleanOrNull==true);uploaded=true}
-                            preview=operations.cloudRestore(input,sid,requireNotNull(chosen),confirm)
+                            val choice=requireNotNull(chosen)
+                            if(session!=null&&stagedChoice!=choice){
+                                operations.cancelSession(requireNotNull(session))
+                                session=null;stagedChoice=null;uploaded=false
+                            }
+                            val manifest=operations.cloudManifest(input,choice)
+                            val sid=session?:operations.createSession().also { session=it;stagedChoice=choice }
+                            if(!uploaded){
+                                status="本次上传 "+manifest.records.size+" 项 · "+manifest.objects.sumOf { it.size }+" 字节"
+                                val p=operations.upload(input,sid,choice){n->scope.launch { status="已上传 $n 个新分块 · 仅所选资料" }}
+                                require(p["ready_for_byte_verification"]?.jsonPrimitive?.booleanOrNull==true)
+                                uploaded=true
+                            }
+                            preview=operations.cloudRestore(input,sid,choice,confirm)
                         }
                         if(confirm)committed=true
                     }catch(e:CancellationException){throw e}catch(e:Exception){failure="操作未完成："+(e.message?.take(160)?:"资料校验或写入失败。")}
