@@ -251,7 +251,7 @@ export function createCoastVault({ router, chat, toast }) {
       };
       const preview = await inspect(false);
       if (!preview.count) {
-        toast('没有检测到需要扫描的旧助手红心；已有收藏收藏不受影响。');
+        toast('没有检测到需要扫描的旧助手红心；已有收藏不受影响。');
         return;
       }
       // Real D1 writes must only follow an explicit owner-triggered preview
