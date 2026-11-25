@@ -22,6 +22,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import com.elementeracoast.app.feature.shell.FeatureGuideButton
+import com.elementeracoast.app.feature.shell.FeatureGuides
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.elementeracoast.app.core.model.ThoughtCandidateSnapshot
@@ -57,7 +59,10 @@ internal fun SoilBottomSheet(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
-                Text("整理当前对话的纸条", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text("整理当前对话的纸条", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    FeatureGuideButton(FeatureGuides.soil)
+                }
                 Text(
                     when {
                         soil.isHistorical -> "这一轮留下的旧纸条 · 仅供翻阅，不进入上下文"

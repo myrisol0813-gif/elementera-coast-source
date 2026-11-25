@@ -133,7 +133,8 @@ export function createLibraryViews({ runtime, currentId, currentPockets, chat })
     if (runtime.libraryTab === 'custom') {
       return {
         title: '记忆',
-        subtitle: '自定义指令 · 独立的单份 active 文档',
+        subtitle: '自定义指令 · 长期参考背景与要求',
+        guide: 'instructions',
         className: 'memory-library',
         body: `${libraryControls()}${customInstructionsBody(runtime.customInstructions)}`,
       };
@@ -144,8 +145,9 @@ export function createLibraryViews({ runtime, currentId, currentPockets, chat })
     const isSeed = entryType === 'seed';
     return {
       title: '记忆',
+      guide: isSeed ? 'seeds' : 'memory',
       subtitle: isSeed
-        ? '种子库 · 未完成但有生长性的意象，不是已确认事实'
+        ? '种子库 · 可继续生长的意象与灵感'
         : '记忆库 · 已经确认的长期纸条',
       className: 'memory-library',
       headerAction: '<button class="feature-head-action" type="button" data-action="memory:entry-new">新增</button>',
@@ -166,7 +168,8 @@ export function createLibraryViews({ runtime, currentId, currentPockets, chat })
     const sourceTime = entry?.source_date || new Date().toISOString().slice(0, 10);
     return {
       title: `${entry ? '编辑' : '新增'}${entryType === 'seed' ? '种子' : '记忆'}`,
-      subtitle: entryType === 'seed' ? '可生长方向，不是已确认事实' : '已确认的长期纸条',
+      guide: entryType === 'seed' ? 'seeds' : 'memory',
+      subtitle: entryType === 'seed' ? '可生长的意象与灵感' : '已确认的长期纸条',
       className: 'memory-entry-edit',
       body: `<form class="form-stack" data-submit="memory:entry-save" data-id="${escapeAttribute(entry?.id || '')}" data-entry-type="${entryType}">
         <label>标题<input name="title" maxlength="120" value="${escapeAttribute(entry?.title || '')}" required></label>

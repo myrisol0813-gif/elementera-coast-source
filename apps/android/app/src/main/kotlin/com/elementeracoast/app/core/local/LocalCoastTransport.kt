@@ -205,12 +205,17 @@ class LocalCoastTransport(private val store: LocalPersistence,
         }
         if (path == "/api/models" && method == "GET")
             return response(r, 200, element(RemoteModelCatalogResponse.serializer(), providerCatalog()).jsonObject)
+        if (path == "/api/chat/cross-window/messages" && method == "GET") {
+            val cid=r.url.queryParameter("current_conversation_id").orEmpty()
+            if(!conversationExists(cid))return missing(r)
+            return response(r,200,element(RemoteCrossWindowSourcesResponse.serializer(),LocalCrossWindow(store).sources(cid)).jsonObject)
+        }
         if (path == "/api/chat/native-context" && method == "POST") {
             val request = json.decodeFromJsonElement(RemoteChatRequest.serializer(), body(r))
             if (!conversationExists(request.conversationId)) return missing(r)
             val budget = request.settings["contextBudget"]?.toLongOrNull()?.coerceAtLeast(1800) ?: 18000
             val room=cache.conversations().first { it.id==request.conversationId }.roomType
-            val prepared=knowledge.context(request.messages,budget.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),if(room=="main")"main_chat" else room,request.conversationId,request.attachmentIds,request.sourceTurnId.orEmpty())
+            val prepared=knowledge.context(request.messages,budget.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),if(room=="main")"main_chat" else room,request.conversationId,request.attachmentIds,request.sourceTurnId.orEmpty(),request.crossWindow)
             return response(r, 200, element(RemoteNativeChatContext.serializer(), RemoteNativeChatContext(
                 ok = true,
                 modelMessages = localMultimodalMessages(prepared.messages,prepared.imageParts),

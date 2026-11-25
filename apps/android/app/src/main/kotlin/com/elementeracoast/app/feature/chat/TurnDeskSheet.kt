@@ -22,6 +22,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.elementeracoast.app.feature.shell.FeatureGuideButton
+import com.elementeracoast.app.feature.shell.FeatureGuides
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.elementeracoast.app.core.model.TurnDeskReceipt
@@ -48,7 +50,10 @@ internal fun TurnDeskBottomSheet(
                 .padding(horizontal = 20.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(9.dp)
         ) {
-            Text("本轮上下文预览", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("本轮上下文预览", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                FeatureGuideButton(FeatureGuides.desk)
+            }
             Text(
                 receipt.comfort.ifBlank { "这张回执只描述本轮真正递给模型的上下文。" },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

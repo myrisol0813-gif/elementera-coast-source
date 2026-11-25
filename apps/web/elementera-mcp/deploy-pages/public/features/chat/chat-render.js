@@ -1,3 +1,4 @@
+import { guideMarkup } from '../../core/feature-guide.js';
 import { escapeAttribute, escapeHtml, formatRichText, qa } from '../../core/dom.js';
 import { icon } from '../../core/icons.js';
 import { activeBranch, createState } from '../chat-state.js';
@@ -176,6 +177,12 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
   function renderMessages(conversationId = runtime.currentId) {
     discardStreamingPatches(conversationId);
     if (!ui.messages || conversationId !== runtime.currentId) return;
+    const guideHost = document.getElementById('chatFeatureGuide');
+    const roomGuide = runtime.conversations.find(c => c.id === conversationId)?.room_type || 'main';
+    if (guideHost && guideHost.dataset.room !== roomGuide) {
+      guideHost.innerHTML = guideMarkup(roomGuide) || guideMarkup('main');
+      guideHost.dataset.room = roomGuide;
+    }
     const preview = runtime.searchPreview?.get(conversationId);
     const state = preview || runtime.histories.get(conversationId) || createState();
     const latestAssistantTurnId = [...state.turns].reverse().find((turn) => activeBranch(turn).assistant)?.id || '';

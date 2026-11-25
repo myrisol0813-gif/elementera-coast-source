@@ -104,7 +104,7 @@ fun DailyLanding(
             )
             DailyPage.Moments -> FeaturePageTopBar(
                 title = "碳硅圈",
-                guide = FeatureGuides.daily,
+                guide = FeatureGuides.moments,
                 subtitle = "前端默认朋友圈",
                 onBack = { page = DailyPage.Home },
                 actionLabel = "+ 动态",
@@ -117,11 +117,11 @@ fun DailyLanding(
                 "写碳硅圈",
                 "直接写入海岸正式条目",
                 { page = DailyPage.Moments },
-                compact = true
+                compact = true, guide = FeatureGuides.moments
             )
             DailyPage.Diary -> FeaturePageTopBar(
                 title = "日记",
-                guide = FeatureGuides.daily,
+                guide = FeatureGuides.diary,
                 subtitle = "海岸里的正式纸页",
                 onBack = { page = DailyPage.Home },
                 actionLabel = "+ 日记",
@@ -134,7 +134,7 @@ fun DailyLanding(
                 "写日记",
                 "直接写入海岸正式日记",
                 { page = DailyPage.Diary },
-                compact = true
+                compact = true, guide = FeatureGuides.diary
             )
             DailyPage.Calendar -> FeaturePageTopBar("日历", "公历 · 日程与纪念日", { page = DailyPage.Home }, compact = true, guide = FeatureGuides.calendar)
             DailyPage.Vault -> FeaturePageTopBar("海岸文件库", "基本文件库与拾潮珍藏", { page = DailyPage.Home }, compact = true, guide = FeatureGuides.vault)
@@ -179,6 +179,7 @@ fun DailyLanding(
           Box(Modifier.align(Alignment.TopCenter)) {
               FeaturePageTopBar(
                   title="书房",
+                  guide=FeatureGuides.library,
                   subtitle="翻书、划线与批注",
                   onBack={page=DailyPage.Home},
                   actionLabel=if(libraryShelf)"＋" else null,

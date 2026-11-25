@@ -1,6 +1,6 @@
 import { escapeHtml } from './dom.js';
 import { icon } from './icons.js';
-import { routeGuideMarkup } from './feature-guide.js';
+import { guideMarkup, routeGuideMarkup } from './feature-guide.js';
 
 export function createRouter(root, { onOpen = () => {}, onClose = () => {} } = {}) {
   const renderers = new Map();
@@ -41,7 +41,7 @@ export function createRouter(root, { onOpen = () => {}, onClose = () => {} } = {
       <header class="feature-head">
         <button class="feature-back" type="button" data-action="router:back" aria-label="返回">${icon('back')}</button>
         <div><h1>${escapeHtml(view.title || '')}</h1><p>${escapeHtml(view.subtitle || '')}</p></div>
-        <div class="coast-feature-head-actions">${view.headerAction || ''}${routeGuideMarkup(current.name)}</div>
+        <div class="coast-feature-head-actions">${view.headerAction || ''}${view.guide ? guideMarkup(view.guide) : routeGuideMarkup(current.name)}</div>
       </header>
       <main class="feature-body">${view.body || ''}</main>
       ${view.footer || ''}
