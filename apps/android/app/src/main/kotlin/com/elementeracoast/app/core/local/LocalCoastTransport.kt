@@ -214,9 +214,11 @@ class LocalCoastTransport(private val store: LocalPersistence,
         if (path == "/api/chat/native-context" && method == "POST") {
             val request = json.decodeFromJsonElement(RemoteChatRequest.serializer(), body(r))
             if (!conversationExists(request.conversationId)) return missing(r)
-            val budget = request.settings["contextBudget"]?.toLongOrNull()?.coerceAtLeast(1800) ?: 18000
+            val requestedBudget = request.settings["contextBudget"]?.toIntOrNull() ?: 18000
+            // The account inference route does not publish a trustworthy window or output cap.
+            val policy = LocalInputBudget.resolve(requestedBudget,8000,false,null)
             val room=cache.conversations().first { it.id==request.conversationId }.roomType
-            val prepared=knowledge.context(request.messages,budget.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),if(room=="main")"main_chat" else room,request.conversationId,request.attachmentIds,request.sourceTurnId.orEmpty(),request.crossWindow,request.realityContext?:RemoteRealityContext())
+            val prepared=knowledge.context(request.messages,policy.comfort,if(room=="main")"main_chat" else room,request.conversationId,request.attachmentIds,request.sourceTurnId.orEmpty(),request.crossWindow,request.realityContext?:RemoteRealityContext(),policy)
             val session=knowledge.toolSession(request.conversationId,request.sourceTurnId,request.crossWindow,prepared.receipt,request.model.let{if(it.startsWith("chatgpt-plan:"))it else "chatgpt-plan:"+it})
             val key=request.conversationId+":"+request.messageId
             toolSessions.remove(key)

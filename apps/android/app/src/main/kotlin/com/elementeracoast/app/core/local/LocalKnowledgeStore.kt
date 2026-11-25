@@ -55,8 +55,9 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence) {
     }
     fun surfaceFor(conversationId:String):String=cache.conversations().firstOrNull{it.id==conversationId}?.roomType?.let{if(it=="main")"main_chat" else it}?:error("本机窗口不存在。")
     data class Context(val messages:List<RemoteChatMessage>,val receipt:RemoteDeskSlip,val imageParts:List<JsonObject> = emptyList())
-    fun context(input:List<RemoteChatMessage>,budget:Int,surface:String,conversationId:String="",attachmentIds:List<String> = emptyList(),turnId:String="",crossWindow:RemoteCrossWindowRequest?=null,reality:RemoteRealityContext=RemoteRealityContext()):Context {
+    fun context(input:List<RemoteChatMessage>,budget:Int,surface:String,conversationId:String="",attachmentIds:List<String> = emptyList(),turnId:String="",crossWindow:RemoteCrossWindowRequest?=null,reality:RemoteRealityContext=RemoteRealityContext(),inputPolicy:LocalInputBudget?=null):Context {
         val attachmentContext=attachments.attachmentContext(conversationId,attachmentIds,input)
+        require(inputPolicy?.vision!=false||attachmentContext.imageParts.isEmpty()){"供应商目录报告当前模型不支持图片输入；附件未发送，请更换模型。"}
         val messages=attachmentContext.messages
         val instructions=instructions()?.content.orEmpty()
         val current=messages.lastOrNull{it.role=="user"}?.content.orEmpty()
@@ -82,6 +83,7 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence) {
             matches.map{it.entry.title+"："+it.entry.content},dogtalk?.text.orEmpty(),cross.text,
             real.context.takeIf{real.delivered}.orEmpty(),responseMode.context.takeIf{responseMode.delivered}.orEmpty(),
             messages,budget,attachmentContext.imageParts.size)
+        require(inputPolicy?.materialLimit?.let{comfort.estimated<=it}!=false){"完整当前消息、附件或画像超出模型目录估算的输入容量；未截断、未发送。请减少附件或调整输出上限。"}
         val deliveredMemory=memories.take(comfort.memoryCount)
         val deliveredWorld=matches.take(comfort.worldbookCount)
         val soilContext=comfort.soil
@@ -91,13 +93,14 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence) {
         val keptAfter=soilContext.substringAfter("余思：\n","").lines().filter{it.startsWith("- ")}.map{it.removePrefix("- ")}
         if(dogtalk!=null&&comfort.dogtalk.isNotEmpty())store.atomic{LocalDogtalkStore(it).consume(dogtalk)}
         return Context(comfort.messages,RemoteDeskSlip(
+            comfort=inputPolicy?.note.orEmpty(),
             currentMessage=RemoteDeskCurrentMessage(status=if(currentMessage==null)"未递给"else "已递给",delivered=currentMessage!=null,content=currentMessage?.content.orEmpty()),
             recentContext=RemoteDeskRecentContext(status=if(recent.isEmpty())"未递给"else "已递给",turns=(recent.size+1)/2,currentMessageSeparate=currentMessage!=null,messages=recent),
             dogtalk=RemoteDeskDogtalk(status=if(comfort.dogtalk.isEmpty())"未递给" else "已递给",delivered=comfort.dogtalk.isNotEmpty(),context=comfort.dogtalk),
             summary="本机上下文按在线舒适预算规则组装；回执仅记录实际递入资料；"+recall.retrievalStatus,
             crossWindow=cross.receipt,
             realityContext=real,responseMode=responseMode,
-            attachments=attachmentContext.receipt.takeIf{attachmentIds.isNotEmpty()},
+            attachments=attachmentContext.receipt.takeIf{attachmentIds.isNotEmpty()}?.let{it.copy(vision=it.vision.copy(supported=inputPolicy?.vision==true))},
             customInstructions=RemoteDeskCustomInstructions(status=if(instructions.isEmpty())"未设置" else "已递给",delivered=instructions.isNotEmpty(),empty=instructions.isEmpty(),length=instructions.length,content=instructions),
             userPortrait=portraitReceipt("用户画像",userPortrait,comfort.over),
             globalExcerpt=portraitReceipt("自我画像",selfPortrait,comfort.over),
@@ -110,7 +113,7 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence) {
                 sourcesPreserved=(if(recent.isEmpty())emptyList()else listOf("recent_context"))+(if(currentMessage==null)emptyList()else listOf("current_message"))+(if(real.delivered)listOf("reality_context")else emptyList())+(if(responseMode.delivered)listOf("response_mode")else emptyList())+(if(soilContext.isNotEmpty())listOf("thinking_soil")else emptyList())+(if(cross.receipt.delivered)listOf("cross_window")else emptyList())+(if(comfort.dogtalk.isNotEmpty())listOf("dogtalk")else emptyList())+(if(instructions.isEmpty())emptyList()else listOf("custom_instructions"))+(if(deliveredWorld.isEmpty())emptyList()else listOf("worldbook"))+(if(deliveredMemory.isEmpty())emptyList()else listOf("related_memory"))+(if(userPortrait.isEmpty())emptyList()else listOf("user_portrait"))+(if(selfPortrait.isEmpty())emptyList()else listOf("global_excerpt")),userPortrait=portraitStatus(userPortrait,comfort.over),globalExcerpt=portraitStatus(selfPortrait,comfort.over))
         ),attachmentContext.imageParts)
     }
-    fun toolSession(cid:String,turn:String,request:RemoteCrossWindowRequest?,receipt:RemoteDeskSlip,modelId:String="")=LocalToolSession.open(store,cid,turn,request,receipt,modelId)
+    fun toolSession(cid:String,turn:String,request:RemoteCrossWindowRequest?,receipt:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null)=LocalToolSession.open(store,cid,turn,request,receipt,modelId,wireLimit)
     private fun portraitStatus(body:String,over:Boolean)=if(body.isEmpty())"empty"else if(over)"over_budget"else "complete"
     private fun portraitReceipt(label:String,body:String,over:Boolean)=RemoteDeskGlobalExcerpt(label=label,status=if(body.isEmpty())"未设置" else "已递给",delivered=body.isNotEmpty(),injection=if(body.isEmpty())"none" else if(over)"over_budget"else "full",estimatedTokens=LocalContextPolicy.estimate(body),length=body.length,content=body)
     companion object {

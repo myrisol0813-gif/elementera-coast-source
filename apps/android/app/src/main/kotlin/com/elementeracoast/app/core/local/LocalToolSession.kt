@@ -14,7 +14,8 @@ internal class LocalToolSession private constructor(
     private val readAllowed:Boolean,
     private val writeAllowed:Boolean,
     private val modelId:String,
-    base:RemoteDeskSlip
+    base:RemoteDeskSlip,
+    private val wireLimit:Int?=null
 ) {
     private data class Spec(val name:String,val key:String,val title:String,val description:String,val parameters:JsonObject)
     private fun schema(fields:Map<String,JsonObject> = emptyMap(),required:List<String> = emptyList())=buildJsonObject {
@@ -69,7 +70,8 @@ internal class LocalToolSession private constructor(
     private var applyResult:()->Unit = {}
     private var estimated=base.contextBudget.estimatedTokens+estimate(tools.toString())
     // Comfort is a soft input-material budget; reserve a bounded tool continuation allowance.
-    private val toolBudget=maxOf(base.contextBudget.comfortCeiling,base.contextBudget.estimatedTokens)+estimate(tools.toString())+4096
+    private val toolBudget=(maxOf(base.contextBudget.comfortCeiling,base.contextBudget.estimatedTokens).toLong()+estimate(tools.toString())+4096).coerceAtMost((wireLimit?:Int.MAX_VALUE).toLong()).toInt()
+    init { require(estimated<=toolBudget){"工具定义及上下文超出模型目录估算容量；未发送。"} }
     private var cross=base.crossWindow
     private val reports=mutableListOf<RemoteDeskToolResult>()
     private val toolRows=specs.map{RemoteDeskTool(name=it.name,group="core",displayName=it.title,toolKey=it.key)}
@@ -275,14 +277,14 @@ internal class LocalToolSession private constructor(
     companion object {
         const val MAX_CALLS=12
         private val WRITE_NAMES=setOf("create_moment","create_diary","moment_comment","moment_like","calendar_create","library_write","memory_write_candidate","global_excerpt_propose")
-        fun open(store:LocalPersistence,cid:String,turn:String,request:RemoteCrossWindowRequest?,base:RemoteDeskSlip,modelId:String=""):LocalToolSession?{
+        fun open(store:LocalPersistence,cid:String,turn:String,request:RemoteCrossWindowRequest?,base:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null):LocalToolSession?{
             val h=RemoteCacheStore(store,strictReads=true).history(cid)?:return null
             val cross=h.contextSettings.crossWindowAuto&&request?.mode=="model_decides"
             val tools=h.contextSettings.localModelToolsEnabled
             val write=h.contextSettings.localModelWriteEnabled&&modelId.isNotBlank()
             if(!cross&&!tools&&!write)return null
             val sourceTurn=h.turns.firstOrNull{it.id==turn}?:return null
-            return LocalToolSession(store,cid,turn,sourceTurn,cross,tools,write,modelId,base)
+            return LocalToolSession(store,cid,turn,sourceTurn,cross,tools,write,modelId,base,wireLimit)
         }
     }
 }

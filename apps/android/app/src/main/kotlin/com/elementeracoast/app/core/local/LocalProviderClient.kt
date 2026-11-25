@@ -113,18 +113,24 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
             "；已用：" + (usage?.let { "USD " + it } ?: "未返回") + "。这不是账户总余额。"
     }
 
-    private data class SoilCatalog(val providerId:String,val readAt:Long,val body:JsonObject?)
-    @Volatile private var soilCatalog:SoilCatalog?=null
+    private data class ModelCatalog(val providerId:String,val baseUrl:String,val readAt:Long,val body:JsonObject?)
+    @Volatile private var modelCatalog:ModelCatalog?=null
+    private suspend fun catalog(p:LocalProviderConfig):JsonObject? {
+        val now=System.currentTimeMillis()
+        val cached=modelCatalog?.takeIf{it.providerId==p.id&&it.baseUrl==p.baseUrl&&now-it.readAt in 0..(if(it.body==null)60000L else 600000L)}
+        if(cached!=null)return cached.body
+        val fetched=try{get(p,"/models")}catch(e:CancellationException){throw e}catch(_:Exception){null}
+        modelCatalog=ModelCatalog(p.id,p.baseUrl,now,fetched)
+        return fetched
+    }
+    internal suspend fun inputBudget(p:LocalProviderConfig,model:String,requested:Int,output:Int,tools:Boolean):LocalInputBudget {
+        val data=if(requested==0||LocalSoilPolicy.isOpenRouter(p))catalog(p) else modelCatalog?.takeIf{it.providerId==p.id&&it.baseUrl==p.baseUrl}?.body
+        val entry=(data?.get("data") as? JsonArray)?.mapNotNull{it as? JsonObject}?.firstOrNull{(it["id"] as? JsonPrimitive)?.contentOrNull==model}
+        return LocalInputBudget.resolve(requested,output,tools,entry)
+    }
     internal suspend fun soilPolicy(p:LocalProviderConfig,model:String):LocalSoilPolicy {
         if(!LocalSoilPolicy.isOpenRouter(p))return LocalSoilPolicy()
-        val now=System.currentTimeMillis()
-        val cached=soilCatalog?.takeIf{it.providerId==p.id&&now-it.readAt in 0..(if(it.body==null)60000L else 600000L)}
-        val catalog=if(cached!=null)cached.body else {
-            val fetched=try{get(p,"/models")}catch(e:CancellationException){throw e}catch(_:Exception){null}
-            soilCatalog=SoilCatalog(p.id,now,fetched)
-            fetched
-        }
-        return LocalSoilPolicy.forProvider(p,model,catalog)
+        return LocalSoilPolicy.forProvider(p,model,catalog(p))
     }
 
     /** Dedicated non-streaming organization for OpenRouter. No tools or chat history. */
