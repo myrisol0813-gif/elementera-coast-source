@@ -18,7 +18,9 @@ class LocalMemoryArchiveTest {
             store.save(saved.id,RemoteMemoryEntryWriteRequest("memory","海浪","原始生命核",content="原始内容",status="active",tag="历史锚点",sourceTime="2025-08-13"))
             assertEquals(old["source_time"],store.snapshot().entries.single()["source_time"])
             val seed=store.save(null,RemoteMemoryEntryWriteRequest("seed","海浪","未确认构想",status="dormant",tag="海岸世界观"))
-            assertEquals(listOf(saved.id),store.recall("今天看海浪","").map{it.id})
+            assertEquals(setOf(saved.id,seed.id),store.recall("今天看海浪","").map{it.id}.toSet())
+            assertTrue(store.recall("不相关词汇","").isEmpty())
+            assertTrue(store.recall("未确认构想","",explicit=true).any{it.id==seed.id})
             val cid="fixture-chat"
             val cache=RemoteCacheStore(from);cache.putConversations(listOf(RemoteConversation(cid,"窗口","main","2026-11-24T00:00:00Z","2026-11-24T00:00:00Z")))
             cache.putHistory(cid,RemoteHistory(conversationId=cid,updatedAt="2026-11-24T00:00:00Z"))

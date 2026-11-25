@@ -199,7 +199,7 @@ internal class LocalToolSession private constructor(
                 val out=buildJsonObject{put("ok",true);put("reference_only",true);put("items",codec.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(RemoteDeskCrossWindowMessages.serializer()),actual.receipt.messages))}
                 return out to {read.addAll(selected);cross=total.receipt.copy(mode="model_decides",status="已递给")}
             }
-            "memory_search"->return rows(LocalMemoryStore(s).recall(str("query"),cid).map{codec.encodeToJsonElement(RemoteMemoryEntry.serializer(),it)}) to {}
+            "memory_search"->return rows(LocalMemoryStore(s).recall(str("query"),cid,explicit=true).map{codec.encodeToJsonElement(RemoteMemoryEntry.serializer(),it)}) to {}
             "calendar_list"->return rows(LocalCalendarStore(s).list(str("month",7)).take(40)) to {}
             "library_books"->return (if("book_id" in input)buildJsonObject{put("ok",true);put("book",side.book(str("book_id")).filterMetadata())}else rows(side.books().take(40))) to {}
             "library_read"->return buildJsonObject{put("ok",true);put("page",side.chapter(str("book_id"),int("chapter_index",0,0..100000),int("start_paragraph",0,0..100000),int("limit",3,1..6)))} to {}
