@@ -113,6 +113,57 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
             "；已用：" + (usage?.let { "USD " + it } ?: "未返回") + "。这不是账户总余额。"
     }
 
+    private data class SoilCatalog(val providerId:String,val readAt:Long,val body:JsonObject?)
+    @Volatile private var soilCatalog:SoilCatalog?=null
+    internal suspend fun soilPolicy(p:LocalProviderConfig,model:String):LocalSoilPolicy {
+        if(!LocalSoilPolicy.isOpenRouter(p))return LocalSoilPolicy()
+        val now=System.currentTimeMillis()
+        val cached=soilCatalog?.takeIf{it.providerId==p.id&&now-it.readAt in 0..(if(it.body==null)60000L else 600000L)}
+        val catalog=if(cached!=null)cached.body else {
+            val fetched=try{get(p,"/models")}catch(e:CancellationException){throw e}catch(_:Exception){null}
+            soilCatalog=SoilCatalog(p.id,now,fetched)
+            fetched
+        }
+        return LocalSoilPolicy.forProvider(p,model,catalog)
+    }
+
+    /** Dedicated non-streaming organization for OpenRouter. No tools or chat history. */
+    internal fun organize(p:LocalProviderConfig,model:String,prompt:String,budget:Int,policy:LocalSoilPolicy):Flow<LocalProviderEvent> {
+        if(!policy.nonStreaming)return stream(p,model,listOf(RemoteChatMessage("user",prompt)),budget)
+        return callbackFlow {
+            val active=java.util.concurrent.atomic.AtomicReference<okhttp3.Call?>()
+            val job=launch(Dispatchers.IO){
+                try{
+                    val payload=buildJsonObject{
+                        put("model",model);put("stream",false);put("max_tokens",budget)
+                        put("messages",localMultimodalMessages(listOf(RemoteChatMessage("user",prompt)),emptyList()))
+                        for((key,value) in policy.options())put(key,value)
+                    }
+                    val call=http.newCall(request(p,"/chat/completions").header("Accept","application/json")
+                        .post(payload.toString().toRequestBody(media)).build())
+                    active.set(call)
+                    call.execute().use{response->
+                        if(!response.isSuccessful)throw failure(response.code)
+                        val source=requireNotNull(response.body).source()
+                        source.request(1048577);require(source.buffer.size<=1048576)
+                        val root=json.parseToJsonElement(source.readUtf8()).jsonObject
+                        require(root["error"]==null||root["error"]==JsonNull)
+                        val choice=root.getValue("choices").jsonArray.first().jsonObject
+                        val reason=choice.getValue("finish_reason").jsonPrimitive.content
+                        val message=choice["message"] as? JsonObject
+                        val content=(message?.get("content") as? JsonPrimitive)?.contentOrNull.orEmpty()
+                        if(reason=="stop"&&content.isNotBlank())send(LocalProviderEvent.Delta(content))
+                        send(LocalProviderEvent.Done(reason))
+                    }
+                    close()
+                }catch(e:CancellationException){throw e}
+                catch(e:CoastApiException){close(e)}
+                catch(_:Exception){close(CoastApiException(CoastApiErrorKind.Decode,"local_soil_response","供应商整理响应格式不兼容。"))}
+            }
+            awaitClose{active.getAndSet(null)?.cancel();job.cancel()}
+        }
+    }
+
     fun stream(p: LocalProviderConfig, model: String, messages: List<RemoteChatMessage>, maxTokens: Int,imageParts:List<JsonObject> = emptyList()): Flow<LocalProviderEvent> =
         streamWithTools(p,model,messages,maxTokens,imageParts,null)
 
