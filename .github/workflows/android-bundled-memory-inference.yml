@@ -1,0 +1,75 @@
+name: Android bundled memory inference
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/android-bundled-memory-inference.yml'
+      - '**/core/local/**'
+      - '**/app/build.gradle.kts'
+      - '**/coast-embedding/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-inference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Build Android app and instrumented tests
+        run: gradle -p apps/android :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon --stacktrace
+      - name: Verify bundled assets and report APK size
+        run: |
+          python - <<'PY'
+          import hashlib, pathlib, zipfile
+          path = pathlib.Path("apps/android/app/build/outputs/apk/debug/app-debug.apk")
+          print(f"APK bytes: {path.stat().st_size}")
+          with zipfile.ZipFile(path) as z:
+              expected = {
+                  "assets/coast-embedding/model.onnx": "15b717c382bcb518ba457b93ea6850ede7f4f1cd8937454aa06972366cd19bcc",
+                  "assets/coast-embedding/vocab.txt": "45bbac6b341c319adc98a532532882e91a9cefc0329aa57bac9ae761c27b291c",
+              }
+              for name, digest in expected.items():
+                  assert hashlib.sha256(z.read(name)).hexdigest() == digest, name
+              assert "assets/coast-embedding/NOTICE.txt" in z.namelist()
+              native = [n for n in z.infolist() if n.filename.startswith("lib/") and "onnxruntime" in n.filename]
+              assert native
+              assert {n.filename.split("/")[1] for n in native} >= {"arm64-v8a", "armeabi-v7a", "x86_64", "x86"}
+              assert all(n.compress_type == zipfile.ZIP_DEFLATED for n in native), "Native libraries not compressed"
+              for abi in sorted({n.filename.split("/")[1] for n in native}):
+                  files = [n for n in native if n.filename.split("/")[1] == abi]
+                  print(f"ORT {abi}: {sum(n.compress_size for n in files)} bytes in APK; {sum(n.file_size for n in files)} bytes extracted")
+          PY
+      - name: Verify real Android CPU inference in the packaged app
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          arch: x86_64
+          target: default
+          disable-animations: true
+          script: >-
+            set -eu;
+            adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk;
+            adb install -r apps/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk;
+            adb shell svc wifi disable;
+            adb shell svc data disable;
+            result="$(adb shell am instrument -w -r -e class com.elementeracoast.app.core.local.BundledEmbeddingDeviceTest com.elementeracoast.source.test/androidx.test.runner.AndroidJUnitRunner)";
+            printf '%s\n' "$result";
+            printf '%s\n' "$result" | grep -F 'OK (2 tests)';
+            if printf '%s\n' "$result" | grep -E 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process crashed'; then exit 1; fi

@@ -55,7 +55,7 @@ private fun soilResponseFormat():JsonObject {
         put("type","string");put("enum",JsonArray(listOf("user","assistant","turn").map(::JsonPrimitive)))
     })))
     val candidates=array(obj(mapOf("title" to string,"content" to string,"source_refs" to refs,"source_excerpt" to string)))
-    val portrait=obj(mapOf("should_update" to type("boolean"),"proposed_body" to string,"reason" to string,"source_excerpt" to string))
+    val portrait=obj(mapOf("should_update" to type("boolean"),"proposed_body" to string,"reason" to string,"source_refs" to refs,"source_excerpt" to string))
     return buildJsonObject {
         put("type","json_schema");put("json_schema",buildJsonObject{
             put("name","thought_soil_v3_portraits");put("strict",true)

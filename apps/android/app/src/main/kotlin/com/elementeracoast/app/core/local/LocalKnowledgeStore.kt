@@ -60,62 +60,59 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence) {
         val messages=attachmentContext.messages
         val instructions=instructions()?.content.orEmpty()
         val current=messages.lastOrNull{it.role=="user"}?.content.orEmpty()
-        val maxChars=budget.coerceAtLeast(1800).toLong()*3
-        require(messages.sumOf{it.content.length.toLong()}+instructions.length<=maxChars){"本机上下文或自定义指令超过预算，未截断、未发送。"}
-        val matches=match(current,messages,surface)
-        val delivered=mutableListOf<RemoteChatMessage>()
-        if(instructions.isNotEmpty())delivered.add(RemoteChatMessage("system",instructions))
+        val matches=match(current,messages.dropLast(if(messages.lastOrNull()?.role=="user")1 else 0),surface)
         val userPortrait=portraits.body("user_portrait")
         val selfPortrait=portraits.body("self_portrait")
-        if(userPortrait.isNotEmpty())delivered.add(RemoteChatMessage("system","用户画像\n"+userPortrait))
-        if(selfPortrait.isNotEmpty())delivered.add(RemoteChatMessage("system","自我画像\n"+selfPortrait))
-        matches.forEach{delivered.add(RemoteChatMessage("system","世界书 · "+it.entry.title+"\n"+it.entry.content))}
-        val memories=memory.recall(current,conversationId)
-        val memoryText=memories.map{e->listOf("记忆 · "+e.title,"生命核："+e.lifeCore,e.content,e.usageHint.takeIf{it.isNotBlank()}?.let{"使用时机："+it}.orEmpty(),e.avoidHint.takeIf{it.isNotBlank()}?.let{"勿误用："+it}.orEmpty()).filter{it.isNotBlank()}.joinToString("\n")}
-        memoryText.forEach{delivered.add(RemoteChatMessage("system",it))}
+        val recall=memory.recallDetailed(current,conversationId)
+        val memories=recall.entries
+        val memoryText=memories.map{e->listOf("标题："+e.title,"类型："+e.entryType,e.tag.takeIf{it.isNotBlank()}?.let{"标签："+it}.orEmpty(),e.sourceWindow.takeIf{it.isNotBlank()}?.let{"来源窗口："+it}.orEmpty(),"生命核："+e.lifeCore,e.usageHint.takeIf{it.isNotBlank()}?.let{"使用时机："+it}.orEmpty(),e.avoidHint.takeIf{it.isNotBlank()}?.let{"勿误用："+it}.orEmpty(),"内容："+e.content).filter{it.isNotBlank()}.joinToString("\n")}
         val soilRow=soil.current(conversationId)
         val soilEnabled=soilRow?.get("auto_refresh_enabled")?.jsonPrimitive?.int==1
         val soilText=soilRow?.takeIf{soilEnabled}?.get("current_text")?.jsonPrimitive?.contentOrNull.orEmpty()
         val after=soilRow?.takeIf{soilEnabled}?.get("afterthoughts_json")?.jsonPrimitive?.contentOrNull?.let{Json.parseToJsonElement(it).jsonArray.map{v->v.jsonPrimitive.content}}.orEmpty()
-        val soilContext=(listOf(soilText)+after).filter{it.isNotBlank()}.joinToString("\n")
-        if(soilContext.isNotEmpty())delivered.add(RemoteChatMessage("system","思维壤\n"+soilContext))
         val dogtalk=LocalDogtalkStore(store).pending(conversationId,surface,turnId)
         val cross = if(crossWindow?.mode=="model_decides"){
             require(cache.history(conversationId)?.contextSettings?.crossWindowAuto==true){"跨窗口自主检索未授权。"}
             LocalCrossWindow.Selection("",RemoteDeskCrossWindow(mode="model_decides",status="已开放 · 未调用"))
         }else LocalCrossWindow(store).select(conversationId,crossWindow)
-        if (cross.text.isNotEmpty()) delivered.add(RemoteChatMessage("system", cross.text))
         val settings=cache.history(conversationId)?.contextSettings?:com.elementeracoast.app.core.model.ConversationContextSettings()
         val real=localReality(store,settings,reality)
         val responseMode=localResponseMode(settings)
-        if(real.delivered)delivered.add(RemoteChatMessage("system","现实注入\n"+real.context))
-        if(responseMode.delivered)delivered.add(RemoteChatMessage("system",responseMode.context))
-        val contextMessages=messages.toMutableList()
-        if(dogtalk!=null){val at=contextMessages.indexOfLast{it.role=="user"};require(at>=0);contextMessages[at]=contextMessages[at].copy(content=contextMessages[at].content+"\n\n"+dogtalk.text)}
-        delivered.addAll(contextMessages)
-        // Reserve a conservative estimate per image, not the base64 byte length.
-        val chars=delivered.sumOf{it.content.length.toLong()}+attachmentContext.imageParts.size*2048L*3
-        require(chars<=maxChars){"本机上下文、完整画像、世界书与记忆超过预算，未截断、未发送。"}
-        if(dogtalk!=null)store.atomic{LocalDogtalkStore(it).consume(dogtalk)}
-        return Context(delivered,RemoteDeskSlip(
-            dogtalk=RemoteDeskDogtalk(status=if(dogtalk==null)"未递给" else "已递给",delivered=dogtalk!=null,context=dogtalk?.text.orEmpty()),
-            summary="本机自定义指令、完整画像、世界书、已确认记忆（关键词检索）、思维壤与近期文字；附件按本轮回执递入",
+        val comfort=LocalContextPolicy.assemble(instructions,userPortrait,selfPortrait,LocalContextPolicy.formatSoil(soilText,after),memoryText,
+            matches.map{it.entry.title+"："+it.entry.content},dogtalk?.text.orEmpty(),cross.text,
+            real.context.takeIf{real.delivered}.orEmpty(),responseMode.context.takeIf{responseMode.delivered}.orEmpty(),
+            messages,budget,attachmentContext.imageParts.size)
+        val deliveredMemory=memories.take(comfort.memoryCount)
+        val deliveredWorld=matches.take(comfort.worldbookCount)
+        val soilContext=comfort.soil
+        val currentMessage=comfort.visible.lastOrNull()?.takeIf{it.role=="user"}
+        val recent=if(currentMessage==null)comfort.visible else comfort.visible.dropLast(1)
+        val keptSoil=soilContext.substringBefore("\n余思：").takeIf{it.startsWith("当前：")}?.removePrefix("当前：").orEmpty()
+        val keptAfter=soilContext.substringAfter("余思：\n","").lines().filter{it.startsWith("- ")}.map{it.removePrefix("- ")}
+        if(dogtalk!=null&&comfort.dogtalk.isNotEmpty())store.atomic{LocalDogtalkStore(it).consume(dogtalk)}
+        return Context(comfort.messages,RemoteDeskSlip(
+            currentMessage=RemoteDeskCurrentMessage(status=if(currentMessage==null)"未递给"else "已递给",delivered=currentMessage!=null,content=currentMessage?.content.orEmpty()),
+            recentContext=RemoteDeskRecentContext(status=if(recent.isEmpty())"未递给"else "已递给",turns=(recent.size+1)/2,currentMessageSeparate=currentMessage!=null,messages=recent),
+            dogtalk=RemoteDeskDogtalk(status=if(comfort.dogtalk.isEmpty())"未递给" else "已递给",delivered=comfort.dogtalk.isNotEmpty(),context=comfort.dogtalk),
+            summary="本机上下文按在线舒适预算规则组装；回执仅记录实际递入资料；"+recall.retrievalStatus,
             crossWindow=cross.receipt,
             realityContext=real,responseMode=responseMode,
             attachments=attachmentContext.receipt.takeIf{attachmentIds.isNotEmpty()},
             customInstructions=RemoteDeskCustomInstructions(status=if(instructions.isEmpty())"未设置" else "已递给",delivered=instructions.isNotEmpty(),empty=instructions.isEmpty(),length=instructions.length,content=instructions),
-            userPortrait=portraitReceipt("用户画像",userPortrait),
-            globalExcerpt=portraitReceipt("自我画像",selfPortrait),
-            thinkingSoil=RemoteDeskThinkingSoil(status=if(soilRow!=null&&!soilEnabled)"已关闭" else if(soilContext.isEmpty())"未设置" else "已递给",enabled=soilEnabled,delivered=soilContext.isNotEmpty(),empty=soilContext.isEmpty(),context=soilContext,currentText=soilText,afterthoughts=after,afterthoughtsCount=after.size),
-            worldbook=RemoteDeskWorldbook(status=if(matches.isEmpty())"未命中" else "已递给",matchedCount=matches.size,deliveredCount=matches.size,matchedTitles=matches.map{it.entry.title},deliveredTitles=matches.map{it.entry.title},
-                entries=matches.map{RemoteDeskWorldbookItem(title=it.entry.title,id=it.entry.id,matchedKeywords=it.keywords,content=it.entry.content,scope=it.entry.scope,matchedBy=it.by,delivered=true,deliveredText=it.entry.content)}),
-            relatedMemory=RemoteDeskMemory(status=if(memories.isEmpty())"未命中" else "已递给",confirmationStatus="仅已确认的 active 记录",count=memories.size,
-                items=memories.mapIndexed{i,e->RemoteDeskMemoryItem(title=e.title,id=e.id,entryType=e.entryType,tag=e.tag,sourceModel=e.sourceModel,sourceWindow=e.sourceWindow,sourceDate=e.sourceDate,reason="本机关键词命中",lifeCore=e.lifeCore,usageHint=e.usageHint,avoidHint=e.avoidHint,content=e.content,deliveredText=memoryText[i])}),
-            contextBudget=RemoteDeskContextBudget(estimatedTokens=((chars+2)/3).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),comfortCeiling=budget.coerceAtLeast(1800),sourcesPreserved=listOf("recent_context")+(if(real.delivered)listOf("reality_context")else emptyList())+(if(responseMode.delivered)listOf("response_mode")else emptyList())+(if(soilContext.isNotEmpty())listOf("thinking_soil")else emptyList())+(if(cross.receipt.delivered)listOf("cross_window")else emptyList())+(if(instructions.isEmpty())emptyList()else listOf("custom_instructions"))+(if(matches.isEmpty())emptyList()else listOf("worldbook"))+(if(memories.isEmpty())emptyList()else listOf("related_memory"))+(if(userPortrait.isEmpty())emptyList()else listOf("user_portrait"))+(if(selfPortrait.isEmpty())emptyList()else listOf("global_excerpt")),userPortrait=if(userPortrait.isEmpty())"empty" else "full",globalExcerpt=if(selfPortrait.isEmpty())"empty" else "full")
+            userPortrait=portraitReceipt("用户画像",userPortrait,comfort.over),
+            globalExcerpt=portraitReceipt("自我画像",selfPortrait,comfort.over),
+            thinkingSoil=RemoteDeskThinkingSoil(status=if(soilRow!=null&&!soilEnabled)"已关闭" else if(soilContext.isEmpty())"未递给" else "已递给",enabled=soilEnabled,delivered=soilContext.isNotEmpty(),empty=soilContext.isEmpty(),context=soilContext,currentText=keptSoil,afterthoughts=keptAfter,afterthoughtsCount=keptAfter.size),
+            worldbook=RemoteDeskWorldbook(status=if(matches.isEmpty())"未命中" else if(deliveredWorld.isEmpty())"预算裁剪"else "已递给",matchedCount=matches.size,deliveredCount=deliveredWorld.size,matchedTitles=matches.map{it.entry.title},deliveredTitles=deliveredWorld.map{it.entry.title},
+                entries=matches.mapIndexed{i,m->RemoteDeskWorldbookItem(title=m.entry.title,id=m.entry.id,matchedKeywords=m.keywords,content=m.entry.content,scope=m.entry.scope,matchedBy=m.by,delivered=i<deliveredWorld.size,deliveredText=if(i<deliveredWorld.size)m.entry.content else "")}),
+            relatedMemory=RemoteDeskMemory(status=if(memories.isEmpty())"未命中" else if(deliveredMemory.isEmpty())"预算裁剪"else "已递给",confirmationStatus="仅已确认的 active / dormant 记录",count=deliveredMemory.size,
+                items=deliveredMemory.mapIndexed{i,e->RemoteDeskMemoryItem(title=e.title,id=e.id,entryType=e.entryType,tag=e.tag,sourceModel=e.sourceModel,sourceWindow=e.sourceWindow,sourceDate=e.sourceDate,reason=recall.reasons[e.id]?:"本机关键词命中",lifeCore=e.lifeCore,usageHint=e.usageHint,avoidHint=e.avoidHint,content=e.content,deliveredText=memoryText[i])}),
+            contextBudget=RemoteDeskContextBudget(estimatedTokens=comfort.estimated,comfortCeiling=comfort.ceiling,trimmed=comfort.trimmed>0,trimmedCount=comfort.trimmed,exceedsComfortCeiling=comfort.over,
+                sourcesPreserved=(if(recent.isEmpty())emptyList()else listOf("recent_context"))+(if(currentMessage==null)emptyList()else listOf("current_message"))+(if(real.delivered)listOf("reality_context")else emptyList())+(if(responseMode.delivered)listOf("response_mode")else emptyList())+(if(soilContext.isNotEmpty())listOf("thinking_soil")else emptyList())+(if(cross.receipt.delivered)listOf("cross_window")else emptyList())+(if(comfort.dogtalk.isNotEmpty())listOf("dogtalk")else emptyList())+(if(instructions.isEmpty())emptyList()else listOf("custom_instructions"))+(if(deliveredWorld.isEmpty())emptyList()else listOf("worldbook"))+(if(deliveredMemory.isEmpty())emptyList()else listOf("related_memory"))+(if(userPortrait.isEmpty())emptyList()else listOf("user_portrait"))+(if(selfPortrait.isEmpty())emptyList()else listOf("global_excerpt")),userPortrait=portraitStatus(userPortrait,comfort.over),globalExcerpt=portraitStatus(selfPortrait,comfort.over))
         ),attachmentContext.imageParts)
     }
     fun toolSession(cid:String,turn:String,request:RemoteCrossWindowRequest?,receipt:RemoteDeskSlip,modelId:String="")=LocalToolSession.open(store,cid,turn,request,receipt,modelId)
-    private fun portraitReceipt(label:String,body:String)=RemoteDeskGlobalExcerpt(label=label,status=if(body.isEmpty())"未设置" else "已递给",delivered=body.isNotEmpty(),injection=if(body.isEmpty())"none" else "full",estimatedTokens=(body.length+2)/3,length=body.length,content=body)
+    private fun portraitStatus(body:String,over:Boolean)=if(body.isEmpty())"empty"else if(over)"over_budget"else "complete"
+    private fun portraitReceipt(label:String,body:String,over:Boolean)=RemoteDeskGlobalExcerpt(label=label,status=if(body.isEmpty())"未设置" else "已递给",delivered=body.isNotEmpty(),injection=if(body.isEmpty())"none" else if(over)"over_budget"else "full",estimatedTokens=LocalContextPolicy.estimate(body),length=body.length,content=body)
     companion object {
         fun validateWorldbook(rows:List<RemoteWorldbookEntry>){
             require(rows.map{it.id}.distinct().size==rows.size&&rows.count{it.enabled&&it.constantActive}<=3){"世界书 ID 重复或常驻词条超过三条。"}

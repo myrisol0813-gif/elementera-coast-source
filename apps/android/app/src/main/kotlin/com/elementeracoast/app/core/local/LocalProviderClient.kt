@@ -173,7 +173,8 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
         val active=java.util.concurrent.atomic.AtomicReference<okhttp3.Call?>()
         val reader=launch(Dispatchers.IO) {
             try {
-                for(round in 0..8){
+                var callsMade=0
+                for(round in 0..LocalToolSession.MAX_CALLS){
                     val payload=buildJsonObject {
                         put("model",model);put("stream",true)
                         val host=normalizeLocalProviderUrl(p.baseUrl).toHttpUrl().host
@@ -181,7 +182,7 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                         if(host in setOf("api.openai.com","openrouter.ai","qianfan.baidubce.com"))put("stream_options",buildJsonObject{put("include_usage",true)})
                         put(if(official)"max_completion_tokens"else "max_tokens",maxTokens.coerceIn(64,65536))
                         put("messages",JsonArray(history))
-                        if(session!=null){put("tools",session.completionsTools);put("tool_choice",if(round==8)"none"else "auto")}
+                        if(session!=null){put("tools",session.completionsTools);put("tool_choice",if(round==LocalToolSession.MAX_CALLS||callsMade>=LocalToolSession.MAX_CALLS)"none"else "auto")}
                     }
                     val call=http.newCall(request(p,"/chat/completions").header("Accept","text/event-stream").post(payload.toString().toRequestBody(media)).build())
                     active.set(call)
@@ -209,7 +210,7 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                                 require(session!=null)
                                 val item=raw.jsonObject
                                 val index=item["index"]?.jsonPrimitive?.intOrNull?:0
-                                require(index in 0..7)
+                                require(index in 0 until LocalToolSession.MAX_CALLS)
                                 val parts=pending.getOrPut(index){ToolParts()}
                                 item["id"]?.jsonPrimitive?.contentOrNull?.let{parts.id.append(it)}
                                 val fn=item["function"] as? JsonObject
@@ -228,7 +229,8 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                         val finish=reason?:"stop"
                         send(LocalProviderEvent.Done(finish,echo.metadata(finish)));close();return@launch
                     }
-                    if(session==null||round==8||reason!="tool_calls")throw CoastApiException(CoastApiErrorKind.Model,"local_tool_limit","本机工具调用超限或协议不完整。")
+                    if(session==null||round==LocalToolSession.MAX_CALLS||callsMade+pending.size>LocalToolSession.MAX_CALLS||reason!="tool_calls")throw CoastApiException(CoastApiErrorKind.Model,"local_tool_limit","本机工具调用超限或协议不完整。")
+                    callsMade+=pending.size
                     require(pending.values.all{it.id.isNotBlank()&&it.name.isNotBlank()})
                     val calls=pending.values.map{part->buildJsonObject{
                         put("id",part.id.toString());put("type","function")

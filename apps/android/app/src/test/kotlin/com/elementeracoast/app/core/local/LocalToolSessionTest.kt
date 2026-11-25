@@ -75,4 +75,11 @@ class LocalToolSessionTest {
         assertEquals(2,n);assertTrue(events.any{it is LocalProviderEvent.Tool&&it.result.ok})
         assertEquals("stop",(events.last() as LocalProviderEvent.Done).reason)
     }
+    @Test fun completedOrEditedTurnCannotReuseAnOldToolSession(){
+        val s=fixture();val tool=open(s)!!
+        val cache=RemoteCacheStore(s)
+        val h=cache.history("current")!!
+        cache.putHistory("current",h.copy(turns=h.turns.map{t->if(t.id=="turn-now")t.copy(user=t.user.copy(variants=t.user.variants.map{it.copy(content="edited")}))else t}))
+        assertFalse(tool.execute("stale","cross_window_keyword_search","""{"query":"海岸"}""").ok)
+    }
 }

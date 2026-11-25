@@ -34,7 +34,8 @@ class LocalSideArchiveRoundtripTest {
             saveDog("read_now")
             val delivery=LocalKnowledgeStore(from).context(listOf(RemoteChatMessage("user","hello")),6000,"main_chat",cid,emptyList(),"turn1")
             assertTrue(delivery.receipt.dogtalk.delivered)
-            assertTrue(delivery.messages.last().content.contains("fixture private draft"))
+            assertTrue(delivery.messages.first().content.contains("fixture private draft"))
+            assertEquals("hello",delivery.messages.last().content)
             assertNull(dog.pending(cid,"main_chat","turn1"))
             assertEquals("keep_private",dog.current("conversation",cid)?.data?.get("read_mode")?.jsonPrimitive?.content)
             val snapshot=dog.read().single{it.module=="dogtalk_snapshots"}
