@@ -63,9 +63,20 @@ internal object FeatureGuides {
     val profile = FeatureGuide("个人资料", "屋主设置 → 个人资料：修改昵称、署名等显示资料，不改变已有记录的实际作者。")
     val appearance = FeatureGuide("外观", "屋主设置 → 外观：调整主题、纸页、字体及重点色，不改变对话内容。")
     val account = FeatureGuide("账户", "屋主设置 → 账户：查看登录状态或返回开屏切换模式。本机和前后端资料独立保存，不自动同步；外部模型仍需网络。")
-    val basic = FeatureGuide("基本设置", "屋主设置 → 基本设置：调整最近聊天轮数、上下文预算及生成偏好。实际输入与输出受模型和供应商能力限制。")
+    val basic = FeatureGuide("基本设置", "屋主设置 → 基本设置：调整最近聊天轮数、上下文预算及生成偏好。自动预算依据模型目录容量预留空间，未知时采用18000的舒服区间；手动可自行填写。实际输入与输出仍受供应商限制。")
     val diagnostics = FeatureGuide("关于与诊断", "屋主设置 → 关于与诊断：查看版本及运行状态，辅助定位异常。")
     val update = FeatureGuide("版本与更新", "屋主设置 → 版本与更新：检查正式发行，下载后校验 SHA-256、包名、版本和签名，正常更新可覆盖安装。")
+
+    val reality = FeatureGuide("现实上下文", "右上角 ··· → 这个窗口 → 现实上下文：选择允许读取的现实信息。只有开启且成功取得的信息会递给模型。")
+    val shortReply = FeatureGuide("短句模式", "右上角 ··· → 这个窗口 → 短句模式：普通闲聊优先简短回应，深度话题仍可自然展开。")
+    val history = FeatureGuide("历史纸条", "回到聊天，点击有纸条的历史消息下方入口，查看对应轮次的整理内容，也可收藏其中的文字。")
+    val draft = FeatureGuide("私人草稿", "输入框右侧尖角 → 屋主抽屉 → 私人草稿：填写尚未说出口的内容，选择阅读方式。保存草稿不等于授权模型读取。")
+    val cross = FeatureGuide("跨窗口回忆", "输入框右侧尖角 → 屋主抽屉 → 跨窗口读取：选取历史消息。允许模型自主检索的开关位于当前窗口设置；不会由手册自动开启。")
+    val echo = FeatureGuide("模型回波", "聊天消息下方的模型回波：查看模型与实际返回的运行信息。预算、估算和供应商实际用量不是同一个数值。")
+    val collection = FeatureGuide("收藏", "小组件 → 文件库 → 收藏：浏览保存的文字、纸条、图片、语音与附件，可搜索、添加备注并返回来源。取消收藏不删除原件。")
+    val pets = FeatureGuide("宠物系统", "小组件 → 宠物系统：仍在准备，目前没有可用的养成操作。")
+    val attachments = FeatureGuide("附件", "输入框左侧加号：选择图片或文件，发送前可以移除。每轮最多12个；实际递入情况在本轮上下文预览中查看。", "本机支持 PNG、JPEG、WebP 与 UTF-8 文本读取；图片已递入不代表模型已经识别。")
+    val toolLog = FeatureGuide("工具调用记录", "侧栏 → 模型工作台：检查工具调用及成功或失败的回执。未授权、模型不支持工具和执行失败是不同情况。")
 
     fun room(type: RoomType, local: Boolean): FeatureGuide = when (type) {
         RoomType.Main -> FeatureGuide("主聊天室", "与所选模型日常对话的空间。\n顶部模型名称：选择模型。\n右上角 ···：设置现实上下文、短句模式、纸条整理与新居信。\n输入框右侧尖角：打开屋主抽屉，查看本轮上下文预览。\n输入框左侧加号：添加图片及文件。\n侧栏搜索：查找窗口与历史原文。", if (local) "需要模型读写本机资料时，右上角 ··· → 这个窗口 → 本机模型工具 / 本机模型写入；两个权限默认关闭、仅对当前窗口生效。" else "")
@@ -78,9 +89,16 @@ internal object FeatureGuides {
         GuideEntry("radio", room(RoomType.Radio, local), "聊天与上下文", !local),
         GuideEntry("lighthouse", room(RoomType.Lighthouse, local), "聊天与上下文", !local),
         GuideEntry("window", window, "聊天与上下文"),
+        GuideEntry("reality", reality, "聊天与上下文"),
+        GuideEntry("short", shortReply, "聊天与上下文"),
         GuideEntry("drawer", drawer, "聊天与上下文"),
+        GuideEntry("draft", draft, "聊天与上下文"),
+        GuideEntry("cross", cross, "聊天与上下文"),
         GuideEntry("soil", soil, "聊天与上下文"),
         GuideEntry("desk", desk, "聊天与上下文"),
+        GuideEntry("history", history, "聊天与上下文"),
+        GuideEntry("echo", echo, "聊天与上下文"),
+        GuideEntry("attachments", attachments, "聊天与上下文"),
         GuideEntry("letter", letter, "聊天与上下文"),
         GuideEntry("memory", memory, "记忆与长期资料"),
         GuideEntry("seeds", seeds, "记忆与长期资料"),
@@ -94,13 +112,16 @@ internal object FeatureGuides {
         GuideEntry("diary", diary, "日常与资料"),
         GuideEntry("calendar", calendar, "日常与资料"),
         GuideEntry("vault", vault, "日常与资料"),
+        GuideEntry("collection", collection, "日常与资料"),
         GuideEntry("library", library, "日常与资料"),
+        GuideEntry("pets", pets, "日常与资料"),
         GuideEntry("models", models, "模型与工具"),
         GuideEntry("codex", codex, "模型与工具", local),
         GuideEntry("provider", provider, "模型与工具", local),
         GuideEntry("readTools", readTools, "模型与工具", local),
         GuideEntry("writeTools", writeTools, "模型与工具", local),
         GuideEntry("tools", tools, "模型与工具"),
+        GuideEntry("toolLog", toolLog, "模型与工具"),
         GuideEntry("settings", settings, "屋主设置与迁移"),
         GuideEntry("profile", profile, "屋主设置与迁移"),
         GuideEntry("appearance", appearance, "屋主设置与迁移"),

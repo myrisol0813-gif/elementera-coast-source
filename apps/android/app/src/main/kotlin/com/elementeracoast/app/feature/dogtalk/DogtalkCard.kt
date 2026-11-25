@@ -66,7 +66,9 @@ fun DogtalkCard(
     historyLoading: Boolean,
     isStreaming: Boolean,
     onNotice: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    guidePane: String? = null,
+    onGuidePaneConsumed: () -> Unit = {}
 ) {
     val canUse = scope != DogtalkScope.Main || conversationId.isNotBlank()
     var drawerPane by rememberSaveable(scope, conversationId) { mutableStateOf("dogtalk") }
@@ -88,6 +90,14 @@ fun DogtalkCard(
 
     LaunchedEffect(open, turnDeskReceipt) {
         if (open && drawerPane == "desk" && turnDeskReceipt == null) drawerPane = "dogtalk"
+    }
+
+    LaunchedEffect(guidePane, open) {
+        if (open && guidePane in setOf("dogtalk", "cross")) {
+            drawerPane = "dogtalk"
+            pane = guidePane ?: "dogtalk"
+            onGuidePaneConsumed()
+        }
     }
 
     if (!open) return

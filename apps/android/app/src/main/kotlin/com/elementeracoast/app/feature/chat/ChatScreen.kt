@@ -173,9 +173,11 @@ fun ChatWindow(
         ?.takeIf { it.role == MessageRole.Assistant }
         ?.deskReceipt
     val deskReceipt = persistedDeskReceipt ?: state.turnDeskReceipt
+    var drawerGuidePane by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(guideTarget) {
         when (guideTarget) {
             "drawer" -> drawerOpen = true
+            "draft", "cross" -> { drawerGuidePane = if (guideTarget == "draft") "dogtalk" else "cross"; drawerOpen = true }
             "desk" -> if (deskReceipt != null) deskOpen = true else { drawerOpen = true; onPlaceholder("完成一轮对话后即可查看本轮上下文预览。") }
             "soil" -> if (state.thoughtSoil != null) { selectedSoil = null; soilOpen = true } else onPlaceholder("当前窗口暂无纸条，可在右上角菜单开启整理。")
             else -> return@LaunchedEffect
@@ -249,6 +251,8 @@ fun ChatWindow(
                 crossWindow = crossWindow,
                 onCrossWindowChange = onCrossWindowChange,
                 turnDeskReceipt = deskReceipt,
+                guidePane = drawerGuidePane,
+                onGuidePaneConsumed = { drawerGuidePane = null },
                 open = drawerOpen,
                 onOpenChange = { drawerOpen = it },
                 onOpenTurnDesk = { if (deskReceipt != null) deskOpen = true },

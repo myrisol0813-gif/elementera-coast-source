@@ -63,13 +63,18 @@ fun DailyLanding(
     onGuideConsumed: () -> Unit = {}
 ) {
     var page by remember { mutableStateOf(DailyPage.Home) }
+    var vaultGuideMode by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(guideTarget) {
         page = when (guideTarget) {
             "daily" -> DailyPage.Home
             "moments" -> DailyPage.Moments
             "diary" -> DailyPage.Diary
             "calendar" -> DailyPage.Calendar
-            "vault" -> DailyPage.Vault
+            "vault", "collection" -> {
+                vaultGuideMode = if (guideTarget == "collection") "treasures" else "basic"
+                DailyPage.Vault
+            }
+            "pets" -> DailyPage.Pet
             "library" -> DailyPage.Library
             else -> return@LaunchedEffect
         }
@@ -158,7 +163,7 @@ fun DailyLanding(
                 "宠物系统",
                 "休憩箱尚未展开",
                 { page = DailyPage.Home },
-                compact = true
+                compact = true, guide = FeatureGuides.pets
             )
         }
 
@@ -180,7 +185,7 @@ fun DailyLanding(
                 DailyPage.Diary -> DiaryScreen(repository, onActionLogged, onSnackbar) { page = DailyPage.DiaryCompose }
                 DailyPage.DiaryCompose -> DiaryComposeScreen(repository, onActionLogged, onSnackbar) { page = DailyPage.Diary }
                 DailyPage.Calendar -> CalendarScreen(sideRooms, onSnackbar)
-                DailyPage.Vault -> CoastVaultScreen(sideRooms, onSnackbar, onOpenSource)
+                DailyPage.Vault -> CoastVaultScreen(sideRooms, onSnackbar, onOpenSource, guideMode = vaultGuideMode, onGuideModeConsumed = { vaultGuideMode = null })
                 DailyPage.Library -> TidalLibraryScreen(
                     sideRooms, onSnackbar,
                     importRequest = libraryImportRequest,

@@ -110,22 +110,22 @@ fun MainShell(
         guideRequest = null
         openModelBoxOnLanding = false
         when (target) {
-            "main" -> if (state.activeRoomType == RoomType.Main) onBackToChat() else onOpenRoomType(RoomType.Main)
+            "main", "history", "echo", "attachments" -> if (state.activeRoomType == RoomType.Main) onBackToChat() else onOpenRoomType(RoomType.Main)
             "radio" -> if (!state.localMode) onOpenRoomType(RoomType.Radio) else onPlaceholder("本机暂不支持共通聊天室。")
             "lighthouse" -> if (!state.localMode) onOpenRoomType(RoomType.Lighthouse) else onPlaceholder("本机暂不支持 MCP 对话区。")
-            "window", "readTools", "writeTools" -> {
+            "window", "reality", "short", "readTools", "writeTools" -> {
                 onBackToChat()
                 showWindowContext = true
             }
-            "drawer", "soil", "desk" -> { guideRequest = target; onBackToChat() }
+            "drawer", "draft", "cross", "soil", "desk" -> { guideRequest = target; onBackToChat() }
             "letter" -> onOpenFeature(FeatureDestination.IslandLetter)
             "memory", "seeds", "pending", "userPortrait", "selfPortrait", "worldbook", "instructions" -> {
                 guideRequest = target; onOpenFeature(FeatureDestination.Memory)
             }
-            "daily", "moments", "diary", "calendar", "vault", "library" -> {
+            "daily", "moments", "diary", "calendar", "vault", "collection", "library", "pets" -> {
                 guideRequest = target; onOpenFeature(FeatureDestination.Daily)
             }
-            "tools" -> onOpenFeature(FeatureDestination.ActionLog)
+            "tools", "toolLog" -> onOpenFeature(FeatureDestination.ActionLog)
             "models", "codex", "provider", "settings", "profile", "appearance", "account", "basic", "backup", "diagnostics", "update" -> {
                 guideRequest = target; onOpenFeature(FeatureDestination.Wolf)
             }

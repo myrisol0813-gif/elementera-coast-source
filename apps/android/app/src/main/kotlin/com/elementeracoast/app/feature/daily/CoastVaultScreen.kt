@@ -115,7 +115,7 @@ internal fun vaultVisibleRows(rows: List<JsonObject>, mode: String, kind: String
 /** Read-only gallery index over canonical Coast media; no duplicate data store. */
 @Composable
 fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Unit,
-    onOpenSource: (ChatSearchHit) -> Unit) {
+    onOpenSource: (ChatSearchHit) -> Unit, guideMode: String? = null, onGuideModeConsumed: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
     var mode by remember { mutableStateOf("basic") }
     var kind by remember { mutableStateOf("all") }
@@ -143,13 +143,20 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: Exception) {
-            failure = error.message ?: "无法读取海岸文件库。"
+            failure = error.message ?: "无法读取文件库。"
             if (cursor.isBlank()) rows = emptyList()
         } finally {
             loading = false
         }
     }
 
+    LaunchedEffect(guideMode) {
+        if (guideMode == "basic" || guideMode == "treasures") {
+            mode = guideMode
+            kind = "all"; query = ""; submittedQuery = ""; rows = emptyList(); revision++
+            onGuideModeConsumed()
+        }
+    }
     LaunchedEffect(mode, kind, submittedQuery, revision) { load() }
     val labels = if (mode == "basic") basicKinds else treasureKinds
     val visibleRows = vaultVisibleRows(rows, mode, kind)
@@ -170,7 +177,7 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
         item(key = "controls") {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("basic" to "基本文件库", "treasures" to "拾潮").forEach { (value, title) ->
+                    listOf("basic" to "基本文件库", "treasures" to "收藏").forEach { (value, title) ->
                         SnowLetterSurface(
                             modifier = Modifier.weight(1f).height(44.dp).clickable {
                                 if (mode != value) {
@@ -263,7 +270,7 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
                     style = MaterialTheme.typography.bodySmall)
                 if (!loading && visibleRows.isEmpty() && failure.isBlank()) Text(
                     if (mode == "basic") "这里还没有符合条件的已存媒体。"
-                    else "还没有符合条件的拾潮记录。",
+                    else "还没有符合条件的收藏记录。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -401,7 +408,7 @@ private fun CoastVaultCard(
                     onSnackbar("备注已保存。")
                 } else {
                     repository.vaultSave(kind, conversation, sourceId, note)
-                    onSnackbar("备注已保存，并已拾入潮间。")
+                    onSnackbar("备注已保存，并已收藏。")
                 }
                 noteEditing = false
                 onChanged()
@@ -433,7 +440,7 @@ private fun CoastVaultCard(
             busy = true
             try {
                 repository.vaultSave(kind, conversation, sourceId, note)
-                onSnackbar("已拾入潮间。")
+                onSnackbar("已收藏。")
                 onChanged()
             } catch (cancel: CancellationException) {
                 throw cancel
@@ -577,7 +584,7 @@ private fun CoastVaultCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     TextButton(enabled = !busy, onClick = ::saveInlineNote) {
                         Text(if (treasure || item.vaultFlag("favorited")) "保存备注"
-                            else "拾入潮间并保存", style = MaterialTheme.typography.labelSmall)
+                            else "收藏并保存", style = MaterialTheme.typography.labelSmall)
                     }
                     TextButton(onClick = {
                         note = item.vaultText("notes")
@@ -689,7 +696,7 @@ private fun CoastVaultCard(
     if (showCancel) AlertDialog(
         onDismissRequest = { showCancel = false },
         title = { Text("取消这条珍藏？") },
-        text = { Text("只移除拾潮里的收藏，原聊天和媒体不会删除。") },
+        text = { Text("只移除收藏里的收藏，原聊天和媒体不会删除。") },
         confirmButton = {
             TextButton(enabled = !busy, onClick = {
                 showCancel = false
@@ -732,7 +739,7 @@ private fun VaultActions(
             onClick = { onDismiss(); onRename() }
         )
         DropdownMenuItem(
-            text = { Text(if (treasure || alreadySaved) "取消珍藏" else "拾入潮间") },
+            text = { Text(if (treasure || alreadySaved) "取消珍藏" else "收藏") },
             enabled = !busy,
             onClick = { onDismiss(); onFavorite() }
         )
