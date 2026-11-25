@@ -91,9 +91,11 @@ internal class LocalMemoryStore(private val store:LocalPersistence) {
         }
         return JsonObject((old?:defaults)+changed).also{validateRow(it,false)}
     }
-    fun recall(input:String,cid:String,explicit:Boolean=false):List<RemoteMemoryEntry>{
+    data class Recall(val entries:List<RemoteMemoryEntry>,val reasons:Map<String,String>,val retrievalStatus:String)
+    fun recall(input:String,cid:String,explicit:Boolean=false):List<RemoteMemoryEntry> = recallDetailed(input,cid,explicit).entries
+    fun recallDetailed(input:String,cid:String,explicit:Boolean=false):Recall{
         val query=input.trim().lowercase(java.util.Locale.ROOT)
-        if(query.isBlank())return emptyList()
+        if(query.isBlank())return Recall(emptyList(),emptyMap(),"空查询")
         val requested=explicit||Regex("你还记得|还记得吗|还记得|回想|找一下.*记忆|搜索.*记忆|查.*记忆|记忆里|种子库|记忆库|以前说过|我们聊过").containsMatchIn(query)
         val tokens=query.split(Regex("[\\s,，。！？!?、:：;；()（）「」“”]+")).filter{it.length>=2}.distinct().take(12)
         fun normalized(value:String)=value.lowercase(java.util.Locale.ROOT).trim()
@@ -121,11 +123,14 @@ internal class LocalMemoryStore(private val store:LocalPersistence) {
                 (if(row.str("entry_type")=="seed")0.03 else 0.0)-
                 (if(row.str("status")=="dormant")0.04 else 0.0)).coerceIn(0.0,1.0)
         }
-        val candidates=snapshot().entries.asSequence().filter{
-            it["deleted_at"]==JsonNull&&it.getValue("user_confirmed").jsonPrimitive.int==1&&
-            it.str("status") in setOf("active","dormant")&&(it.str("scope")=="global"||it.str("conversation_id")==cid)
-        }.mapNotNull{row->
-            val base=keyword(row);val rank=score(row,base)
+        val allowed=snapshot().entries.filter{LocalSemanticIndex.eligible(it)&&(it.str("scope")=="global"||it.str("conversation_id")==cid)}
+        val semantic=(store as? FileLocalPersistence)?.semanticIndex?.let{it.lookup(input,allowed)}
+        val reasons=mutableMapOf<String,String>()
+        val candidates=allowed.asSequence().mapNotNull{row->
+            val lexical=keyword(row)
+            val vector=LocalHybridMemoryRank.semantic(semantic?.scores?.get(row.str("id")),requested)
+            val base=maxOf(lexical,vector);val rank=score(row,base)
+            reasons[row.str("id")]=LocalHybridMemoryRank.reason(lexical,vector)
             val threshold=if(requested)0.55 else if(row.str("entry_type")=="seed")0.82 else 0.74
             if(base>0&&(base>=0.92||rank>=threshold))row to rank else null
         }.sortedWith(compareByDescending<Pair<JsonObject,Double>>{it.second}.thenByDescending{it.first["updated_at"]!!.jsonPrimitive.long}.thenBy{it.first.str("id")})
@@ -139,7 +144,7 @@ internal class LocalMemoryStore(private val store:LocalPersistence) {
             else {if(memories>=if(requested)6 else 3)continue;memories++}
             topics.add(topic);selected.add(entry(row))
         }
-        return selected
+        return Recall(selected,reasons.filterKeys{key->selected.any{it.id==key}},semantic?.status?:"关键词召回")
     }
     companion object{
         const val KEY="local.memory.records.v2"

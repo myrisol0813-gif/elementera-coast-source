@@ -63,7 +63,8 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence) {
         val matches=match(current,messages.dropLast(if(messages.lastOrNull()?.role=="user")1 else 0),surface)
         val userPortrait=portraits.body("user_portrait")
         val selfPortrait=portraits.body("self_portrait")
-        val memories=memory.recall(current,conversationId)
+        val recall=memory.recallDetailed(current,conversationId)
+        val memories=recall.entries
         val memoryText=memories.map{e->listOf("标题："+e.title,"类型："+e.entryType,e.tag.takeIf{it.isNotBlank()}?.let{"标签："+it}.orEmpty(),e.sourceWindow.takeIf{it.isNotBlank()}?.let{"来源窗口："+it}.orEmpty(),"生命核："+e.lifeCore,e.usageHint.takeIf{it.isNotBlank()}?.let{"使用时机："+it}.orEmpty(),e.avoidHint.takeIf{it.isNotBlank()}?.let{"勿误用："+it}.orEmpty(),"内容："+e.content).filter{it.isNotBlank()}.joinToString("\n")}
         val soilRow=soil.current(conversationId)
         val soilEnabled=soilRow?.get("auto_refresh_enabled")?.jsonPrimitive?.int==1
@@ -93,7 +94,7 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence) {
             currentMessage=RemoteDeskCurrentMessage(status=if(currentMessage==null)"未递给"else "已递给",delivered=currentMessage!=null,content=currentMessage?.content.orEmpty()),
             recentContext=RemoteDeskRecentContext(status=if(recent.isEmpty())"未递给"else "已递给",turns=(recent.size+1)/2,currentMessageSeparate=currentMessage!=null,messages=recent),
             dogtalk=RemoteDeskDogtalk(status=if(comfort.dogtalk.isEmpty())"未递给" else "已递给",delivered=comfort.dogtalk.isNotEmpty(),context=comfort.dogtalk),
-            summary="本机上下文按在线舒适预算规则组装；回执仅记录实际递入资料",
+            summary="本机上下文按在线舒适预算规则组装；回执仅记录实际递入资料；"+recall.retrievalStatus,
             crossWindow=cross.receipt,
             realityContext=real,responseMode=responseMode,
             attachments=attachmentContext.receipt.takeIf{attachmentIds.isNotEmpty()},
@@ -104,7 +105,7 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence) {
             worldbook=RemoteDeskWorldbook(status=if(matches.isEmpty())"未命中" else if(deliveredWorld.isEmpty())"预算裁剪"else "已递给",matchedCount=matches.size,deliveredCount=deliveredWorld.size,matchedTitles=matches.map{it.entry.title},deliveredTitles=deliveredWorld.map{it.entry.title},
                 entries=matches.mapIndexed{i,m->RemoteDeskWorldbookItem(title=m.entry.title,id=m.entry.id,matchedKeywords=m.keywords,content=m.entry.content,scope=m.entry.scope,matchedBy=m.by,delivered=i<deliveredWorld.size,deliveredText=if(i<deliveredWorld.size)m.entry.content else "")}),
             relatedMemory=RemoteDeskMemory(status=if(memories.isEmpty())"未命中" else if(deliveredMemory.isEmpty())"预算裁剪"else "已递给",confirmationStatus="仅已确认的 active / dormant 记录",count=deliveredMemory.size,
-                items=deliveredMemory.mapIndexed{i,e->RemoteDeskMemoryItem(title=e.title,id=e.id,entryType=e.entryType,tag=e.tag,sourceModel=e.sourceModel,sourceWindow=e.sourceWindow,sourceDate=e.sourceDate,reason="本机关键词命中",lifeCore=e.lifeCore,usageHint=e.usageHint,avoidHint=e.avoidHint,content=e.content,deliveredText=memoryText[i])}),
+                items=deliveredMemory.mapIndexed{i,e->RemoteDeskMemoryItem(title=e.title,id=e.id,entryType=e.entryType,tag=e.tag,sourceModel=e.sourceModel,sourceWindow=e.sourceWindow,sourceDate=e.sourceDate,reason=recall.reasons[e.id]?:"本机关键词命中",lifeCore=e.lifeCore,usageHint=e.usageHint,avoidHint=e.avoidHint,content=e.content,deliveredText=memoryText[i])}),
             contextBudget=RemoteDeskContextBudget(estimatedTokens=comfort.estimated,comfortCeiling=comfort.ceiling,trimmed=comfort.trimmed>0,trimmedCount=comfort.trimmed,exceedsComfortCeiling=comfort.over,
                 sourcesPreserved=(if(recent.isEmpty())emptyList()else listOf("recent_context"))+(if(currentMessage==null)emptyList()else listOf("current_message"))+(if(real.delivered)listOf("reality_context")else emptyList())+(if(responseMode.delivered)listOf("response_mode")else emptyList())+(if(soilContext.isNotEmpty())listOf("thinking_soil")else emptyList())+(if(cross.receipt.delivered)listOf("cross_window")else emptyList())+(if(comfort.dogtalk.isNotEmpty())listOf("dogtalk")else emptyList())+(if(instructions.isEmpty())emptyList()else listOf("custom_instructions"))+(if(deliveredWorld.isEmpty())emptyList()else listOf("worldbook"))+(if(deliveredMemory.isEmpty())emptyList()else listOf("related_memory"))+(if(userPortrait.isEmpty())emptyList()else listOf("user_portrait"))+(if(selfPortrait.isEmpty())emptyList()else listOf("global_excerpt")),userPortrait=portraitStatus(userPortrait,comfort.over),globalExcerpt=portraitStatus(selfPortrait,comfort.over))
         ),attachmentContext.imageParts)

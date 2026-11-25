@@ -8,7 +8,7 @@ import java.nio.LongBuffer
 import kotlin.math.sqrt
 
 /** Bundled, CPU-only encoder. No provider credentials, network, or chat model dependency. */
-internal class CoastEmbedding(context:Context):AutoCloseable {
+internal class CoastEmbedding(context:Context):CoastVectorEncoder {
     private val assets=context.applicationContext.assets
     private val tokenizer=assets.open("coast-embedding/vocab.txt").bufferedReader(Charsets.UTF_8).use{CoastWordPiece(it.readLines())}
     private val env=OrtEnvironment.getEnvironment()
@@ -35,7 +35,7 @@ internal class CoastEmbedding(context:Context):AutoCloseable {
             }
         }
     }
-    fun query(text:String)=infer(tokenizer.encode("为这个句子生成表示以用于检索相关文章："+text))
-    fun documents(text:String):List<FloatArray> = tokenizer.tokens(text).chunked(510).map{infer(tokenizer.frame(it))}
+    override fun query(text:String)=infer(tokenizer.encode("为这个句子生成表示以用于检索相关文章："+text))
+    override fun documents(text:String):List<FloatArray> = tokenizer.tokens(text).chunked(510).map{infer(tokenizer.frame(it))}
     override fun close(){session.close()}
 }
