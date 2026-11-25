@@ -79,4 +79,42 @@ class LocalCoastTransportTest {
         assertEquals(200, call(a, "/api/daily/diaries", "POST", """{"date":"2026-11-24","text":"本机日记"}""").first)
         assertTrue(call(client(local), "/api/daily/diaries").second.toString().contains("本机日记"))
     }
+
+    @Test fun nativeToolRouteUsesOnlyAuthorizedLocalSession() {
+        val local=MemoryLocalPersistence()
+        val a=client(local)
+        fun create(title:String)=call(a,"/api/chat/conversations","POST",buildJsonObject{put("title",title)}.toString()).second
+            .getValue("conversation").jsonObject.getValue("id").jsonPrimitive.content
+        val cid=create("current");val old=create("old")
+        assertEquals(200,call(a,"/api/chat/history?conversation_id="+cid,"PUT",
+            """{"context_settings":{"cross_window_auto":true},"turns":[{"id":"t1","user":{"variants":[{"id":"u1","content":"问题"}]}}]}""").first)
+        assertEquals(200,call(a,"/api/chat/history?conversation_id="+old,"PUT",
+            """{"turns":[{"id":"t2","user":{"variants":[{"id":"u2","content":"旧信全文"}]}}]}""").first)
+        val request=buildJsonObject{
+            put("conversation_id",cid);put("source_turn_id","t1");put("message_id","assistant1");put("model","fixture")
+            put("local_date","2026-11-25");put("local_datetime","2026-11-25T12:00:00")
+            putJsonObject("cross_window"){put("mode","model_decides")}
+            putJsonArray("messages"){add(buildJsonObject{put("role","user");put("content","问题")})}
+        }
+        val context=call(a,"/api/chat/native-context","POST",request.toString())
+        assertEquals(200,context.first)
+        assertTrue(context.second.getValue("tools").toString().contains("cross_window_keyword_search"))
+        assertFalse(context.second.getValue("model_messages").toString().contains("旧信全文"))
+        fun invoke(id:String,name:String,args:String):Pair<Int,JsonObject>{
+            val body=JsonObject(request+("tool_call" to buildJsonObject{
+                put("id",id);put("type","function");putJsonObject("function"){put("name",name);put("arguments",args)}
+            }))
+            return call(a,"/api/chat/native-tool","POST",body.toString())
+        }
+        val found=invoke("call1","cross_window_keyword_search","""{"query":"旧信"}""")
+        assertEquals(200,found.first);assertTrue(found.second.getValue("ok").jsonPrimitive.boolean)
+        val args=buildJsonObject{putJsonArray("messages"){add(buildJsonObject{put("conversation_id",old);put("message_id","u2")})}}.toString()
+        val read=invoke("call2","cross_window_read_messages",args)
+        assertTrue(read.second.getValue("ok").jsonPrimitive.boolean)
+        assertTrue(read.second.getValue("output").jsonPrimitive.content.contains("旧信全文"))
+        assertEquals(2,LocalToolAudit(local).read().size)
+        assertEquals(200,call(a,"/api/chat/history?conversation_id="+cid,"PUT",
+            """{"turns":[{"id":"t1","user":{"variants":[{"id":"u1","content":"问题"}]}}]}""").first)
+        assertFalse(invoke("call3","cross_window_keyword_search","""{"query":"旧信"}""").second.getValue("ok").jsonPrimitive.boolean)
+    }
 }

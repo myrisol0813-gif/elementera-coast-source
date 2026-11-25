@@ -172,7 +172,7 @@ internal class LocalToolSession private constructor(
             "list_daily_diaries"->return rows(cache.dailyDiaries().take(8).map{codec.encodeToJsonElement(RemoteDailyDiary.serializer(),it)}) to {}
             "worldbook_list"->{
                 val q=str("query")
-                return rows(LocalKnowledgeStore(s).entries().filter{it.scope!="visitor"&&it.enabled&&listOf(it.title,it.content).any{v->v.contains(q,true)}}.take(6).map{codec.encodeToJsonElement(RemoteWorldbookEntry.serializer(),it)}) to {}
+                return rows(LocalKnowledgeStore(s).entries().filter{it.scope in setOf("owner","both",LocalKnowledgeStore(s).surfaceFor(cid))&&it.enabled&&listOf(it.title,it.content).any{v->v.contains(q,true)}}.take(6).map{codec.encodeToJsonElement(RemoteWorldbookEntry.serializer(),it)}) to {}
             }
             else->error("未知工具")
         }
