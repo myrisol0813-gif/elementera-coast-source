@@ -96,3 +96,31 @@ test('local archive with binary originals restores as a single cloud transaction
  assert.deepEqual((await listArchiveDogtalk(dst,{kind:'records'})).items,(await listArchiveDogtalk(src,{kind:'records'})).items);
  await assert.rejects(()=>restoreArchiveChatGroup(dst,session.id,manifest,c.id,true),/already exists/);
 });
+
+test('native three-turn history restores old desk receipts without dropping or injecting them',async()=>{
+ const src=new D1Database(),dst=new D1Database(),c=await createConversation(src,'Local three turns','main');
+ const at='2026-11-25T00:00:00.000Z';
+ const slips=[{summary:'first',custom_instructions:{delivered:true,content:'old receipt'}},{summary:'second',context_budget:{estimated_tokens:22}},{summary:'third'}];
+ const turns=slips.map((desk_slip,i)=>({id:'local-turn-'+i,user:{active:0,variants:[{id:'u-'+i,content:'question '+i,created_at:at}]},assistant:{activeByUserVariant:{'0':0},variantsByUserVariant:{'0':[{id:'a-'+i,content:'answer '+i,created_at:at,generation_source:'chat',desk_slip}]}}}));
+ const history={version:4,conversation_id:c.id,updated_at:at,turns};
+ const o=await encodeRecordObject({kind:'local_chat',data:{conversation:c,history}});
+ const records=[{module:'chat',id:c.id,record_object:o.descriptor.object_sha256,media_objects:[],dependencies:[]}];
+ const manifest={format:'elementera-coast-archive',version:2,workspace:'local',application_id:'com.elementeracoast.source',exported_at:at,modules:MODULES.map(module=>({module,coverage:module==='chat'?'partial':'unavailable',count:module==='chat'?1:0})),records,objects:[o.descriptor]};
+ const session=await createArchiveSession(dst);
+ await registerArchiveObject(dst,session.id,o.descriptor);for(let i=0;i<o.chunks.length;i++)await putArchiveChunk(dst,session.id,o.descriptor.object_sha256,i,o.chunks[i]);
+ const preview=await restoreArchiveRecord(dst,session.id,manifest,'chat',c.id,false);
+ assert.equal(preview.ready,1);assert.equal(preview.committed,false);
+ await assert.rejects(()=>readArchiveChat(dst,c.id));
+ await restoreArchiveRecord(dst,session.id,manifest,'chat',c.id,true);
+ const stored=JSON.parse((await readArchiveChat(dst,c.id)).history_json);
+ assert.deepEqual(stored.turns.map(t=>t.assistant.variantsByUserVariant['0'][0].desk_slip),slips);
+ assert.equal(stored.turns[0].assistant.variantsByUserVariant['0'][0].archive_retained_desk_slip,true);
+ assert.equal(stored.turns[1].assistant.variantsByUserVariant['0'][0].archive_retained_desk_slip,true);
+ assert.equal(stored.turns[2].assistant.variantsByUserVariant['0'][0].archive_retained_desk_slip,undefined);
+ // An older client can omit historical receipts; the archived variants survive.
+ const edited=structuredClone(stored);
+ for(const t of edited.turns.slice(0,2)){delete t.assistant.variantsByUserVariant['0'][0].desk_slip;delete t.assistant.variantsByUserVariant['0'][0].archive_retained_desk_slip;}
+ await writeConversationState(dst,c.id,edited);
+ const updated=JSON.parse((await readArchiveChat(dst,c.id)).history_json);
+ assert.deepEqual(updated.turns.map(t=>t.assistant.variantsByUserVariant['0'][0].desk_slip),slips);
+});
