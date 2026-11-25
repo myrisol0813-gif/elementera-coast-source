@@ -71,7 +71,10 @@ class LocalCoastTransportTest {
         assertTrue(response.second.toString().contains("Keep original text"));assertTrue(response.second.toString().contains("Matched text"))
         assertFalse(response.second.toString().contains("Private visitor text"))
         assertTrue(LocalKnowledgeStore(store).context(listOf(com.elementeracoast.app.core.remote.RemoteChatMessage("user","wave")),1800,"main_chat").receipt.customInstructions.delivered)
-        assertTrue(runCatching{LocalKnowledgeStore(store).context(listOf(com.elementeracoast.app.core.remote.RemoteChatMessage("user","x".repeat(6000))),1800,"main_chat")}.isFailure)
+        val longText="长".repeat(6000)
+        val over=LocalKnowledgeStore(store).context(listOf(com.elementeracoast.app.core.remote.RemoteChatMessage("user",longText)),1800,"main_chat")
+        assertTrue(over.receipt.contextBudget.exceedsComfortCeiling)
+        assertEquals(longText,over.messages.last().content)
     }
     @Test fun dailyRecordsSurviveReopen() {
         val local = MemoryLocalPersistence()
