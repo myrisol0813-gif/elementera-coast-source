@@ -287,9 +287,17 @@ internal object LocalSoilRun {
                 past.add(snapshot(p.cid,turn,assistant,value,at))
         }
         val prior=p.row.str("source_assistant_id")
-        if(prior.isNotBlank() && (p.row.str("current_text").isNotBlank() || p.row.str("afterthoughts_json")!="[]")) {
-            val previous=p.history.firstOrNull { t -> t.assistant.variantsByUserVariant.values.flatten().any { it.id==prior } }
-            if(previous!=null)save(previous.id,prior,p.row,p.row.getValue("updated_at").jsonPrimitive.long)
+        if(p.row.str("current_text").isNotBlank() || p.row.str("afterthoughts_json")!="[]") {
+            // Resolve the exact old message first, including an inactive regenerated branch.
+            // Legacy rows without a message ID may only be attributed to a distinct earlier
+            // completed turn; same-turn regeneration is ambiguous and must not be guessed.
+            if(prior.isNotBlank()){
+                val previous=p.history.firstOrNull { t -> t.assistant.variantsByUserVariant.values.flatten().any { it.id==prior } }
+                if(previous!=null)save(previous.id,prior,p.row,p.row.getValue("updated_at").jsonPrimitive.long)
+            }else{
+                val previous=active(p.history).firstOrNull{it.id==p.row.str("organized_through_turn_id")&&it.id!=latest.id}
+                if(previous!=null)save(previous.id,previous.assistant.id,p.row,p.row.getValue("updated_at").jsonPrimitive.long)
+            }
         }
         save(latest.id,latest.assistant.id,row,now)
         soil.write(rows.copy(current=rows.current.filterNot { it.str("conversation_id")==p.cid }+row,history=past))

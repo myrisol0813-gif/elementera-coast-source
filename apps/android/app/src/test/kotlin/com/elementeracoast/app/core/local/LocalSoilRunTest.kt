@@ -135,4 +135,28 @@ class LocalSoilRunTest {
         assertTrue(p.prompt.contains("是否提出候选，由你自行判断"))
         assertFalse(p.prompt.contains("通常200至800字"))
     }
+
+    @Test fun legacySoilRescuesOnlyDistinctEarlierTurn(){
+        for(ambiguous in listOf(false,true)){
+            val s=fixture();val cache=RemoteCacheStore(s)
+            val h=cache.history(cid)!!
+            val second=RemoteTurn("turn2",user=RemoteUserBranch(variants=listOf(RemoteVariant("user2","后续"))),
+                assistant=RemoteAssistantBranches(variantsByUserVariant=mapOf("0" to listOf(RemoteVariant("assistant2","后来回复",modelId=model,finishReason="stop")))))
+            cache.putHistory(cid,h.copy(turns=h.turns+second))
+            val soil=LocalSoilStore(s);val before=soil.read()
+            val legacy=JsonObject(before.current.single()+mapOf(
+                "current_text" to JsonPrimitive("旧地层"),
+                "organized_through_turn_id" to JsonPrimitive(if(ambiguous)"turn2" else "turn1"),
+                "source_assistant_id" to JsonPrimitive(""),
+                "model_label" to JsonPrimitive(model)
+            ))
+            soil.write(before.copy(current=listOf(legacy)))
+            val prepared=LocalSoilRun.prepare(s,cid,model)!!
+            LocalSoilRun.commit(s,prepared,"""{"current_text":"新地层","afterthoughts":[]}""")
+            val history=soil.read().history.associateBy{it.getValue("assistant_message_id").jsonPrimitive.content}
+            assertEquals("新地层",history.getValue("assistant2").getValue("current_text").jsonPrimitive.content)
+            if(ambiguous)assertEquals(setOf("assistant2"),history.keys)
+            else assertEquals("旧地层",history.getValue("assistant1").getValue("current_text").jsonPrimitive.content)
+        }
+    }
 }

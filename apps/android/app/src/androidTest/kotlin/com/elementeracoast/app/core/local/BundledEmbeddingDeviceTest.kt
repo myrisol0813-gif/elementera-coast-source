@@ -53,8 +53,14 @@ class BundledEmbeddingDeviceTest {
             assertTrue(result.retrievalStatus,result.retrievalStatus.startsWith("混合召回"))
             assertEquals(relevant.id,result.entries.first().id)
             assertEquals("本机语义命中",result.reasons[relevant.id])
-            memory.delete(relevant.id)
+            // A failed staged write must never affect the authoritative memory or index.
+            assertTrue(runCatching{store.atomic{staged->LocalMemoryStore(staged).delete(relevant.id);error("rollback fixture")}}.isFailure)
+            assertTrue(memory.recallDetailed("下雨时怎样避免被淋湿","",explicit=true).entries.any{it.id==relevant.id})
+            store.atomic{staged->LocalMemoryStore(staged).delete(relevant.id)}
             assertTrue(memory.recallDetailed("下雨时怎样避免被淋湿","",explicit=true).entries.none{it.id==relevant.id})
+            val refreshed=System.currentTimeMillis()+90000
+            while(index.progress()!="语义索引就绪 · 1/1"&&System.currentTimeMillis()<refreshed)Thread.sleep(100)
+            assertEquals("语义索引就绪 · 1/1",index.progress())
         }finally{index.close()}
     }
 }
