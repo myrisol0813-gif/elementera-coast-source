@@ -49,6 +49,14 @@ internal class LocalCrossWindow(store: LocalPersistence) {
                 }
             }}.take(10).toList()
     }
+    fun recent(currentId:String, sourceId:String, turns:Int):List<RemoteCrossWindowMessageSelection>{
+        require(sourceId!=currentId&&turns in 1..9999)
+        require(cache.conversations().any{it.id==sourceId&&it.deletedAt==null}){"所选窗口不存在。"}
+        val selected=items(sourceId).groupBy{it.turn}.values.toList().takeLast(turns).flatten()
+        if(selected.sumOf{it.variant.content.length.toLong()}>12000L)
+            throw LocalToolFailure("budget_exceeded","所选近期消息太长，请减少轮数；未截断原文。")
+        return selected.map{RemoteCrossWindowMessageSelection(sourceId,it.variant.id)}
+    }
     data class Selection(val text: String, val receipt: RemoteDeskCrossWindow)
     fun select(currentId: String, request: RemoteCrossWindowRequest?): Selection {
         val mode = request?.mode ?: "off"
