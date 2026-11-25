@@ -41,7 +41,16 @@ jobs:
           arch: x86_64
           target: default
           disable-animations: true
-          script: gradle -p apps/android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.elementeracoast.app.core.local.BundledEmbeddingDeviceTest --offline --no-daemon --stacktrace
+          script: |
+            set -eu
+            adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk
+            adb install -r apps/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell svc wifi disable
+            adb shell svc data disable
+            result="$(adb shell am instrument -w -r -e class com.elementeracoast.app.core.local.BundledEmbeddingDeviceTest com.elementeracoast.source.test/androidx.test.runner.AndroidJUnitRunner)"
+            printf '%s\n' "$result"
+            printf '%s\n' "$result" | grep -F 'OK (2 tests)'
+            if printf '%s\n' "$result" | grep -E 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process crashed'; then exit 1; fi
       - name: Verify bundled assets and report APK size
         run: |
           python - <<'PY'
