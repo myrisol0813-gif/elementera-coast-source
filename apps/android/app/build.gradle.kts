@@ -73,6 +73,7 @@ android {
 }
 
 dependencies {
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
     val composeBom = platform("androidx.compose:compose-bom:2024.09.02")
     implementation(composeBom)
     implementation("androidx.core:core-ktx:1.13.1")
@@ -99,4 +100,62 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
         showCauses = true
         showStackTraces = true
     }
+}
+
+/** Model assets are verified at build time, never fetched by the installed app. */
+val coastEmbeddingAssets = layout.buildDirectory.dir("generated/coast-embedding-assets")
+val coastEmbeddingRevision = "75c43b069aac4d136ba6bc1122f995fedcfd2781"
+val coastEmbeddingFiles = mapOf(
+    "onnx/model_quantized.onnx" to Pair("model.onnx", "15b717c382bcb518ba457b93ea6850ede7f4f1cd8937454aa06972366cd19bcc"),
+    "vocab.txt" to Pair("vocab.txt", "45bbac6b341c319adc98a532532882e91a9cefc0329aa57bac9ae761c27b291c")
+)
+val prepareCoastEmbedding by tasks.registering {
+    inputs.property("revision", coastEmbeddingRevision)
+    inputs.property("files", coastEmbeddingFiles.toString())
+    outputs.dir(coastEmbeddingAssets)
+    doLast {
+        val target = coastEmbeddingAssets.get().asFile.resolve("coast-embedding")
+        target.mkdirs()
+        fun digest(file: java.io.File): String {
+            val md = java.security.MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { input ->
+                val buffer = ByteArray(65536)
+                while (true) {
+                    val n = input.read(buffer)
+                    if (n < 0) break
+                    md.update(buffer, 0, n)
+                }
+            }
+            return md.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
+        }
+        for ((remote, pair) in coastEmbeddingFiles) {
+            val (name, expected) = pair
+            val file = target.resolve(name)
+            if (file.isFile && digest(file) == expected) continue
+            val temp = target.resolve(name + ".tmp")
+            try {
+                val connection = java.net.URI("https://huggingface.co/Xenova/bge-small-zh-v1.5/resolve/$coastEmbeddingRevision/$remote").toURL().openConnection()
+                connection.connectTimeout = 30000
+                connection.readTimeout = 90000
+                connection.setRequestProperty("User-Agent", "Coast-Android-build/1.0")
+                connection.getInputStream().use { input -> temp.outputStream().use { output ->
+                    val buffer = ByteArray(65536)
+                    var count = 0L
+                    while (true) {
+                        val n = input.read(buffer)
+                        if (n < 0) break
+                        count += n
+                        check(count <= 30_000_000) { "Embedding asset too large" }
+                        output.write(buffer, 0, n)
+                    }
+                } }
+                check(digest(temp) == expected) { "Embedding asset SHA256 mismatch: $name" }
+                java.nio.file.Files.move(temp.toPath(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            } finally { temp.delete() }
+        }
+    }
+}
+android.sourceSets.getByName("main").assets.srcDir(coastEmbeddingAssets)
+tasks.matching { it.name in setOf("preBuild", "preDebugBuild", "preReleaseBuild") }.configureEach {
+    dependsOn(prepareCoastEmbedding)
 }
