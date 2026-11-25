@@ -51,7 +51,7 @@ fun MemoryLanding(
         Column(Modifier.fillMaxSize()) {
             FeaturePageTopBar(
                 title = "待确认区",
-                guide = FeatureGuides.memory,
+                guide = FeatureGuides.pending,
                 subtitle = "当前窗口 · 只有确认后才进入记忆库或种子库",
                 onBack = { pendingOpen = false },
                 actionLabel = null,
