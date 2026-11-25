@@ -40,6 +40,7 @@ import com.elementeracoast.app.feature.chatgpt.ChatGptConnectState
 import com.elementeracoast.app.feature.serpentdesk.DevHandsRepository
 import com.elementeracoast.app.feature.shell.FeaturePageTopBar
 import com.elementeracoast.app.feature.shell.FeatureGuides
+import com.elementeracoast.app.feature.shell.LocalOpenGuideManual
 import androidx.activity.compose.BackHandler
 import com.elementeracoast.app.ui.theme.SnowLetterSurface
 import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
@@ -64,13 +65,33 @@ fun WolfScreen(
     onActionLogged: (String, String, String) -> Unit,
     onSnackbar: (String) -> Unit,
     onBackToChat: () -> Unit,
-    openModelBoxInitially: Boolean = false
+    openModelBoxInitially: Boolean = false,
+    guideTarget: String? = null,
+    onGuideConsumed: () -> Unit = {}
 ) {
     val state by store.state.collectAsState()
     var page by remember { mutableStateOf<WolfDestination?>(if (openModelBoxInitially) WolfDestination.ModelBox else null) }
     val current = page
     var modelPage by remember { mutableStateOf(LocalModelPage.Catalog) }
     val homeTitle = "屋主设置"
+    val openManual = LocalOpenGuideManual.current
+    LaunchedEffect(guideTarget) {
+        if (guideTarget == null) return@LaunchedEffect
+        page = when (guideTarget) {
+            "profile" -> WolfDestination.Profile
+            "appearance" -> WolfDestination.Appearance
+            "account" -> WolfDestination.Account
+            "backup" -> WolfDestination.ChatRecords
+            "models", "codex", "provider" -> WolfDestination.ModelBox
+            "basic" -> WolfDestination.BasicSettings
+            "diagnostics" -> WolfDestination.Diagnostics
+            "update" -> WolfDestination.Update
+            "settings" -> null
+            else -> return@LaunchedEffect
+        }
+        modelPage = LocalModelPage.Catalog
+        onGuideConsumed()
+    }
     fun back() { if (current == WolfDestination.ModelBox && modelPage != LocalModelPage.Catalog) modelPage = LocalModelPage.Catalog else if (openModelBoxInitially && current == WolfDestination.ModelBox) onBackToChat() else if (current != null) { page = null; modelPage = LocalModelPage.Catalog } else onBackToChat() }
     BackHandler(enabled = current != null) { back() }
 
@@ -81,7 +102,8 @@ fun WolfScreen(
             state = state,
             model = shellState.currentModel,
             localMode = shellState.localMode,
-            onOpen = { page = it }
+            onOpen = { page = it },
+            onOpenManual = openManual
         )
         }
         return
@@ -90,7 +112,16 @@ fun WolfScreen(
     Column(Modifier.fillMaxSize()) {
         val sub = if (current == WolfDestination.ModelBox && modelPage != LocalModelPage.Catalog) " — " + modelPage.title else ""
         FeaturePageTopBar("$homeTitle — ${current.title}$sub", if (shellState.localMode) "本机模式" else current.subtitle, onBack = ::back,
-            guide = when (current) { WolfDestination.ModelBox -> FeatureGuides.models; WolfDestination.ChatRecords -> FeatureGuides.backup; else -> FeatureGuides.settings },
+            guide = when (current) {
+                WolfDestination.ModelBox -> FeatureGuides.models
+                WolfDestination.ChatRecords -> FeatureGuides.backup
+                WolfDestination.Profile -> FeatureGuides.profile
+                WolfDestination.Appearance -> FeatureGuides.appearance
+                WolfDestination.Account -> FeatureGuides.account
+                WolfDestination.BasicSettings -> FeatureGuides.basic
+                WolfDestination.Diagnostics -> FeatureGuides.diagnostics
+                WolfDestination.Update -> FeatureGuides.update
+            },
             actionLabel = if (current == WolfDestination.ModelBox && shellState.localMode && modelPage == LocalModelPage.Catalog) "刷新" else null,
             onAction = if (current == WolfDestination.ModelBox && shellState.localMode && modelPage == LocalModelPage.Catalog) onRefreshModels else null)
         Box(Modifier.weight(1f)) {
@@ -136,7 +167,8 @@ private fun WolfHome(
     state: WolfState,
     model: String,
     localMode: Boolean,
-    onOpen: (WolfDestination) -> Unit
+    onOpen: (WolfDestination) -> Unit,
+    onOpenManual: () -> Unit
 ) {
     LazyColumn(
         contentPadding = PaddingValues(horizontal = 26.dp, vertical = 28.dp),
@@ -163,6 +195,7 @@ private fun WolfHome(
                 subtitle = "当前 Native：${BuildConfig.VERSION_NAME}"
             ) { onOpen(WolfDestination.Update) }
         }
+        item { WolfRow("使用手册", "按页面查看说明及操作入口", onOpenManual) }
     }
 }
 

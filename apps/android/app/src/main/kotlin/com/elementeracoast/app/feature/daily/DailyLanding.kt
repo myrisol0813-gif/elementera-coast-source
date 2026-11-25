@@ -57,9 +57,23 @@ fun DailyLanding(
     onBackToChat: () -> Unit,
     onOpenSource: (ChatSearchHit) -> Unit,
     onActionLogged: (String, String, String) -> Unit,
-    onSnackbar: (String) -> Unit
+    onSnackbar: (String) -> Unit,
+    guideTarget: String? = null,
+    onGuideConsumed: () -> Unit = {}
 ) {
     var page by remember { mutableStateOf(DailyPage.Home) }
+    LaunchedEffect(guideTarget) {
+        page = when (guideTarget) {
+            "daily" -> DailyPage.Home
+            "moments" -> DailyPage.Moments
+            "diary" -> DailyPage.Diary
+            "calendar" -> DailyPage.Calendar
+            "vault" -> DailyPage.Vault
+            "library" -> DailyPage.Library
+            else -> return@LaunchedEffect
+        }
+        onGuideConsumed()
+    }
     var libraryShelf by remember { mutableStateOf(true) }
     var libraryChromeVisible by remember { mutableStateOf(true) }
     var libraryImportRequest by remember { androidx.compose.runtime.mutableIntStateOf(0) }
@@ -71,9 +85,9 @@ fun DailyLanding(
         try {
             repository.refresh()
             onRefreshCoast()
-            onSnackbar("海岸状态已刷新")
+            onSnackbar("资料已刷新")
         } catch (error: CoastApiException) {
-            onSnackbar("海岸日报刷新失败：${error.message}")
+            onSnackbar("小组件刷新失败：${error.message}")
         }
     }
 
@@ -81,7 +95,7 @@ fun DailyLanding(
         try {
             repository.refresh()
         } catch (error: CoastApiException) {
-            onSnackbar("海岸日报载入失败：${error.message}")
+            onSnackbar("小组件载入失败：${error.message}")
         }
     }
 
@@ -94,7 +108,7 @@ fun DailyLanding(
       Column(Modifier.fillMaxSize()) {
         when (page) {
             DailyPage.Home -> FeaturePageTopBar(
-                title = "海岸日报",
+                title = "小组件",
                 guide = FeatureGuides.daily,
                 subtitle = "朋友圈与日记",
                 onBack = onBackToChat,
@@ -115,14 +129,14 @@ fun DailyLanding(
             )
             DailyPage.MomentCompose -> FeaturePageTopBar(
                 "写碳硅圈",
-                "直接写入海岸正式条目",
+                "写入正式动态",
                 { page = DailyPage.Moments },
                 compact = true, guide = FeatureGuides.moments
             )
             DailyPage.Diary -> FeaturePageTopBar(
                 title = "日记",
                 guide = FeatureGuides.diary,
-                subtitle = "海岸里的正式纸页",
+                subtitle = "正式日记",
                 onBack = { page = DailyPage.Home },
                 actionLabel = "+ 日记",
                 onAction = { page = DailyPage.DiaryCompose },
@@ -132,12 +146,12 @@ fun DailyLanding(
             )
             DailyPage.DiaryCompose -> FeaturePageTopBar(
                 "写日记",
-                "直接写入海岸正式日记",
+                "写入正式日记",
                 { page = DailyPage.Diary },
                 compact = true, guide = FeatureGuides.diary
             )
             DailyPage.Calendar -> FeaturePageTopBar("日历", "公历 · 日程与纪念日", { page = DailyPage.Home }, compact = true, guide = FeatureGuides.calendar)
-            DailyPage.Vault -> FeaturePageTopBar("海岸文件库", "基本文件库与拾潮珍藏", { page = DailyPage.Home }, compact = true, guide = FeatureGuides.vault)
+            DailyPage.Vault -> FeaturePageTopBar("文件库", "基本文件库与收藏", { page = DailyPage.Home }, compact = true, guide = FeatureGuides.vault)
             DailyPage.Library -> Unit
             DailyPage.Pet -> FeaturePageTopBar(
                 "宠物系统",
@@ -196,7 +210,7 @@ private fun DailyHome(onOpen: (DailyPage) -> Unit, onFutureWidgets: () -> Unit) 
     val mapping = listOf(
         Triple(DailyPage.Moments, DailyLandingItem("碳硅圈", "前端默认朋友圈"), Icons.Default.FavoriteBorder),
         Triple(DailyPage.Diary, DailyLandingItem("日记", "留下今天的纸页"), Icons.Default.Edit),
-        Triple(DailyPage.Vault, DailyLandingItem("文件库", "媒体归总与拾潮珍藏"), Icons.Default.AutoStories),
+        Triple(DailyPage.Vault, DailyLandingItem("文件库", "媒体归总与收藏"), Icons.Default.AutoStories),
         Triple(DailyPage.Calendar, DailyLandingItem("日历", "公历日程与纪念日"), Icons.Default.CalendarMonth),
         Triple(DailyPage.Library, DailyLandingItem("书房", "翻书、划线与批注"), Icons.Default.AutoStories),
         Triple(DailyPage.Pet, DailyLandingItem("宠物系统", "还在准备休憩箱"), Icons.Default.Pets)
@@ -243,7 +257,7 @@ private fun DailyHomeCard(item: DailyLandingItem, icon: ImageVector, onClick: ()
 internal fun dailyLandingItems(): List<DailyLandingItem> = listOf(
     DailyLandingItem("碳硅圈", "前端默认朋友圈"),
     DailyLandingItem("日记", "留下今天的纸页"),
-    DailyLandingItem("文件库", "媒体归总与拾潮珍藏"),
+    DailyLandingItem("文件库", "媒体归总与收藏"),
     DailyLandingItem("日历", "公历日程与纪念日"),
     DailyLandingItem("书房", "翻书、划线与批注"),
     DailyLandingItem("宠物系统", "还在准备休憩箱")

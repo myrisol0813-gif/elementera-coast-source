@@ -72,7 +72,9 @@ fun ChatWindow(
     onSetThoughtSoilEnabled: (Boolean) -> Unit,
     onSaveThoughtSoil: (String, List<String>) -> Unit,
     onResumeThoughtSoil: () -> Unit,
-    onPlaceholder: (String) -> Unit
+    onPlaceholder: (String) -> Unit,
+    guideTarget: String? = null,
+    onGuideConsumed: () -> Unit = {}
 ) {
     var input by rememberSaveable(state.activeConversationId) { mutableStateOf("") }
     var avatarDialogOpen by rememberSaveable { mutableStateOf(false) }
@@ -171,6 +173,15 @@ fun ChatWindow(
         ?.takeIf { it.role == MessageRole.Assistant }
         ?.deskReceipt
     val deskReceipt = persistedDeskReceipt ?: state.turnDeskReceipt
+    LaunchedEffect(guideTarget) {
+        when (guideTarget) {
+            "drawer" -> drawerOpen = true
+            "desk" -> if (deskReceipt != null) deskOpen = true else { drawerOpen = true; onPlaceholder("完成一轮对话后即可查看本轮上下文预览。") }
+            "soil" -> if (state.thoughtSoil != null) { selectedSoil = null; soilOpen = true } else onPlaceholder("当前窗口暂无纸条，可在右上角菜单开启整理。")
+            else -> return@LaunchedEffect
+        }
+        onGuideConsumed()
+    }
 
     LaunchedEffect(toolNotice?.id) {
         val id = toolNotice?.id ?: return@LaunchedEffect

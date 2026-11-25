@@ -183,10 +183,10 @@ internal fun WindowContextSheet(
                     SettingSwitchRow(title = "跨窗口回忆", note = if(settings.crossWindowAuto) "由模型决定 · 持续生效" else "关闭 · 仍可手动递入旧消息",
                         checked = settings.crossWindowAuto, enabled = usable,
                         onCheckedChange = { onSettingsChange(settings.copy(crossWindowAuto=it)) })
-                    SettingSwitchRow(title = "本机模型工具", note = "允许模型读取本机记忆、日常、日历、书房与拾潮等资料",
+                    SettingSwitchRow(title = "本机模型工具", note = "默认关闭，仅当前窗口；允许模型按需读取本机记忆、日常、日历、书房及收藏",
                         checked = settings.localModelToolsEnabled, enabled = usable,
                         onCheckedChange = { onSettingsChange(settings.copy(localModelToolsEnabled=it)) })
-                    SettingSwitchRow(title = "本机模型写入", note = "允许模型新增日记、动态、批注、日历事项与待确认记忆；不会直接确认记忆",
+                    SettingSwitchRow(title = "本机模型写入", note = "默认关闭，仅当前窗口；允许新增已支持的日常记录、笔记及记忆候选；正式记忆仍需确认",
                         checked = settings.localModelWriteEnabled, enabled = usable,
                         onCheckedChange = { onSettingsChange(settings.copy(localModelWriteEnabled=it)) })
                 }
@@ -254,7 +254,7 @@ internal fun WindowContextSheet(
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
                         contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                     )
-                ) { Text("登岛信") }
+                ) { Text("新居信") }
                 Button(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f),

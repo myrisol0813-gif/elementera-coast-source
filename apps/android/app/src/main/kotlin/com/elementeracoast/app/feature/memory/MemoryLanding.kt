@@ -26,11 +26,33 @@ fun MemoryLanding(
     onPendingOpenConsumed: () -> Unit,
     onBackToChat: () -> Unit,
     onActionLogged: (String, String, String) -> Unit,
-    onSnackbar: (String) -> Unit
+    onSnackbar: (String) -> Unit,
+    guideTarget: String? = null,
+    onGuideConsumed: () -> Unit = {}
 ) {
     var tab by remember { mutableStateOf(MemoryTab.Memory) }
     var pendingCreate by remember { mutableStateOf<MemoryTab?>(null) }
     var pendingOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(guideTarget) {
+        if (guideTarget == null) return@LaunchedEffect
+        if (guideTarget == "pending") {
+            if (conversationId.isBlank()) onSnackbar("当前还没有聊天窗口，待确认区需要先进入一个窗口。")
+            else pendingOpen = true
+        } else {
+            tab = when (guideTarget) {
+                "memory" -> MemoryTab.Memory
+                "seeds" -> MemoryTab.Seed
+                "userPortrait" -> MemoryTab.UserPortrait
+                "selfPortrait" -> MemoryTab.GlobalExcerpt
+                "worldbook" -> MemoryTab.Worldbook
+                "instructions" -> MemoryTab.Instructions
+                else -> return@LaunchedEffect
+            }
+            pendingOpen = false
+            pendingCreate = null
+        }
+        onGuideConsumed()
+    }
 
     LaunchedEffect(conversationId) {
         runCatching { repository.refresh(conversationId) }
