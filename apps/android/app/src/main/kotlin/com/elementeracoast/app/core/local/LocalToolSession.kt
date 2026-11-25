@@ -99,7 +99,7 @@ internal class LocalToolSession private constructor(
                 val audit=LocalToolAudit(s)
                 val room=RemoteCacheStore(s,strictReads=true).conversations().firstOrNull{it.id==cid}?.roomType?:error("窗口已删除")
                 audit.write(audit.read()+buildJsonObject{
-                    put("id",auditId);put("tool_key",spec.key);put("actor","native_myri")
+                    put("id",auditId);put("tool_key",spec.key);put("actor","native_model_partner")
                     put("room_scope",if(room=="main")"main_chat"else room);put("conversation_id",cid)
                     put("status",if(success)"success"else "error");put("created_at",start);put("finished_at",System.currentTimeMillis().coerceAtLeast(start))
                 })

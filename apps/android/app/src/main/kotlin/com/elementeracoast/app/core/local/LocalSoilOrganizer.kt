@@ -227,7 +227,7 @@ internal object LocalSoilRun {
             put("user_portrait_candidate_json",portraitSummaries.getValue("user_portrait").toString());put("self_portrait_candidate_json",portraitSummaries.getValue("self_portrait").toString())
             put("revision",Math.addExact(p.row.getValue("revision").jsonPrimitive.int,1));put("updated_at",now)
             put("organized_through_turn_id",latest.id);put("source_assistant_id",latest.assistant.id)
-            put("actor","native_myri");put("surface","native_auto");put("model_label",p.model.take(200));put("display_author",p.model.substringAfterLast('/').take(120))
+            put("actor","native_model_partner");put("surface","native_auto");put("model_label",p.model.take(200));put("display_author",p.model.substringAfterLast('/').take(120))
             put("source_conversation_id",p.cid);put("source_turn_id",latest.id);put("tool_call_id",JsonNull)
         })
         val past=rows.history.toMutableList()
