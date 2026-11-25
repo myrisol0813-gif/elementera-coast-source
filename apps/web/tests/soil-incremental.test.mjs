@@ -210,7 +210,7 @@ await createEntry(db, {
   content: '统一种子库继续由语义召回系统负责。',
   usage_hint: '再次谈到同轨与项目世界观时召回。',
   avoid_hint: '',
-  tag: '世界观',
+  tag: '偏好',
   source_ref: { conversation_id: seedConversation.id },
 });
 const memoryContext = await buildMemoryContext({ COAST_CHAT_DB: db }, 'owner', seedConversation.id, '同轨燕鸥', { limit: 3 });
