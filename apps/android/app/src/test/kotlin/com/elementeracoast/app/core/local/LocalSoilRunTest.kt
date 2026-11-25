@@ -122,4 +122,17 @@ class LocalSoilRunTest {
         LocalSoilRun.commit(s,prepared,raw)
         assertEquals("完整纸条",LocalSoilStore(s).read().current.single()["current_text"]!!.jsonPrimitive.content)
     }
+    @Test fun organizerUsesOnlineDigestAndAutonomousWording() {
+        val p=LocalSoilRun.prepare(fixture(),cid,model)!!
+        val input=Json.parseToJsonElement(p.prompt.substringAfter("整理输入结构：\n")).jsonObject
+        assertEquals("reply_incremental",input["mode"]!!.jsonPrimitive.content)
+        val latest=input["latest_turn"]!!.jsonObject
+        assertEquals("turn1",latest["turn_id"]!!.jsonPrimitive.content)
+        assertEquals("assistant1",latest["assistant"]!!.jsonObject["message_id"]!!.jsonPrimitive.content)
+        assertEquals(JsonNull,input["previous_turn_excerpt"])
+        assertEquals(JsonArray(emptyList()),input["missed_since_success"])
+        assertTrue(input["portraits"]!!.jsonObject.containsKey("self"))
+        assertTrue(p.prompt.contains("是否提出候选，由你自行判断"))
+        assertFalse(p.prompt.contains("通常200至800字"))
+    }
 }
