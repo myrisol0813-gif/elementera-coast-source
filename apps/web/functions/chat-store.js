@@ -103,6 +103,8 @@ export function normalizeContextSettings(value = {}) {
     reality_enabled: raw.reality_enabled === true,
     reality_fields: fields,
     short_reply_mode: raw.short_reply_mode === true,
+    ...(raw.cross_window_auto === true ? { cross_window_auto: true } : {}),
+    ...(raw.local_model_tools_enabled === true ? { local_model_tools_enabled: true } : {}),
     weather_city: weatherCity,
   };
 }
