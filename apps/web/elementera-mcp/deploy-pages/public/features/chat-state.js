@@ -111,7 +111,7 @@ export function normalizeVariant(value = {}, prefix = 'variant') {
     ...(sourceModelLabel ? { source_model_label: sourceModelLabel } : {}),
     ...(furnitureRuns.length ? { furniture_runs: furnitureRuns } : {}),
     ...(attachments.length ? { attachments } : {}),
-    ...(deskSlip ? { desk_slip: deskSlip } : {}),
+    ...(deskSlip ? { desk_slip: deskSlip, ...(value.archive_retained_desk_slip === true ? { archive_retained_desk_slip: true } : {}) } : {}),
     ...(errorDetail ? { errorDetail } : {}),
   };
 }
@@ -163,7 +163,7 @@ function keepCurrentDeskSlip(turns) {
   for (const turn of turns) {
     for (const assistants of Object.values(turn?.assistant?.variantsByUserVariant || {})) {
       for (const variant of assistants) {
-        if (variant !== current) delete variant.desk_slip;
+        if (variant !== current && variant.archive_retained_desk_slip !== true) delete variant.desk_slip;
       }
     }
   }
