@@ -179,6 +179,14 @@ internal fun WindowContextSheet(
             }
 
             SoftSettingsCard {
+                if (com.elementeracoast.app.core.local.NativeWorkspace.isLocal) {
+                    SettingSwitchRow(title = "跨窗口回忆", note = if(settings.crossWindowAuto) "由模型决定 · 持续生效" else "关闭 · 仍可手动递入旧消息",
+                        checked = settings.crossWindowAuto, enabled = usable,
+                        onCheckedChange = { onSettingsChange(settings.copy(crossWindowAuto=it)) })
+                    SettingSwitchRow(title = "本机模型工具", note = "允许模型读取本机记忆、日常、日历、书房与拾潮等资料",
+                        checked = settings.localModelToolsEnabled, enabled = usable,
+                        onCheckedChange = { onSettingsChange(settings.copy(localModelToolsEnabled=it)) })
+                }
                 SettingSwitchRow(
                     title = "短句模式",
                     note = "独立于现实上下文。普通闲聊优先简短接话，深话题仍可自然变长。",
