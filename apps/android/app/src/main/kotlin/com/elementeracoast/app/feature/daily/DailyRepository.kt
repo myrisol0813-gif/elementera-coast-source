@@ -29,6 +29,7 @@ interface DailyRepository {
     suspend fun addMomentComment(id: String, text: String): DailyMoment
     suspend fun deleteMomentComment(id: String, commentId: String): DailyMoment
     suspend fun requestModelPartnerComment(id: String): DailyMoment
+    suspend fun requestModelPartnerComment(id: String, selectedModel: String): DailyMoment = requestModelPartnerComment(id)
     suspend fun createDiary(date: String, weather: String, mood: String, tags: List<String>, text: String): DailyDiary
     suspend fun patchDiary(id: String, date: String, weather: String, mood: String, tags: List<String>, text: String): DailyDiary
     suspend fun deleteDiary(id: String)
@@ -38,7 +39,8 @@ interface DailyRepository {
 
 class DefaultDailyRepository(
     private val api: CoastApiClient,
-    private val cache: RemoteCacheStore
+    private val cache: RemoteCacheStore,
+    private val localComment: (suspend (String, String) -> RemoteDailyMoment)? = null
 ) : DailyRepository {
     private val _snapshot = MutableStateFlow(
         DailySnapshot(
@@ -92,7 +94,13 @@ class DefaultDailyRepository(
 
     override suspend fun deleteMomentComment(id: String, commentId: String): DailyMoment = replaceMoment(api.deleteDailyMomentComment(id, commentId))
 
-    override suspend fun requestModelPartnerComment(id: String): DailyMoment = replaceMoment(api.requestDailyModelPartnerComment(id).moment)
+    override suspend fun requestModelPartnerComment(id: String): DailyMoment = requestModelPartnerComment(id, "")
+
+    override suspend fun requestModelPartnerComment(id: String, selectedModel: String): DailyMoment {
+        val generate = localComment
+        return if (generate == null) replaceMoment(api.requestDailyModelPartnerComment(id).moment)
+        else replaceMoment(generate(id, selectedModel), persist = false)
+    }
 
     override suspend fun createDiary(date: String, weather: String, mood: String, tags: List<String>, text: String): DailyDiary =
         replaceDiary(
@@ -149,10 +157,10 @@ class DefaultDailyRepository(
         return mapped
     }
 
-    private fun replaceMoment(remote: RemoteDailyMoment): DailyMoment {
+    private fun replaceMoment(remote: RemoteDailyMoment, persist: Boolean = true): DailyMoment {
         val cached = cache.dailyMoments()
         val next = if (cached.any { it.id == remote.id }) cached.map { if (it.id == remote.id) remote else it } else listOf(remote) + cached
-        cache.putDailyMoments(next)
+        if (persist) cache.putDailyMoments(next)
         return DailyMapper.moment(remote).also { mapped ->
             _snapshot.update { state ->
                 val moments = if (state.moments.any { it.id == mapped.id }) state.moments.map { if (it.id == mapped.id) mapped else it } else listOf(mapped) + state.moments

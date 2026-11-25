@@ -164,10 +164,10 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
         }
     }
 
-    fun stream(p: LocalProviderConfig, model: String, messages: List<RemoteChatMessage>, maxTokens: Int,imageParts:List<JsonObject> = emptyList()): Flow<LocalProviderEvent> =
-        streamWithTools(p,model,messages,maxTokens,imageParts,null)
+    fun stream(p: LocalProviderConfig, model: String, messages: List<RemoteChatMessage>, maxTokens: Int,imageParts:List<JsonObject> = emptyList(),temperature:Double?=null): Flow<LocalProviderEvent> =
+        streamWithTools(p,model,messages,maxTokens,imageParts,null,temperature)
 
-    internal fun streamWithTools(p:LocalProviderConfig, model:String, messages:List<RemoteChatMessage>,maxTokens:Int,imageParts:List<JsonObject>,session:LocalToolSession?):Flow<LocalProviderEvent> = callbackFlow {
+    internal fun streamWithTools(p:LocalProviderConfig, model:String, messages:List<RemoteChatMessage>,maxTokens:Int,imageParts:List<JsonObject>,session:LocalToolSession?,temperature:Double?=null):Flow<LocalProviderEvent> = callbackFlow {
         val history=localMultimodalMessages(messages,imageParts).toMutableList()
         val echo=LocalProviderEcho(p,model,maxTokens)
         val active=java.util.concurrent.atomic.AtomicReference<okhttp3.Call?>()
@@ -182,6 +182,7 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                         if(host in setOf("api.openai.com","openrouter.ai","qianfan.baidubce.com"))put("stream_options",buildJsonObject{put("include_usage",true)})
                         put(if(official)"max_completion_tokens"else "max_tokens",maxTokens.coerceIn(64,65536))
                         put("messages",JsonArray(history))
+                        temperature?.let{put("temperature",it)}
                         if(session!=null){put("tools",session.completionsTools);put("tool_choice",if(round==LocalToolSession.MAX_CALLS||callsMade>=LocalToolSession.MAX_CALLS)"none"else "auto")}
                     }
                     val call=http.newCall(request(p,"/chat/completions").header("Accept","text/event-stream").post(payload.toString().toRequestBody(media)).build())

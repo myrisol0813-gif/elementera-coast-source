@@ -52,6 +52,7 @@ internal fun FeatureLandingScreen(
         when (feature) {
             FeatureDestination.Daily -> DailyLanding(
                 repository = daily,
+                selectedModel = shellState.currentModel,
                 guideTarget = guideTarget,
                 onGuideConsumed = onGuideConsumed,
                 modelPartnerAvatarDataUrl = shellState.modelPartnerAvatarDataUrl,

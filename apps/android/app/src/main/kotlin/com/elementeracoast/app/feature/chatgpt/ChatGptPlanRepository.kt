@@ -174,7 +174,8 @@ class ChatGptPlanRepository(
         prompt: String,
         reasoningEffort: String? = null,
         maxOutputTokens: Int? = null,
-        maxResultChars: Int = 10000
+        maxResultChars: Int = 10000,
+        systemPrompt: String? = null
     ): ChatGptProbeResult = mutex.withLock {
         require(model.isNotBlank() && prompt.isNotBlank())
         require(maxResultChars in 1..16000)
@@ -182,6 +183,7 @@ class ChatGptPlanRepository(
         withContext(Dispatchers.IO) {
             val payload = buildJsonObject {
                 put("model", model)
+                systemPrompt?.takeIf(String::isNotBlank)?.let { put("instructions", it) }
                 put("input", buildJsonArray { add(buildJsonObject {
                     put("role", "user")
                     put("content", prompt)
