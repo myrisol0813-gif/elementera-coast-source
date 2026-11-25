@@ -238,6 +238,22 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val result=session.execute(call.str("id").orEmpty(),fn.str("name").orEmpty(),fn.str("arguments").orEmpty())
             return response(r,200,element(RemoteNativeToolResult.serializer(),result).jsonObject)
         }
+        if (path == "/api/chat/message-metadata" && method == "GET") {
+            val cid=r.url.queryParameter("conversation_id").orEmpty()
+            val mid=r.url.queryParameter("message_id").orEmpty()
+            if(!conversationExists(cid)||mid.isBlank())return missing(r)
+            val variant=cache.history(cid)?.turns.orEmpty().flatMap{it.assistant.variantsByUserVariant.values.flatten()}.firstOrNull{it.id==mid}
+                ?:return missing(r)
+            val stored=store.get("local.echo."+cid+"."+mid)
+            val snapshot=stored.takeIf{it.isNotBlank()}?.let{json.parseToJsonElement(it).jsonObject}
+            val old=snapshot?.get("metadata")?.takeUnless{it==JsonNull}?.let{json.decodeFromJsonElement(RemoteModelMetadata.serializer(),it)}
+            val meta=variant.modelEcho?:old?:RemoteModelMetadata(requestedModel=variant.modelId,finishReason=variant.finishReason)
+            val result=RemoteMessageModelMetadataResponse(ok=true,conversationId=cid,messageId=mid,
+                status=if(variant.modelEcho!=null)"saved"else snapshot?.str("status")?:if(variant.usage!=null)"saved"else "not_returned",
+                sanitized=true,metadata=meta.copy(usage=variant.usage?:meta.usage),
+                rawMetadataSanitized=if(r.url.queryParameter("include_raw")=="1")snapshot?.get("raw_metadata_sanitized")?.takeUnless{it==JsonNull}else null)
+            return response(r,200,element(RemoteMessageModelMetadataResponse.serializer(),result).jsonObject)
+        }
         if (path == "/api/chat/native-echo" && method == "POST") {
             val b = body(r)
             val cid = b.str("conversation_id").orEmpty()

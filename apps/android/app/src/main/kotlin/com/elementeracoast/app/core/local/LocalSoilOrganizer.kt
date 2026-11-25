@@ -4,6 +4,9 @@ import com.elementeracoast.app.core.remote.*
 import com.elementeracoast.app.feature.chatgpt.ChatGptPlanRepository
 import com.elementeracoast.app.feature.memory.selectThoughtSoilReasoningEffort
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import com.elementeracoast.app.core.network.CoastApiException
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
@@ -20,8 +23,8 @@ internal class LocalSoilOrganizer(
     private val client: LocalProviderClient = LocalProviderClient()
 ) {
     suspend fun organize(conversationId: String, modelId: String) {
-        val prepared = withContext(Dispatchers.IO) { LocalSoilRun.prepare(store, conversationId, modelId) } ?: return
-        val result = if (modelId.startsWith("chatgpt-plan:")) {
+        val prepared = try { withContext(Dispatchers.IO) { LocalSoilRun.prepare(store, conversationId, modelId) } } catch(e:CancellationException){throw e} catch(_:Exception){throw LocalSoilFailure("准备整理资料失败")} ?: return
+        val result = try { if (modelId.startsWith("chatgpt-plan:")) {
             val account = requireNotNull(plan) { "请先连接 ChatGPT 套餐。" }
             val model = modelId.removePrefix("chatgpt-plan:")
             val effort = selectThoughtSoilReasoningEffort(account.reasoningEffortsFor(model))
@@ -31,7 +34,7 @@ internal class LocalSoilOrganizer(
             val (provider, model) = requireNotNull(providers.resolve(modelId)) { "整理模型未配置。" }
             val output = StringBuilder()
             var complete = false
-            client.stream(provider, model, listOf(RemoteChatMessage("user", prepared.prompt)), 3200).collect { event ->
+            client.stream(provider, model, listOf(RemoteChatMessage("user", prepared.prompt)), localSoilOutputBudget(provider,model)).collect { event ->
                 when (event) {
                     is LocalProviderEvent.Delta -> {
                         require(output.length + event.text.length <= LocalSoilRun.MAX_RESULT) { "整理结果超限。" }
@@ -39,7 +42,7 @@ internal class LocalSoilOrganizer(
                     }
                     is LocalProviderEvent.Tool -> error("整理不允许调用工具。")
                     is LocalProviderEvent.Done -> {
-                        require(event.reason == "stop") { "整理结果未正常结束。" }
+                        if(event.reason!="stop")throw LocalSoilFailure(if(event.reason=="length")"供应商达到整理输出上限"else if(event.reason=="content_filter")"供应商截断了整理输出"else "供应商没有正常结束整理")
                         complete = true
                     }
                 }
@@ -47,9 +50,15 @@ internal class LocalSoilOrganizer(
             require(complete)
             output.toString()
         }
+        } catch(e:CancellationException){throw e} catch(e:LocalSoilFailure){throw e} catch(e:CoastApiException){throw LocalSoilFailure(if(e.status>0)"供应商请求失败（HTTP ${e.status}）"else "供应商整理请求或流式响应失败")} catch(_:Exception){throw LocalSoilFailure("供应商整理请求未完成")}
         withContext(Dispatchers.IO) { LocalSoilRun.commit(store, prepared, result) }
     }
 }
+
+internal class LocalSoilFailure(val detail:String):IllegalArgumentException(detail)
+
+internal fun localSoilOutputBudget(provider:LocalProviderConfig, model:String):Int =
+    if(normalizeLocalProviderUrl(provider.baseUrl).toHttpUrl().host=="qianfan.baidubce.com" && model.equals("ernie-5.5-flash-preview",true))16384 else 3200
 
 /** Pure preparation and validated canonical persistence shared by both inference paths. */
 internal object LocalSoilRun {
@@ -130,36 +139,36 @@ internal object LocalSoilRun {
     private data class Parsed(val current: String, val after: JsonArray, val candidates: Map<String,List<Candidate>>, val portraits: Map<String,Proposal>)
     private fun parse(p: Prepared, raw: String): Parsed {
         require(raw.length <= MAX_RESULT) { "整理结果超限。" }
-        val clean = raw.trim().let { if (it.startsWith("```json") && it.endsWith("```")) it.removePrefix("```json").removeSuffix("```").trim() else it }
+        val clean = raw.trim().let { val fence=Regex("(?is)^```(?:json)?\\s*([\\s\\S]*?)\\s*```$").matchEntire(it);fence?.groupValues?.get(1)?.trim()?:it }
         val obj = Json.parseToJsonElement(clean).jsonObject
-        require(obj.keys == textFields) { "整理结果字段不完整。" }
+        require(obj.keys.all{it in textFields}&&obj.keys.containsAll(setOf("current_text","afterthoughts"))) { "整理结果字段不完整。" }
         val current = strictText(obj["current_text"],4000)
         val after = JsonArray(array(obj["afterthoughts"],7).map { JsonPrimitive(strictText(it,2000)) }.filter { it.content.isNotBlank() })
         val allowed = p.turns.map { it.id }.toSet()
         val latest = p.turns.last()
         val candidates = listOf("memory","seed").associateWith { dest ->
-            array(obj[dest+"_candidates"],3).map { rawCandidate ->
+            array(obj[dest+"_candidates"]?:JsonArray(emptyList()),3).map { rawCandidate ->
                 val c = rawCandidate.jsonObject
                 val content = strictText(c["content"],2000); require(content.isNotBlank())
                 val title = strictText(c["title"],120).ifBlank { content.take(120) }
-                val refs = array(c["source_refs"],8).map { ref ->
+                val refs = array(c["source_refs"]?:JsonArray(emptyList()),8).map { ref ->
                     val o=ref.jsonObject
                     val tid=strictText(o["turn_id"],160);val role=strictText(o["role"],16)
                     require(tid in allowed && role in setOf("user","assistant","turn")) { "整理引用不在本轮输入中。" }
                     buildJsonObject { put("turn_id",tid);put("role",role) }
                 }.distinct().ifEmpty { listOf(buildJsonObject { put("turn_id",latest.id);put("role","turn") }) }
-                Candidate(title,content,JsonArray(refs),strictText(c["source_excerpt"],1200))
+                Candidate(title,content,JsonArray(refs),strictText(c["source_excerpt"]?:JsonPrimitive(""),1200))
             }.distinctBy { normalized(it.content) }
         }
         val portraits = modules.associateWith { module ->
-            val o=obj.getValue(module).jsonObject
+            val o=obj[module]?.jsonObject?:return@associateWith Proposal(false,"","","")
             val enabled=p.portraitRoots[module]?.let { it.enabled("write_enabled") && it.str("body").length<=MAX_PORTRAIT } ?: true
             val flag=o.getValue("should_update").jsonPrimitive
             require(!flag.isString)
             val update=flag.boolean
-            val body=strictText(o["proposed_body"],MAX_PORTRAIT)
+            val body=strictText(o["proposed_body"]?:JsonPrimitive(""),MAX_PORTRAIT)
             require(!update || enabled && body.isNotBlank()) { "画像未授权或候选正文为空。" }
-            Proposal(update,body,strictText(o["reason"],4000),strictText(o["source_excerpt"],1200))
+            Proposal(update,body,strictText(o["reason"]?:JsonPrimitive(""),4000),strictText(o["source_excerpt"]?:JsonPrimitive(""),1200))
         }
         return Parsed(current,after,candidates,portraits)
     }
@@ -171,11 +180,11 @@ internal object LocalSoilRun {
         put("display_author",row.str("display_author"));put("created_at",now)
     }
     fun commit(store:LocalPersistence,p:Prepared,raw:String) {
-        val result=parse(p,raw)
+        val result=try{parse(p,raw)}catch(_:Exception){throw LocalSoilFailure("整理回包格式不符合约定")}
         // Ordinary soil-only replies need one atomic file write, not a clone of all attachments.
         // Candidate updates span several canonical files and use the existing all-or-nothing transaction.
         val multi=result.candidates.values.any { it.isNotEmpty() } || result.portraits.values.any { it.update }
-        if(multi)store.atomic { apply(it,p,result) } else store.readConsistent { apply(it,p,result) }
+        try{if(multi)store.atomic { apply(it,p,result) } else store.readConsistent { apply(it,p,result) }}catch(_:Exception){throw LocalSoilFailure("本机保存校验未通过或资料已变化")}
     }
     private fun apply(s:LocalPersistence,p:Prepared,result:Parsed) {
         val soil=LocalSoilStore(s);val rows=soil.read()
