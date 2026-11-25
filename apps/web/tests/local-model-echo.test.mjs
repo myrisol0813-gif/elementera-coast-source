@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { normalizeContextSettings } from '../functions/chat-store.js';
+import { normalizeVariant } from '../elementera-mcp/deploy-pages/public/features/chat-state.js';
+const value=normalizeVariant({id:'assistant_fixture',content:'reply',usage:{prompt_tokens:100,cached_tokens:25},model_echo:{provider:'fixture.example',requested_model:'fixture',reasoning_text:'Bearer abcdefghijk',api_key:'secret',request:{max_tokens:16384,stream:true,authorization:'secret'}}},'assistant');
+assert.equal(value.usage.cached_tokens,25);
+assert.equal('completion_tokens' in value.usage,false);
+assert.equal(value.model_echo.reasoning_text,'Bearer [REDACTED]');
+assert.equal('api_key' in value.model_echo,false);
+assert.equal('authorization' in value.model_echo.request,false);
+assert.equal('usage' in normalizeVariant({content:'old',usage:{total_tokens:99}},'assistant'),false);
+assert.equal('model_echo' in normalizeVariant({content:'old'},'assistant'),false);
+assert.equal('model_echo' in normalizeVariant({content:'user',model_echo:{provider:'fixture'}},'user'),false);

@@ -11,13 +11,14 @@ import {
   writeMessageModelMetadata,
 } from './model-metadata-store.js';
 
-function stateHasAssistantMessage(state, messageId) {
+function findAssistantMessage(state, messageId) {
   for (const turn of Array.isArray(state?.turns) ? state.turns : []) {
     const branches = turn?.assistant?.variantsByUserVariant;
     if (!branches || typeof branches !== 'object') continue;
     for (const variants of Object.values(branches)) {
       if (!Array.isArray(variants)) continue;
-      if (variants.some((variant) => String(variant?.id || '') === messageId)) return true;
+      const found = variants.find(variant => String(variant?.id || '') === messageId);
+      if (found) return found;
     }
   }
   return false;
@@ -93,10 +94,13 @@ export async function modelMetadataApi(request, env) {
   const messageId = sanitizeId(rawMessageId, 'assistant_variant');
   await getConversation(env.COAST_CHAT_DB, conversationId);
   const state = await readConversationState(env.COAST_CHAT_DB, conversationId);
-  if (!stateHasAssistantMessage(state, messageId)) {
+  const variant = findAssistantMessage(state, messageId);
+  if (!variant) {
     throw new ChatStoreError('message_not_found', '这条模型回复不存在于当前聊天窗口。', 404);
   }
-  return json(await readMessageModelMetadata(env.COAST_CHAT_DB, conversationId, messageId, {
+  const saved = await readMessageModelMetadata(env.COAST_CHAT_DB, conversationId, messageId, {
     includeRaw: url.searchParams.get('include_raw') === '1',
-  }));
+  });
+  if (saved.status === 'not_returned' && variant.model_echo) return json({...saved, status: 'saved', metadata: {...variant.model_echo, ...(variant.usage ? {usage:variant.usage} : {})}});
+  return json(saved);
 }
