@@ -459,7 +459,7 @@ export function attachmentReceiptOnFailure(receipt, error) {
  * trusted current turn, and return its exact future assistant-variant reference.
  * This is not a public upload endpoint. Caller must reserve/commit the
  * assistant variant and handle cancellation/failure before exposing the tool. */
-export async function saveGeneratedImageOriginal(db,{conversationId,turnId,messageId,generated,visionSupported=null,reservedUserId=null}={}){
+export async function saveGeneratedImageOriginal(db,{conversationId,turnId,messageId,generated,visionSupported=null,reservedUserId=null,modelTool=false}={}){
   const valid=v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(v);
   if(![conversationId,turnId,messageId].every(valid))throw new ChatAttachmentError('generated_source_invalid','生成图像缺少确定的回复版本。');
   const conv=await getConversation(db,conversationId);
@@ -489,7 +489,7 @@ export async function saveGeneratedImageOriginal(db,{conversationId,turnId,messa
     const idx=t?.user.variants.findIndex(v=>v.id===reservedUserId)??-1;
     const v=idx<0?null:t.assistant.variantsByUserVariant[String(idx)]?.find(x=>x.id===messageId);
     if(!v||v.finish_reason!=='image_pending'||v.attachments?.length)throw new ChatAttachmentError('image_reservation_lost','原回复版本已不再等待生成图像。',409);
-    v.attachments=[attachment];v.content='';v.finish_reason='stop';delete v.errorDetail;
+    v.attachments=[attachment];v.content='';v.finish_reason=modelTool?'image_saved':'stop';delete v.errorDetail;
     next.updated_at=iso(stamp);
     const expected=snap.state_json,encoded=JSON.stringify(normalizeState(next));
     // All writes share the same CAS guard, and the batch rolls back on any SQL error.
@@ -510,7 +510,7 @@ export async function saveGeneratedImageOriginal(db,{conversationId,turnId,messa
 /** User-triggered independent image request, disabled unless explicitly
  * configured. Reserve an exact reply before any network call. A repeated
  * message ID never initiates a second provider request. */
-export async function runManualImageGeneration(env,input,{generate=generateIndependentImage,discover=discoverImageModels}={}){
+export async function runManualImageGeneration(env,input,{generate=generateIndependentImage,discover=discoverImageModels,modelTool=false,visionSupported=null,onSaved=null,expectedModel=null}={}){
   const fail=(type,message,status=400)=>{throw new ChatAttachmentError(type,message,status);};
   const id=v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(v);
   const allowed=['conversation_id','turn_id','user_variant_id','message_id','prompt'];
@@ -529,24 +529,30 @@ export async function runManualImageGeneration(env,input,{generate=generateIndep
   const turn=state.turns.find(t=>t.id===tid);
   const index=turn?.user.variants.findIndex(v=>v.id===uid)??-1;
   if(index<0||turn.user.active!==index||turn.user.variants[index].hidden)fail('generated_source_invalid','原消息版本已变化。',409);
+  if(expectedModel!==null&&model!==expectedModel)fail('image_model_changed','生图模型选择已变化。',409);
   const existing=state.turns.flatMap(t=>[...t.user.variants,...Object.values(t.assistant.variantsByUserVariant).flat()]);
-  if(existing.some(v=>v.id===mid)||existing.some(v=>v.finish_reason==='image_pending'))fail('image_already_reserved','已有生成任务或此请求已使用；不会再次生成。',409);
   const branch=turn.assistant.variantsByUserVariant[String(index)]||[];
-  if(branch.length>=20)fail('image_branch_full','当前回复版本已满。',409);
+  const target=branch.find(v=>v.id===mid);
+  if(existing.some(v=>v.finish_reason==='image_pending')|| (modelTool ? (!target||target.hidden||target.finish_reason!=='image_tool_ready'||target.attachments?.length||existing.filter(v=>v.id===mid).length!==1) : existing.some(v=>v.id===mid)))fail('image_already_reserved','已有生成任务或此请求已使用；不会再次生成。',409);
+  if(!modelTool&&branch.length>=20)fail('image_branch_full','当前回复版本已满。',409);
   let catalog;
   try{catalog=await discover(fetch,key);}catch{fail('image_catalog_unavailable','无法核验生图模型目录，未发起生成。',502);}
   if(!catalog.some(m=>m.id===model))fail('image_model_unavailable','所选模型不在独立生图 API 目录中，未发起生成。',409);
   if((await readProfile(db)).current_image_model!==model)fail('image_model_changed','生成模型选择已变化，请重新发起。',409);
   const stamp=nowMs();
-  branch.push({id:mid,content:'',created_at:iso(stamp),model_id:model,finish_reason:'image_pending',generation_source:'chat'});
-  turn.assistant.variantsByUserVariant[String(index)]=branch;
-  turn.assistant.activeByUserVariant[String(index)]=branch.length-1;
+  if(modelTool)target.finish_reason='image_pending';
+  else {
+    branch.push({id:mid,content:'',created_at:iso(stamp),model_id:model,finish_reason:'image_pending',generation_source:'chat'});
+    turn.assistant.variantsByUserVariant[String(index)]=branch;
+    turn.assistant.activeByUserVariant[String(index)]=branch.length-1;
+  }
   state.updated_at=iso(stamp);
   const reserved=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS (SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL)',[JSON.stringify(normalizeState(state)),stamp,cid,snapshot.state_json,cid]);
   if(reserved.meta?.changes!==1)fail('image_state_changed','聊天已变化，未发起生成。',409);
   try{
     const generated=await generate({key,model,allowPaid:true},{prompt:prompt.trim()});
-    const result=await saveGeneratedImageOriginal(db,{conversationId:cid,turnId:tid,messageId:mid,generated,visionSupported:null,reservedUserId:uid});
+    const result=await saveGeneratedImageOriginal(db,{conversationId:cid,turnId:tid,messageId:mid,generated,visionSupported,reservedUserId:uid,modelTool});
+    if(onSaved)onSaved(result);
     return {ok:true,attachment:result.attachment,readback:result.readback.receipt,history:{...await readConversationState(db,cid),conversation_id:cid}};
   }catch(error){
     // Never retry a provider request. Preserve a committed picture, and only

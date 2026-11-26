@@ -545,9 +545,28 @@ export async function writeConversationState(db, id, value) {
   const conversationId = sanitizeId(id, 'conversation');
   await requireActiveConversation(db, conversationId);
   const state = normalizeState(value);
+  const previous = await first(db,'SELECT state_json FROM conversation_states WHERE conversation_id=?',[conversationId]);
+  if(!previous?.state_json)throw new ChatStoreError('conversation_state_missing','聊天记录不存在，未创建替代数据。',409);
+  const old=normalizeState(JSON.parse(previous.state_json));
+  for(const t of old.turns){
+    const incoming=state.turns.find(x=>x.id===t.id);
+    for(const [key,variants] of Object.entries(t.assistant.variantsByUserVariant)){
+      const uid=t.user.variants[Number(key)]?.id;
+      const i=incoming?.user.variants.findIndex(v=>v.id===uid)??-1;
+      for(const v of variants){
+        const match=i<0?null:incoming.assistant.variantsByUserVariant[String(i)]?.find(x=>x.id===v.id);
+        if(v.finish_reason==='image_pending'&&(!match||match.finish_reason!=='image_pending'))throw new ChatStoreError('image_pending','绘图仍在进行；请刷新原窗口，不覆盖任务。',409);
+        if(!match)continue; // explicit deletion is not resurrected
+        const saved=(v.attachments||[]).filter(a=>a.image_generation?.message_id===v.id);
+        if(saved.length)match.attachments=[...(match.attachments||[]).filter(a=>!saved.some(x=>x.id===a.id)),...saved];
+      }
+    }
+  }
   await carryArchiveDeskSlips(db, conversationId, state);
   const timestamp = nowMs();
-  await writeStateRow(db, conversationId, state, timestamp);
+  state.updated_at=iso(timestamp);
+  const changed=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS (SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL)',[JSON.stringify(normalizeState(state)),timestamp,conversationId,previous.state_json,conversationId]);
+  if(changed.meta?.changes!==1)throw new ChatStoreError('history_changed','聊天在保存时发生变化，请刷新；未覆盖原记录。',409);
   await run(db, `UPDATE conversations SET updated_at = ?
     WHERE id = ? AND user_id = ? AND deleted_at IS NULL`, [timestamp, conversationId, USER_ID]);
   state.updated_at = iso(timestamp);

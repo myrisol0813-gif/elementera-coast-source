@@ -144,10 +144,11 @@ export function createChatConversations({
     const previous = runtime.saveChains.get(conversationId) || Promise.resolve();
     const next = previous.catch(() => undefined).then(async () => {
       if (runtime.deletedIds.has(conversationId)) return;
-      await requestJson(`${API.history}?conversation_id=${encodeURIComponent(conversationId)}`, {
+      const saved=await requestJson(`${API.history}?conversation_id=${encodeURIComponent(conversationId)}`, {
         method: 'PUT',
         body: JSON.stringify(snapshot),
       });
+      if(saved.history&&runtime.histories.get(conversationId)===snapshot)setHistory(conversationId,saved.history);
       if (runtime.currentId === conversationId) setStatus('');
     }).catch((error) => {
       if (runtime.currentId === conversationId && !runtime.deletedIds.has(conversationId)) {

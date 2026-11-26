@@ -1,4 +1,4 @@
-import { createManualImageSender } from './chat-manual-image.js';
+import { createManualImageSender, prepareAutonomousImageTurn, imageToolSucceeded } from './chat-manual-image.js';
 import { API, requestJson } from '../../core/api.js';
 import {
   activeBranch,
@@ -73,7 +73,6 @@ export function createChatGeneration({
 }) {
   const contextMessages = (history, turnId) => buildContextMessages(history, turnId, runtime.runSettings() || {});
   const chatRequestContext = (conversationId) => buildChatRequestContext(runtime.runSettings, runtime.recallHistory, conversationId);
-
   const { autoTitle, autoTitleFromLanding, sendLandingLetter } = createChatTitleLanding({
     runtime,
     composerState,
@@ -104,7 +103,7 @@ export function createChatGeneration({
     composerState();
     const requestContext = chatRequestContext(conversationId);
     const streamingEnabled = requestContext.settings.streamingEnabled === true;
-    if (!streamingEnabled) saveHistory(conversationId, appended.state).catch(() => undefined);
+    if (!streamingEnabled && !runtime.profile.current_image_model) saveHistory(conversationId, appended.state).catch(() => undefined);
     const modelId = runtime.profile.current_chat_model || DEFAULT_MODEL;
     const payload = {
       conversation_id: conversationId,
@@ -133,6 +132,7 @@ export function createChatGeneration({
       deskSlip: null,
     };
     try {
+      await prepareAutonomousImageTurn(runtime,conversationId,appended,payload,saveHistory);
       if (streamingEnabled) {
         const streamed = await runChatStreamFlow({
           payload,
@@ -158,7 +158,7 @@ export function createChatGeneration({
         finishReason = String(data?.finish_reason || '');
         if (runtime.currentId === conversationId) runtime.desk?.captureSlip(data.desk_slip);
         patch = {
-          content: data?.message?.content || '模型没有返回文本。',
+          content: data?.message?.content || (data?.tool_results?.some(imageToolSucceeded) ? '' : '模型没有返回文本。'),
           errorDetail: '',
           model_id: data?.model || modelId,
           ...(data?.usage ? { usage: data.usage } : {}),
@@ -203,6 +203,7 @@ export function createChatGeneration({
     renderMessages(conversationId);
     composerState();
     if (!await saveHistory(conversationId, latest).then(() => !runtime.deletedIds.has(conversationId), () => false)) return false;
+      renderMessages(conversationId);
     if (runtime.currentId === conversationId) runtime.desk?.onConversationChanged(latest, conversationId);
     if (generated) void voice?.load(conversationId, { force: true });
     if (generated) { dogtalk?.resetCrossWindow?.({ room_scope: 'conversation', conversation_id: conversationId }); autoTitle(conversationId, latest, turnId).catch(() => undefined); }

@@ -1,3 +1,4 @@
+import { attachImageTool } from './chat-image-tool.js';
 import {
   apiError,
   json,
@@ -412,6 +413,8 @@ function streamFormalChat(request, env, input, assembled, metadataContext, dogta
           allowSystem: assembled.modelMessages[0]?.role === 'system',
           signal: request.signal,
           executeTool: assembled.executeTool,
+          takePrivateContinuation: assembled.takePrivateContinuation,
+          hasGeneratedImage: assembled.hasGeneratedImage,
           onMetadata: async (snapshot) => {
             metadataCaptured = true;
             await saveModelEcho(env, metadataContext.conversationId, metadataContext.messageId, snapshot);
@@ -498,7 +501,7 @@ async function formalChat(request, env) {
     });
   }
 
-  const assembled = await assembleCleanContext(env, {
+  let assembled = await assembleCleanContext(env, {
     conversationId,
     sourceTurnId,
     messages,
@@ -515,6 +518,7 @@ async function formalChat(request, env) {
     initialFurniture: dogtalkSubmission ? ['收好一张私人草稿纸条'] : [],
     crossWindow: value.cross_window,
   });
+  assembled=await attachImageTool(env,assembled,{conversationId,turnId:sourceTurnId,messageId,roomType:conversation.room_type,chatModel:value.model,enabled:value.image_tool_enabled===true,signal:request.signal});
   const attachmentIds = (Array.isArray(value.attachment_ids) ? value.attachment_ids : [])
     .map((item) => String(item || '').trim())
     .filter(Boolean)
@@ -549,6 +553,8 @@ async function formalChat(request, env) {
     }, {
       allowSystem: assembled.modelMessages[0]?.role === 'system',
       executeTool: assembled.executeTool,
+      takePrivateContinuation: assembled.takePrivateContinuation,
+      hasGeneratedImage: assembled.hasGeneratedImage,
       captureMetadata: true,
     });
   } catch (error) {

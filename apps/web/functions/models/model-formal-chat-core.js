@@ -263,9 +263,9 @@ async function executeToolCalls(calls, executeTool) {
   return { results, messages };
 }
 
-function completedReply(message, model, finishReason, completedToolCalls = 0) {
+function completedReply(message, model, finishReason, completedToolCalls = 0, hasImage = false) {
   const content = typeof message?.content === 'string' ? message.content : '';
-  if (!content.trim()) {
+  if (!content.trim() && !hasImage) {
     throw new ModelRequestError('empty_model_reply', '模型结束了工具调用，但没有返回可展示正文。前端没有把空白回复当作成功。', 502, {
       model,
       finish_reason: finishReason || null,
@@ -307,6 +307,8 @@ export async function performFormalChatWithTools(env, input = {}, {
   allowSystem = false,
   executeTool,
   captureMetadata = false,
+  takePrivateContinuation = () => [],
+  hasGeneratedImage = () => false,
 } = {}) {
   const prepared = await prepareFormalChat(env, input, allowSystem);
   const webSearch = createWebSearchTracker(input, prepared);
@@ -328,7 +330,7 @@ export async function performFormalChatWithTools(env, input = {}, {
 
     if (!calls.length) {
       const model = upstream?.model || prepared.modelId;
-      const content = completedReply(message, model, choice?.finish_reason, allToolResults.length);
+      const content = completedReply(message, model, choice?.finish_reason, allToolResults.length, hasGeneratedImage());
       const result = {
         ok: true,
         model,
@@ -366,6 +368,7 @@ export async function performFormalChatWithTools(env, input = {}, {
         tool_calls: calls,
       },
       ...executed.messages,
+      ...takePrivateContinuation(),
     ];
   }
 }
@@ -390,6 +393,8 @@ export async function* performFormalChatStream(env, input = {}, {
   signal,
   executeTool,
   onMetadata,
+  takePrivateContinuation = () => [],
+  hasGeneratedImage = () => false,
 } = {}) {
   const prepared = await prepareFormalChat(env, input, allowSystem);
   const webSearch = createWebSearchTracker(input, prepared);
@@ -495,11 +500,12 @@ export async function* performFormalChatStream(env, input = {}, {
             tool_calls: calls,
           },
           ...executed.messages,
+          ...takePrivateContinuation(),
         ];
         continue;
       }
 
-      if (!roundContent.trim()) {
+      if (!roundContent.trim() && !hasGeneratedImage()) {
         throw new ModelRequestError('empty_model_reply', '模型结束了工具调用，但没有返回可展示正文。前端没有把空白回复当作成功。', 502, {
           model: actualModel,
           finish_reason: finishReason,

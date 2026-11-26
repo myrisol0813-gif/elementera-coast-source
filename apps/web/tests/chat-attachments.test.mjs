@@ -1,3 +1,5 @@
+import { attachImageTool } from '../functions/chat-image-tool.js';
+import { performFormalChatWithTools } from '../functions/models/model-formal-chat-core.js';
 import { D1Database } from './d1-helper.mjs';
 import { createConversation, readConversationState, writeConversationState, writeProfile } from '../functions/chat-store.js';
 import {
@@ -149,3 +151,47 @@ assert.equal(jobCalls,1);
 await assert.rejects(()=>runManualImageGeneration(jobEnv,{...jobInput,message_id:'job-failed'},{discover:mockDiscover,generate:async()=>{throw Error('private upstream error')}}),e=>e.type==='image_generation_failed');
 assert.equal((await readConversationState(jobDb,jobChat.id)).turns[0].assistant.variantsByUserVariant['0'][1].finish_reason,'image_failed');
 assert.equal(jobDb.database.prepare('SELECT count(*) AS n FROM chat_attachments').get().n,1);
+
+const toolChat=await createConversation(jobDb,'自主绘图','main');
+const toolHistory={turns:[{id:'tool-turn',user:{variants:[{id:'tool-user',content:'draw'}]},assistant:{variantsByUserVariant:{0:[{id:'tool-assistant',content:'',finish_reason:'image_tool_ready'}]}}}]};
+await writeConversationState(jobDb,toolChat.id,toolHistory);
+const toolArgs={conversationId:toolChat.id,turnId:'tool-turn',messageId:'tool-assistant',roomType:'main',chatModel:'openai/gpt-fixture',enabled:true};
+const fakeBase={tools:[{type:'function',function:{name:'fixture_tool',parameters:{type:'object',properties:{}}}}],executeTool:async()=>({ok:true})};
+const visionCatalog={groups:{openai_chat:[{id:'openai/gpt-fixture',architecture:{input_modalities:['text','image']}}]}};
+let imageCalls=0;
+const deps={catalog:async()=>visionCatalog,discover:mockDiscover,generate:async(c,p)=>{imageCalls++;return {bytes:generatedPng,mime:'image/png',provider:'openrouter',requested_model:c.model,prompt:p.prompt,cost_usd:0.025}}};
+const tool=await attachImageTool(jobEnv,fakeBase,toolArgs,deps);
+assert.equal(tool.tools.at(-1).function.name,'image_generate');
+const denied=await attachImageTool(jobEnv,fakeBase,{...toolArgs,enabled:false},deps);
+assert.equal(denied,fakeBase);
+const originalFetch=globalThis.fetch;
+let requests=[];
+try{
+  globalThis.fetch=async(url,options={})=>{
+    if(String(url).includes('/models?'))return new Response(JSON.stringify({data:[{id:'openai/gpt-fixture',name:'GPT fixture',architecture:{input_modalities:['text','image'],output_modalities:['text']},supported_parameters:['tools','tool_choice']}]}));
+    const p=JSON.parse(options.body);requests.push(p);
+    if(requests.length===1)return new Response(JSON.stringify({model:'openai/gpt-fixture',choices:[{finish_reason:'tool_calls',message:{role:'assistant',content:null,tool_calls:[{id:'img-call',type:'function',function:{name:'image_generate',arguments:JSON.stringify({prompt:'a wolf'})}}]}}]}));
+    assert.equal(p.messages.at(-2).role,'tool');
+    assert.doesNotMatch(p.messages.at(-2).content,/base64|data:image/);
+    assert.equal(p.messages.at(-1).role,'user');
+    assert.equal(p.messages.at(-1).content[1].image_url.url,'data:image/png;base64,'+btoa(String.fromCharCode(...generatedPng)));
+    return new Response(JSON.stringify({model:'openai/gpt-fixture',choices:[{finish_reason:'stop',message:{role:'assistant',content:''}}]}));
+  };
+  const result=await performFormalChatWithTools(jobEnv,{model:'openai/gpt-fixture',messages:[{role:'user',content:'draw'}],tools:tool.tools},{executeTool:tool.executeTool,takePrivateContinuation:tool.takePrivateContinuation,hasGeneratedImage:tool.hasGeneratedImage});
+  assert.equal(result.message.content,'');
+  assert.equal(result.tool_results[0].result.status,'saved');
+  assert.doesNotMatch(JSON.stringify(result),/data:image|base64/);
+  assert.equal(requests.length,2);
+}finally{globalThis.fetch=originalFetch;}
+assert.equal(imageCalls,1);
+assert.equal((await tool.executeTool({function:{name:'image_generate',arguments:'{"prompt":"again"}'}})).ok,false);
+assert.equal(tool.takePrivateContinuation().length,0);
+const afterImage=(await readConversationState(jobDb,toolChat.id)).turns[0].assistant.variantsByUserVariant['0'][0];
+assert.equal(afterImage.finish_reason,'image_saved');
+assert.equal(afterImage.attachments.length,1);
+const oldClient=structuredClone(toolHistory);
+oldClient.turns[0].assistant.variantsByUserVariant[0][0].finish_reason='stop';
+oldClient.turns[0].assistant.variantsByUserVariant[0][0].content='Here is your picture.';
+const merged=await writeConversationState(jobDb,toolChat.id,oldClient);
+assert.deepEqual(merged.turns[0].assistant.variantsByUserVariant['0'][0].attachments,afterImage.attachments);
+assert.equal(merged.turns[0].assistant.variantsByUserVariant['0'][0].content,'Here is your picture.');

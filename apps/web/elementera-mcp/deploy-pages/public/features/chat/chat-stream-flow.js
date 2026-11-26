@@ -1,3 +1,4 @@
+import { imageToolSucceeded } from './chat-manual-image.js';
 import { requestChatStream } from './chat-stream.js';
 import { resetToolStatus, showLocalToolStatus, showWebSearchStatus } from './chat-tool-status.js';
 
@@ -175,6 +176,7 @@ export async function runChatStreamFlow({
           return;
         }
         if (item.event === 'tool') {
+          if(imageToolSucceeded(item.data))streamState.generatedImage=true;
           showLocalToolStatus(item.data);
           return;
         }
@@ -216,7 +218,7 @@ export async function runChatStreamFlow({
     error.type = 'stream_incomplete';
     throw annotateCrossWindowError(error, streamState.deskSlip, runtime, conversationId);
   }
-  if (!streamState.partialContent.trim()) {
+  if (!streamState.partialContent.trim() && !streamState.generatedImage) {
     const error = new Error('模型完成了这次请求，但没有返回文字。');
     error.type = 'empty_model_reply';
     throw annotateCrossWindowError(error, streamState.deskSlip, runtime, conversationId);
