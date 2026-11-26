@@ -476,7 +476,7 @@ function streamFormalChat(request, env, input, assembled, metadataContext, dogta
 async function replySequenceChat(request,env){
   if(request.method!=='POST')return methodNotAllowed('POST');
   requireSameOrigin(request);
-  if(env.COAST_REPLY_SEQUENCE_EXPERIMENTAL!=='true')throw new ChatStoreError('reply_sequence_unavailable','真实连续回复仍在施工。',409);
+  if(env.COAST_REPLY_SEQUENCE_EXPERIMENTAL==='false')throw new ChatStoreError('reply_sequence_unavailable','服务端已暂停连续回复，请关闭本窗口连续回复或联系部署者。',409);
   const value=await body(request),db=env.COAST_CHAT_DB;
   // The ChatGPT subscription adapter has no verified hard output cap for
   // this budget contract. Do not send subscription model IDs to OpenRouter.

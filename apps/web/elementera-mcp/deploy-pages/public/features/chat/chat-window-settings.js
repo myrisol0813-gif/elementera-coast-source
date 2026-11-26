@@ -63,6 +63,8 @@ export function createChatWindowSettings({
     const locked = isUnavailableConversation();
     const fields = new Set(settings.reality_fields);
     const mediaLocked=locked||!['main','radio'].includes(activeConversation()?.room_type);
+    const plan=String(runtime.profile?.current_chat_model||'').startsWith('chatgpt-plan:');
+    const replyLocked=mediaLocked||Boolean(runtime.generation||runtime.finalizing||runtime.pendingComposerSend)||plan&&!settings.reply_sequence_enabled;
 
     const rows = WEB_REALITY_FIELDS.map(([field, title, note]) => switchRow({
       field,
@@ -115,7 +117,7 @@ export function createChatWindowSettings({
             ${switchRow({title:'允许添加表情包',note:'模型可登记自己在本窗口生成并保存的图片。',checked:settings.sticker_add_enabled,enabled:!mediaLocked,action:!mediaLocked?'chat:window-sticker-add':''})}
           </section>
           <section class="window-context-card">
-            ${switchRow({title:'真实连续回复',note:'执行链施工中，暂不开放自动追加回复；预算可先保存。',checked:false,enabled:false})}
+            ${switchRow({title:'真实连续回复（实验）',note:plan?'网页不能直接调用设备上的 GPT 套餐；请选择普通 API 模型。':'模型可主动追加独立回复；达到额度或缺少用量时停止。',checked:settings.reply_sequence_enabled,enabled:!replyLocked,action:!replyLocked?'chat:window-reply-toggle':''})}
             ${REPLY_BUDGET_FIELDS.map(field=>replyBudgetRow(settings,field,mediaLocked)).join('')}
             <button class="window-context-link" type="button" data-action="chat:window-reply-budget-save" ${mediaLocked?'disabled':''}><span><strong>保存本窗口预算</strong><small>留空的项目继承基本设置。</small></span><span>›</span></button>
           </section>
@@ -175,6 +177,12 @@ export function createChatWindowSettings({
     const state = currentHistory();
     const settings = normalizeContextSettings(state.context_settings);
 
+    if(name==='window-reply-toggle'){
+      if(isUnavailableConversation()||!['main','radio'].includes(activeConversation()?.room_type))return;
+      if(runtime.generation||runtime.finalizing||runtime.pendingComposerSend)return toast('请先结束当前回复，再修改开关。');
+      if(!settings.reply_sequence_enabled&&String(runtime.profile?.current_chat_model||'').startsWith('chatgpt-plan:'))return toast('网页暂不支持设备 GPT 套餐执行。');
+      return writeSettings({...settings,reply_sequence_enabled:!settings.reply_sequence_enabled});
+    }
     if(name==='window-reply-budget-save'){
       if(isUnavailableConversation()||!['main','radio'].includes(activeConversation()?.room_type))return;
       if(runtime.generation||runtime.finalizing||runtime.pendingComposerSend)return toast('请先结束当前回复，再修改预算。');

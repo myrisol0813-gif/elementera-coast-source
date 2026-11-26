@@ -159,7 +159,7 @@ const {routeChatApi}=await import('../functions/chat-router.js');
 const routeDb=new D1Database(),routeCv=await createConversation(routeDb,'route','main');
 const routeIdentity={conversation_id:routeCv.id,source_turn_id:'route-turn',user_variant_id:'route-user',sequence_id:'route-sequence'};
 await writeConversationState(routeDb,routeCv.id,{context_settings:{reply_sequence_enabled:true,reply_sequence_tool_budget:0},turns:[{id:'route-turn',user:{variants:[{id:'route-user',content:'original human'}]}}]});
-const routeEnv={COAST_CHAT_DB:routeDb,OPENROUTER_API_KEY:'synthetic-key',COAST_REPLY_SEQUENCE_EXPERIMENTAL:'true'};
+const routeEnv={COAST_CHAT_DB:routeDb,OPENROUTER_API_KEY:'synthetic-key'};
 const crossCv=await createConversation(routeDb,'cross fixture','main');
 await writeConversationState(routeDb,crossCv.id,{turns:[{id:'cross-turn',user:{variants:[{id:'cross-user',content:'selected cross-window text'}]}}]});
 const {saveMysticDogtalk,getMysticDogtalk}=await import('../functions/dogtalk-store.js');
