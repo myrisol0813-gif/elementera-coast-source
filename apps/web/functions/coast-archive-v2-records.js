@@ -1,5 +1,6 @@
 import { safeToolPage } from './coast-archive-v2-tool-audit.js';
 import { ensureChatSchema } from './chat-store.js';
+import {recoverStaleReplyRuns} from './chat-reply-run.js';
 import { ensureMemorySchema } from './memory-store/memory-schema.js';
 import { MEMORY_OWNER_ID } from './memory-store/memory-normalize.js';
 import { ensureCalendarSchema } from './calendar-store.js';
@@ -35,8 +36,12 @@ export async function readArchiveChat(db,conversationId){
   check(id.test(conversationId),'invalid conversation id');await ensureChatSchema(db);
   const conversation=await db.prepare(modules.chat.sql+' AND id=?').bind(conversationId).first();
   if(!conversation)throw Object.assign(Error('conversation not found'),{status:404});
-  const row=await db.prepare('SELECT state_json,updated_at FROM conversation_states WHERE conversation_id=?').bind(conversationId).first();
+  await recoverStaleReplyRuns(db,Date.now(),conversationId);
+  // Check the ledger in the same SQL snapshot as the history. Never archive
+  // a claimed/pending media slot without the execution state that owns it.
+  const row=await db.prepare("SELECT s.state_json,s.updated_at,EXISTS(SELECT 1 FROM chat_reply_runs r WHERE r.conversation_id=s.conversation_id AND r.status='running') AS reply_active FROM conversation_states s WHERE s.conversation_id=?").bind(conversationId).first();
   if(!row)throw Object.assign(Error('conversation history missing'),{status:409});
+  if(row.reply_active)throw Object.assign(Error('该窗口正在连续回复，请结束本组后重新导出。'),{status:409,type:'archive_reply_run_active'});
   // Preserve the persisted JSON text, including historical receipt numeric tokens.
   return {conversation,history_json:row.state_json,history_updated_at:row.updated_at};
 }

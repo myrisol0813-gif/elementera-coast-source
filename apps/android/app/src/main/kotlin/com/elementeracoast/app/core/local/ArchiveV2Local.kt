@@ -21,6 +21,7 @@ internal object ArchiveV2Local {
     fun export(store:LocalPersistence,applicationId:String,output:File,appearanceRoot:File?=null):ArchiveV2Manifest = store.readConsistent { stable -> exportStable(stable,applicationId,output,appearanceRoot) }
     private fun exportStable(store:LocalPersistence,applicationId:String,output:File,appearanceRoot:File?):ArchiveV2Manifest {
         require(!output.exists()&&output.parentFile?.isDirectory==true)
+        require(RemoteCacheStore(store,strictReads=true).conversations().none{LocalReplyRunStore(store).active(it.id)}){"本机有窗口正在连续回复，请结束本组或恢复中断任务后重新导出。"}
         val payload=CoastTransferCodec.decode(LocalBackupArchive.encode(LocalBackupArchive.capture(store,applicationId)))
         val originals=LocalAttachmentStore(store)
         val attachmentRows=originals.entries()
@@ -153,6 +154,7 @@ internal object ArchiveV2Local {
             val parents=bytes?.let{LocalTransferRestore.plannedParents(it,applicationId,base,target,attachmentMeta,snapshots)}
             val cache=RemoteCacheStore(target,strictReads=true)
             val existing=cache.conversations().map{it.id}.toSet()
+            require(existing.none{LocalReplyRunStore(target).active(it)}){"本机有窗口正在连续回复，请结束本组后再恢复归档。"}
             val histories=if(extra.any{it in LocalSoilStore.modules}||"attachments" in selection||selection.any{it in LocalSideRecords.modules||it in LocalDogtalkStore.modules})bytes?.let{LocalTransferRestore.plannedHistories(it,applicationId,base,target,attachmentMeta,snapshots)}?:existing.associateWith{requireNotNull(cache.history(it))} else emptyMap()
             val report=bytes?.let{if(write)LocalTransferRestore.restoreStaged(it,applicationId,base,target,attachmentMeta,snapshots) else LocalTransferRestore.preview(it,applicationId,base,target,attachmentMeta,snapshots)}
             val extras=ArchiveV2Knowledge.apply(rows,extra,target,write,parents?.first?:existing,parents?.second.orEmpty(),histories)

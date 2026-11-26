@@ -139,12 +139,14 @@ test('reply group with real sticker original and individual desk receipts round 
  assert.equal(await reserveReplyStep(src,identity,'group-first',0),true);
  assert.ok(await claimReplyStep(src,identity,'group-first'));
  assert.equal(await reserveReplyMedia(src,identity,'group-first','fixture/chat',{sticker:true}),true);
+ await assert.rejects(()=>readArchiveChat(src,c.id),e=>e.type==='archive_reply_run_active');
  await deliverSticker(src,{conversation_id:c.id,turn_id:identity.turnId,user_variant_id:identity.userVariantId,message_id:'group-first',sticker_id:sticker.id},{allowSend:true,sequenceId:identity.sequenceId});
  assert.ok(await commitReplyStep(src,identity,'group-first',{id:'group-first',content:'',finish_reason:'stop',model_id:'fixture/chat',desk_slip:{summary:'first desk'}},{tool_calls:1,total_tokens:100,continue_requested:true}));
  assert.equal(await reserveReplyStep(src,identity,'group-second',1),true);
  assert.ok(await claimReplyStep(src,identity,'group-second'));
  assert.ok(await commitReplyStep(src,identity,'group-second',{id:'group-second',content:'next message',finish_reason:'stop',model_id:'fixture/chat',desk_slip:{summary:'second desk',reply_sequence_previous:[{message_id:'group-first',content:''}]}},{tool_calls:0,total_tokens:100,continue_requested:false}));
  assert.equal(await settleReplyRun(src,identity,'completed'),true);
+ assert.ok(await readArchiveChat(src,c.id));
  const original=(await readConversationState(src,c.id)).turns[0].assistant.variantsByUserVariant['0'];
  const attachment=original[0].attachments[0];
  const at='2026-11-26T00:00:00Z';

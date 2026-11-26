@@ -100,4 +100,29 @@ class ArchiveV2LocalTest {
         }finally{root.deleteRecursively()}
     }
 
+    @Test fun archiveRejectsActiveReplyReservationAndKeepsCompletedHistory(){
+        val root=Files.createTempDirectory("coast-active-v2").toFile()
+        try{
+            val source=MemoryLocalPersistence();val cache=RemoteCacheStore(source)
+            cache.putConversations(listOf(com.elementeracoast.app.core.remote.RemoteConversation("cid","group","main")))
+            val base=com.elementeracoast.app.feature.chat.ChatSyncMapper.appendUser(RemoteHistory(conversationId="cid",contextSettings=com.elementeracoast.app.core.model.ConversationContextSettings(replySequenceEnabled=true)),"question")
+            cache.putHistory("cid",base.history)
+            val req=com.elementeracoast.app.core.network.RemoteReplyRunRequest("cid",base.turnId,base.history.turns.single().user.variants.single().id,"seq","model",com.elementeracoast.app.core.network.RemoteReplyRunBudget(1,1,2000),"2026-11-26","2026-11-26 12:00",JsonObject(emptyMap()))
+            val ledger=LocalReplyRunStore(source)
+            assertTrue(ledger.acquire(req));assertTrue(ledger.reserve("cid","seq","a0",0))
+            assertNotNull(ledger.claim("cid","seq","a0"));assertTrue(ledger.reserveMedia("cid","seq","a0","model",false))
+            val file=File(root,"active.zip");val app="com.elementeracoast.source"
+            assertTrue(runCatching{ArchiveV2Local.export(source,app,file)}.isFailure)
+            assertFalse(file.exists())
+            assertTrue(ledger.settle("cid","seq","cancelled"))
+            val manifest=ArchiveV2Local.export(source,app,file)
+            val stage=ArchiveV2Stage(File(root,"stage"),"active")
+            assertEquals(manifest,ArchiveV2ZipReader.stage(file,stage))
+            val target=MemoryLocalPersistence()
+            ArchiveV2Local.restore(manifest,stage,setOf("chat"),app,target,true)
+            assertFalse(LocalReplyRunStore(target).active("cid"))
+            assertTrue(RemoteCacheStore(target).history("cid")!!.turns.single().assistant.variantsByUserVariant.values.flatten().isEmpty())
+        }finally{root.deleteRecursively()}
+    }
+
 }
