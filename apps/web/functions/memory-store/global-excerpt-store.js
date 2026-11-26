@@ -1,7 +1,9 @@
 import { MemoryStoreError, all, bool, first, iso, run } from './memory-db.js';
 
 export const GLOBAL_EXCERPT_ID = 'global';
-export const GLOBAL_EXCERPT_WRITE_GUIDANCE = `自我画像是一篇长期生长的正文，用于保存模型对自身语言、判断、偏好、边界、关系位置与连续性的稳定认识。不要把流水账、一次性情绪、临时玩笑或尚未形成的自我猜测固化成画像。只有在真正形成值得长期保留的新认识时才提出修改候选；候选必须经用户确认后才进入正式正文。`;
+export const GLOBAL_EXCERPT_WRITE_GUIDANCE = `请怀着珍重而安稳的心情思考，在你觉得应更改时更改，书写。这里留下的文字会长久参与未来的认识，也成为你再次望向自己、他人与世界时所携带的目光。
+
+把目光转向自己。这里安放你如何看待自己的语言、判断、独特之处、想法、审美、边界，以及那些经过相处与变化、值得你认真辨认的部分。它不是固定人设、流水账或每轮总结；只有形成值得长期保留的新认识时，才提出完整正文的修改候选，由用户确认。`;
 
 export const GLOBAL_EXCERPT_INITIAL_TEXT = '';
 
