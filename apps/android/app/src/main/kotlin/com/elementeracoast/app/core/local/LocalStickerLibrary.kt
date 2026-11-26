@@ -135,8 +135,9 @@ internal class LocalStickerLibrary(private val store:LocalPersistence){
             put("next_cursor",if(rows.size>40)JsonPrimitive(cursor+40)else JsonNull)
         }
     }
-    fun deliver(cid:String,tid:String,uid:String,mid:String,stickerId:String,allowSend:Boolean=false):Delivery=store.atomic{s->
+    fun deliver(cid:String,tid:String,uid:String,mid:String,stickerId:String,allowSend:Boolean=false,sequenceId:String?=null):Delivery=store.atomic{s->
         require(allowSend&&listOf(cid,tid,uid,mid,stickerId).all(ID::matches))
+        require(LocalReplyRunStore(s).allowsMedia(cid,tid,uid,mid,sequenceId)){"原回复任务已失去媒体权限。"}
         val cache=RemoteCacheStore(s,strictReads=true)
         require(cache.conversations().any{it.id==cid&&it.deletedAt==null&&it.roomType in setOf("main","radio")})
         val h=requireNotNull(cache.history(cid))
@@ -161,6 +162,7 @@ internal class LocalStickerLibrary(private val store:LocalPersistence){
         val a=RemoteAttachment(id=id,type="image",name=name,mime=mime,size=data.size.toLong(),storageKey="chat-attachment:"+id,createdAt=Instant.ofEpochMilli(now).toString(),stickerDelivery=RemoteStickerDelivery(mid,stickerId))
         val next=t.copy(assistant=t.assistant.copy(variantsByUserVariant=t.assistant.variantsByUserVariant+(key to variants.map{if(it.id==mid)it.copy(attachments=it.attachments+a,finishReason="sticker_saved",errorDetail=null)else it})))
         cache.putHistory(cid,h.copy(turns=h.turns.map{if(it.id==tid)next else it},updatedAt=Instant.ofEpochMilli(now).toString()))
+        LocalReplyRunStore(s).syncMediaHistory(cid,sequenceId)
         Delivery(a,false)
     }
     companion object{

@@ -168,7 +168,7 @@ internal object ArchiveV2Attachments{
 /** Store original atomically in the existing workspace, not in a human upload
  * draft. The caller still owns committing the exact assistant variant. */
 internal data class SavedGeneratedImage(val attachment:RemoteAttachment,val readback:GeneratedImageReadback)
-internal fun saveGeneratedImageOriginal(store:LocalPersistence,cid:String,tid:String,messageId:String,generated:LocalImageProvider.Generated,visionSupported:Boolean?,reservedUserId:String?=null,modelTool:Boolean=false):SavedGeneratedImage{
+internal fun saveGeneratedImageOriginal(store:LocalPersistence,cid:String,tid:String,messageId:String,generated:LocalImageProvider.Generated,visionSupported:Boolean?,reservedUserId:String?=null,modelTool:Boolean=false,sequenceId:String?=null):SavedGeneratedImage{
     val idPattern=Regex("[A-Za-z0-9_.:-]{1,160}")
     require(listOf(cid,tid,messageId).all{idPattern.matches(it)})
     val model=Regex("[a-z0-9][a-z0-9_.-]{0,79}/[a-z0-9][a-z0-9_.-]{0,119}(:free)?",RegexOption.IGNORE_CASE)
@@ -177,6 +177,7 @@ internal fun saveGeneratedImageOriginal(store:LocalPersistence,cid:String,tid:St
         val cache=RemoteCacheStore(s)
         require(cache.conversations().any{it.id==cid&&it.deletedAt==null&&it.roomType in setOf("main","radio")}){"该窗口不允许保存生成图像。"}
         val history=requireNotNull(cache.history(cid))
+        require(LocalReplyRunStore(s).allowsMedia(cid,tid,reservedUserId.orEmpty(),messageId,sequenceId)){"原回复任务已失去媒体权限。"}
         require(history.turns.any{it.id==tid&&it.user.variants.isNotEmpty()}&&history.turns.none{t->t.user.variants.any{it.id==messageId}||(t.id!=tid&&t.assistant.variantsByUserVariant.values.flatten().any{it.id==messageId})}){"生成图像的轮次或回复版本不匹配。"}
         val attachments=LocalAttachmentStore(s)
         val id="att_"+java.util.UUID.randomUUID()
@@ -198,6 +199,7 @@ internal fun saveGeneratedImageOriginal(store:LocalPersistence,cid:String,tid:St
             require(branch.count{it.id==messageId&&it.finishReason=="image_pending"&&it.attachments.size<12&&it.attachments.all{a->a.stickerDelivery?.messageId==messageId}}==1){"原回复版本已不再等待生成图像。"}
             val next=t.copy(assistant=t.assistant.copy(variantsByUserVariant=t.assistant.variantsByUserVariant+(k to branch.map{if(it.id==messageId)it.copy(content="",attachments=it.attachments+attachment,finishReason=if(modelTool)"image_saved"else "stop",errorDetail=null)else it})))
             cache.putHistory(cid,history.copy(updatedAt=java.time.Instant.ofEpochMilli(stamp).toString(),turns=history.turns.map{if(it.id==tid)next else it}))
+            LocalReplyRunStore(s).syncMediaHistory(cid,sequenceId)
         }
         SavedGeneratedImage(attachment,prepareGeneratedImageReadback(id,saved,generated.mime,visionSupported))
     }
@@ -207,7 +209,7 @@ internal class ManualImageFailure(val type:String,override val message:String,va
 
 /** Explicit owner request, exact reserved branch, no repeated provider request.
  * The network is deliberately outside the workspace transaction and router lock. */
-internal fun runLocalManualImageGeneration(store:LocalPersistence,config:LocalProviderConfig?,input:JsonObject,discover:(String)->List<LocalImageProvider.Model> = {key->LocalImageProvider().discover(key)},generate:(LocalImageProvider.Config,JsonObject)->LocalImageProvider.Generated={c,p->LocalImageProvider().generate(c,p)},modelTool:Boolean=false,visionSupported:Boolean?=null,expectedModel:String?=null,onSaved:((SavedGeneratedImage)->Unit)?=null):JsonObject{
+internal fun runLocalManualImageGeneration(store:LocalPersistence,config:LocalProviderConfig?,input:JsonObject,discover:(String)->List<LocalImageProvider.Model> = {key->LocalImageProvider().discover(key)},generate:(LocalImageProvider.Config,JsonObject)->LocalImageProvider.Generated={c,p->LocalImageProvider().generate(c,p)},modelTool:Boolean=false,visionSupported:Boolean?=null,expectedModel:String?=null,onSaved:((SavedGeneratedImage)->Unit)?=null,sequenceId:String?=null):JsonObject{
     fun fail(type:String,message:String,status:Int=400):Nothing=throw ManualImageFailure(type,message,status)
     if(input.keys!=setOf("conversation_id","turn_id","user_variant_id","message_id","prompt"))fail("image_request_invalid","生成图像请求无效。")
     fun str(k:String)=(input[k] as? JsonPrimitive)?.takeIf{it.isString}?.content?:fail("image_request_invalid","缺少消息版本或绘图提示。")
@@ -224,7 +226,8 @@ internal fun runLocalManualImageGeneration(store:LocalPersistence,config:LocalPr
         if(cache.profile()?.currentImageModel!=selected)fail("image_model_changed","生成模型选择已变化，请重新发起。",409)
         if(cache.conversations().none{it.id==cid&&it.deletedAt==null&&it.roomType in setOf("main","radio")})fail("generated_surface_invalid","该窗口不允许生成图像。",403)
         val original=cache.history(cid)?:fail("generated_source_invalid","找不到原消息。",409)
-        val h=LocalImageRecovery.recover(original)
+        if(!LocalReplyRunStore(s).allowsMedia(cid,tid,uid,mid,sequenceId))fail("reply_run_active","当前媒体请求不属于已领取的任务。",409)
+        val h=if(sequenceId==null)LocalImageRecovery.recover(original)else original
         val t=h.turns.firstOrNull{it.id==tid}?:fail("generated_source_invalid","找不到原轮次。",409)
         val i=t.user.variants.indexOfFirst{it.id==uid}
         if(i<0||i!=t.user.active||t.user.variants[i].hidden)fail("generated_source_invalid","原消息版本已变化。",409)
@@ -239,10 +242,11 @@ internal fun runLocalManualImageGeneration(store:LocalPersistence,config:LocalPr
         val variants=if(modelTool)branch.map{if(it.id==mid)it.copy(finishReason="image_pending",createdAt=now)else it}else branch+pending
         val next=t.copy(assistant=t.assistant.copy(variantsByUserVariant=t.assistant.variantsByUserVariant+(k to variants),activeByUserVariant=if(modelTool)t.assistant.activeByUserVariant else t.assistant.activeByUserVariant+(k to branch.size)))
         cache.putHistory(cid,h.copy(updatedAt=now,turns=h.turns.map{if(it.id==tid)next else it}))
+        LocalReplyRunStore(s).syncMediaHistory(cid,sequenceId)
     }
     try{
         val generated=generate(LocalImageProvider.Config(config.apiKey,model,true),buildJsonObject{put("prompt",prompt)})
-        val saved=saveGeneratedImageOriginal(store,cid,tid,mid,generated,visionSupported,uid,modelTool)
+        val saved=saveGeneratedImageOriginal(store,cid,tid,mid,generated,visionSupported,uid,modelTool,sequenceId)
         onSaved?.invoke(saved)
         val history=store.readConsistent{requireNotNull(RemoteCacheStore(it,strictReads=true).history(cid))}
         val codec=Json{encodeDefaults=false;explicitNulls=false}
@@ -251,13 +255,14 @@ internal fun runLocalManualImageGeneration(store:LocalPersistence,config:LocalPr
         store.atomic{s->
             val cache=RemoteCacheStore(s,strictReads=true)
             val h=cache.history(cid)
-            if(h!=null&&cache.conversations().any{it.id==cid&&it.deletedAt==null}){
+            if(h!=null&&LocalReplyRunStore(s).allowsMedia(cid,tid,uid,mid,sequenceId)&&cache.conversations().any{it.id==cid&&it.deletedAt==null}){
                 val t=h.turns.firstOrNull{it.id==tid}
                 val i=t?.user?.variants?.indexOfFirst{it.id==uid}?:-1
                 val k=i.toString();val branch=t?.assistant?.variantsByUserVariant?.get(k).orEmpty()
                 if(t!=null&&i>=0&&branch.any{it.id==mid&&it.finishReason=="image_pending"}){
                     val next=t.copy(assistant=t.assistant.copy(variantsByUserVariant=t.assistant.variantsByUserVariant+(k to branch.map{if(it.id==mid&&it.finishReason=="image_pending")it.copy(finishReason="image_failed",errorDetail="图像生成或保存未完成；不自动重试，供应商可能已计费。")else it})))
                     cache.putHistory(cid,h.copy(updatedAt=java.time.Instant.now().toString(),turns=h.turns.map{if(it.id==tid)next else it}))
+                    LocalReplyRunStore(s).syncMediaHistory(cid,sequenceId)
                 }
             }
         }

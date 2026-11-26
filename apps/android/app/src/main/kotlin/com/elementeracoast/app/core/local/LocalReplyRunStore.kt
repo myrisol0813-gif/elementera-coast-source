@@ -48,11 +48,10 @@ internal class LocalReplyRunStore(private val store:LocalPersistence){
     fun active(cid:String):Boolean=store.readConsistent{s->
         val seq=s.get(activeKey(cid));seq.isNotBlank()&&get(s,cid,seq)?.status=="running"
     }
-    fun recover(cid:String,now:Long=System.currentTimeMillis()):Boolean=store.readConsistent{s->
+    fun recover(cid:String,now:Long=System.currentTimeMillis()):Boolean=store.atomic{s->
         val seq=s.get(activeKey(cid));val row=seq.takeIf{it.isNotBlank()}?.let{get(s,cid,it)}
-        if(row==null||row.status!="running"||row.updatedAt>=now-30*60*1000L)return@readConsistent false
-        // Keep pending identity and receipts. Never issue a provider request.
-        put(s,cid,row.copy(status="interrupted",updatedAt=now));true
+        if(row==null||row.status!="running"||row.updatedAt>=now-30*60*1000L)return@atomic false
+        settleIn(s,cid,row,"interrupted",now)
     }
     fun acquire(request:RemoteReplyRunRequest):Boolean=store.readConsistent{s->
         val cid=request.conversationId;val seq=request.sequenceId
@@ -92,31 +91,87 @@ internal class LocalReplyRunStore(private val store:LocalPersistence){
         put(s,cid,r.copy(pendingState="claimed",updatedAt=System.currentTimeMillis()))
         Claim(r.receipts.size,r.receipts.size+1<r.max&&list.size+1<20,budget.first,budget.second,h,list.filter{it.replySequence?.id==seq})
     }
+    // Every media mutation runs inside the original binary-store transaction.
+    // These helpers operate on its staged store, not a second transaction.
+    fun allowsMedia(cid:String,tid:String,uid:String,mid:String,seq:String?):Boolean=store.readConsistent{s->
+        if(seq==null)return@readConsistent !LocalReplyRunStore(s).active(cid)
+        val r=get(s,cid,seq)?:return@readConsistent false
+        r.status=="running"&&r.pendingState=="claimed"&&r.pendingId==mid&&r.turnId==tid&&r.userId==uid&&history(s,cid,r)!=null
+    }
+    fun syncMediaHistory(cid:String,seq:String?){
+        if(seq==null)return
+        val row=requireNotNull(get(store,cid,seq))
+        require(row.status=="running"&&row.pendingState=="claimed")
+        val h=requireNotNull(cache(store).history(cid))
+        put(store,cid,row.copy(historyHash=hash(h),updatedAt=System.currentTimeMillis()))
+    }
+    fun reserveMedia(cid:String,seq:String,mid:String,model:String,image:Boolean):Boolean=store.atomic{s->
+        val r=get(s,cid,seq)?:return@atomic false
+        if(!LocalReplyRunStore(s).allowsMedia(cid,r.turnId,r.userId,mid,seq))return@atomic false
+        val h=history(s,cid,r)?:return@atomic false
+        val(t,list)=branch(h,r.turnId,r.userId)
+        if(list.size>=20||h.turns.any{v->(v.user.variants+v.assistant.variantsByUserVariant.values.flatten()).any{it.id==mid}})return@atomic false
+        val key=t.user.active.toString()
+        val now=Instant.now().toString()
+        val slot=RemoteVariant(mid,"",now,modelId=model,finishReason=if(image)"image_tool_ready"else "sticker_tool_ready",generationSource="chat")
+        val next=t.copy(assistant=t.assistant.copy(variantsByUserVariant=t.assistant.variantsByUserVariant+(key to (list+slot))))
+        cache(s).putHistory(cid,h.copy(updatedAt=now,turns=h.turns.map{if(it.id==t.id)next else it}))
+        LocalReplyRunStore(s).syncMediaHistory(cid,seq)
+        true
+    }
     fun commit(cid:String,seq:String,variant:RemoteVariant,usage:Usage):Pair<RemoteHistory,Usage>?=store.atomic{s->
         val r=get(s,cid,seq)?:return@atomic null
-        if(r.status!="running"||r.pendingId!=variant.id||r.pendingState!="claimed"||variant.content.isBlank()||usage.messageId!=variant.id)return@atomic null
+        if(r.status!="running"||r.pendingId!=variant.id||r.pendingState!="claimed"||usage.messageId!=variant.id)return@atomic null
         val budget=remaining(r)?:return@atomic null
         val h=history(s,cid,r)?:return@atomic null
         val (turn,list)=branch(h,r.turnId,r.userId)
-        if(list.size>=20)return@atomic null
+        val slotIndex=list.indexOfFirst{it.id==variant.id}
+        val slot=list.getOrNull(slotIndex)
+        if(slot!=null&&(slotIndex!=list.lastIndex||slot.replySequence!=null||slot.finishReason !in setOf("image_tool_ready","sticker_tool_ready","image_saved","sticker_saved","image_failed")))return@atomic null
+        val originals=slot?.attachments.orEmpty().filter{it.imageGeneration?.messageId==variant.id||it.stickerDelivery?.messageId==variant.id}
+        if((slot==null&&list.size>=20)||(variant.content.isBlank()&&originals.isEmpty()))return@atomic null
         val known=usage.toolCalls?.let{it in 0..budget.first}==true&&usage.totalTokens?.let{it>=0}==true
         val receipt=usage.copy(toolCalls=usage.toolCalls.takeIf{known},totalTokens=usage.totalTokens.takeIf{known},
             continueRequested=known&&usage.totalTokens!!<budget.second&&usage.continueRequested&&variant.finishReason=="stop")
         val key=turn.user.active.toString()
-        val saved=variant.copy(replySequence=RemoteReplySequence(seq,r.receipts.size),archiveRetainedDeskSlip=true)
-        val next=turn.copy(assistant=turn.assistant.copy(activeByUserVariant=turn.assistant.activeByUserVariant+(key to list.size),
-            variantsByUserVariant=turn.assistant.variantsByUserVariant+(key to (list+saved))))
+        val saved=variant.copy(createdAt=slot?.createdAt?:variant.createdAt,attachments=originals,replySequence=RemoteReplySequence(seq,r.receipts.size),archiveRetainedDeskSlip=true)
+        val next=turn.copy(assistant=turn.assistant.copy(activeByUserVariant=turn.assistant.activeByUserVariant+(key to if(slot==null)list.size else slotIndex),
+            variantsByUserVariant=turn.assistant.variantsByUserVariant+(key to if(slot==null)list+saved else list.map{if(it.id==saved.id)saved else it})))
         val c=cache(s)
         c.putHistory(cid,h.copy(updatedAt=Instant.now().toString(),archiveStorageUpdatedAt=null,turns=h.turns.map{if(it.id==turn.id)next else it}))
         val canonical=requireNotNull(c.history(cid))
         put(s,cid,r.copy(historyHash=hash(canonical),pendingId=null,pendingState=null,receipts=r.receipts+receipt,updatedAt=System.currentTimeMillis()))
         canonical to receipt
     }
-    fun settle(cid:String,seq:String,status:String):Boolean=store.readConsistent{s->
+    fun settle(cid:String,seq:String,status:String):Boolean=store.atomic{s->
+        val r=get(s,cid,seq)?:return@atomic false
+        settleIn(s,cid,r,status,System.currentTimeMillis())
+    }
+    private fun settleIn(s:LocalPersistence,cid:String,r:Row,status:String,now:Long):Boolean{
         require(status in setOf("completed","limit_reached","permission_or_budget","reservation_lost","failed","cancelled","interrupted"))
-        val r=get(s,cid,seq)?:return@readConsistent false
-        if(r.status!="running"||r.pendingId!=null&&status in setOf("completed","limit_reached"))return@readConsistent false
-        put(s,cid,r.copy(status=status,updatedAt=System.currentTimeMillis()));true
+        if(r.status!="running"||r.pendingId!=null&&status in setOf("completed","limit_reached"))return false
+        var nextHash=r.historyHash
+        if(r.pendingId!=null){
+            val h=history(s,cid,r)?:return false
+            val(t,list)=branch(h,r.turnId,r.userId)
+            val slot=list.firstOrNull{it.id==r.pendingId}
+            if(slot!=null&&slot.replySequence==null){
+                if(slot.finishReason !in setOf("image_tool_ready","sticker_tool_ready","image_pending","image_saved","sticker_saved","image_failed"))return false
+                val originals=slot.attachments.filter{it.imageGeneration?.messageId==slot.id||it.stickerDelivery?.messageId==slot.id}
+                val keep=originals.isNotEmpty()||slot.finishReason in setOf("image_pending","image_failed")
+                val replacement=if(keep)slot.copy(
+                    finishReason=if(originals.isEmpty())"image_failed" else if(originals.any{it.imageGeneration!=null})"image_saved_interrupted" else "sticker_saved_interrupted",
+                    errorDetail=if(originals.isEmpty())"绘图未确认完成；不会自动重试，供应商可能已计费。"else "图片原件已保存，连续回复文字未确认完成。",
+                    replySequence=RemoteReplySequence(r.sequenceId,r.receipts.size))else null
+                val key=t.user.active.toString()
+                val updated=list.flatMap{if(it.id==slot.id)listOfNotNull(replacement)else listOf(it)}
+                val active=if(keep)updated.lastIndex else (t.assistant.activeByUserVariant[key]?:0).coerceIn(0,maxOf(0,updated.lastIndex))
+                val next=t.copy(assistant=t.assistant.copy(variantsByUserVariant=t.assistant.variantsByUserVariant+(key to updated),activeByUserVariant=t.assistant.activeByUserVariant+(key to active)))
+                val c=cache(s);c.putHistory(cid,h.copy(updatedAt=Instant.ofEpochMilli(now).toString(),turns=h.turns.map{if(it.id==t.id)next else it}))
+                nextHash=hash(requireNotNull(c.history(cid)))
+            }
+        }
+        put(s,cid,r.copy(status=status,historyHash=nextHash,updatedAt=now));return true
     }
     fun claimSoil(cid:String,seq:String):Boolean=store.readConsistent{s->
         val r=get(s,cid,seq)?:return@readConsistent false
