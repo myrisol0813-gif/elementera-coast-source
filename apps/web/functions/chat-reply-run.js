@@ -219,3 +219,24 @@ export async function executeDurableReplyRun(db,identity,budget,{invoke,emit=()=
   if(!await settleReplyRun(db,identity,status))fail('reply_settle_unconfirmed','整组状态未确认，请刷新窗口；不会重试。');
   return {status,saved,...(failure?{error_type:String(failure.type||'reply_failed'),message:String(failure.message||'连续回复中断。').slice(0,1200)}:{})};
 }
+
+
+// One automatic organizer claim per settled group. A lost receipt is not
+// retried automatically, just as a lost provider response is not replayed.
+export async function claimReplyRunSoil(db,conversationId,sequenceId,tailId){
+  await ensureChatSchema(db);ids(conversationId,sequenceId,tailId);
+  const row=await stmt(db,'SELECT * FROM chat_reply_runs WHERE conversation_id=? AND sequence_id=?',conversationId,sequenceId).first();
+  if(!row||row.status==='running'||row.soil_state||receipts(row).at(-1)?.message_id!==tailId)return false;
+  const {raw,state}=await source(db,conversationId);
+  const {turn,key,list}=branch(state,row.turn_id,row.user_variant_id);
+  const group=list.filter(v=>v.reply_sequence?.id===sequenceId);
+  const records=receipts(row);
+  if(group.length!==records.length||group.some((v,i)=>v.id!==records[i].message_id||v.reply_sequence.index!==i)
+    ||list[turn.assistant.activeByUserVariant[key]]?.id!==tailId)return false;
+  return changes(await stmt(db,`UPDATE chat_reply_runs SET soil_state='claimed',soil_updated_at=? WHERE sequence_id=? AND status!='running' AND soil_state IS NULL AND receipts_json=? AND EXISTS(SELECT 1 FROM conversation_states WHERE conversation_id=? AND state_json=?) AND NOT EXISTS(SELECT 1 FROM chat_reply_runs WHERE conversation_id=? AND status='running')`,
+    Date.now(),sequenceId,row.receipts_json,conversationId,raw,conversationId).run());
+}
+export async function finishReplyRunSoil(db,conversationId,sequenceId,status){
+  if(!['done','skipped','failed'].includes(status))fail('reply_soil_status_invalid','整理状态无效。');
+  return changes(await stmt(db,"UPDATE chat_reply_runs SET soil_state=?,soil_updated_at=? WHERE conversation_id=? AND sequence_id=? AND soil_state='claimed'",status,Date.now(),conversationId,sequenceId).run());
+}

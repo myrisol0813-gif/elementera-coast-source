@@ -182,3 +182,16 @@ try{
   assert.equal(payloads.length,3);
   assert.deepEqual((await readConversationState(routeDb,routeCv.id)).turns[0].assistant.variantsByUserVariant['0'].map(v=>v.content),['first actual reply','second actual reply']);
 }finally{globalThis.fetch=routeFetch;}
+
+const {claimReplyRunSoil,finishReplyRunSoil}=await import('../functions/chat-reply-run.js');
+const {visibleCompletedTurns,soilTurnDigest,organizeConversationSoil}=await import('../functions/memory/memory-soil-organizer.js');
+const groupBranch=visibleCompletedTurns(await readConversationState(routeDb,routeCv.id)).at(-1);
+const groupDigest=soilTurnDigest(groupBranch,6000);
+assert.deepEqual(groupDigest.assistant_messages.map(m=>m.content),['first actual reply','second actual reply']);
+assert.equal(groupDigest.assistant.message_id,groupDigest.assistant_messages[1].message_id);
+const soilTail=groupBranch.assistant.id;
+assert.equal(await claimReplyRunSoil(routeDb,routeCv.id,'route-sequence',soilTail),true);
+assert.equal(await claimReplyRunSoil(routeDb,routeCv.id,'route-sequence',soilTail),false);
+assert.equal(await finishReplyRunSoil(routeDb,routeCv.id,'route-sequence','done'),true);
+assert.equal((await organizeConversationSoil(routeEnv,routeCv.id,{trigger:'reply',reply_sequence_id:'route-sequence'})).reason,'reply_sequence_already_claimed_or_unsettled');
+assert.equal((await organizeConversationSoil(routeEnv,routeCv.id,{trigger:'reply'})).reason,'reply_sequence_not_current');

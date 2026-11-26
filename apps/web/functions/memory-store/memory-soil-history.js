@@ -4,7 +4,7 @@ import { ensureMemorySchema } from './memory-schema.js';
 
 // A historical record is presentation-only. It must never be imported by
 // context assembly, memory recall, embeddings or model-facing search tools.
-export function soilSnapshotStatement(db, conversationId, branch, soil) {
+export function soilSnapshotStatement(db, conversationId, branch, soil, guard=null) {
   const turnId = clip(branch?.turn_id || '', 180);
   const messageId = clip(branch?.assistant?.id || '', 180);
   if (!turnId || !messageId || !soil) return null;
@@ -13,11 +13,12 @@ export function soilSnapshotStatement(db, conversationId, branch, soil) {
   return db.prepare(`INSERT OR IGNORE INTO conversation_soil_snapshots (
     conversation_id, turn_id, assistant_message_id, current_text,
     afterthoughts_json, revision, model_label, display_author, created_at
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+  ) ${guard?'SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM conversation_soils WHERE conversation_id=? AND source_assistant_id=? AND revision=? AND updated_at=?)':'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'}`)
     .bind(conversationId, turnId, messageId, currentText, JSON.stringify(afterthoughts),
       Math.max(1, Number(soil.revision) || 1),
       clip(soil.model_label || branch.assistant?.model_id || '', 180),
-      clip(soil.display_author || '思维壤', 100), Date.now());
+      clip(soil.display_author || '思维壤', 100), Date.now(),
+      ...(guard?[conversationId,messageId,guard.revision,guard.updatedAt]:[]));
 }
 
 export async function saveSoilSnapshot(db, conversationId, branch, soil) {

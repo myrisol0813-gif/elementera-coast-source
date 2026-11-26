@@ -311,6 +311,7 @@ await waitFor(()=>document.querySelector('[data-message-id="dom-sequence-1"]')?.
 assert.equal(document.querySelector('[data-message-id="dom-sequence-0"] .assistant-text').textContent,'canonical 0');
 assert.equal(document.querySelector('[data-message-id="dom-sequence-1"] .assistant-text').textContent,'canonical 1');
 assert.equal(historyPutCount,beforeSequenceWrites+1,'only human history is written by client; server owns commits');
-assert.equal(soilCount,beforeSequenceSoil,'old single-reply organizer must not run during sequence');
+await waitFor(()=>soilCount===beforeSequenceSoil+1,'one group soil organization');
+assert.equal(soilCount,beforeSequenceSoil+1,'one organizer after all committed messages');
 await chatSpine.unmount();
 console.log('streaming: ok');

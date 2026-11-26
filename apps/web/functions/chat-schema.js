@@ -77,6 +77,8 @@ async function createLatestSchema(db) {
     pending_id TEXT, pending_state TEXT, receipts_json TEXT NOT NULL DEFAULT '[]',
     updated_at INTEGER NOT NULL
   )`);
+  await ensureColumn(db,'chat_reply_runs','soil_state','TEXT DEFAULT NULL');
+  await ensureColumn(db,'chat_reply_runs','soil_updated_at','INTEGER DEFAULT NULL');
   await run(db, `CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_reply_run_live
     ON chat_reply_runs(conversation_id) WHERE status='running'`);
   await run(db, `CREATE TABLE IF NOT EXISTS chat_profiles (

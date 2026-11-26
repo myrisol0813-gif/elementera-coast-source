@@ -1,4 +1,5 @@
 import { readConversationState, readProfile } from '../chat-store.js';
+import { claimReplyRunSoil, finishReplyRunSoil } from '../chat-reply-run.js';
 import { safeLogError } from '../http.js';
 import { soilSettings } from '../memory-config.js';
 import {
@@ -133,10 +134,15 @@ export function activeBranch(turn = {}) {
     Math.max(0, Number(turn?.assistant?.activeByUserVariant?.[String(userIndex)] || 0)),
     Math.max(0, assistants.length - 1),
   );
+  const assistant=assistants[assistantIndex]||null;
+  const seq=assistant?.reply_sequence?.id;
+  const group=seq?assistants.filter(v=>v.reply_sequence?.id===seq).sort((a,b)=>a.reply_sequence.index-b.reply_sequence.index):[];
+  if(group.some((v,i)=>v.reply_sequence.index!==i))throw new MemoryStoreError('reply_group_history_changed','连续回复组不完整。',409);
   return {
     turn_id: String(turn.id || ''),
     user: userVariants[userIndex] || null,
-    assistant: assistants[assistantIndex] || null,
+    assistant: group.at(-1)||assistant,
+    ...(group.length?{assistant_messages:group}:{}),
   };
 }
 
@@ -215,8 +221,15 @@ export function soilTurnDigest(branch, maxChars) {
     },
     assistant: {
       message_id: String(branch.assistant?.id || ''),
-      content: clipSoilContent(branch.assistant?.content, maxChars),
+      content: clipSoilContent(branch.assistant?.content, branch.assistant_messages?.length?Math.floor(maxChars/2):maxChars),
     },
+    ...(branch.assistant_messages?.length?{
+      assistant_messages:branch.assistant_messages.map((message,index)=>{
+        const limit=Math.max(1,Math.floor(maxChars/(2*branch.assistant_messages.length)));
+        const content=clipSoilContent(message.content,limit);
+        return {message_id:String(message.id||message.message_id||''),index,content,truncated:content.length<String(message.content||'').length||message.truncated===true};
+      })
+    }:{}),
   };
 }
 
@@ -266,7 +279,8 @@ export function boundedSoilContext(context) {
     previous_turn_excerpt: context.previous_turn_excerpt ? soilTurnDigest({
       turn_id: context.previous_turn_excerpt.turn_id,
       user: context.previous_turn_excerpt.user,
-      assistant: context.previous_turn_excerpt.assistant,
+      assistant: {...context.previous_turn_excerpt.assistant,id:context.previous_turn_excerpt.assistant?.message_id},
+      assistant_messages:context.previous_turn_excerpt.assistant_messages,
     }, 400) : null,
     missed_since_success: (context.missed_since_success || []).slice(-1),
   };
@@ -366,11 +380,31 @@ old_current_text 与 old_afterthoughts 是上一版桌面，可自由保留、�
 source_refs 可以只选择真正相关的 turn_id；如果不需要精确指向，可返回空数组，系统会补上本轮来源。
 整理结果只提出候选。记忆、种子与两幅画像都必须经过各自的确认流程后才成为正式内容。
 
+若某轮带有 assistant_messages，按其 index 依次阅读所有独立回复；assistant 只是末条索引与摘录，不是另一条回复。truncated=true 表示摘录被裁短，不要推测省略内容。
+
 整理输入结构：
 ${JSON.stringify(context)}`;
 }
 
-export async function organizeConversationSoil(env, conversationId, value) {
+export async function organizeConversationSoil(env,conversationId,value){
+  if(value.trigger!=='reply'&&!value.reply_sequence_id)return organizeConversationSoilInternal(env,conversationId,value);
+  const db=env.COAST_CHAT_DB,state=await readConversationState(db,conversationId);
+  const latest=visibleCompletedTurns(state).at(-1),seq=latest?.assistant?.reply_sequence?.id;
+  if(!seq&&!value.reply_sequence_id)return organizeConversationSoilInternal(env,conversationId,value);
+  const skipped=async reason=>({ok:true,skipped:true,reason,soil:await readSoil(db,conversationId)});
+  if(!seq||value.reply_sequence_id!==seq)return skipped('reply_sequence_not_current');
+  if(value.plan_phase)return skipped('reply_sequence_plan_unavailable');
+  if(!await claimReplyRunSoil(db,conversationId,seq,latest.assistant.id))return skipped('reply_sequence_already_claimed_or_unsettled');
+  let status='failed';
+  try{
+    const result=await organizeConversationSoilInternal(env,conversationId,{...value,model:latest.assistant.model_id||value.model,
+      expected_sequence_tail:latest.assistant.id,expected_history_revision:state.updated_at});
+    status=result.skipped?'skipped':result.degraded?'failed':'done';
+    return result;
+  }finally{await finishReplyRunSoil(db,conversationId,seq,status);}
+}
+
+async function organizeConversationSoilInternal(env, conversationId, value) {
   const landing = value.trigger === 'landing';
   const reply = value.trigger === 'reply';
   const force = value.force === true || reply;
@@ -406,6 +440,8 @@ export async function organizeConversationSoil(env, conversationId, value) {
   const turns = landing ? completedTurns(state) : visibleCompletedTurns(state);
   if (!turns.length) return { ok: true, skipped: true, reason: 'no_completed_turns', soil: oldSoil };
   const latestTurn = turns.at(-1);
+  if(value.expected_sequence_tail&&(latestTurn?.assistant?.id!==value.expected_sequence_tail||state.updated_at!==value.expected_history_revision))
+    return {ok:true,skipped:true,reason:'reply_sequence_not_current',soil:oldSoil};
   const activeModel = String(latestTurn?.assistant?.model_id || '').trim();
   // An older Native app must not silently fall through to a billed Coast
   // provider when a ChatGPT-plan assistant has just completed.
@@ -482,7 +518,8 @@ export async function organizeConversationSoil(env, conversationId, value) {
     const modelId = requestedModel || profile.current_chat_model || 'openai/gpt-4.1-nano';
     const basePrompt = soilPrompt(turns, oldSoil, { landing, portraits });
     let lastJsonError = null;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
+    const maxAttempts=value.reply_sequence_id?1:2;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       try {
         const result = await performFormalChat(env, {
           model: modelId,
@@ -511,7 +548,7 @@ export async function organizeConversationSoil(env, conversationId, value) {
       } catch (error) {
         if (!(error instanceof MemoryStoreError && String(error.type || '').startsWith('soil_organize_'))) throw error;
         lastJsonError = error;
-        if (attempt === 1) throw error;
+        if (attempt + 1 >= maxAttempts) throw error;
       }
     }
     if (!organized && lastJsonError) throw lastJsonError;
@@ -531,6 +568,11 @@ export async function organizeConversationSoil(env, conversationId, value) {
     };
   }
 
+  if(value.expected_sequence_tail){
+    const [fresh,freshSoil]=await Promise.all([readConversationState(env.COAST_CHAT_DB,conversationId),readSoil(env.COAST_CHAT_DB,conversationId)]);
+    if(fresh.updated_at!==value.expected_history_revision||freshSoil.revision!==oldSoil.revision)
+      return {ok:true,degraded:true,reason:'reply_sequence_soil_stale',soil:freshSoil};
+  }
   const allowedTurnIds = new Set(turns.map((turn) => turn.turn_id).filter(Boolean));
   const fallbackExcerpt = [latestTurn?.user?.content, latestTurn?.assistant?.content]
     .map((part) => String(part || '').replace(/\s+/g, ' ').trim())
@@ -625,6 +667,7 @@ export async function organizeConversationSoil(env, conversationId, value) {
       source_turn_id: soilValue.organized_through_turn_id || '',
     },
     snapshotBranch: latestTurn,
+    ...(value.expected_sequence_tail?{expectedRevision:oldSoil.revision,expectedHistoryUpdatedAt:Date.parse(value.expected_history_revision)}:{}),
   });
   if (organizedBy) {
     await saveGenerationProvenance(env.COAST_CHAT_DB, 'soil', conversationId, organizedBy);

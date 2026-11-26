@@ -170,13 +170,23 @@ export function createChatGeneration({
         setHistory(conversationId,canonical);renderMessages(conversationId);
         if(runtime.currentId===conversationId)runtime.desk?.onConversationChanged(canonical,conversationId);
       }
-      // Finalization is deliberately gated until group-aware soil is wired.
-      // Never run the old single-reply organizer on a partial sequence.
+      if(ended&&committed&&!runtime.deletedIds.has(conversationId)){
+        runtime.finalizing=true;runtime.finalizingConversationId=conversationId;
+      }
       composerState();
     }
     if(runtime.deletedIds.has(conversationId))return false;
     if(ended?.message&&ended.status==='failed')toast(ended.message+'；已保存的消息保留。');
     if(committed){void voice?.load(conversationId,{force:true});}
+    if(ended&&committed){
+      try{
+        const organized=await runtime.memory?.onReplyCompleted(conversationId,{modelId:lastModel,sequenceId});
+        if(organized?.ok===false)toast('回复组已保存；思维壤整理未确认，保留原纸条。');
+        dogtalk?.resetCrossWindow?.({room_scope:'conversation',conversation_id:conversationId});
+        autoTitle(conversationId,canonical,turnId).catch(()=>undefined);
+      }catch(error){console.warn('[memory:reply-sequence]',error);toast('回复组已保存；思维壤整理未确认。');}
+      finally{runtime.finalizing=false;runtime.finalizingConversationId=null;composerState();}
+    }
     return true;
   }
 
