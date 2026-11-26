@@ -464,8 +464,8 @@ assert.equal(pictureMedia.role,'assistant');assert.equal(pictureMedia.message_id
 const pictureFavorite=await saveTreasure(db,{kind:'image',conversation_id:pictureConversation.id,source_id:picture.id});
 assert.equal(pictureFavorite.role,'assistant');assert.equal(pictureFavorite.message_id,'picture-assistant');
 const pictureState=await readConversationState(db,pictureConversation.id);
-const row={...picture,kind:'image',turn_id:'picture-turn'};
-assert.equal(attachmentOrigin(pictureState,row).role,'assistant');
-assert.equal(attachmentOrigin(pictureState,{...row,turn_id:null}).role,null);
+const pictureRow={...picture,kind:'image',turn_id:'picture-turn'};
+assert.equal(attachmentOrigin(pictureState,pictureRow).role,'assistant');
+assert.equal(attachmentOrigin(pictureState,{...pictureRow,turn_id:null}).role,null);
 const ambiguous=structuredClone(pictureState);ambiguous.turns[0].user.variants[0].attachments=[picture];
-assert.equal(attachmentOrigin(ambiguous,row).status,'ambiguous');
+assert.equal(attachmentOrigin(ambiguous,pictureRow).status,'ambiguous');
