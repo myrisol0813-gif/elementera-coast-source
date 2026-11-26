@@ -133,6 +133,21 @@ globalThis.fetch = async (input, options = {}) => {
     };
     return json({ ok: true, conversation: conversations[0] });
   }
+  if (url.pathname === '/api/chat/reply-sequence') {
+    const turn=serverHistory.turns.find(t=>t.id===body.source_turn_id);
+    const key=String(turn.user.active);
+    const list=turn.assistant.variantsByUserVariant[key];
+    const events=[['reply_group_start',{sequence_id:body.sequence_id,max_messages:2}]];
+    for(let index=0;index<2;index++){
+      const id='dom-sequence-'+index;
+      events.push(['reply_begin',{message_id:id,index}],['reply_delta',{message_id:id,content:'delta '+index}]);
+      list.push({id,content:'canonical '+index,reply_sequence:{id:body.sequence_id,index},finish_reason:'stop'});
+      turn.assistant.activeByUserVariant[key]=list.length-1;
+      events.push(['reply_committed',{message_id:id,index,history:structuredClone(serverHistory)}]);
+    }
+    events.push(['reply_group_end',{status:'completed',saved:2}]);
+    return coastStream({before:events.map(([event,data])=>'event: '+event+'\ndata: '+JSON.stringify(data)+'\n\n')},options);
+  }
   if (url.pathname === '/api/chat') {
     chatRequestCount += 1;
     chatBodies.push(body);
@@ -287,5 +302,15 @@ assert.ok(chatRequestCount >= 5);
 assert.equal(historyWrites.filter((history) => history.turns?.at(-1)?.assistant?.variantsByUserVariant?.['0']?.at(-1)?.finish_reason === 'cancelled').length, 1);
 assert.equal(historyWrites.filter((history) => history.turns?.at(-1)?.assistant?.variantsByUserVariant?.['0']?.at(-1)?.finish_reason === 'error').length, 1);
 
+// Reload an explicitly enabled experimental window from its canonical history.
+serverHistory.context_settings={reply_sequence_enabled:true};
+await chat.openSearchResult({conversation_id:'conv-stream',kind:'conversation'});
+const beforeSequenceSoil=soilCount,beforeSequenceWrites=historyPutCount;
+send('real sequence');
+await waitFor(()=>document.querySelector('[data-message-id="dom-sequence-1"]')?.textContent.includes('canonical 1'),'sequence second bubble');
+assert.equal(document.querySelector('[data-message-id="dom-sequence-0"] .assistant-text').textContent,'canonical 0');
+assert.equal(document.querySelector('[data-message-id="dom-sequence-1"] .assistant-text').textContent,'canonical 1');
+assert.equal(historyPutCount,beforeSequenceWrites+1,'only human history is written by client; server owns commits');
+assert.equal(soilCount,beforeSequenceSoil,'old single-reply organizer must not run during sequence');
 await chatSpine.unmount();
 console.log('streaming: ok');

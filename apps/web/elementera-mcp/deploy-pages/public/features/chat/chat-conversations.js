@@ -153,7 +153,7 @@ export function createChatConversations({
       if (runtime.currentId === conversationId) setStatus('');
     }).catch(async (error) => {
       if (runtime.currentId === conversationId && !runtime.deletedIds.has(conversationId)) {
-        if(['image_pending','image_history_changed','history_changed'].includes(error.type))try{const fresh=await requestJson(`${API.history}?conversation_id=${encodeURIComponent(conversationId)}`);setHistory(conversationId,fresh.history);renderMessages(conversationId);}catch{}
+        if(['image_pending','image_history_changed','history_changed','reply_group_history_changed','reply_run_active'].includes(error.type))try{const fresh=await requestJson(`${API.history}?conversation_id=${encodeURIComponent(conversationId)}`);setHistory(conversationId,fresh.history);renderMessages(conversationId);}catch{}
         setStatus(`聊天记录写入失败：${error.message}`, 'error');
       }
       throw error;

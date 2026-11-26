@@ -28,8 +28,8 @@ export function createCoastSseParser(onEvent) {
   });
 }
 
-export async function requestChatStream(payload, { signal, onEvent }) {
-  const response = await fetch(API.chat, {
+export async function requestChatStream(payload, { signal, onEvent, endpoint = API.chat }) {
+  const response = await fetch(endpoint, {
     method: 'POST',
     credentials: 'same-origin',
     cache: 'no-store',

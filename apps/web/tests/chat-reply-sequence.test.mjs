@@ -147,3 +147,38 @@ assert.deepEqual(runResult,{status:'completed',saved:2});
 assert.deepEqual(invoked,[[],['runner text 0']]);
 assert.deepEqual(events.map(e=>e[0]),['reply_group_start','reply_begin','reply_delta','reply_committed','reply_begin','reply_delta','reply_committed']);
 assert.deepEqual(events.filter(e=>e[0]==='reply_committed').map(e=>e[1].history.turns[0].assistant.variantsByUserVariant['0'].filter(v=>v.reply_sequence?.id===third.sequenceId).length),[1,2]);
+
+// HTTP route invokes the actual formal-provider adapter with a synthetic
+// provider. Verify the next independent request reads the first saved reply.
+const {routeChatApi}=await import('../functions/chat-router.js');
+const routeDb=new D1Database(),routeCv=await createConversation(routeDb,'route','main');
+const routeIdentity={conversation_id:routeCv.id,source_turn_id:'route-turn',user_variant_id:'route-user',sequence_id:'route-sequence'};
+await writeConversationState(routeDb,routeCv.id,{context_settings:{reply_sequence_enabled:true,reply_sequence_tool_budget:0},turns:[{id:'route-turn',user:{variants:[{id:'route-user',content:'original human'}]}}]});
+const routeEnv={COAST_CHAT_DB:routeDb,OPENROUTER_API_KEY:'synthetic-key',COAST_REPLY_SEQUENCE_EXPERIMENTAL:'true'};
+const routeBody={...routeIdentity,model:'openai/gpt-4.1-nano',settings:{streamingEnabled:false,contextBudget:6000},budget:{maxMessages:2,toolBudget:0,tokenBudget:48000}};
+const makeRequest=()=>new Request('https://coast.test/api/chat/reply-sequence',{method:'POST',headers:{Origin:'https://coast.test','Content-Type':'application/json'},body:JSON.stringify(routeBody)});
+assert.equal((await routeChatApi(makeRequest(),{...routeEnv,COAST_REPLY_SEQUENCE_EXPERIMENTAL:'false'})).status,409);
+const routeFetch=globalThis.fetch,payloads=[];
+try{
+  globalThis.fetch=async(url,options={})=>{
+    if(String(url).includes('/models?'))return new Response(JSON.stringify({data:[{id:'openai/gpt-4.1-nano',name:'fixture',architecture:{output_modalities:['text']},pricing:{prompt:'0.1',completion:'0.2'},supported_parameters:['tools','tool_choice']}]}),{headers:{'Content-Type':'application/json'}});
+    const payload=JSON.parse(options.body);payloads.push(payload);
+    const n=payloads.length;
+    if(n===3){
+      const persisted=await readConversationState(routeDb,routeCv.id);
+      assert.equal(persisted.turns[0].assistant.variantsByUserVariant['0'][0].content,'first actual reply');
+      assert.deepEqual(payload.messages.filter(m=>m.role==='assistant').map(m=>m.content),['first actual reply']);
+      assert.equal(payload.messages.filter(m=>m.role==='user').length,1);
+    }
+    return new Response(JSON.stringify({model:'openai/gpt-4.1-nano',usage:{prompt_tokens:100,completion_tokens:20,total_tokens:120},choices:[n===1?
+      {finish_reason:'tool_calls',message:{content:null,tool_calls:[{id:'continue-fixture',type:'function',function:{name:'continue_reply',arguments:'{}'}}]}}:
+      {finish_reason:'stop',message:{content:n===2?'first actual reply':'second actual reply'}}]}),{headers:{'Content-Type':'application/json'}});
+  };
+  const response=await routeChatApi(makeRequest(),routeEnv);
+  assert.equal(response.status,200);
+  const wire=await response.text();
+  assert.equal((wire.match(/event: reply_committed/g)||[]).length,2,wire.slice(-800));
+  assert.match(wire,/event: reply_group_end/);
+  assert.equal(payloads.length,3);
+  assert.deepEqual((await readConversationState(routeDb,routeCv.id)).turns[0].assistant.variantsByUserVariant['0'].map(v=>v.content),['first actual reply','second actual reply']);
+}finally{globalThis.fetch=routeFetch;}

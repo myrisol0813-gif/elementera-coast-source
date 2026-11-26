@@ -132,7 +132,7 @@ export function createChatActions({
       return;
     }
     if ((runtime.generation || runtime.finalizing || runtime.pendingComposerSend)
-      && ['switch-variant', 'edit-user', 'delete-user', 'delete-assistant', 'regenerate'].includes(name)) {
+      && ['switch-variant', 'edit-user', 'delete-user', 'delete-assistant', 'regenerate', 'like'].includes(name)) {
       return toast('请先停止或等待当前回复完成。');
     }
     if (name === 'switch-variant') {
