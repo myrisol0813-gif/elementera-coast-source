@@ -261,6 +261,9 @@ fun ChatWindow(
                 isStreaming = state.isStreaming,
                 onNotice = onPlaceholder
             )
+            if (state.backgroundGeneration) {
+                androidx.compose.material3.Text("另一个窗口正在生成或整理；可以先写草稿。", style = androidx.compose.material3.MaterialTheme.typography.labelSmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+            }
             HorizontalDivider(color = androidx.compose.material3.MaterialTheme.colorScheme.outlineVariant.copy(alpha = .55f))
             CoastComposer(
                 conversationId = state.activeConversationId,
