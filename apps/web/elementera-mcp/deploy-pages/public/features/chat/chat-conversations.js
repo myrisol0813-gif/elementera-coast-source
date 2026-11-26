@@ -93,6 +93,7 @@ export function createChatConversations({
     const conversation = runtime.conversations.find((item) => item.id === conversationId) || null;
     setComposerReady(false, '正在载入聊天记录…');
     runtime.currentId = conversationId;
+    if (ui.input && runtime.composerDrafts) ui.input.value = runtime.composerDrafts.read(conversationId);
     storage.setCurrentConversation(conversationId);
     renderConversationList();
     setStatus('正在载入聊天记录…', 'loading');
@@ -204,6 +205,7 @@ export function createChatConversations({
       throw error;
     }
     runtime.conversations = runtime.conversations.filter((item) => item.id !== conversationId);
+    runtime.composerDrafts?.remove(conversationId);
     runtime.histories.delete(conversationId);
     runtime.searchPreview?.delete(conversationId);
     runtime.treasureIndicators?.delete(conversationId);
