@@ -417,7 +417,7 @@ internal class LocalToolSession private constructor(
             val write=h.contextSettings.localModelWriteEnabled&&modelId.isNotBlank()
             if(!cross&&!tools&&!write)return null
             val sourceTurn=h.turns.firstOrNull{it.id==turn}?:return null
-            val mediaId=messageId?.takeIf{mid->LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")&&sourceTurn.assistant.variantsByUserVariant[sourceTurn.user.active.toString()]?.any{it.id==mid&&!it.hidden&&it.finishReason in setOf("image_tool_ready","sticker_tool_ready")}==true}
+            val mediaId=messageId?.takeIf{mid->(h.contextSettings.stickerAddEnabled||h.contextSettings.stickerSendEnabled)&&LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")&&sourceTurn.assistant.variantsByUserVariant[sourceTurn.user.active.toString()]?.any{it.id==mid&&!it.hidden&&it.finishReason in setOf("image_tool_ready","sticker_tool_ready")}==true}
             return LocalToolSession(store,cid,turn,sourceTurn,cross,tools,write,modelId,base,wireLimit,web?.takeIf{request?.mode!="keyword"&&LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},voice?.takeIf{LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},image,mediaId,mediaId!=null&&tools&&write&&h.contextSettings.stickerSendEnabled,mediaId!=null&&write&&h.contextSettings.stickerAddEnabled)
         }
     }
