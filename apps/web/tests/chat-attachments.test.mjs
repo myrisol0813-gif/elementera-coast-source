@@ -9,6 +9,7 @@ import {
   listChatAttachmentMetadata,
   uploadChatAttachment,
   saveGeneratedImageOriginal,
+  runManualImageGeneration,
 } from '../functions/chat-attachments.js';
 import assert from 'node:assert/strict';
 
@@ -123,3 +124,23 @@ await writeConversationState(db,conversation.id,{turns:[{id:generatedTurn,user:{
 const persistedImage=(await readConversationState(db,conversation.id)).turns[0].assistant.variantsByUserVariant['0'][0].attachments[0];
 assert.deepEqual(persistedImage,savedImage.attachment);
 await assert.rejects(()=>saveGeneratedImageOriginal(db,{conversationId:conversation.id,turnId:'missing-turn',messageId:generatedMessage,generated:{}}),e=>e.type==='generated_source_invalid');
+
+const jobDb=new D1Database();
+const jobChat=await createConversation(jobDb,'图像任务','main');
+await writeConversationState(jobDb,jobChat.id,{turns:[{id:'job-turn',user:{variants:[{id:'job-user',content:'draw'}]}}]});
+const jobEnv={COAST_CHAT_DB:jobDb,COAST_INDEPENDENT_IMAGE_ENABLED:'true',COAST_INDEPENDENT_IMAGE_KEY:'test-key',COAST_INDEPENDENT_IMAGE_MODEL:'fixture/image:free'};
+const jobInput={conversation_id:jobChat.id,turn_id:'job-turn',user_variant_id:'job-user',message_id:'job-assistant',prompt:'draw a wolf'};
+let jobCalls=0;
+const mockGenerate=async(config,input)=>{jobCalls++;assert.equal(config.allowPaid,false);assert.equal(input.prompt,'draw a wolf');const pending=(await readConversationState(jobDb,jobChat.id)).turns[0].assistant.variantsByUserVariant['0'][0];assert.equal(pending.finish_reason,'image_pending');return {bytes:generatedPng,mime:'image/png',provider:'openrouter',requested_model:config.model,reported_model:config.model,cost_usd:0,prompt:input.prompt}};
+await assert.rejects(()=>runManualImageGeneration({...jobEnv,COAST_INDEPENDENT_IMAGE_MODEL:'fixture/paid'},jobInput,{generate:mockGenerate}),e=>e.type==='image_not_configured');
+const jobResult=await runManualImageGeneration(jobEnv,jobInput,{generate:mockGenerate});
+assert.equal(jobResult.history.turns[0].assistant.variantsByUserVariant['0'][0].content,'');
+assert.equal(jobResult.history.turns[0].assistant.variantsByUserVariant['0'][0].finish_reason,'stop');
+assert.deepEqual(jobResult.history.turns[0].assistant.variantsByUserVariant['0'][0].attachments,[jobResult.attachment]);
+assert.deepEqual(new Uint8Array((await getChatAttachmentRecord(jobDb,jobChat.id,jobResult.attachment.id)).data),generatedPng);
+assert.equal(jobResult.readback.status,'vision_unknown');
+await assert.rejects(()=>runManualImageGeneration(jobEnv,jobInput,{generate:mockGenerate}),e=>e.type==='image_already_reserved');
+assert.equal(jobCalls,1);
+await assert.rejects(()=>runManualImageGeneration(jobEnv,{...jobInput,message_id:'job-failed'},{generate:async()=>{throw Error('private upstream error')}}),e=>e.type==='image_generation_failed');
+assert.equal((await readConversationState(jobDb,jobChat.id)).turns[0].assistant.variantsByUserVariant['0'][1].finish_reason,'image_failed');
+assert.equal(jobDb.database.prepare('SELECT count(*) AS n FROM chat_attachments').get().n,1);

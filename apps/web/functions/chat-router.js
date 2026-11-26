@@ -18,6 +18,7 @@ import {
   deleteChatAttachment,
   getChatAttachmentRecord,
   resolveChatAttachmentsForModel,
+  runManualImageGeneration,
   uploadChatAttachment,
 } from './chat-attachments.js';
 import {
@@ -728,6 +729,7 @@ export function isChatApiPath(pathname) {
     || pathname.startsWith(`${ATTACHMENTS_PATH}/`)
     || pathname === LANDING_LETTER_PATH
     || pathname === MODEL_METADATA_PATH
+    || pathname === '/api/chat/image-generate'
     || pathname === '/api/chat/native-context'
     || pathname === '/api/chat/native-tool'
     || pathname === '/api/chat/native-echo'
@@ -744,6 +746,11 @@ export async function routeChatApi(request, env) {
   const pathname = new URL(request.url).pathname;
   try {
     if (pathname === FORMAL_CHAT_PATH) return await formalChat(request, env);
+    if (pathname === '/api/chat/image-generate') {
+      if (request.method !== 'POST') return methodNotAllowed('POST');
+      requireSameOrigin(request);
+      return json(await runManualImageGeneration(env,await body(request)),201);
+    }
     if (pathname === ATTACHMENTS_PATH || pathname.startsWith(`${ATTACHMENTS_PATH}/`)) return await attachments(request, env, pathname);
     if (pathname === LANDING_LETTER_PATH) return await landingLetter(request, env);
     if (pathname === MODEL_METADATA_PATH) return await modelMetadataApi(request, env);

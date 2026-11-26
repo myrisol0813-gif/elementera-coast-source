@@ -1,7 +1,7 @@
 import { fetchModelCatalog } from './models/model-catalog.js';
 import { ModelRequestError } from './models/model-validation.js';
-import { prepareGeneratedImageReadback } from './independent-image.js';
-import { ensureChatSchema, getConversation, readConversationState, sanitizeId } from './chat-store.js';
+import { generateIndependentImage, prepareGeneratedImageReadback } from './independent-image.js';
+import { ensureChatSchema, getConversation, normalizeState, readConversationState, sanitizeId } from './chat-store.js';
 
 export const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
 export const MAX_TEXT_ATTACHMENT_BYTES = 1024 * 1024;
@@ -459,7 +459,7 @@ export function attachmentReceiptOnFailure(receipt, error) {
  * trusted current turn, and return its exact future assistant-variant reference.
  * This is not a public upload endpoint. Caller must reserve/commit the
  * assistant variant and handle cancellation/failure before exposing the tool. */
-export async function saveGeneratedImageOriginal(db,{conversationId,turnId,messageId,generated,visionSupported=null}={}){
+export async function saveGeneratedImageOriginal(db,{conversationId,turnId,messageId,generated,visionSupported=null,reservedUserId=null}={}){
   const valid=v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(v);
   if(![conversationId,turnId,messageId].every(valid))throw new ChatAttachmentError('generated_source_invalid','生成图像缺少确定的回复版本。');
   const conv=await getConversation(db,conversationId);
@@ -477,12 +477,89 @@ export async function saveGeneratedImageOriginal(db,{conversationId,turnId,messa
   const stamp=nowMs();
   const statements=[db.prepare('INSERT INTO chat_attachments (id,conversation_id,turn_id,kind,name,mime,size,data,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)').bind(id,conversationId,turnId,'image',name,generated.mime,generated.bytes.length,new Uint8Array(),stamp,stamp)];
   for(let i=0;i<generated.bytes.length;i+=ATTACHMENT_CHUNK_BYTES)statements.push(db.prepare('INSERT INTO chat_attachment_chunks (attachment_id,chunk_index,data) VALUES (?,?,?)').bind(id,Math.floor(i/ATTACHMENT_CHUNK_BYTES),generated.bytes.slice(i,i+ATTACHMENT_CHUNK_BYTES)));
-  await db.batch(statements);
-  const saved=await getChatAttachmentRecord(db,conversationId,id);
-  const original=bytes(saved.data);
-  if(saved.turn_id!==turnId||original.length!==generated.bytes.length||original.some((v,i)=>v!==generated.bytes[i]))throw new ChatAttachmentError('generated_original_mismatch','图像原件读回校验失败。',500);
   const provenance={message_id:messageId,provider:'openrouter',requested_model:generated.requested_model,prompt:generated.prompt};
   if(typeof generated.reported_model==='string'&&model.test(generated.reported_model))provenance.reported_model=generated.reported_model;
   if(typeof generated.cost_usd==='number'&&Number.isFinite(generated.cost_usd)&&generated.cost_usd>=0)provenance.cost_usd=generated.cost_usd;
-  return {attachment:{...metadata(saved),image_generation:provenance},readback:prepareGeneratedImageReadback({attachmentId:id,bytes:original,mime:saved.mime,visionSupported})};
+  const attachment={...metadata({id,kind:'image',name,mime:generated.mime,size:generated.bytes.length,created_at:stamp}),image_generation:provenance};
+
+  if(reservedUserId!==null){
+    const snap=await first(db,'SELECT state_json FROM conversation_states WHERE conversation_id=?',[conversationId]);
+    const next=normalizeState(JSON.parse(snap?.state_json||'{}'));
+    const t=next.turns.find(x=>x.id===turnId);
+    const idx=t?.user.variants.findIndex(v=>v.id===reservedUserId)??-1;
+    const v=idx<0?null:t.assistant.variantsByUserVariant[String(idx)]?.find(x=>x.id===messageId);
+    if(!v||v.finish_reason!=='image_pending'||v.attachments?.length)throw new ChatAttachmentError('image_reservation_lost','原回复版本已不再等待生成图像。',409);
+    v.attachments=[attachment];v.content='';v.finish_reason='stop';delete v.errorDetail;
+    next.updated_at=iso(stamp);
+    const expected=snap.state_json,encoded=JSON.stringify(normalizeState(next));
+    // All writes share the same CAS guard, and the batch rolls back on any SQL error.
+    const guard='EXISTS (SELECT 1 FROM conversation_states s JOIN conversations c ON c.id=s.conversation_id WHERE s.conversation_id=? AND s.state_json=? AND c.deleted_at IS NULL)';
+    const guarded=[db.prepare('INSERT INTO chat_attachments (id,conversation_id,turn_id,kind,name,mime,size,data,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,?,? WHERE '+guard).bind(id,conversationId,turnId,'image',name,generated.mime,generated.bytes.length,new Uint8Array(),stamp,stamp,conversationId,expected)];
+    for(let i=0;i<generated.bytes.length;i+=ATTACHMENT_CHUNK_BYTES)guarded.push(db.prepare('INSERT INTO chat_attachment_chunks (attachment_id,chunk_index,data) SELECT ?,?,? WHERE '+guard).bind(id,Math.floor(i/ATTACHMENT_CHUNK_BYTES),generated.bytes.slice(i,i+ATTACHMENT_CHUNK_BYTES),conversationId,expected));
+    guarded.push(db.prepare('UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS (SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL)').bind(encoded,stamp,conversationId,expected,conversationId));
+    guarded.push(db.prepare('UPDATE conversations SET updated_at=? WHERE id=? AND deleted_at IS NULL AND EXISTS (SELECT 1 FROM conversation_states WHERE conversation_id=? AND state_json=?)').bind(stamp,conversationId,conversationId,encoded));
+    const results=await db.batch(guarded);
+    if(results.at(-2)?.meta?.changes!==1)throw new ChatAttachmentError('image_state_changed','聊天在保存时发生变化，未覆盖新记录。',409);
+  }else await db.batch(statements);
+  const saved=await getChatAttachmentRecord(db,conversationId,id);
+  const original=bytes(saved.data);
+  if(saved.turn_id!==turnId||original.length!==generated.bytes.length||original.some((v,i)=>v!==generated.bytes[i]))throw new ChatAttachmentError('generated_original_mismatch','图像原件读回校验失败。',500);
+  return {attachment,readback:prepareGeneratedImageReadback({attachmentId:id,bytes:original,mime:saved.mime,visionSupported})};
+}
+
+/** User-triggered independent image request, disabled unless explicitly
+ * configured. Reserve an exact reply before any network call. A repeated
+ * message ID never initiates a second provider request. */
+export async function runManualImageGeneration(env,input,{generate=generateIndependentImage}={}){
+  const fail=(type,message,status=400)=>{throw new ChatAttachmentError(type,message,status);};
+  const id=v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(v);
+  const allowed=['conversation_id','turn_id','user_variant_id','message_id','prompt'];
+  if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!allowed.includes(k)))fail('image_request_invalid','生成图像请求无效。');
+  const {conversation_id:cid,turn_id:tid,user_variant_id:uid,message_id:mid,prompt}=input;
+  if(![cid,tid,uid,mid].every(id)||typeof prompt!=='string'||!prompt.trim()||prompt.trim().length>4000)fail('image_request_invalid','缺少明确的消息版本或绘图提示。');
+  const model=String(env.COAST_INDEPENDENT_IMAGE_MODEL||'').trim(),key=String(env.COAST_INDEPENDENT_IMAGE_KEY||'').trim();
+  if(env.COAST_INDEPENDENT_IMAGE_ENABLED!=='true'||!key||! /^[a-z0-9][a-z0-9_.-]{0,79}\/[a-z0-9][a-z0-9_.-]{0,119}:free$/i.test(model))fail('image_not_configured','尚未配置明确的免费独立生图模型。',503);
+  const db=env.COAST_CHAT_DB;
+  const conv=await getConversation(db,cid);
+  if(!['main','radio'].includes(conv.room_type))fail('generated_surface_invalid','该窗口不允许生成图像。',403);
+  const snapshot=await first(db,'SELECT state_json FROM conversation_states WHERE conversation_id=?',[cid]);
+  if(!snapshot?.state_json)fail('generated_source_invalid','找不到原消息。',409);
+  const state=normalizeState(JSON.parse(snapshot.state_json));
+  const turn=state.turns.find(t=>t.id===tid);
+  const index=turn?.user.variants.findIndex(v=>v.id===uid)??-1;
+  if(index<0||turn.user.active!==index||turn.user.variants[index].hidden)fail('generated_source_invalid','原消息版本已变化。',409);
+  const existing=state.turns.flatMap(t=>[...t.user.variants,...Object.values(t.assistant.variantsByUserVariant).flat()]);
+  if(existing.some(v=>v.id===mid)||existing.some(v=>v.finish_reason==='image_pending'))fail('image_already_reserved','已有生成任务或此请求已使用；不会再次生成。',409);
+  const branch=turn.assistant.variantsByUserVariant[String(index)]||[];
+  if(branch.length>=20)fail('image_branch_full','当前回复版本已满。',409);
+  const stamp=nowMs();
+  branch.push({id:mid,content:'',created_at:iso(stamp),model_id:model,finish_reason:'image_pending',generation_source:'chat'});
+  turn.assistant.variantsByUserVariant[String(index)]=branch;
+  turn.assistant.activeByUserVariant[String(index)]=branch.length-1;
+  state.updated_at=iso(stamp);
+  const reserved=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS (SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL)',[JSON.stringify(normalizeState(state)),stamp,cid,snapshot.state_json,cid]);
+  if(reserved.meta?.changes!==1)fail('image_state_changed','聊天已变化，未发起生成。',409);
+  try{
+    const generated=await generate({key,model,allowPaid:false},{prompt:prompt.trim()});
+    const result=await saveGeneratedImageOriginal(db,{conversationId:cid,turnId:tid,messageId:mid,generated,visionSupported:null,reservedUserId:uid});
+    return {ok:true,attachment:result.attachment,readback:result.readback.receipt,history:{...await readConversationState(db,cid),conversation_id:cid}};
+  }catch(error){
+    // Never retry a provider request. Preserve a committed picture, and only
+    // mark the still-pending exact branch failed if it remains present.
+    for(let attempt=0;attempt<3;attempt++){
+      const row=await first(db,'SELECT state_json FROM conversation_states WHERE conversation_id=?',[cid]);
+      if(!row)break;
+      const next=normalizeState(JSON.parse(row.state_json));
+      const t=next.turns.find(x=>x.id===tid);
+      const i=t?.user.variants.findIndex(v=>v.id===uid)??-1;
+      const v=i<0?null:t.assistant.variantsByUserVariant[String(i)]?.find(x=>x.id===mid);
+      if(!v||v.finish_reason!=='image_pending')break;
+      v.finish_reason='image_failed';v.errorDetail='图像生成或保存未完成；不自动重试，供应商可能已计费。';
+      const ts=nowMs();next.updated_at=iso(ts);
+      const changed=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS (SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL)',[JSON.stringify(normalizeState(next)),ts,cid,row.state_json,cid]);
+      if(changed.meta?.changes===1)break;
+    }
+    if(error instanceof ChatAttachmentError)throw error;
+    fail('image_generation_failed','图像生成或保存未完成；不自动重试，供应商可能已计费。',502);
+  }
 }
