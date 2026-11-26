@@ -47,11 +47,24 @@ export function createChatActions({
       runtime.generation.controller.abort();
       return;
     }
+    if (runtime.pendingComposerSend) return false;
     const pending = attachments?.current?.() || [];
     if (ui.input?.value.trim() || pending.length) {
-      const sent = await send(ui.input?.value || '', pending);
-      if (sent) attachments?.clearSent?.();
-      return sent;
+      const id = runtime.currentId;
+      const text = ui.input?.value || '';
+      const revision = runtime.composerDrafts?.write(id, text);
+      runtime.pendingComposerSend = id;
+      try {
+        const sent = await send(text, pending);
+        if (sent) {
+          runtime.composerDrafts?.accepted(id, revision);
+          if (!runtime.pendingAttachmentConversationId || runtime.pendingAttachmentConversationId === id) attachments?.clearSent?.();
+        }
+        return sent;
+      } finally {
+        runtime.pendingComposerSend = null;
+        composerState();
+      }
     }
     return toast('通话模式还没接入。先输入文字或添加附件。');
   }
@@ -61,7 +74,10 @@ export function createChatActions({
   }
 
   function handleInput(name) {
-    if (name === 'composer') composerState();
+    if (name === 'composer') {
+      runtime.composerDrafts?.write(runtime.currentId, ui.input?.value || '');
+      composerState();
+    }
   }
 
   function handleChange(name, target) {
