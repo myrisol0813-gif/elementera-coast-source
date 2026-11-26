@@ -35,9 +35,9 @@ internal class LocalToolSession private constructor(
             add(Spec("read_mystic_dogtalk","dogtalk.read","读取私人草稿","仅检查当前轮用户明确授权的私人草稿；已经递入本轮的内容不重复读取。保留私密或困惑时阅读的草稿不会通过此工具公开。",schema()))
             add(Spec("memory_search","memory.search","搜索正式记忆","检索已确认的正式记忆，按本机语义索引与关键词返回少量匹配内容；索引不可用时使用关键词。",schema(mapOf("query" to string()),listOf("query"))))
             add(Spec("calendar_list","calendar.list","查看公历日程","读取指定月份本机日历。",schema(mapOf("month" to string(7)),listOf("month"))))
-            add(Spec("library_books","library.books","翻阅书架","列出本机书籍；指定 book_id 时返回目录。",schema(mapOf("book_id" to string()))))
-            add(Spec("library_read","library.read","读书页","读取指定书籍的一页，最多6个段落。",schema(mapOf("book_id" to string(),"chapter_index" to integer(0,100000),"start_paragraph" to integer(0,100000),"limit" to integer(1,6)),listOf("book_id","chapter_index"))))
-            add(Spec("library_notes","library.notes","读书房笔记","读取指定书籍最近20条笔记。",schema(mapOf("book_id" to string()),listOf("book_id"))))
+            add(Spec("library_books","library.books","翻阅书架","不填 book_id 时列出本机书籍及真实 id；从返回的 id 选择书，再指定 book_id 查看目录。不要用书名代替 id。",schema(mapOf("book_id" to string()))))
+            add(Spec("library_read","library.read","读书页","使用书架返回的真实 book_id；chapter_index 与 start_paragraph 从0开始，默认3段、最多6段。",schema(mapOf("book_id" to string(),"chapter_index" to integer(0,100000),"start_paragraph" to integer(0,100000),"limit" to integer(1,6)),listOf("book_id","chapter_index"))))
+            add(Spec("library_notes","library.notes","读书房笔记","读取指定书籍最近20条笔记；可指定从0开始的 chapter_index。",schema(mapOf("book_id" to string(),"chapter_index" to integer(0,100000)),listOf("book_id"))))
             add(Spec("vault_search","vault.search","翻拾潮目录","按关键词查找拾潮，返回短摘录和收藏ID。",schema(mapOf("query" to string()),listOf("query"))))
             add(Spec("vault_read","vault.read","精读拾潮","读取指定收藏的文字与备注。其他窗口原聊天仍受跨窗口权限控制。",schema(mapOf("id" to string()),listOf("id"))))
             add(Spec("list_daily_moments","daily.moments.list","读碳硅圈","读取最近的本机动态，最多8条。",schema()))
@@ -96,6 +96,15 @@ internal class LocalToolSession private constructor(
             else -> readAllowed&&h.contextSettings.localModelToolsEnabled
         }
     }
+    // Optional nulls emitted by function-call providers mean omission; required nulls remain invalid.
+    private fun parseInput(spec:Spec,arguments:String):JsonObject {
+        val raw=Json.parseToJsonElement(arguments).jsonObject
+        val fields=spec.parameters.getValue("properties").jsonObject.keys
+        val required=spec.parameters.getValue("required").jsonArray.map{it.jsonPrimitive.content}.toSet()
+        if(raw.keys.any{it !in fields})throw LocalToolFailure("invalid_arguments","工具包含未声明字段。")
+        if(required.any{raw[it]==null||raw[it]==JsonNull})throw LocalToolFailure("invalid_arguments","缺少必填工具字段："+required.filter{raw[it]==null||raw[it]==JsonNull}.joinToString(","))
+        return JsonObject(raw.filterValues{it!=JsonNull})
+    }
     @Synchronized fun execute(callId:String,name:String,arguments:String):RemoteNativeToolResult {
         val spec=specs.firstOrNull{it.name==name}?:return errorResult("工具未授权。")
         if(calls>=MAX_CALLS||callId.isBlank()||!seenCalls.add(callId))return errorResult("工具次数上限或重复调用。")
@@ -106,8 +115,7 @@ internal class LocalToolSession private constructor(
         var output=buildJsonObject{put("ok",false);put("message","工具没有执行。")}
         try {
             require(arguments.length<=6000){"工具参数超限。"}
-            val input=Json.parseToJsonElement(arguments).jsonObject
-            require(input.keys.all{it in spec.parameters.getValue("properties").jsonObject.keys}&&spec.parameters.getValue("required").jsonArray.all{it.jsonPrimitive.content in input})
+            val input=parseInput(spec,arguments)
             val candidate=store.readConsistent{s->
                 if(!allowedNow(s,spec))throw LocalToolFailure("permission_revoked","窗口权限已关闭或来源轮次已变化。")
                 run(s,spec,input)
@@ -148,8 +156,7 @@ internal class LocalToolSession private constructor(
         val auditId=UUID.randomUUID().toString()
         val output=try {
             require(arguments.length<=12000)
-            val input=Json.parseToJsonElement(arguments).jsonObject
-            require(input.keys.all{it in spec.parameters.getValue("properties").jsonObject.keys}&&spec.parameters.getValue("required").jsonArray.all{it.jsonPrimitive.content in input})
+            val input=parseInput(spec,arguments)
             store.atomic{s->
                 if(!allowedNow(s,spec))throw LocalToolFailure("permission_revoked","当前窗口写入权限已关闭或窗口已变化。")
                 val value=LocalToolWrites(s,cid,turn,modelId,auditId).execute(spec.name,input)
@@ -249,9 +256,9 @@ internal class LocalToolSession private constructor(
                 return JsonObject(rows(items)+("retrieval_status" to JsonPrimitive(recall.retrievalStatus))) to {}
             }
             "calendar_list"->return rows(LocalCalendarStore(s).list(str("month",7)).take(40)) to {}
-            "library_books"->return (if("book_id" in input)buildJsonObject{put("ok",true);put("book",side.book(str("book_id")).filterMetadata())}else rows(side.books().take(40))) to {}
+            "library_books"->return (if(input["book_id"]?.jsonPrimitive?.contentOrNull?.isNotBlank()==true)buildJsonObject{put("ok",true);put("book",side.book(str("book_id")).filterMetadata())}else rows(side.books().take(40))) to {}
             "library_read"->return buildJsonObject{put("ok",true);put("page",side.chapter(str("book_id"),int("chapter_index",0,0..100000),int("start_paragraph",0,0..100000),int("limit",3,1..6)))} to {}
-            "library_notes"->return rows(side.notes(str("book_id")).takeLast(20)) to {}
+            "library_notes"->return rows(side.notes(str("book_id")).filter{note->"chapter_index" !in input || note["chapter_index"]?.jsonPrimitive?.intOrNull==int("chapter_index",0,0..100000)}.takeLast(20)) to {}
             "vault_search"->{
                 val q=str("query")
                 val found=side.treasureRows("all",q,"","",0).getValue("items").jsonArray.take(10).map{v->
