@@ -1,6 +1,6 @@
 import {recoverImageTasks,protectImageHistory,IMAGE_RECOVERY_MS} from '../functions/image-task-recovery.js';
 import { attachImageTool } from '../functions/chat-image-tool.js';
-import { performFormalChatWithTools } from '../functions/models/model-formal-chat-core.js';
+import { performFormalChatWithTools,performFormalChatStream } from '../functions/models/model-formal-chat-core.js';
 import { D1Database } from './d1-helper.mjs';
 import { createConversation, readConversationState, writeConversationState, writeProfile } from '../functions/chat-store.js';
 import {
@@ -221,3 +221,37 @@ const deletionRevision=await readConversationState(jobDb,toolChat.id);
 await assert.rejects(()=>writeConversationState(jobDb,toolChat.id,{turns:[]}),e=>e.type==='image_history_changed');
 await assert.rejects(()=>writeConversationState(jobDb,toolChat.id,{turns:[]},{deleteRevision:'wrong'}),e=>e.type==='image_history_changed');
 assert.equal((await writeConversationState(jobDb,toolChat.id,{turns:[]},{deleteRevision:deletionRevision.updated_at})).turns.length,0);
+
+for(const vision of [true,false,null]){
+  const c=await createConversation(jobDb,'流式绘图','main');
+  const h={turns:[{id:'sse-turn',user:{variants:[{id:'sse-user',content:'draw'}]},assistant:{variantsByUserVariant:{0:[{id:'sse-assistant',content:'',finish_reason:'image_tool_ready'}]}}}]};
+  await writeConversationState(jobDb,c.id,h);
+  const tool=await attachImageTool(jobEnv,fakeBase,{...toolArgs,conversationId:c.id,turnId:'sse-turn',messageId:'sse-assistant',expectedImageModel:'fixture/paid'},{...deps,catalog:async()=>({groups:{openai_chat:[{id:'openai/gpt-fixture',architecture:vision===null?{}:{input_modalities:vision?['text','image']:['text']}}]}})});
+  const sse=(...chunks)=>new Response(chunks.map(v=>'data: '+JSON.stringify(v)+'\n\n').join('')+'data: [DONE]\n\n',{headers:{'Content-Type':'text/event-stream'}});
+  let rounds=0;const events=[];
+  try{
+    globalThis.fetch=async(url,options={})=>{
+      const p=JSON.parse(options.body);rounds++;
+      if(rounds===1)return sse({model:'openai/gpt-fixture',choices:[{delta:{tool_calls:[{index:0,id:'img-sse',type:'function',function:{name:'image_generate',arguments:'{"prompt":"wolf"}'}}]},finish_reason:'tool_calls'}]});
+      const output=p.messages.find(m=>m.role==='tool');
+      assert.doesNotMatch(output.content,/data:image|base64/);
+      assert.equal(JSON.parse(output.content).readback.status,vision===true?'prepared':vision===false?'model_no_vision':'vision_unknown');
+      if(vision===true){
+        assert.equal(p.messages.at(-1).content[1].image_url.url,'data:image/png;base64,'+btoa(String.fromCharCode(...generatedPng)));
+        // Exercise a genuine continuation failure after the image has already been saved.
+        return new Response('{"error":{"message":"fixture continuation failure"}}',{status:502});
+      }
+      assert.equal(p.messages.at(-1).role,'tool');
+      assert.doesNotMatch(JSON.stringify(p.messages),/data:image|base64/);
+      return sse({model:'openai/gpt-fixture',choices:[{delta:{},finish_reason:'stop'}]});
+    };
+    const consume=async()=>{for await(const event of performFormalChatStream(jobEnv,{model:'openai/gpt-fixture',messages:[{role:'user',content:'draw'}],tools:tool.tools},{executeTool:tool.executeTool,takePrivateContinuation:tool.takePrivateContinuation,hasGeneratedImage:tool.hasGeneratedImage}))events.push(event);};
+    if(vision===true)await assert.rejects(consume);else await consume();
+  }finally{globalThis.fetch=originalFetch;}
+  assert.equal(rounds,2);
+  assert.equal(events.find(e=>e.event==='tool').data.result.status,'saved');
+  assert.doesNotMatch(JSON.stringify(events),/data:image|base64/);
+  const saved=(await readConversationState(jobDb,c.id)).turns[0].assistant.variantsByUserVariant['0'][0];
+  assert.equal(saved.attachments.length,1);
+  assert.deepEqual(new Uint8Array((await getChatAttachmentRecord(jobDb,c.id,saved.attachments[0].id)).data),generatedPng);
+}
