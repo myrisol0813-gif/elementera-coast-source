@@ -48,13 +48,14 @@ data class BasicSettings(
     val seedCooldownTurns: Int = 2,
     val worldbookEnabled: Boolean = true,
     val worldbookLimit: Int = 3,
-    val memoryLimit: Int = 8
+    val memoryLimit: Int = 8,
+    val toolCallLimit: Int = 24
 ) {
     companion object {
         val activeFieldNames = listOf(
             "recentTurns", "contextBudget", "outputLength", "maxOutputTokens", "creativity",
             "streamingEnabled", "soilBudget", "seedCooldownTurns", "worldbookEnabled",
-            "worldbookLimit", "memoryLimit"
+            "worldbookLimit", "memoryLimit", "toolCallLimit"
         )
     }
 }

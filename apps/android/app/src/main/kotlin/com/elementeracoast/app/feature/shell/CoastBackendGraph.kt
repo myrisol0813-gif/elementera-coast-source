@@ -66,7 +66,8 @@ data class CoastBackendGraph(
             val metadataRemote = ModelMetadataRemoteDataSource(config, http)
             val titleRemote = ConversationTitleRemoteDataSource(config, http)
             val reasoning = ReasoningEffortStore.production(context)
-            val chatRepository = DefaultChatRepository(api, cache, metadataRemote, reasoningStore = reasoning)
+            val toolLimit = { com.elementeracoast.app.core.network.TurnToolPolicy.stored(persistence) }
+            val chatRepository = DefaultChatRepository(api, cache, metadataRemote, reasoningStore = reasoning,toolLimit=toolLimit)
             return CoastBackendGraph(
                 auth = DefaultAuthRepository(authStore, api),
                 conversations = DefaultConversationRepository(api, cache, titleRemote),
@@ -81,7 +82,7 @@ data class CoastBackendGraph(
                 dogtalk = DefaultDogtalkRepository(config, http),
                 crossWindow = DefaultCrossWindowRepository(config, http),
                 archive = DefaultGlobalArchiveRepository(api),
-                officialChat = chatGptPlan?.let { NativeChatGptTurnRepository(api, chatRepository, it, reasoning) }
+                officialChat = chatGptPlan?.let { NativeChatGptTurnRepository(api, chatRepository, it, reasoning,toolLimit=toolLimit) }
             )
         }
     }

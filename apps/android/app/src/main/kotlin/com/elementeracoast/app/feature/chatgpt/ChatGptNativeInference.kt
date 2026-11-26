@@ -310,8 +310,8 @@ internal class ChatGptNativeInference(
                 var usageTotal = NativeChatUsage()
                 var callsMade = 0
 
-                val toolLimit = (prepared.limitations?.maxToolsPerTurn ?: 12).coerceIn(1, TurnToolPolicy.MAX_CALLS)
-                for (round in 0..TurnToolPolicy.MAX_ROUNDS) {
+                val toolLimit = minOf(TurnToolPolicy.normalize(request.settings["toolCallLimit"]?.toIntOrNull()), (prepared.limitations?.maxToolsPerTurn ?: 12).coerceIn(1,TurnToolPolicy.MAX_CALLS))
+                for (round in 0..toolLimit) {
                     val finalOnly = TurnToolPolicy.finalOnly(round, callsMade, toolLimit)
                     val body = buildJsonObject {
                         put("model", model)

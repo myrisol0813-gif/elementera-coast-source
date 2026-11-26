@@ -77,6 +77,7 @@ internal class LocalToolSession private constructor(
     private val read=linkedSetOf<RemoteCrossWindowMessageSelection>()
     private val preciseRead=linkedSetOf<RemoteCrossWindowMessageSelection>()
     private val seenCalls=mutableSetOf<String>()
+    val maxCalls=com.elementeracoast.app.core.network.TurnToolPolicy.stored(store)
     private var calls=0
     private var applyResult:()->Unit = {}
     private var estimated=base.contextBudget.estimatedTokens+estimate(tools.toString())
@@ -117,7 +118,7 @@ internal class LocalToolSession private constructor(
     }
     @Synchronized fun execute(callId:String,name:String,arguments:String):RemoteNativeToolResult {
         val spec=specs.firstOrNull{it.name==name}?:return errorResult("工具未授权。")
-        if(calls>=MAX_CALLS||callId.isBlank()||!seenCalls.add(callId))return errorResult("工具次数上限或重复调用。")
+        if(calls>=maxCalls||callId.isBlank()||!seenCalls.add(callId))return errorResult("工具次数上限或重复调用。")
         calls++
         val start=System.currentTimeMillis()
         if(name=="image_generate")return executeImage(spec,arguments,start)

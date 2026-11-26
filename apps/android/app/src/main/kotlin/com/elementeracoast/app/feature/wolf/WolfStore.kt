@@ -142,7 +142,8 @@ class WolfStore(private val persistence: LocalPersistence) {
                 seedCooldownTurns = int(KEY_SEED_COOLDOWN, 2),
                 worldbookEnabled = bool(KEY_WORLDBOOK_ENABLED, true),
                 worldbookLimit = int(KEY_WORLDBOOK_LIMIT, 3),
-                memoryLimit = int(KEY_MEMORY_LIMIT, 8)
+                memoryLimit = int(KEY_MEMORY_LIMIT, 8),
+                toolCallLimit = com.elementeracoast.app.core.network.TurnToolPolicy.stored(persistence)
             ).normalized()
         )
     }
@@ -175,6 +176,7 @@ class WolfStore(private val persistence: LocalPersistence) {
         persistence.put(KEY_WORLDBOOK_ENABLED, basic.worldbookEnabled.toString())
         persistence.put(KEY_WORLDBOOK_LIMIT, basic.worldbookLimit.toString())
         persistence.put(KEY_MEMORY_LIMIT, basic.memoryLimit.toString())
+        persistence.put(com.elementeracoast.app.core.network.TurnToolPolicy.STORE_KEY,basic.toolCallLimit.toString())
     }
 
     private fun BasicSettings.normalized() = copy(
@@ -186,7 +188,8 @@ class WolfStore(private val persistence: LocalPersistence) {
         soilBudget = soilBudget.coerceIn(300, 4000),
         seedCooldownTurns = seedCooldownTurns.coerceIn(0, 8),
         worldbookLimit = worldbookLimit.coerceIn(0, 6),
-        memoryLimit = memoryLimit.coerceIn(0, 12)
+        memoryLimit = memoryLimit.coerceIn(0, 12),
+        toolCallLimit = com.elementeracoast.app.core.network.TurnToolPolicy.normalize(toolCallLimit)
     )
 
     private fun sanitizeHex(value: String): String {

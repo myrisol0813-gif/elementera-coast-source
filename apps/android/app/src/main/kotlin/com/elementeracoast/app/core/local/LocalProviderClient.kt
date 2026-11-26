@@ -181,8 +181,9 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
         val reader=launch(Dispatchers.IO) {
             try {
                 var callsMade=0
-                for(round in 0..TurnToolPolicy.MAX_ROUNDS){
-                    val finalOnly=TurnToolPolicy.finalOnly(round,callsMade)
+                val limit=session?.maxCalls?:TurnToolPolicy.DEFAULT_CALLS
+                for(round in 0..limit){
+                    val finalOnly=TurnToolPolicy.finalOnly(round,callsMade,limit)
                     val payload=buildJsonObject {
                         put("model",model);put("stream",true)
                         val host=normalizeLocalProviderUrl(p.baseUrl).toHttpUrl().host
@@ -250,7 +251,7 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                     }}
                     history.add(buildJsonObject{put("role","assistant");put("content",if(roundText.isEmpty())JsonNull else JsonPrimitive(roundText.toString()));put("tool_calls",JsonArray(calls))})
                     for(part in pending.values){
-                        val result=if(TurnToolPolicy.canExecute(callsMade)){
+                        val result=if(TurnToolPolicy.canExecute(callsMade,limit)){
                             callsMade++
                             session.execute(part.id.toString(),part.name.toString(),part.arguments.toString())
                         }else com.elementeracoast.app.core.remote.RemoteNativeToolResult(ok=false,output=TurnToolPolicy.LIMIT_RECEIPT,deskSlip=session.receipt)

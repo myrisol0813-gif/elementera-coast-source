@@ -82,7 +82,8 @@ class DefaultChatRepository(
     private val cache: RemoteCacheStore,
     private val metadataRemote: ModelMetadataRemoteDataSource? = null,
     private val json: Json = Json { ignoreUnknownKeys = true; explicitNulls = false },
-    private val reasoningStore: ReasoningEffortStore? = null
+    private val reasoningStore: ReasoningEffortStore? = null,
+    private val toolLimit: () -> Int = { com.elementeracoast.app.core.network.TurnToolPolicy.DEFAULT_CALLS }
 ) : ChatRepository {
     override fun cachedHistory(conversationId: String): RemoteHistory? = cache.history(conversationId)
 
@@ -153,7 +154,8 @@ class DefaultChatRepository(
                 "recentTurns" to normalizedRecentTurns.toString(),
                 "contextBudget" to (if(contextBudget==0)0 else contextBudget.coerceAtLeast(1800)).toString(),
                 "outputLength" to outputLength,
-                "maxOutputTokens" to maxOutputTokens.coerceIn(64, 65536).toString()
+                "maxOutputTokens" to maxOutputTokens.coerceIn(64, 65536).toString(),
+                "toolCallLimit" to com.elementeracoast.app.core.network.TurnToolPolicy.normalize(toolLimit()).toString()
             ) + (effort?.let { mapOf("reasoningEffort" to it) } ?: emptyMap()),
             crossWindow = crossWindow.toRemote(),
             stream = true,

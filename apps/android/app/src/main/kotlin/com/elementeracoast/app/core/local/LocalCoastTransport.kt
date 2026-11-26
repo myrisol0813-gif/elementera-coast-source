@@ -269,7 +269,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 tools = session?.tools?:JsonArray(emptyList()),
                 modelMessages = localMultimodalMessages(prepared.messages,prepared.imageParts),
                 deskSlip = session?.receipt?:prepared.receipt,
-                limitations = RemoteNativeToolLimits(LocalToolSession.MAX_CALLS)
+                limitations = RemoteNativeToolLimits(session?.maxCalls?:com.elementeracoast.app.core.network.TurnToolPolicy.stored(store))
             )).jsonObject)
         }
         if (path == "/api/chat/message-metadata" && method == "GET") {

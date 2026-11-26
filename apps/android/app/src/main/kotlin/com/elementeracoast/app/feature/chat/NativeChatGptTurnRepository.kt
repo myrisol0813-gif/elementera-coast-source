@@ -30,7 +30,8 @@ internal class NativeChatGptTurnRepository(
     private val api: CoastApiClient,
     private val historyRepository: ChatRepository,
     private val account: ChatGptPlanRepository,
-    private val reasoningStore: ReasoningEffortStore? = null
+    private val reasoningStore: ReasoningEffortStore? = null,
+    private val toolLimit: () -> Int = { com.elementeracoast.app.core.network.TurnToolPolicy.DEFAULT_CALLS }
 ) : ChatRepository by historyRepository {
     private val inference = ChatGptNativeInference(account, api)
 
@@ -70,7 +71,8 @@ internal class NativeChatGptTurnRepository(
                 // These remain user-visible but unsupported by the ChatGPT plan route;
                 // the provider adapter never sends forbidden max_output_tokens.
                 "outputLength" to outputLength,
-                "maxOutputTokens" to maxOutputTokens.coerceIn(64, 65536).toString()
+                "maxOutputTokens" to maxOutputTokens.coerceIn(64, 65536).toString(),
+                "toolCallLimit" to com.elementeracoast.app.core.network.TurnToolPolicy.normalize(toolLimit()).toString()
             ),
             crossWindow = crossWindow.toRemote(),
             stream = true,
