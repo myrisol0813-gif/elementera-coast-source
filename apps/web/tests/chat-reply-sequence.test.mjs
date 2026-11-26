@@ -214,3 +214,35 @@ assert.ok(deskGroup.every(v=>v.desk_slip.cross_window.messages.some(g=>g.message
 assert.equal((await getMysticDogtalk(routeDb,draftScope)).read_mode,'read_now');
 assert.equal((await getMysticDogtalk(routeDb,draftScope)).body,'fresh unsubmitted draft');
 assert.ok(deskGroup.every(v=>v.desk_slip.dogtalk.context.includes('original authorized draft')));
+
+const {uploadOwnerSticker}=await import('../functions/sticker-library.js');
+const {getChatAttachmentRecord}=await import('../functions/chat-attachments.js');
+const mediaCv=await createConversation(routeDb,'group media route','main');
+const png=Uint8Array.from([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,6,0,0,0]);
+const sticker=await uploadOwnerSticker(routeDb,{name:'group.png',mime:'image/png',description:'group media',bytes:png},{actor:'owner'});
+await writeConversationState(routeDb,mediaCv.id,{context_settings:{reply_sequence_enabled:true,sticker_send_enabled:true},turns:[{id:'media-turn',user:{variants:[{id:'media-user',content:'hello'}]}}]});
+const mediaBody={conversation_id:mediaCv.id,source_turn_id:'media-turn',user_variant_id:'media-user',sequence_id:'media-run',model:'openai/gpt-4.1-nano',settings:{streamingEnabled:false,contextBudget:6000},budget:{maxMessages:2,toolBudget:2,tokenBudget:48000}};
+let mediaCalls=0;
+try{
+  globalThis.fetch=async(url,options={})=>{
+    if(String(url).includes('/models?'))return new Response(JSON.stringify({data:[{id:'openai/gpt-4.1-nano',name:'fixture',architecture:{input_modalities:['text'],output_modalities:['text']},pricing:{prompt:'0.1',completion:'0.2'},supported_parameters:['tools','tool_choice']}]}),{headers:{'Content-Type':'application/json'}});
+    const payload=JSON.parse(options.body);mediaCalls++;
+    if(mediaCalls===1)assert.ok(payload.tools.some(t=>t.function?.name==='sticker_send'));
+    if(mediaCalls===3){
+      const first=(await readConversationState(routeDb,mediaCv.id)).turns[0].assistant.variantsByUserVariant['0'][0];
+      assert.equal(first.content,'');assert.equal(first.attachments.length,1);
+      assert.ok(payload.messages.some(m=>typeof m.content==='string'&&m.content.includes('本组前序媒体')&&m.content.includes(first.id)));
+    }
+    const choice=mediaCalls===1?{finish_reason:'tool_calls',message:{content:null,tool_calls:[
+      {id:'sticker-call',type:'function',function:{name:'sticker_send',arguments:JSON.stringify({sticker_id:sticker.id})}},
+      {id:'more-call',type:'function',function:{name:'continue_reply',arguments:'{}'}}
+    ]}}:{finish_reason:'stop',message:{content:mediaCalls===2?'':'after sticker'}};
+    return new Response(JSON.stringify({model:mediaBody.model,usage:{prompt_tokens:100,completion_tokens:20,total_tokens:120},choices:[choice]}),{headers:{'Content-Type':'application/json'}});
+  };
+  const response=await routeChatApi(new Request('https://coast.test/api/chat/reply-sequence',{method:'POST',headers:{Origin:'https://coast.test','Content-Type':'application/json'},body:JSON.stringify(mediaBody)}),routeEnv);
+  const events=await response.text();assert.equal((events.match(/event: reply_committed/g)||[]).length,2,events.slice(-1500));
+  const group=(await readConversationState(routeDb,mediaCv.id)).turns[0].assistant.variantsByUserVariant['0'];
+  assert.equal(group.length,2);assert.equal(group[1].content,'after sticker');
+  assert.deepEqual(new Uint8Array((await getChatAttachmentRecord(routeDb,mediaCv.id,group[0].attachments[0].id)).data),png);
+  assert.equal(group[1].desk_slip.reply_sequence_previous[0].media_receipt.not_delivered[0].reason,'model_no_vision');
+}finally{globalThis.fetch=routeFetch;}

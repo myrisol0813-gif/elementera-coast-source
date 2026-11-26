@@ -85,7 +85,7 @@ export async function claimReplyStep(db,identity,messageId){
     Date.now(),identity.sequenceId,messageId,identity.conversationId,raw).run();
   if(!changes(changed))return null;
   return {index,mayContinue:index+1<row.max_messages&&list.length+1<20,toolBudget:budget.tools,tokenBudget:budget.tokens,
-    previous:list.filter(v=>v.reply_sequence?.id===identity.sequenceId).map(v=>({id:v.id,content:v.content}))};
+    previous:list.filter(v=>v.reply_sequence?.id===identity.sequenceId).map(v=>({id:v.id,content:v.content,...(v.attachments?.length?{attachments:v.attachments}: {})}))};
 }
 // Materialize a media reservation only for the currently claimed step.
 // It is not a committed group member until commitReplyStep promotes it.

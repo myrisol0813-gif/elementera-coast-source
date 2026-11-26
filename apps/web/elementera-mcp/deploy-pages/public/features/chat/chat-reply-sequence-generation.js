@@ -15,10 +15,7 @@ export function createReplySequenceGenerator({runtime,toast,dogtalk,setHistory,c
     if(!userId)return false;
     const cfg=resolveReplySequenceBudget(runtime.runSettings()||{},original.context_settings,branch.assistants.length);
     if(!cfg.maxMessages){toast('当前回复分支已满，请先整理旧版本；没有发起模型请求。');return false;}
-    if(runtime.profile.current_image_model||original.context_settings.sticker_send_enabled||original.context_settings.sticker_add_enabled){
-      toast('连续回复的媒体工具尚未接通；没有偷偷切换普通回复。');return false;
-    }
-    const sequenceId=crypto.randomUUID(),controller=new AbortController();
+     const sequenceId=crypto.randomUUID(),controller=new AbortController();
     const task={conversationId,turnId,userIndex:branch.userIndex,assistantIndex:-1,controller,sequenceId};
     runtime.generation=task;composerState();
     const modelId=runtime.profile.current_chat_model||DEFAULT_MODEL;
@@ -31,7 +28,7 @@ export function createReplySequenceGenerator({runtime,toast,dogtalk,setHistory,c
       if(controller.signal.aborted)return true;
       const payload={conversation_id:conversationId,source_turn_id:turnId,user_variant_id:userId,sequence_id:sequenceId,
         model:modelId,settings:requestContext.settings,budget:cfg,local_date:localDateKey(),local_datetime:localDateTimeKey(),
-        recent_entry_ids:requestContext.recentEntryIds,...(crossWindowSubmission?{cross_window:crossWindowSubmission}:{}),...(dogtalkSubmission?{dogtalk:dogtalkSubmission}:{})};
+        recent_entry_ids:requestContext.recentEntryIds,...(runtime.profile.current_image_model?{image_tool_enabled:true,image_model_id:runtime.profile.current_image_model}:{}),...(crossWindowSubmission?{cross_window:crossWindowSubmission}:{}),...(dogtalkSubmission?{dogtalk:dogtalkSubmission}:{})};
       await requestChatStream(payload,{endpoint:API.replySequence,signal:controller.signal,onEvent:item=>{
         const data=item.data||{};
         if(runtime.deletedIds.has(conversationId)){controller.abort();return;}
@@ -68,6 +65,7 @@ export function createReplySequenceGenerator({runtime,toast,dogtalk,setHistory,c
         }
         if(item.event==='reply_group_end'){
           if(data.saved!==committed||typeof data.status!=='string')throw Error('unconfirmed_reply_group_end');
+          if(data.history)canonical=setHistory(conversationId,data.history);
           ended=data;return;
         }
       }});

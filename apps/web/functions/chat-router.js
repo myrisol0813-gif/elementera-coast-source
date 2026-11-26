@@ -1,7 +1,7 @@
 import { attachImageTool } from './chat-image-tool.js';
 import { attachStickerTools } from './chat-sticker-tool.js';
 import { prepareReplyGroupDogtalk } from './dogtalk-store.js';
-import { canonicalReplyContext, executeDurableReplyRun, isReplyRunActive, recoverStaleReplyRuns } from './chat-reply-run.js';
+import { canonicalReplyContext, executeDurableReplyRun, isReplyRunActive, recoverStaleReplyRuns, reserveReplyMedia } from './chat-reply-run.js';
 import {
   apiError,
   json,
@@ -481,8 +481,9 @@ async function replySequenceChat(request,env){
   const identity={conversationId:value.conversation_id,turnId:value.source_turn_id,userVariantId:value.user_variant_id,sequenceId:value.sequence_id};
   const conversation=await getConversation(db,identity.conversationId);
   const initial=await readConversationState(db,identity.conversationId);
-  if(initial.context_settings.sticker_send_enabled||initial.context_settings.sticker_add_enabled||value.image_tool_enabled===true)
-    throw new ChatStoreError('reply_sequence_media_unavailable','连续回复的媒体工具预约尚未接通，请勿在此测试路径启用。',409);
+  const imageModel=value.image_tool_enabled===true?(await readProfile(db)).current_image_model:'';
+  if(value.image_tool_enabled===true&&(!imageModel||imageModel!==value.image_model_id))
+    throw new ChatStoreError('image_model_changed','生图模型选择已变化；请刷新后重新发起。',409);
   if(value.dogtalk&&(!value.dogtalk.snapshot_id||typeof value.dogtalk!=='object'||Array.isArray(value.dogtalk)))
     throw new ChatStoreError('dogtalk_group_scope_mismatch','私人草稿缺少明确的一次性提交身份。',409);
   const settings=formalChatRequestSettings(value.settings||{});
@@ -509,22 +510,47 @@ async function replySequenceChat(request,env){
             const activeUser=turn.user.variants[turn.user.active];
             const attachmentIds=(activeUser.attachments||[]).map(a=>a.id);
             const groupDogtalk=step.index===0?await prepareReplyGroupDogtalk(db,{conversationId:identity.conversationId,turnId:identity.turnId,user:activeUser,submission:value.dogtalk}):deliveredDogtalk;
-            const assembled=await assembleCleanContext(env,{
+            let assembled=await assembleCleanContext(env,{
               conversationId:identity.conversationId,sourceTurnId:identity.turnId,messages,lastUser,
               settings,localDate:localDate(value.local_date),localDateTime:value.local_datetime,
               realityContext:value.reality_context,realityAllowedFields:PWA_REALITY_FIELDS,
               surface:conversationSurface(conversation.room_type),model:value.model,
               permission:'owner',recentEntryIds:value.recent_entry_ids,preview:step.index>0,crossWindow:value.cross_window,groupDogtalk,
             });
+            const sticker=step.state.context_settings.sticker_send_enabled||step.state.context_settings.sticker_add_enabled;
+            if(step.toolBudget>0&&(imageModel||sticker)){
+              if(imageModel&&(await readProfile(db)).current_image_model!==imageModel)throw new ChatStoreError('image_model_changed','生图模型已变化，未继续请求。',409);
+              if(!await reserveReplyMedia(db,identity,step.messageId,value.model,{image:!!imageModel,sticker:!!sticker}))
+                throw new ChatStoreError('reply_media_reservation_lost','媒体预约未确认；没有发起模型请求。',409);
+              const mediaOptions={conversationId:identity.conversationId,turnId:identity.turnId,messageId:step.messageId,
+                roomType:conversation.room_type,chatModel:value.model,enabled:!!imageModel,expectedImageModel:imageModel||null,signal:step.signal,sequenceId:identity.sequenceId};
+              assembled=await attachImageTool(env,assembled,mediaOptions);
+              assembled=await attachStickerTools(env,assembled,mediaOptions);
+            }
             const resolved=attachmentIds.length?await resolveChatAttachmentsForModel(env,db,{
               conversationId:identity.conversationId,turnId:identity.turnId,attachmentIds,modelId:value.model
             }):null;
             const base=resolved?applyChatAttachmentsToMessages(assembled.modelMessages,resolved):assembled.modelMessages;
             // No synthetic human message; these are exact prior committed
             // assistant messages from this sequence, not untrusted client text.
-            const modelMessages=[...base,...step.previous.map(v=>({role:'assistant',content:v.content}))];
+            const modelMessages=[...base],previousMedia=[];
+            for(const v of step.previous){
+              if(v.content.trim())modelMessages.push({role:'assistant',content:v.content});
+              if(!v.attachments?.length)continue;
+              const ids=v.attachments.filter(a=>a.image_generation?.message_id===v.id||a.sticker_delivery?.message_id===v.id).map(a=>a.id);
+              if(!ids.length)continue;
+              const media=await resolveChatAttachmentsForModel(env,db,{conversationId:identity.conversationId,attachmentIds:ids,modelId:value.model});
+              const receipt=attachmentDeskReceipt(media);
+              previousMedia.push({message_id:v.id,receipt});
+              const note='【本组前序媒体 · 系统转交，非人类新发言】原助手消息 '+v.id+'；已保存图像 '+ids.join('、')+'。'+(media.image_parts.length?'附实际像素。':'本次未递入像素，不要声称看见。');
+              // Chat Completions accepts image_url only on its user transport
+              // role. This is a labelled system transfer, not a new chat turn.
+              if(media.image_parts.length)modelMessages.push({role:'user',content:[{type:'text',text:note},...media.image_parts]});
+              else modelMessages.push({role:'system',content:note});
+            }
             const input={model:value.model,messages:modelMessages,settings,tools:assembled.tools,web_search_query:lastUser.content};
-            const options={allowSystem:base[0]?.role==='system',signal:step.signal,executeTool:assembled.executeTool,
+            const options={allowSystem:modelMessages.some(m=>m.role==='system'),signal:step.signal,executeTool:assembled.executeTool,
+              takePrivateContinuation:assembled.takePrivateContinuation,hasGeneratedImage:assembled.hasGeneratedImage,
               replySequence:{mayContinue:step.mayContinue,toolBudget:step.toolBudget,tokenBudget:step.tokenBudget}};
             let content='',usage=null,finishReason='',model=value.model,receipt=null,serverTools=null;
             if(step.signal.aborted)throw new DOMException('Aborted','AbortError');
@@ -542,16 +568,16 @@ async function replySequenceChat(request,env){
               receipt=data.reply_sequence_receipt;serverTools=data.server_tools;
               await saveModelEcho(env,identity.conversationId,step.messageId,data.model_metadata);
             }
-            if(!receipt||!content.trim()||!finishReason)throw new ChatStoreError('reply_sequence_incomplete','模型未返回可保存的完整回复。',502);
+            if(!receipt||(!content.trim()&&!assembled.hasGeneratedImage?.())||!finishReason)throw new ChatStoreError('reply_sequence_incomplete','模型未返回可保存的完整回复。',502);
             const desk=withRuntimeDeskSlip(assembled.deskSlip(),{attachments:attachmentDeskReceipt(resolved),serverTools});
             if(step.index===0)deliveredDogtalk=desk.dogtalk?.delivered&&desk.dogtalk.context?{context:desk.dogtalk.context,selected:true,reason:'same_group'}:null;
-            if(step.previous.length)desk.reply_sequence_previous=step.previous.map(v=>({message_id:v.id,content:v.content}));
+            if(step.previous.length)desk.reply_sequence_previous=step.previous.map(v=>({message_id:v.id,content:v.content,...(previousMedia.find(m=>m.message_id===v.id)?{media_receipt:previousMedia.find(m=>m.message_id===v.id).receipt}:{})}));
             return {variant:{id:step.messageId,content,model_id:model,finish_reason:finishReason,generation_source:'chat',
               ...(usage?{usage}:{}),furniture_runs:assembled.furnitureRuns(),
               desk_slip:desk},receipt};
           }
         });
-        emit('reply_group_end',result);
+        emit('reply_group_end',{...result,...(!['completed','limit_reached'].includes(result.status)?{history:await readConversationState(db,identity.conversationId)}:{})});
       }catch(error){emit('reply_group_error',safeStreamError(error));}
       finally{request.signal?.removeEventListener('abort',abort);try{output.close();}catch{}}
     },
