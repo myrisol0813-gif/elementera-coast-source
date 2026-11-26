@@ -202,7 +202,7 @@ export function createChatGeneration({
     if (runtime.generation?.controller === controller) runtime.generation = null;
     renderMessages(conversationId);
     composerState();
-    await saveHistory(conversationId, latest).catch(() => undefined);
+    if (!await saveHistory(conversationId, latest).then(() => !runtime.deletedIds.has(conversationId), () => false)) return false;
     runtime.desk?.onConversationChanged(latest, conversationId);
     if (generated) void voice?.load(conversationId, { force: true });
     if (generated) { dogtalk?.resetCrossWindow?.({ room_scope: 'conversation', conversation_id: conversationId }); autoTitle(conversationId, latest, turnId).catch(() => undefined); }
@@ -221,6 +221,7 @@ export function createChatGeneration({
       else if (soilFailed) toast('回复已保存，整理当前对话的纸条已保底整理。', 3000);
       else if (lockedBlank) toast('整理当前对话的纸条目前为空且已手动锁定；恢复自动整理后会继续更新。', 3200);
     }
+    return true;
   }
 
   async function send(text, attachments = []) {
@@ -240,14 +241,15 @@ export function createChatGeneration({
       attachments: attachmentList,
     });
     setHistory(runtime.currentId, appended.state);
-    ui.input.value = '';
     composerState();
     renderMessages();
     const conversation = runtime.conversations.find((item) => item.id === runtime.currentId);
-    if (conversation?.room_type === 'lighthouse') await saveHistory(runtime.currentId, appended.state).catch(() => undefined);
-    else await generate(runtime.currentId, appended.turn.id, turnPapers);
-    dogtalk?.mountComposer(ui.dogtalk, target);
-    return true;
+    const id = target.conversation_id;
+    const accepted = conversation?.room_type === 'lighthouse'
+      ? await saveHistory(id, appended.state).then(() => !runtime.deletedIds.has(id), () => false)
+      : await generate(id, appended.turn.id, turnPapers);
+    if (runtime.currentId === id) dogtalk?.mountComposer(ui.dogtalk, target);
+    return accepted === true;
   }
 
   return Object.freeze({ contextMessages, chatRequestContext, patchGeneratedVariant, generate, sendLandingLetter, autoTitle, autoTitleFromLanding, send });
