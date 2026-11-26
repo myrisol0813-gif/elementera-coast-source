@@ -125,4 +125,31 @@ class ArchiveV2LocalTest {
         }finally{root.deleteRecursively()}
     }
 
+    @Test fun explicitDeviceSettingsArchiveKeepsBudgetZeroAndDoesNotMoveCredentials(){
+        val root=Files.createTempDirectory("coast-device-settings").toFile()
+        try{
+            val source=MemoryLocalPersistence();val target=MemoryLocalPersistence()
+            source.put("wolf.replySequenceMaxMessages","7");source.put("wolf.replySequenceToolBudget","0")
+            source.put("wolf.replySequenceTokenBudget","95000");source.put("wolf.toolCallLimit","41")
+            source.put("wolf.contextBudget","0");source.put("provider.secret","not-exported")
+            target.put("wolf.replySequenceTokenBudget","12000");target.put("provider.secret","target-secret")
+            val app="com.elementeracoast.source";val file=File(root,"device.zip")
+            val m=ArchiveV2Local.export(source,app,file,root);val stage=ArchiveV2Stage(File(root,"stage"),"device")
+            assertEquals(m,ArchiveV2ZipReader.stage(file,stage))
+            assertEquals(1,ArchiveV2Local.restore(m,stage,setOf("appearance"),app,target,false,root).counts.getValue("appearance").ready)
+            assertEquals("12000",target.get("wolf.replySequenceTokenBudget"))
+            ArchiveV2Local.restore(m,stage,setOf("appearance"),app,target,true,root)
+            val b=com.elementeracoast.app.feature.wolf.WolfStore(target).state.value.basic
+            assertEquals(7,b.replySequenceMaxMessages);assertEquals(0,b.replySequenceToolBudget)
+            assertEquals(95000,b.replySequenceTokenBudget);assertEquals(41,b.toolCallLimit);assertEquals(0,b.contextBudget)
+            assertEquals("target-secret",target.get("provider.secret"))
+            val legacy=ArchiveV2Appearance.Snapshot(JsonObject(emptyMap()),emptyList())
+            ArchiveV2Appearance.apply(legacy,target,root,true)
+            assertEquals("95000",target.get("wolf.replySequenceTokenBudget"))
+            val invalid=ArchiveV2Appearance.capture(source,root).let{it.copy(basicSettings=JsonObject(it.basicSettings!!+("replySequenceToolBudget" to JsonPrimitive("999"))))}
+            assertTrue(runCatching{ArchiveV2Appearance.apply(invalid,target,root,true)}.isFailure)
+            assertEquals("0",target.get("wolf.replySequenceToolBudget"))
+        }finally{root.deleteRecursively()}
+    }
+
 }

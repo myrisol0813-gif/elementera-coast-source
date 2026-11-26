@@ -97,7 +97,9 @@ class WolfStore(private val persistence: LocalPersistence) {
     }
 
     private fun update(transform: (WolfState) -> WolfState) {
-        val next = transform(_state.value)
+        // An explicit archive restore can change persisted settings while
+        // this store is still mounted. Never overwrite them with stale UI state.
+        val next = transform(load())
         _state.value = next
         persist(next)
     }

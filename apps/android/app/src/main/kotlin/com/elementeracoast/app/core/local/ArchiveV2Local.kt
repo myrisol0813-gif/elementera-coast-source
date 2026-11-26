@@ -74,7 +74,7 @@ internal object ArchiveV2Local {
                         val d=describe(a.bytes);ByteArrayInputStream(a.bytes).use{writer.objectEntry(d,it)}
                         objects[d.objectSha256]=d;d.objectSha256
                     }
-                    if(appearance.settings.isNotEmpty()||media.isNotEmpty())add("appearance",ArchiveV2Appearance.ID,"appearance",appearance.data(),media)
+                    add("appearance",ArchiveV2Appearance.ID,"appearance",appearance.data(),media)
                 }
                 val counts=records.groupingBy { it.module }.eachCount()
                 val manifest=ArchiveV2Manifest("elementera-coast-archive",2,"local",applicationId,payload.getValue("exportedAt").jsonPrimitive.content,

@@ -19,7 +19,7 @@ import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-private val v2Labels=mapOf("chat" to "聊天","calendar" to "日历","daily" to "日常","model_profile" to "模型资料","attachments" to "附件","voice" to "语音","thinking_soil" to "思维壤","thinking_soil_history" to "思维壤历史","dogtalk_records" to "私人草稿","dogtalk_snapshots" to "历史快照","memory_entries" to "记忆","memory_pockets" to "候选","user_portrait" to "用户画像","self_portrait" to "自我画像","worldbook" to "世界书","custom_instructions" to "自定义","vault" to "拾潮","library" to "书房","appearance" to "外观","tools" to "工具")
+private val v2Labels=mapOf("chat" to "聊天","calendar" to "日历","daily" to "日常","model_profile" to "模型资料","attachments" to "附件","voice" to "语音","thinking_soil" to "思维壤","thinking_soil_history" to "思维壤历史","dogtalk_records" to "私人草稿","dogtalk_snapshots" to "历史快照","memory_entries" to "记忆","memory_pockets" to "候选","user_portrait" to "用户画像","self_portrait" to "自我画像","worldbook" to "世界书","custom_instructions" to "自定义","vault" to "拾潮","library" to "书房","appearance" to "设备外观与基本设置","tools" to "工具")
 @Composable
 internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchiveRepository,localMode:Boolean,allowed:Boolean,onSnackbar:(String)->Unit,htmlBusy:Boolean,onExportHtml:()->Unit){
     val context=LocalContext.current;val scope=rememberCoroutineScope()
@@ -61,7 +61,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchive
                 if(!isZip){legacyUri=uri;return@launch}
                 val input=operations.open(uri)
                 choices=operations.cloudChoices(input);chosen=choices.firstOrNull()
-                incoming=input;selected=operations.localModules(input.manifest)
+                incoming=input;selected=operations.localModules(input.manifest)-"appearance"
                 session=null;stagedChoice=null;uploaded=false;preview=null;committed=false;failure=""
             }catch(e:CancellationException){throw e}catch(e:Exception){onSnackbar("无法读取 V2 ZIP：格式、空间或完整性校验失败。")}
             finally{busy=false}
