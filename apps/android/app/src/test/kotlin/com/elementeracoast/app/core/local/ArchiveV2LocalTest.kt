@@ -71,4 +71,33 @@ class ArchiveV2LocalTest {
             assertTrue(rejected.isFailure)
         }finally{root.deleteRecursively()}
     }
+    @Test fun replyGroupsAndTheirDeskReceiptsRoundTripWithoutTaskReplay(){
+        val root=Files.createTempDirectory("coast-reply-v2").toFile()
+        try{
+            val source=MemoryLocalPersistence();val target=MemoryLocalPersistence()
+            val cache=RemoteCacheStore(source)
+            cache.putConversations(listOf(com.elementeracoast.app.core.remote.RemoteConversation("cid","group","main")))
+            val cfg=com.elementeracoast.app.core.model.ConversationContextSettings(replySequenceEnabled=true,replySequenceMaxMessages=4,replySequenceToolBudget=0,replySequenceTokenBudget=17000)
+            val a=com.elementeracoast.app.core.remote.RemoteVariant("a0","first",replySequence=com.elementeracoast.app.core.remote.RemoteReplySequence("seq",0),
+                deskSlip=com.elementeracoast.app.core.remote.RemoteDeskSlip(summary="first desk"),archiveRetainedDeskSlip=true)
+            val b=a.copy(id="a1",content="second",replySequence=com.elementeracoast.app.core.remote.RemoteReplySequence("seq",1),
+                deskSlip=com.elementeracoast.app.core.remote.RemoteDeskSlip(summary="second desk",replySequencePrevious=listOf(com.elementeracoast.app.core.remote.RemoteDeskSequenceMessage("a0","first"))))
+            val t=RemoteTurn("t",user=RemoteUserBranch(variants=listOf(RemoteVariant("u","hello"))),assistant=com.elementeracoast.app.core.remote.RemoteAssistantBranches(mapOf("0" to 1),mapOf("0" to listOf(a,b))))
+            cache.putHistory("cid",RemoteHistory(conversationId="cid",contextSettings=cfg,turns=listOf(t)))
+            val file=File(root,"group.zip");val app="com.elementeracoast.source";val manifest=ArchiveV2Local.export(source,app,file)
+            val stage=ArchiveV2Stage(File(root,"stage"),"group")
+            assertEquals(manifest,ArchiveV2ZipReader.stage(file,stage))
+            ArchiveV2Local.restore(manifest,stage,setOf("chat"),app,target,true)
+            val restored=RemoteCacheStore(target).history("cid")!!
+            assertEquals(cfg,restored.contextSettings)
+            val group=restored.turns.single().assistant.variantsByUserVariant.getValue("0")
+            assertEquals(listOf("a0","a1"),group.map{it.id})
+            assertEquals(listOf(0,1),group.map{it.replySequence!!.index})
+            assertTrue(group.all{it.archiveRetainedDeskSlip})
+            assertEquals("first desk",group.first().deskSlip!!.summary)
+            assertEquals("a0",group.last().deskSlip!!.replySequencePrevious.single().messageId)
+            assertFalse(LocalReplyRunStore(target).active("cid"))
+        }finally{root.deleteRecursively()}
+    }
+
 }

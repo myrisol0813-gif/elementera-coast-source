@@ -99,7 +99,7 @@ internal object OfflineV2HtmlArchive {
                             val conv=data["conversation"].obj()
                             val history=(data["history"]?:data["history_json"]).let { if(it is JsonPrimitive)Json.parseToJsonElement(it.content).obj() else it.obj() }
                             fun variant(v:JsonObject,role:String,label:String)=buildString{
-                                append("<article class=\"$role\"><small>"+esc(label)+" · "+esc(time(v.s("created_at")))+"</small><p>"+esc(v.s("content"))+"</p>")
+                                append("<article class=\"$role\"><small>"+esc(label)+" · "+esc(v.s("id"))+" · "+esc(time(v.s("created_at")))+"</small><p>"+esc(v.s("content"))+"</p>")
                                 for(a in v["attachments"].arr()){
                                     val ref=a.obj();val m=attachments[conv.s("id")+":"+ref.s("id")]
                                     if(m!=null)append(media(m)) else {append("<p>原件未归档："+esc(ref.s("name"))+"</p>");warnings.add("聊天附件未匹配："+ref.s("id"))}
@@ -112,7 +112,15 @@ internal object OfflineV2HtmlArchive {
                                 history["turns"].arr().forEachIndexed{j,t->
                                     val turn=t.obj();append("<section><h2>第 "+(j+1)+" 轮</h2>")
                                     turn["user"].obj()["variants"].arr().forEachIndexed{k,v->append(variant(v.obj(),"user","用户变体 "+(k+1)))}
-                                    turn["assistant"].obj()["variantsByUserVariant"].obj().forEach{(k,vs)->vs.arr().forEachIndexed{l,v->append(variant(v.obj(),"assistant","分支 $k · 回复 "+(l+1)))}}
+                                    turn["assistant"].obj()["variantsByUserVariant"].obj().forEach{(k,vs)->
+                                        val groups=linkedMapOf<String,Int>()
+                                        vs.arr().forEachIndexed{l,v->
+                                            val obj=v.obj();val seq=obj["reply_sequence"].obj();val sid=seq.s("id")
+                                            val version=groups.getOrPut(if(sid.isBlank())"single:$l" else "group:$sid"){groups.size+1}
+                                            val label="分支 $k · 版本 $version"+if(sid.isNotBlank())" · 连续回复 "+((seq["index"]?.jsonPrimitive?.intOrNull?:0)+1)+" · 组 "+sid else ""
+                                            append(variant(obj,"assistant",label))
+                                        }
+                                    }
                                     append("</section>")
                                 }
                                 val linked=files.filter{it.kind=="voice"&&it.data.s("conversation_id")==conv.s("id")}
