@@ -1,0 +1,35 @@
+package com.elementeracoast.app.feature.chat
+
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.*
+import org.junit.Test
+
+class ReplySequenceTest {
+    private val identity=ReplySequence.Identity("window","turn","user","sequence")
+    @Test fun eachCallFollowsCanonicalCommitAndOrganizesOnce()=runBlocking{
+        val events=mutableListOf<String>();var n=0
+        val r=ReplySequence.run(identity,3,{(++n).toString()},
+            acquire={true},reserve={events.add("reserve:"+it.messageId);true},
+            invoke={step,prior->events.add("invoke:"+step.messageId+":"+prior.joinToString(","){it.id});ReplySequence.Response(step.messageId,true,true)},
+            commit={step,result->events.add("commit:"+step.messageId);ReplySequence.Saved(step.messageId,result.value)},
+            settle={events.add("settle:"+it.status)},organize={events.add("organize:"+it.messages.size)})
+        assertEquals("limit_reached",r.status)
+        assertEquals(listOf("reserve:1","invoke:1:","commit:1","reserve:2","invoke:2:1","commit:2","reserve:3","invoke:3:1,2","commit:3","settle:limit_reached","organize:3"),events)
+    }
+    @Test fun failuresDoNotReplayAndPreserveSavedMessages()=runBlocking{
+        var n=0;var organized=0;var pending:String?=null
+        val r=ReplySequence.run(identity,3,{(++n).toString()},
+            acquire={true},reserve={true},
+            invoke={step,_->if(step.index==1)error("provider");ReplySequence.Response("first",true,true)},
+            commit={step,result->ReplySequence.Saved(step.messageId,result.value)},
+            settle={pending=it.pending?.messageId},organize={organized++})
+        assertEquals("failed",r.status);assertEquals("2",pending);assertEquals(1,r.messages.size);assertEquals(1,organized);assertEquals(2,n)
+    }
+    @Test fun revocationStopsBeforeNextReservation()=runBlocking{
+        var n=0;var organized=0
+        val r=ReplySequence.run(identity,3,{(++n).toString()},
+            acquire={true},reserve={true},invoke={_,_->ReplySequence.Response("first",true,true)},
+            commit={step,result->ReplySequence.Saved(step.messageId,result.value)},settle={},organize={organized++},canContinue={_,_->false})
+        assertEquals("permission_or_budget",r.status);assertEquals(1,n);assertEquals(1,organized)
+    }
+}
