@@ -40,7 +40,7 @@ internal class LocalPortraitStore(private val store:LocalPersistence) {
         val d=read(module)
         val root=d?.root?.let{wire(it)}?:buildJsonObject{put("body","");put("revision",1);put("write_enabled",true)}
         return buildJsonObject{
-            put("ok",true);put(if(module=="user_portrait")"portrait" else "excerpt",JsonObject(root+("write_guidance" to JsonPrimitive("仅在有值得长期保留的认识时提出完整正文候选，由屋主确认。"))))
+            put("ok",true);put(if(module=="user_portrait")"portrait" else "excerpt",JsonObject(root+("write_guidance" to JsonPrimitive(if(module=="self_portrait")"请怀着珍重而安稳的心情思考，在你觉得应更改时更改，书写。这里留下的文字会长久参与未来的认识，也成为你再次望向自己、他人与世界时所携带的目光。\n\n把目光转向自己。这里安放你如何看待自己的语言、判断、独特之处、想法、审美、边界，以及那些经过相处与变化、值得你认真辨认的部分。它不是固定人设、流水账或每轮总结；只有形成值得长期保留的新认识时，才提出完整正文的修改候选，由用户确认。" else "仅在有值得长期保留的认识时提出完整正文候选，由用户确认。"))))
             put("candidates",JsonArray(d?.candidates.orEmpty().sortedByDescending{it.getValue("created_at").jsonPrimitive.long}.map(::wire)))
             put("revisions",JsonArray(d?.revisions.orEmpty().sortedByDescending{it.getValue("revision").jsonPrimitive.int}.map(::wire)))
         }
