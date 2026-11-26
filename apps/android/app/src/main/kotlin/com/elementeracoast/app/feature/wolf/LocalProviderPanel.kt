@@ -63,7 +63,6 @@ internal fun LocalProviderPanel(current: String, onRefresh: () -> Unit) {
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         LocalIndependentWebPanel()
-        LocalVoicePanel()
         Text("本机 API 供应商", style = MaterialTheme.typography.titleMedium)
         Text("支持 HTTPS OpenAI 兼容 Chat Completions。Key 加密留在本机，聊天只发送给选中的模型服务。当前仅支持近期文字上下文；记忆、工具、附件与自动整理待接入。",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -202,7 +201,7 @@ private fun LocalIndependentWebPanel(){
 
 
 @Composable
-private fun LocalVoicePanel(){
+internal fun LocalVoicePanel(){
     val context=LocalContext.current.applicationContext
     val store=remember(context){LocalProviderStore(context,voiceOnly=true)}
     val scope=rememberCoroutineScope()
