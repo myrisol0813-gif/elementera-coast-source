@@ -66,12 +66,28 @@ class LocalProviderStore(context: Context, searchOnly:Boolean=false, voiceOnly:B
         return if (model in provider.models) provider to model else null
     }
 
-    fun catalog(): RemoteModelCatalogResponse = RemoteModelCatalogResponse(
-        ok = true,
-        groups = RemoteModelGroups(openAiChat = load().flatMap { p ->
-            p.models.map { RemoteModelCatalogItem(p.modelId(it), p.name + " · " + it) }
-        })
-    )
+    // Image API selection is namespaced by the same existing provider ID.
+    // Never route credentials for arbitrary endpoints to OpenRouter.
+    fun resolveImageProvider(selected:String):LocalProviderConfig? {
+        if(!selected.startsWith("local:")||'/' !in selected)return null
+        val provider=load().firstOrNull{it.id==selected.removePrefix("local:").substringBefore('/')&&it.baseUrl.trimEnd('/')=="https://openrouter.ai/api/v1"}?:return null
+        val raw=selected.substringAfter('/')
+        if(!Regex("[a-z0-9][a-z0-9_.-]{0,79}/[a-z0-9][a-z0-9_.-]{0,119}(:free)?",RegexOption.IGNORE_CASE).matches(raw))return null
+        return provider.copy(models=listOf(raw))
+    }
+
+    fun catalog(): RemoteModelCatalogResponse {
+        val providers=load()
+        val chat=mutableListOf<RemoteModelCatalogItem>()
+        val images=mutableListOf<RemoteModelCatalogItem>()
+        for(p in providers){
+            val directory=if(p.baseUrl.trimEnd('/')=="https://openrouter.ai/api/v1")runCatching{LocalImageProvider().discover(p.apiKey)}.getOrNull()else null
+            val imageIds=directory.orEmpty().map{it.id}.toSet()
+            chat+=p.models.filterNot{it in imageIds}.map{RemoteModelCatalogItem(p.modelId(it),p.name+" · "+it)}
+            images+=directory.orEmpty().map{RemoteModelCatalogItem(p.modelId(it.id),p.name+" · "+it.name)}
+        }
+        return RemoteModelCatalogResponse(ok=true,groups=RemoteModelGroups(openAiChat=chat,openAiImage=images))
+    }
 
     private fun save(values: List<LocalProviderConfig>) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")

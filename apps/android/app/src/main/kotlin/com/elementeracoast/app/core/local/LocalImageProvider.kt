@@ -21,9 +21,9 @@ internal class LocalImageProvider(
     data class Generated(val bytes:ByteArray,val mime:String,val provider:String,val requestedModel:String,val reportedModel:String?,val costUsd:Double?,val prompt:String)
     class Failure(val code:String,override val message:String):IllegalStateException(message)
     private fun fail(code:String,message:String):Nothing=throw Failure(code,message)
-    private fun request(req:Request,cap:Long):JsonObject{
+    private fun request(req:Request,cap:Long,timeoutSeconds:Long=120):JsonObject{
         try{
-            return http.newCall(req).execute().use{res->
+            return http.newCall(req).apply{timeout().timeout(timeoutSeconds,TimeUnit.SECONDS)}.execute().use{res->
                 if(!res.isSuccessful)fail("provider_http","图像供应商返回HTTP "+res.code+"；未保存图像，可能已产生费用。")
                 val body=res.body?:fail("empty_response","没有供应商响应。")
                 if(body.contentLength()>cap||body.source().request(cap+1))fail("response_limit","供应商响应超限。")
@@ -34,7 +34,7 @@ internal class LocalImageProvider(
     private fun JsonObject.str(k:String)=(this[k] as? JsonPrimitive)?.takeIf{it.isString}?.contentOrNull
     fun discover(key:String=""):List<Model>{
         val req=Request.Builder().url(BASE+"/models").get().apply{if(key.isNotBlank())header("Authorization","Bearer "+key.trim())}.build()
-        val data=request(req,4L*1024*1024)
+        val data=request(req,4L*1024*1024,8)
         val rows=data["data"] as? JsonArray?:fail("catalog_invalid","图像模型目录不可用。")
         return rows.mapNotNull{v->
             val m=v as? JsonObject?:return@mapNotNull null
