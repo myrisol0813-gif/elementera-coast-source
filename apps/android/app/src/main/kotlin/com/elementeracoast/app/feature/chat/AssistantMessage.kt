@@ -88,7 +88,7 @@ internal fun AssistantMessage(
         }
         Spacer(Modifier.height(8.dp))
         Column(modifier = Modifier.fillMaxWidth()) {
-            SnowLetterSurface(
+            if (message.text.isNotBlank() || isStreamingTail || !message.errorDetail.isNullOrBlank()) SnowLetterSurface(
                 modifier = Modifier.fillMaxWidth(),
                 role = SnowLetterSurfaceRole.AssistantBubble,
                 fallbackColor = MaterialTheme.colorScheme.surface.copy(alpha = .34f),
@@ -111,15 +111,15 @@ internal fun AssistantMessage(
                 }
             }
             if(message.attachments.isNotEmpty()){
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(if (message.text.isNotBlank() || isStreamingTail || !message.errorDetail.isNullOrBlank()) 6.dp else 0.dp))
                 MessageAttachmentList(conversationId=conversationId,attachments=message.attachments,previewSource=attachmentPreviewSource)
             }
             Spacer(Modifier.height(CoastChatTokens.MessageActionTopGap))
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                 val compactTraceLabel = maxWidth < 410.dp
                 MessageActionRow(modifier = Modifier.fillMaxWidth()) {
-                    MessageActionButton(Icons.Default.ContentCopy, "复制", onClick = onCopy)
-                    MessageActionButton(Icons.Default.Mic, "生成语音", enabled = !isStreamingTail && !message.remoteVariantId.isNullOrBlank(), onClick = onVoice)
+                    MessageActionButton(Icons.Default.ContentCopy, "复制", enabled = message.text.isNotBlank(), onClick = onCopy)
+                    MessageActionButton(Icons.Default.Mic, "生成语音", enabled = !isStreamingTail && message.text.isNotBlank() && !message.remoteVariantId.isNullOrBlank(), onClick = onVoice)
                     MessageActionButton(Icons.Default.ThumbUp, "点赞", active = message.liked, onClick = { onAction(MessageAction.ToggleLike(message.id)) })
                     MessageActionButton(Icons.Default.Refresh, "重新生成", enabled = !isStreamingTail, onClick = { onAction(MessageAction.Regenerate(message.id)) })
                     MessageActionButton(Icons.Default.FavoriteBorder, "收藏", active = message.favorite, onClick = { onAction(MessageAction.ToggleFavorite(message.id)) })
