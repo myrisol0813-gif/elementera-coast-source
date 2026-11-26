@@ -1,3 +1,4 @@
+import { attachmentOrigin } from './attachment-origin.js';
 import { ensureChatSchema, getConversation, readConversationState } from './chat-store.js';
 import { ensureChatAttachmentSchema } from './chat-attachments.js';
 import { ensureVoiceSchema } from './voice-clips.js';
@@ -167,12 +168,18 @@ export async function resolveTreasureSource(db, input = {}) {
   } else {
     await ensureChatAttachmentSchema(db);
     const row = await db.prepare(
-      'SELECT id, turn_id, name, kind FROM chat_attachments WHERE id = ? AND conversation_id = ?'
+      'SELECT id, turn_id, name, kind, mime, size FROM chat_attachments WHERE id = ? AND conversation_id = ?'
     ).bind(sourceId, conversationId).first();
     if (!row || row.kind !== kind) throw new TreasureError('source_not_found', '这份图片或附件已不存在。', 404);
     excerpt = row.name || '';
     turnId = row.turn_id;
-    role = 'user';
+    const origin=attachmentOrigin(await readConversationState(db,conversationId),row);
+    if(origin.status==='ambiguous')throw new TreasureError('source_ambiguous','同一原件关联了不同发送者，不能猜测收藏来源。',409);
+    // Legacy human attachment favorites stored no message ID. Keep restore
+    // compatibility while giving new assistant originals their exact variant.
+    role=origin.role || 'user';
+    messageId=origin.role==='assistant'?origin.messageId:null;
+    if(origin.role==='assistant'&&!messageId)throw new TreasureError('source_ambiguous','无法唯一确认助手图片所属消息。',409);
   }
   if (excerpt.length > TREASURE_LIMITS.excerpt_chars) {
     throw new TreasureError('excerpt_too_long', '单条摘录最多 12000 字。');
@@ -190,7 +197,7 @@ export async function saveTreasure(db,input={}){
   await db.prepare(
     'INSERT INTO coast_vault_treasures (id,source_key,kind,conversation_id,turn_id,message_id,source_id,role,excerpt,selections_json,notes,created_at,updated_at) ' +
     'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(source_key) DO UPDATE SET ' +
-    'excerpt = excluded.excerpt, selections_json = excluded.selections_json, notes = excluded.notes, updated_at = excluded.updated_at'
+    'turn_id = excluded.turn_id, message_id = excluded.message_id, role = excluded.role, excerpt = excluded.excerpt, selections_json = excluded.selections_json, notes = excluded.notes, updated_at = excluded.updated_at'
   ).bind(id, sourceKey, kind, conversationId, turnId, messageId, sourceId, role,
     excerpt, JSON.stringify(indices), notes, now, now).run();
   const result = await db.prepare('SELECT * FROM coast_vault_treasures WHERE source_key = ?').bind(sourceKey).first();

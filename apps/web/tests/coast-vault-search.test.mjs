@@ -453,3 +453,19 @@ assert.match(chatTreasuresPreview, /oldHeart && !saved/,
   'a partial migration must not silently hide remaining legacy hearts');
 
 console.log('coast vault SQLite integration: ok');
+
+const {attachmentOrigin}=await import('../functions/attachment-origin.js');
+const pictureConversation=await createConversation(db,'assistant picture fixture','main');
+const picture=await uploadChatAttachment(db,pictureConversation.id,{name:'picture.png',type:'image/png',size:5,async arrayBuffer(){return Uint8Array.of(1,2,3,4,5).buffer;}});
+await writeConversationState(db,pictureConversation.id,{version:4,turns:[{id:'picture-turn',user:{active:0,variants:[{id:'picture-user',content:'draw'}]},assistant:{activeByUserVariant:{0:0},variantsByUserVariant:{0:[{id:'picture-assistant',content:'drawn',attachments:[picture]}]}}}]});
+await bindChatAttachmentsToTurn(db,pictureConversation.id,'picture-turn',[picture.id]);
+const pictureMedia=(await listMediaLibrary(db,{kind:'image',q:'picture.png'})).items.find(x=>x.id===picture.id);
+assert.equal(pictureMedia.role,'assistant');assert.equal(pictureMedia.message_id,'picture-assistant');assert.equal(pictureMedia.origin_status,'linked');
+const pictureFavorite=await saveTreasure(db,{kind:'image',conversation_id:pictureConversation.id,source_id:picture.id});
+assert.equal(pictureFavorite.role,'assistant');assert.equal(pictureFavorite.message_id,'picture-assistant');
+const pictureState=await readConversationState(db,pictureConversation.id);
+const row={...picture,kind:'image',turn_id:'picture-turn'};
+assert.equal(attachmentOrigin(pictureState,row).role,'assistant');
+assert.equal(attachmentOrigin(pictureState,{...row,turn_id:null}).role,null);
+const ambiguous=structuredClone(pictureState);ambiguous.turns[0].user.variants[0].attachments=[picture];
+assert.equal(attachmentOrigin(ambiguous,row).status,'ambiguous');

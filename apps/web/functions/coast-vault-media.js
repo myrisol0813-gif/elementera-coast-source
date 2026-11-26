@@ -1,3 +1,4 @@
+import { attachmentOrigin } from './attachment-origin.js';
 import { ensureChatAttachmentSchema } from './chat-attachments.js';
 import { ensureVoiceSchema } from './voice-clips.js';
 import { ensureTreasureSchema } from './coast-vault-treasures.js';
@@ -24,6 +25,8 @@ function source(row) {
     id: row.id, kind: row.kind, source_type: row.kind === 'audio' ? 'voice_clip' : 'chat_attachment',
     conversation_id: row.conversation_id, turn_id: row.turn_id,
     message_id: row.message_id || null,
+    role: row.kind === 'audio' ? 'assistant' : row.role || null,
+    origin_status: row.kind === 'audio' ? (row.message_id ? 'linked' : 'turn_only') : row.origin_status || 'unlinked',
     name: row.name, display_name: row.display_name || '', mime: row.mime, size: Number(row.size) || 0,
     source_text: row.source_text || null, created_at: Number(row.created_at) || 0,
     treasure_id: row.treasure_id || null, favorited: Boolean(row.treasure_id),
@@ -87,13 +90,10 @@ export async function listMediaLibrary(db, { kind = 'all', q = '', cursor = 0 } 
       try { turns = JSON.parse(state?.state_json || '{}').turns || []; } catch { /* no fabricated source */ }
       stateCache.set(row.conversation_id, turns);
     }
-    const turn = stateCache.get(row.conversation_id).find(item => item.id === row.turn_id);
-    const variants = [
-      ...(turn?.user?.variants || []),
-      ...Object.values(turn?.assistant?.variantsByUserVariant || {}).flat(),
-    ];
-    const sourceVariant = variants.find(item => item.attachments?.some(attachment => attachment.id === row.id));
-    if (sourceVariant) row.message_id = sourceVariant.id;
+    const origin = attachmentOrigin({turns:stateCache.get(row.conversation_id)},row);
+    row.message_id=origin.messageId;
+    row.role=origin.role;
+    row.origin_status=origin.status;
   }
   return {
     items: indexed.map(source),

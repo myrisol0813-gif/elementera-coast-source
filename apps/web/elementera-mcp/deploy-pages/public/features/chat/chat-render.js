@@ -205,7 +205,7 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
         renderMessageAttachments(branch.user?.attachments || [], conversationId),
         branch.user?.id ? renderRikkaAttachments(runtime, conversationId, branch.user.id) : '',
       ].join('');
-      const assistantAttachment = branch.assistant?.id ? renderRikkaAttachments(runtime, conversationId, branch.assistant.id) : '';
+      const assistantAttachment = branch.assistant?.id ? renderMessageAttachments(branch.assistant.attachments || [], conversationId) + renderRikkaAttachments(runtime, conversationId, branch.assistant.id) : '';
       const userImported = branch.user?.message_source === 'rikkahub';
       const assistantImported = branch.assistant?.message_source === 'rikkahub';
       const userStamp = messageStamp(branch.user?.created_at);
