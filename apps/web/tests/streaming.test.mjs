@@ -64,7 +64,7 @@ const storage = {
 
 const now = () => new Date().toISOString();
 let conversations = [{
-  id: 'conv-stream', title: '新聊天', created_at: now(), updated_at: now(), deleted_at: null,
+  id: 'conv-stream', title: '新聊天', room_type: 'main', source: 'coast', created_at: now(), updated_at: now(), deleted_at: null,
   title_manual: false, title_generated_at: null, title_model_id: null,
 }];
 let serverHistory = { version: 4, updated_at: now(), turns: [] };
@@ -73,6 +73,7 @@ const historyWrites = [];
 let titleCount = 0;
 let soilCount = 0;
 let chatRequestCount = 0;
+let sequenceRequestCount = 0;
 const chatBodies = [];
 const toastMessages = [];
 const encoder = new TextEncoder();
@@ -134,6 +135,8 @@ globalThis.fetch = async (input, options = {}) => {
     return json({ ok: true, conversation: conversations[0] });
   }
   if (url.pathname === '/api/chat/reply-sequence') {
+    sequenceRequestCount++;
+    assert.equal(body.conversation_id,'conv-stream');
     const turn=serverHistory.turns.find(t=>t.id===body.source_turn_id);
     const key=String(turn.user.active);
     const list=turn.assistant.variantsByUserVariant[key];
@@ -303,11 +306,15 @@ assert.equal(historyWrites.filter((history) => history.turns?.at(-1)?.assistant?
 assert.equal(historyWrites.filter((history) => history.turns?.at(-1)?.assistant?.variantsByUserVariant?.['0']?.at(-1)?.finish_reason === 'error').length, 1);
 
 // Reload an explicitly enabled experimental window from its canonical history.
+await waitFor(()=>!document.querySelector('#composerActionButton').disabled,'previous send finalized');
 serverHistory.context_settings={reply_sequence_enabled:true};
-await chat.openSearchResult({conversation_id:'conv-stream',kind:'conversation'});
+assert.equal(await chat.openSearchResult({conversation_id:'conv-stream',kind:'conversation'}),true);
+assert.equal(chat.getCurrentConversation().room_type,'main');
 const beforeSequenceSoil=soilCount,beforeSequenceWrites=historyPutCount;
 send('real sequence');
-await waitFor(()=>document.querySelector('[data-message-id="dom-sequence-1"]')?.textContent.includes('canonical 1'),'sequence second bubble');
+await waitFor(()=>sequenceRequestCount===1,'explicit sequence endpoint');
+try{await waitFor(()=>document.querySelector('[data-message-id="dom-sequence-1"]')?.textContent.includes('canonical 1'),'sequence second bubble');}
+catch(error){throw new Error(error.message+'; messages='+JSON.stringify(chat.getActiveMessages())+'; toast='+JSON.stringify(toastMessages.slice(-4)));}
 assert.equal(document.querySelector('[data-message-id="dom-sequence-0"] .assistant-text').textContent,'canonical 0');
 assert.equal(document.querySelector('[data-message-id="dom-sequence-1"] .assistant-text').textContent,'canonical 1');
 assert.equal(historyPutCount,beforeSequenceWrites+1,'only human history is written by client; server owns commits');
