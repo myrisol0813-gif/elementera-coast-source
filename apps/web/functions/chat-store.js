@@ -1,5 +1,5 @@
 import { recoverImageTasks, protectImageHistory } from './image-task-recovery.js';
-import { protectReplyGroupHistory } from './chat-reply-run.js';
+import { protectReplyGroupHistory, recoverStaleReplyRuns, isReplyRunActive } from './chat-reply-run.js';
 import { ensureChatSchema as ensureSchema } from './chat-schema.js';
 import { sanitizeFurnitureRuns } from './tool-furniture-summary.js';
 
@@ -543,13 +543,16 @@ export async function readConversationState(db, id) {
   await ensureChatSchema(db);
   const conversationId = sanitizeId(id, 'conversation');
   await requireActiveConversation(db, conversationId);
+  await recoverStaleReplyRuns(db,Date.now(),conversationId);
   const row = await first(db, 'SELECT state_json, updated_at FROM conversation_states WHERE conversation_id = ?', [conversationId]);
   if (!row?.state_json) {
     throw new ChatStoreError('conversation_state_missing', '聊天记录不存在，未创建替代数据。', 500);
   }
   try {
     const state=normalizeState(JSON.parse(row.state_json));
-    if(recoverImageTasks(state)){
+    // The group ledger, rather than the legacy image timer, owns its
+    // active reservations. Otherwise a long active run could lose its slot.
+    if(!await isReplyRunActive(db,conversationId)&&recoverImageTasks(state)){
       const stamp=nowMs();state.updated_at=iso(stamp);
       const changed=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=?',[JSON.stringify(normalizeState(state)),stamp,conversationId,row.state_json]);
       if(changed.meta?.changes!==1)return readConversationState(db,conversationId);

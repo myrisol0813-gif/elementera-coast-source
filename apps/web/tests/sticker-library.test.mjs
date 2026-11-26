@@ -170,7 +170,13 @@ for(const order of [['sticker_send','image_generate'],['image_generate','sticker
   assert.equal(await reserveReplyMedia(directDb,identity,'group-second','fixture/chat',{sticker:true}),true);
   const next=await attachStickerTools(env,blank,{...opts,messageId:'group-second'});
   assert.equal((await next.executeTool(call('sticker_send',{sticker_id:direct2.id}))).ok,true);
-  assert.equal(await settleReplyRun(directDb,identity,'cancelled'),true);
+  if(order[0]==='sticker_send'){
+    assert.equal(await settleReplyRun(directDb,identity,'cancelled'),true);
+  }else{
+    const {recoverStaleReplyRuns}=await import('../functions/chat-reply-run.js');
+    assert.equal(await recoverStaleReplyRuns(directDb,Date.now()+31*60*1000,chat.id),1);
+    assert.equal(await recoverStaleReplyRuns(directDb,Date.now()+31*60*1000,chat.id),0);
+  }
   const interrupted=(await readConversationState(directDb,chat.id)).turns[0].assistant.variantsByUserVariant['0'];
   assert.deepEqual(interrupted.map(v=>v.id),['group-first','group-second']);
   assert.deepEqual(interrupted.map(v=>v.reply_sequence.index),[0,1]);

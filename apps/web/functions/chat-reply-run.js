@@ -141,8 +141,8 @@ export async function commitReplyStep(db,identity,messageId,variant,receipt){
   if(!changes(result[0])||!changes(result[1]))return null;
   return {id:messageId,content:variant.content,receipt:record};
 }
-export async function settleReplyRun(db,identity,status){
-  const row=await rowFor(db,identity);if(!row||row.status!=='running')return false;
+export async function settleReplyRun(db,identity,status,{expectedUpdatedAt=null}={}){
+  const row=await rowFor(db,identity);if(!row||row.status!=='running'||expectedUpdatedAt!==null&&row.updated_at!==expectedUpdatedAt)return false;
   if(!['completed','limit_reached','permission_or_budget','reservation_lost','failed','cancelled','interrupted'].includes(status))fail('reply_run_invalid_status','任务状态无效。');
   if(row.pending_id&&['completed','limit_reached'].includes(status))return false;
   // A failed media step must not discard originals or leave a ready slot
@@ -169,20 +169,34 @@ export async function settleReplyRun(db,identity,status){
       const stamp=Date.now();state.updated_at=new Date(stamp).toISOString();
       const encoded=JSON.stringify(normalizeState(state));
       const result=await db.batch([
-        stmt(db,`UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS(SELECT 1 FROM chat_reply_runs WHERE sequence_id=? AND status='running' AND pending_id=? AND pending_state IS ? AND receipts_json=?)`,encoded,stamp,identity.conversationId,raw,identity.sequenceId,row.pending_id,row.pending_state,row.receipts_json),
-        stmt(db,`UPDATE chat_reply_runs SET status=?,updated_at=? WHERE sequence_id=? AND status='running' AND pending_id=? AND pending_state IS ? AND receipts_json=? AND EXISTS(SELECT 1 FROM conversation_states WHERE conversation_id=? AND state_json=?)`,status,stamp,identity.sequenceId,row.pending_id,row.pending_state,row.receipts_json,identity.conversationId,encoded)
+        stmt(db,`UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS(SELECT 1 FROM chat_reply_runs WHERE sequence_id=? AND status='running' AND pending_id=? AND pending_state IS ? AND receipts_json=? AND updated_at=?)`,encoded,stamp,identity.conversationId,raw,identity.sequenceId,row.pending_id,row.pending_state,row.receipts_json,row.updated_at),
+        stmt(db,`UPDATE chat_reply_runs SET status=?,updated_at=? WHERE sequence_id=? AND status='running' AND pending_id=? AND pending_state IS ? AND receipts_json=? AND updated_at=? AND EXISTS(SELECT 1 FROM conversation_states WHERE conversation_id=? AND state_json=?)`,status,stamp,identity.sequenceId,row.pending_id,row.pending_state,row.receipts_json,row.updated_at,identity.conversationId,encoded)
       ]);
       return changes(result[0])&&changes(result[1]);
     }
   }
-  return changes(await stmt(db,`UPDATE chat_reply_runs SET status=?,updated_at=? WHERE sequence_id=? AND status='running' AND receipts_json=? AND pending_id IS ? AND pending_state IS ?`,
-    status,Date.now(),identity.sequenceId,row.receipts_json,row.pending_id,row.pending_state).run());
+  return changes(await stmt(db,`UPDATE chat_reply_runs SET status=?,updated_at=? WHERE sequence_id=? AND status='running' AND receipts_json=? AND pending_id IS ? AND pending_state IS ? AND updated_at=?`,
+    status,Date.now(),identity.sequenceId,row.receipts_json,row.pending_id,row.pending_state,row.updated_at).run());
 }
-export async function recoverStaleReplyRuns(db,now=Date.now()){
+export async function recoverStaleReplyRuns(db,now=Date.now(),conversationId=null){
   await ensureChatSchema(db);
-  // Never call a provider or clear pending identity. A claimed call may have
-  // been billed. Explicit user regeneration must use a fresh sequence ID.
-  return (await stmt(db,`UPDATE chat_reply_runs SET status='interrupted',updated_at=? WHERE status='running' AND updated_at<?`,now,now-STALE_MS).run()).meta?.changes||0;
+  // Reuse the same atomic settlement as explicit cancellation, including
+  // media promotion. No provider calls and no replay of uncertain requests.
+  const rows=(await stmt(db,`SELECT r.* FROM chat_reply_runs r WHERE status='running' AND updated_at<? AND (? IS NULL OR conversation_id=?)`,now-STALE_MS,conversationId,conversationId).all()).results||[];
+  let recovered=0;
+  for(const row of rows){
+    const identity={conversationId:row.conversation_id,turnId:row.turn_id,userVariantId:row.user_variant_id,sequenceId:row.sequence_id};
+    try{
+      if(await settleReplyRun(db,identity,'interrupted',{expectedUpdatedAt:row.updated_at}))recovered++;
+    }catch(error){
+      // A deleted/removed window must not prevent recovery of other windows.
+      // If an active source changed, leave it for explicit inspection.
+      const live=await stmt(db,'SELECT id FROM conversations WHERE id=? AND deleted_at IS NULL',row.conversation_id).first();
+      if(live)throw error;
+      if(changes(await stmt(db,`UPDATE chat_reply_runs SET status='interrupted',updated_at=? WHERE sequence_id=? AND status='running' AND updated_at=?`,now,row.sequence_id,row.updated_at).run()))recovered++;
+    }
+  }
+  return recovered;
 }
 
 // Old clients cannot silently discard or split a committed group. Explicit
