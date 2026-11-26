@@ -109,13 +109,13 @@ internal class LocalToolWrites(private val s:LocalPersistence,private val cid:St
                     else->fail("invalid_action","请选择 create、edit 或 delete。")
                 }
             }
-            "global_excerpt_propose"->{
+            "global_excerpt_propose","user_portrait_propose"->{
                 val body=input.text("proposed_body",10000);val reason=input.text("reason",4000)
                 val kind=input.text("change_kind",40,true).ifBlank{"rewrite"}
                 if(kind !in setOf("append","rewrite","refine"))throw LocalToolFailure("invalid_arguments","请选择 append、rewrite 或 refine。")
                 if(LocalSoilStore(s).current(cid)?.get("auto_refresh_enabled")?.jsonPrimitive?.int!=1)
                     throw LocalToolFailure("permission_revoked","当前窗口未开启自动整理。")
-                val candidate=LocalPortraitStore(s).proposeSelf(body,kind,reason,cid,turn,label)
+                val candidate=LocalPortraitStore(s).propose(if(name=="user_portrait_propose")"user_portrait" else "self_portrait",body,kind,reason,cid,turn,label)
                 result(candidate)
             }
             "memory_write_candidate"->{
