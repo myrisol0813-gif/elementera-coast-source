@@ -95,4 +95,42 @@ class LocalToolSessionTest {
         assertFalse(session.execute("revoked","cross_window_read_recent","""{"conversation_id":"old","turns":1}""").ok)
         assertFalse(LocalToolAudit(s).read().toString().contains("完整原文"))
     }
+
+    @Test fun independentWebRequiresWindowPermissionAndRetainsActualSources(){
+        val s=fixture(auto=false,tools=true)
+        var key:String?="synthetic-secret"
+        var calls=0
+        val http=OkHttpClient.Builder().addInterceptor{chain->
+            calls++
+            val r=chain.request()
+            assertEquals("api.tavily.com",r.url.host)
+            val buf=Buffer();r.body!!.writeTo(buf)
+            assertFalse(buf.readUtf8().contains("现在的问题"))
+            Response.Builder().request(r).protocol(Protocol.HTTP_1_1).code(200).message("ok")
+                .body("""{"results":[{"url":"https://www.iana.org/domains","title":"Public source","content":"Actual excerpt"}]}""".toResponseBody()).build()
+        }.build()
+        val k=LocalKnowledgeStore(s,LocalIndependentWeb({key},http))
+        val req=RemoteCrossWindowRequest("off")
+        val c=k.context(listOf(RemoteChatMessage("user","现在的问题")),12000,"main_chat","current",crossWindow=req)
+        val session=k.toolSession("current","turn-now",req,c.receipt)!!
+        assertTrue(session.tools.toString().contains("independent_web_search"))
+        val result=session.execute("web1","independent_web_search","""{"query":"public fixture"}""")
+        assertTrue(result.output,result.ok)
+        assertTrue(result.output.contains("Actual excerpt"))
+        assertTrue(result.deskSlip.workbench.toolResults.any{it.name=="independent_web_search"&&it.content.contains("https://www.iana.org/domains")})
+        assertEquals(1,calls)
+        assertFalse(LocalToolAudit(s).read().toString().contains("public fixture"))
+        assertEquals("web.independent_search",LocalToolAudit(s).read().single()["tool_key"]!!.jsonPrimitive.content)
+        val keyword=k.toolSession("current","turn-now",RemoteCrossWindowRequest("keyword"),c.receipt)!!
+        assertFalse(keyword.tools.toString().contains("independent_web_search"))
+        key=null
+        assertFalse(session.execute("web2","independent_web_search","""{"query":"not authorized"}""").ok)
+        assertEquals(1,calls)
+        assertFalse(k.toolSession("current","turn-now",req,c.receipt)!!.tools.toString().contains("independent_web_search"))
+        key="synthetic-secret"
+        val cache=RemoteCacheStore(s)
+        cache.putHistory("current",cache.history("current")!!.copy(contextSettings=ConversationContextSettings()))
+        assertFalse(session.execute("web3","independent_web_search","""{"query":"not authorized"}""").ok)
+        assertEquals(1,calls)
+    }
 }
