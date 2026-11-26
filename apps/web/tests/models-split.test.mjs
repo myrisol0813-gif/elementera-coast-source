@@ -49,6 +49,7 @@ assert.equal('handleSandbox' in api, false, 'retired sandbox export must not ret
 
 console.log(`models-split: ok (${lines} lines)`);
 
+const { buildModelCatalog } = api;
 const imageCatalog=buildModelCatalog({data:[{id:'openai/gpt-image-2',architecture:{output_modalities:['image']}},{id:'fixture/chat-image',architecture:{output_modalities:['text','image']}}]},[{id:'fixture/actual-image',name:'Actual image',free:false},{id:'fixture/free-image:free',name:'Free image',free:true}]);
 assert.equal(imageCatalog.image_catalog_status,'verified');
 assert.deepEqual(imageCatalog.groups.openai_image.map(m=>m.id),['fixture/actual-image','fixture/free-image:free']);
