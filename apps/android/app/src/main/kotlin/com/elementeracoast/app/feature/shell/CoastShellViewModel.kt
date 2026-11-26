@@ -1293,8 +1293,9 @@ class CoastShellViewModel(
             showPlaceholder("当前模型通道尚未接通连续回复；未发起模型请求。");return
         }
         val window=initial.contextSettings
-        if(window.stickerSendEnabled||window.stickerAddEnabled||_state.value.currentImageModel.isNotBlank() ){
-            showPlaceholder("连续回复的媒体工具尚未接通；未发起模型请求。");return
+        val imageModel=_state.value.currentImageModel
+        if(localMode&&(window.stickerSendEnabled||window.stickerAddEnabled||imageModel.isNotBlank())){
+            showPlaceholder("本机连续回复媒体工具尚未接通；未发起模型请求。");return
         }
         val source=initial.turns.firstOrNull{it.id==tid}?:return
         val user=source.user.variants.getOrNull(source.user.active)?:return
@@ -1347,7 +1348,8 @@ class CoastShellViewModel(
                         com.elementeracoast.app.core.model.CrossWindowMode.Manual->"manual"
                         com.elementeracoast.app.core.model.CrossWindowMode.ModelDecides->"model_decides"
                         else->"keyword"
-                    },crossWindow.messages.map{com.elementeracoast.app.core.remote.RemoteCrossWindowMessageSelection(it.conversationId,it.messageId)}))
+                    },crossWindow.messages.map{com.elementeracoast.app.core.remote.RemoteCrossWindowMessageSelection(it.conversationId,it.messageId)}),
+                imageToolEnabled=imageModel.isNotBlank(),imageModelId=imageModel.takeIf{it.isNotBlank()})
             backend.chat.streamReplyRun(request).collect{event->
                 when(event){
                     is ReplyRunEvent.Start->Unit
@@ -1359,7 +1361,7 @@ class CoastShellViewModel(
                         if(_state.value.activeConversationId==cid)_state.update{it.copy(backendOffline=false,
                             turnDeskReceipt=event.variant.deskSlip?.let(com.elementeracoast.app.feature.chat.TurnDeskMapper::toUi))}
                     }
-                    is ReplyRunEvent.End->{end=event;displayCanonical()}
+                    is ReplyRunEvent.End->{end=event;event.history?.let{canonical=it};displayCanonical()}
                 }
             }
             val settled=end?:throw CoastApiException(CoastApiErrorKind.Stream,"reply_group_incomplete","未确认整组结束。")

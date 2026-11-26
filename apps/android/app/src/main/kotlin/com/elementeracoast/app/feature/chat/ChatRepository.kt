@@ -91,6 +91,7 @@ class DefaultChatRepository(
     override fun streamReplyRun(request:RemoteReplyRunRequest):Flow<ReplyRunEvent> = flow {
         api.streamReplyRun(request).collect { event ->
             if(event is ReplyRunEvent.Committed)cache.putHistory(request.conversationId,event.history)
+            if(event is ReplyRunEvent.End)event.history?.let{cache.putHistory(request.conversationId,it)}
             emit(event)
         }
     }
