@@ -1,5 +1,6 @@
 import {readConversationState} from './chat-store.js';
 import {listStickers,registerSticker,deliverSticker} from './sticker-library.js';
+import {buildFurnitureSummary,sanitizeFurnitureRuns} from './tool-furniture-summary.js';
 const fn=(name,description,properties,required)=>({type:'function',function:{name,description,parameters:{type:'object',properties,required,additionalProperties:false}}});
 const search=fn('sticker_search','按说明查找已登记的表情包。仅返回素材编号和文字说明，不读取像素；按需使用，不必每轮发送。',{q:{type:'string',maxLength:100},cursor:{type:'integer',minimum:0}},[]);
 const send=fn('sticker_send','选择目录中的一张表情包，将真实图片原件发送至当前助手回复。不调用生图服务。',{sticker_id:{type:'string'}},['sticker_id']);
@@ -8,7 +9,7 @@ const names=new Set([search.function.name,send.function.name,add.function.name])
 function target(state,tid,mid){
  const t=state.turns.find(t=>t.id===tid),i=t?.user?.active,uid=t?.user?.variants?.[i]?.id;
  const v=t?.assistant?.variantsByUserVariant?.[String(i)]?.find(v=>v.id===mid);
- return uid&&v&&!v.hidden&&['sticker_tool_ready','sticker_saved','image_tool_ready','image_saved'].includes(v.finish_reason)?{uid,v}:null;
+ return uid&&!t.user.variants[i].hidden&&v&&!v.hidden&&['sticker_tool_ready','sticker_saved','image_tool_ready','image_saved'].includes(v.finish_reason)?{uid,v}:null;
 }
 export async function attachStickerTools(env,assembled,{conversationId,turnId,messageId,roomType,signal}={}){
  if(!conversationId||!turnId||!messageId||!['main','radio'].includes(roomType))return assembled;
@@ -20,7 +21,7 @@ export async function attachStickerTools(env,assembled,{conversationId,turnId,me
  const originalHasImage=assembled.hasGeneratedImage;
  return {...assembled,tools,
  hasGeneratedImage:()=>saved||Boolean(originalHasImage?.()),
- furnitureRuns:()=>[...(assembled.furnitureRuns?.()||[]),...runs].slice(0,16),
+ furnitureRuns:()=>sanitizeFurnitureRuns([...(assembled.furnitureRuns?.()||[]),...runs]),
  executeTool:async call=>{
   const name=call?.function?.name;
   if(!names.has(name))return assembled.executeTool(call);
@@ -42,7 +43,7 @@ export async function attachStickerTools(env,assembled,{conversationId,turnId,me
     result={ok:true,status:'saved',attachment:{id:a.id,type:a.type,mime:a.mime,size:a.size},reused:sent.reused};
    }
   }catch(error){result={ok:false,error:String(error?.type||'sticker_operation_failed'),message:'表情包操作未完成。'};}
-  runs.push({id:'sticker:'+crypto.randomUUID(),tool_key:name,label:name==='sticker_search'?'查找了表情包':name==='sticker_add'?'登记了表情包':'发送了表情包',status:result.ok?'success':'error',count:1,items:[]});
+  runs.push(buildFurnitureSummary({id:'sticker:'+crypto.randomUUID(),toolKey:name,displayName:name==='sticker_search'?'查找了表情包':name==='sticker_add'?'登记了表情包':'发送了表情包',status:result.ok?'success':'error',output:{count:name==='sticker_search'?result.items?.length:1},error:{type:result.error}}));
   return result;
  }};
 }

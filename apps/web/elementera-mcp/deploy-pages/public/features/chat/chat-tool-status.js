@@ -1,4 +1,7 @@
 const TOOL_LABELS = Object.freeze({
+  sticker_search:'查找表情包',
+  sticker_send:'发送表情包',
+  sticker_add:'登记表情包',
   'memory.search': '搜索记忆',
   'memory.write_candidate': '放入待确认区',
   'dogtalk.read': '读取私人草稿',

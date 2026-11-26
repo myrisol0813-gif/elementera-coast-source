@@ -119,7 +119,7 @@ export async function deliverSticker(db,input,{allowSend=false}={}){
   const index=turn?.user?.variants?.findIndex(v=>v.id===uid)??-1;
   const target=index<0?null:turn.assistant.variantsByUserVariant[String(index)]?.find(v=>v.id===mid);
   if(state.context_settings?.sticker_send_enabled!==true)fail('sticker_send_denied','当前窗口未允许发送表情包。',403);
-  if(!target||target.hidden||turn.user.active!==index||
+  if(!target||target.hidden||turn.user.variants[index]?.hidden||turn.user.active!==index||
     !['sticker_tool_ready','sticker_saved','image_tool_ready','image_saved'].includes(target.finish_reason))
     fail('sticker_reservation_lost','原回复版本不再等待表情包。',409);
   const attachments=target.attachments||[];
@@ -169,12 +169,12 @@ export async function listOwnerStickers(db,{q='',cursor=0}={}, {actor}={}){
   if(typeof q!=='string'||q.length>100||!Number.isSafeInteger(cursor)||cursor<0||cursor>100000)fail('invalid_sticker_query','素材搜索参数无效。');
   await ensureStickerLibrarySchema(db);
   const like='%'+q.trim().replace(/[!%_]/g,x=>'!'+x)+'%';
-  const result=await query(db,`SELECT s.*,a.name,a.mime,a.size,a.turn_id,c.deleted_at
+  const result=await query(db,`SELECT s.*,a.name,a.mime,a.size,a.turn_id,c.deleted_at,c.id AS source_conversation_id
     FROM coast_sticker_library s LEFT JOIN chat_attachments a ON a.id=s.attachment_id AND a.conversation_id=s.conversation_id
     LEFT JOIN conversations c ON c.id=s.conversation_id AND c.user_id='owner' AND c.conversation_kind='chat'
     WHERE s.description LIKE ? ESCAPE '!' ORDER BY s.created_at DESC,s.id DESC LIMIT 41 OFFSET ?`,[like,cursor]).all();
   const rows=result.results||[];
-  return {items:rows.slice(0,40).map(row=>({...publicEntry(row),conversation_id:row.conversation_id,attachment_id:row.attachment_id,name:row.name||'',available:Boolean(row.mime&&!row.deleted_at)})),next_cursor:rows.length>40?cursor+40:null};
+  return {items:rows.slice(0,40).map(row=>({...publicEntry(row),conversation_id:row.conversation_id,attachment_id:row.attachment_id,name:row.name||'',available:Boolean(row.mime&&row.source_conversation_id&&!row.deleted_at)})),next_cursor:rows.length>40?cursor+40:null};
 }
 export async function updateOwnerSticker(db,id,input,{actor}={}){
   if(actor!=='owner')fail('sticker_manage_denied','只有屋主可以管理素材。',403);

@@ -52,6 +52,7 @@ export function createChatWindowSettings({
     const settings = normalizeContextSettings(state.context_settings);
     const locked = isUnavailableConversation();
     const fields = new Set(settings.reality_fields);
+    const mediaLocked=locked||!['main','radio'].includes(activeConversation()?.room_type);
 
     const rows = WEB_REALITY_FIELDS.map(([field, title, note]) => switchRow({
       field,
@@ -100,8 +101,8 @@ export function createChatWindowSettings({
           </section>
 
           <section class="window-context-card">
-            ${switchRow({title:'允许发送表情包',note:'模型可自主查找和发送已启用的素材，不调用生图 API。',checked:settings.sticker_send_enabled,enabled:!locked,action:!locked?'chat:window-sticker-send':''})}
-            ${switchRow({title:'允许添加表情包',note:'模型可登记自己在本窗口生成并保存的图片。',checked:settings.sticker_add_enabled,enabled:!locked,action:!locked?'chat:window-sticker-add':''})}
+            ${switchRow({title:'允许发送表情包',note:'模型可自主查找和发送已启用的素材，不调用生图 API。',checked:settings.sticker_send_enabled,enabled:!mediaLocked,action:!mediaLocked?'chat:window-sticker-send':''})}
+            ${switchRow({title:'允许添加表情包',note:'模型可登记自己在本窗口生成并保存的图片。',checked:settings.sticker_add_enabled,enabled:!mediaLocked,action:!mediaLocked?'chat:window-sticker-add':''})}
           </section>
           <section class="window-context-card window-context-note">
             <strong>PWA 与 Native 的边界</strong>
@@ -126,6 +127,7 @@ export function createChatWindowSettings({
 
   async function writeSettings(nextSettings) {
     if (!runtime.currentId || isUnavailableConversation()) return;
+    const cid=runtime.currentId;
     const previous = currentHistory();
     const next = { ...previous, context_settings: normalizeContextSettings(nextSettings) };
     setHistory(runtime.currentId, next);
@@ -133,11 +135,11 @@ export function createChatWindowSettings({
     renderMessages(runtime.currentId);
     render();
     try {
-      await saveHistory(runtime.currentId, next);
+      await saveHistory(cid, next);
     } catch (error) {
-      setHistory(runtime.currentId, previous);
+      setHistory(cid, previous);
       renderConversationList();
-      renderMessages(runtime.currentId);
+      if(runtime.currentId===cid)renderMessages(cid);
       render();
       toast(`窗口设置保存失败：${error.message}`);
     }

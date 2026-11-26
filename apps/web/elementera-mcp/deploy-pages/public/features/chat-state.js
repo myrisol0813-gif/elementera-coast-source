@@ -105,6 +105,8 @@ function normalizeAttachments(value, assistantId) {
     const createdAt = typeof item?.created_at === 'string' ? item.created_at : now();
     if (!item?.id || !name || !storageKey) return null;
     const imageGeneration=type==='image'?normalizeImageGeneration(item.image_generation,assistantId):null;
+    const sd=item.sticker_delivery;
+    const stickerDelivery=type==='image'&&assistantId&&sd?.message_id===assistantId&&typeof sd.sticker_id==='string'&&/^sticker_[A-Za-z0-9_.:-]{1,152}$/.test(sd.sticker_id)?{message_id:assistantId,sticker_id:sd.sticker_id}:null;
     return {
       id: idValue,
       type,
@@ -114,6 +116,7 @@ function normalizeAttachments(value, assistantId) {
       storage_key: storageKey,
       created_at: createdAt,
       ...(imageGeneration?{image_generation:imageGeneration}:{}),
+      ...(stickerDelivery?{sticker_delivery:stickerDelivery}:{}),
     };
   }).filter(Boolean);
 }
