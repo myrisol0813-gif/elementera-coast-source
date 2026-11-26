@@ -62,6 +62,8 @@ internal class LocalToolWrites(private val s:LocalPersistence,private val cid:St
                 val row=calendar.save(null,buildJsonObject{
                     put("day",input.date());put("title",input.text("title",120));put("body",input.text("body",4000,true))
                     put("kind",input.text("kind",10,true).ifBlank{"event"})
+                    put("recurrence",input.text("recurrence",10,true).ifBlank{"none"})
+                    input["anniversary"]?.let{put("anniversary",it)}
                 })
                 val key=row.getValue("id").jsonPrimitive.content
                 val changed=JsonObject(row+buildJsonObject{
