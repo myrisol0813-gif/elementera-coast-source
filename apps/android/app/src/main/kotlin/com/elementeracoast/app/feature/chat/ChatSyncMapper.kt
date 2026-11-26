@@ -209,6 +209,8 @@ object ChatSyncMapper {
             val assistantIndex = (turn.assistant.activeByUserVariant[key] ?: 0)
                 .coerceIn(0, (assistants.size - 1).coerceAtLeast(0))
             val assistant = assistants.getOrNull(assistantIndex)
+            val alternatives=ReplySequence.alternatives(assistants)
+            val alternativeIndex=alternatives.indexOfFirst{assistant in it.messages}
             if (assistant != null) {
                 add(
                     ChatMessage(
@@ -224,9 +226,9 @@ object ChatSyncMapper {
                         liked = assistant.liked,
                         favorite = assistant.favorite,
                         errorDetail = assistant.errorDetail,
-                        variantIndex = assistantIndex,
-                        variantCount = assistants.size.coerceAtLeast(1),
-                        variants = assistants.map { it.content },
+                        variantIndex = alternativeIndex,
+                        variantCount = alternatives.size.coerceAtLeast(1),
+                        variants = alternatives.map { choice -> choice.messages.joinToString("\n\n"){it.content} },
                         createdAtLabel = assistant.createdAt,
                         attachments = assistant.attachments.map(::toChatAttachment),
                         furnitureRuns = assistant.furnitureRuns.map(::toFurnitureRun),

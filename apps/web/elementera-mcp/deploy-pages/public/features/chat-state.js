@@ -1,5 +1,5 @@
 import { clamp, id, sanitizeId } from '../core/dom.js';
-import { selectedReplyGroup } from './chat/chat-reply-sequence.js';
+import { selectedReplyGroup, replyAlternatives } from './chat/chat-reply-sequence.js';
 
 const MAX_ERROR_DETAIL = 12000;
 const MAX_TURNS = 400;
@@ -357,6 +357,11 @@ export function appendAssistantVariant(value, turnId, variantValue) {
   const branch = activeBranch(turn);
   const variant = normalizeVariant(variantValue, 'assistant');
   const list = turn.assistant.variantsByUserVariant[branch.key] || [];
+  // A grouped history cannot be truncated through its first message.
+  // Ordinary ungrouped histories retain the existing rolling limit.
+  if (list.length >= MAX_VARIANTS && (variant.reply_sequence || list.some(v=>v.reply_sequence))) {
+    return { state, turn: null, variant: null, assistantIndex: -1, userIndex: -1 };
+  }
   list.push(variant);
   turn.assistant.variantsByUserVariant[branch.key] = list.slice(-MAX_VARIANTS);
   const assistantIndex = turn.assistant.variantsByUserVariant[branch.key].length - 1;
@@ -418,8 +423,13 @@ export function deleteActiveAssistantVariant(value, turnId) {
   if (!turn) return state;
   const branch = activeBranch(turn);
   if (!branch.assistants.length) return state;
-  branch.assistants.splice(branch.assistantIndex, 1);
-  turn.assistant.activeByUserVariant[branch.key] = Math.min(branch.assistantIndex, Math.max(0, branch.assistants.length - 1));
+  const alternatives = replyAlternatives(branch.assistants);
+  const selected = alternatives.findIndex(a => a.messages.includes(branch.assistant));
+  const removed = new Set(alternatives[selected].messages.map(v=>v.id));
+  const remaining = branch.assistants.filter(v=>!removed.has(v.id));
+  const choices = replyAlternatives(remaining);
+  turn.assistant.variantsByUserVariant[branch.key] = remaining;
+  turn.assistant.activeByUserVariant[branch.key] = choices[Math.min(selected, choices.length-1)]?.activeIndex ?? 0;
   state.updated_at = now();
   return state;
 }
@@ -434,8 +444,11 @@ export function switchVariant(value, turnId, kind, direction) {
   }
   if (kind === 'assistant') {
     const branch = activeBranch(turn);
-    if (branch.assistants.length > 1) {
-      turn.assistant.activeByUserVariant[branch.key] = (branch.assistantIndex + delta + branch.assistants.length) % branch.assistants.length;
+    const alternatives = replyAlternatives(branch.assistants);
+    if (alternatives.length > 1) {
+      const current = alternatives.findIndex(a=>a.messages.includes(branch.assistant));
+      const next = (current + delta + alternatives.length) % alternatives.length;
+      turn.assistant.activeByUserVariant[branch.key] = alternatives[next].activeIndex;
     }
   }
   state.updated_at = now();

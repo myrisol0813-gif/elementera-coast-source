@@ -65,3 +65,17 @@ assert.deepEqual(activeMessages(raw).map(x=>x.content),['hello','first','second'
 const alternative={...raw.turns[0],assistant:{...raw.turns[0].assistant,activeByUserVariant:{0:0}}};
 assert.deepEqual(contextMessages({turns:[alternative,target]},target.id,{recentTurns:2}).map(x=>x.content),['hello','old','next question']);
 assert.deepEqual(contextMessages({turns:[raw.turns[0]]},'turn',{recentTurns:2}).map(x=>x.content),['hello']);
+
+const {replyAlternatives}=await import('../elementera-mcp/deploy-pages/public/features/chat/chat-reply-sequence.js');
+const {switchVariant,deleteActiveAssistantVariant,appendAssistantVariant,activeBranch}=await import('../elementera-mcp/deploy-pages/public/features/chat-state.js');
+assert.equal(replyAlternatives(variants).length,2);
+const switched=switchVariant(raw,'turn','assistant','previous');
+assert.equal(activeBranch(switched.turns[0]).assistant.id,'old');
+const back=switchVariant(switched,'turn','assistant','next');
+assert.equal(activeBranch(back.turns[0]).assistant.id,'second');
+const deleted=deleteActiveAssistantVariant(back,'turn');
+assert.deepEqual(activeBranch(deleted.turns[0]).assistants.map(x=>x.id),['old']);
+const full={turns:[{...raw.turns[0],assistant:{activeByUserVariant:{0:19},variantsByUserVariant:{0:[...group,...Array.from({length:17},(_,i)=>({id:'legacy-'+i,content:'legacy'}))]}}}]};
+const rejected=appendAssistantVariant(full,'turn',{id:'new',content:'new'});
+assert.equal(rejected.variant,null);
+assert.equal(activeBranch(rejected.state.turns[0]).assistants.length,20);

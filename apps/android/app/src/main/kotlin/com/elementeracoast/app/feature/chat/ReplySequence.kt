@@ -21,6 +21,19 @@ internal object ReplySequence {
         require(group.withIndex().all{(i,v)->v.replySequence!!.index==i}){"invalid_reply_sequence_group"}
         return group
     }
+    data class Alternative(val messages:List<com.elementeracoast.app.core.remote.RemoteVariant>,val activeIndex:Int)
+    fun alternatives(variants:List<com.elementeracoast.app.core.remote.RemoteVariant>):List<Alternative>{
+        val seen=mutableSetOf<String>()
+        return buildList {
+            variants.forEachIndexed { index, variant ->
+                if(seen.add(variant.id)){
+                    val group=selectedGroup(variants,index)
+                    seen.addAll(group.map{it.id})
+                    add(Alternative(group,variants.indexOf(group.last())))
+                }
+            }
+        }
+    }
     fun limit(n:Int)=n.also{require(it in 1..20){"invalid_reply_sequence_limit"}}
 
     suspend fun <T> run(identity:Identity,maxMessages:Int,newId:()->String,

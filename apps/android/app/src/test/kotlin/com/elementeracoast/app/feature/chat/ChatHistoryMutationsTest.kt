@@ -65,6 +65,27 @@ class ChatHistoryMutationsTest {
     }
 
     @Test
+    fun groupedAlternativesNavigateAndDeleteTogether(){
+        val base=branchedHistory()
+        val turn=base.turns.single()
+        val old=turn.assistant.variantsByUserVariant.getValue("0").first()
+        val first=RemoteVariant("first","first",replySequence=com.elementeracoast.app.core.remote.RemoteReplySequence("seq",0))
+        val second=first.copy(id="second",content="second",replySequence=first.replySequence!!.copy(index=1))
+        val grouped=base.copy(turns=listOf(turn.copy(assistant=RemoteAssistantBranches(
+            activeByUserVariant=mapOf("0" to 2),variantsByUserVariant=mapOf("0" to listOf(old,first,second))))))
+        val role=com.elementeracoast.app.core.model.MessageRole.Assistant
+        val ui=ChatSyncMapper.toUi(grouped).last()
+        assertEquals(2,ui.variantCount)
+        assertEquals(1,ui.variantIndex)
+        val previous=ChatBranchNavigator.select(grouped,turn.id,role,0)
+        assertEquals(0,previous.turns.single().assistant.activeByUserVariant["0"])
+        val next=ChatBranchNavigator.select(previous,turn.id,role,1)
+        assertEquals(2,next.turns.single().assistant.activeByUserVariant["0"])
+        val removed=ChatHistoryMutations.deleteActiveAssistant(next,turn.id)
+        assertEquals(listOf(old),removed.turns.single().assistant.variantsByUserVariant["0"])
+    }
+
+    @Test
     fun assistantReactionsMutateTheCanonicalActiveVariant() {
         val liked = ChatHistoryMutations.toggleActiveAssistantLike(branchedHistory(), "turn-1")
         val likedVariant = liked.turns.single().assistant.variantsByUserVariant["0"].orEmpty()[1]

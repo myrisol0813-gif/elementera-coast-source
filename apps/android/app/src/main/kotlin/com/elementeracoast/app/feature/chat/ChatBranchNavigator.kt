@@ -18,7 +18,8 @@ object ChatBranchNavigator {
                     val key = userIndex.toString()
                     val variants = turn.assistant.variantsByUserVariant[key].orEmpty()
                     if (variants.isEmpty()) return@map turn
-                    val index = requestedIndex.coerceIn(0, variants.lastIndex)
+                    val alternatives=ReplySequence.alternatives(variants)
+                    val index=alternatives[requestedIndex.coerceIn(0,alternatives.lastIndex)].activeIndex
                     turn.copy(
                         assistant = turn.assistant.copy(
                             activeByUserVariant = turn.assistant.activeByUserVariant + (key to index)

@@ -78,3 +78,16 @@ export function selectedReplyGroup(variants,activeIndex){
   if(group.some((v,i)=>v.reply_sequence.index!==i))throw Error('invalid_reply_sequence_group');
   return group;
 }
+
+// One navigation entry per alternative, even if its messages have several IDs.
+// Keep the raw index of the last message as the existing active pointer.
+export function replyAlternatives(variants){
+  const seen=new Set(),out=[];
+  variants.forEach((variant,index)=>{
+    if(seen.has(variant.id))return;
+    const messages=selectedReplyGroup(variants,index);
+    for(const message of messages)seen.add(message.id);
+    out.push({messages,activeIndex:variants.indexOf(messages[messages.length-1])});
+  });
+  return out;
+}

@@ -103,8 +103,12 @@ object ChatHistoryMutations {
     fun deleteActiveAssistant(history: RemoteHistory, turnId: String): RemoteHistory =
         patchAssistantBranch(history, turnId) { assistants, activeIndex ->
             if (assistants.isEmpty()) return@patchAssistantBranch assistants to 0
-            val remaining = assistants.toMutableList().also { it.removeAt(activeIndex) }
-            remaining to activeIndex.coerceAtMost((remaining.size - 1).coerceAtLeast(0))
+            val choices=ReplySequence.alternatives(assistants)
+            val selected=choices.indexOfFirst{assistants[activeIndex] in it.messages}
+            val removed=choices[selected].messages.map{it.id}.toSet()
+            val remaining=assistants.filterNot{it.id in removed}
+            val alternatives=ReplySequence.alternatives(remaining)
+            remaining to (alternatives.getOrNull(selected.coerceAtMost(alternatives.lastIndex))?.activeIndex ?: 0)
         }
 
     fun toggleActiveAssistantLike(history: RemoteHistory, turnId: String): RemoteHistory =
