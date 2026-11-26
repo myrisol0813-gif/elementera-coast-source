@@ -16,7 +16,8 @@ internal class LocalToolSession private constructor(
     private val modelId:String,
     base:RemoteDeskSlip,
     private val wireLimit:Int?=null,
-    private val web:LocalIndependentWeb?=null
+    private val web:LocalIndependentWeb?=null,
+    private val voice:LocalVoiceProvider?=null
 ) {
     private data class Spec(val name:String,val key:String,val title:String,val description:String,val parameters:JsonObject)
     private fun schema(fields:Map<String,JsonObject> = emptyMap(),required:List<String> = emptyList())=buildJsonObject {
@@ -50,6 +51,7 @@ internal class LocalToolSession private constructor(
             add(Spec("worldbook_list","worldbook.list","翻世界书","按关键词查找当前屋主可读的词条。",schema(mapOf("query" to string()),listOf("query"))))
         }
         if(writeAllowed){
+            if(voice?.configured()==true) add(Spec("voice_create","voice.create","留下语音","把自己写的一小段文字念成真实MP3，保存到当前轮次。使用已授权的独立ElevenLabs额度，一轮至多一次；只发送待朗读文字。",schema(mapOf("text" to string(2400)),listOf("text"))))
             if(base.thinkingSoil.enabled && LocalPortraitStore(store).read("self_portrait")?.root?.get("write_enabled")?.jsonPrimitive?.int != 0)
                 add(Spec("global_excerpt_propose","memory.global_excerpt_propose","提出自我画像修改稿","仅在自动整理和画像写入均开启时提出整篇完整修改稿，说明长期价值；只进入待确认区，不覆盖正式正文。本机单次工具参数最多12000字符；不要提交截断的正文。",schema(mapOf("proposed_body" to string(10000),"reason" to string(4000),"change_kind" to string(40)),listOf("proposed_body","reason"))))
             if(base.thinkingSoil.enabled && LocalPortraitStore(store).read("user_portrait")?.root?.get("write_enabled")?.jsonPrimitive?.int != 0)
@@ -115,6 +117,7 @@ internal class LocalToolSession private constructor(
         if(calls>=MAX_CALLS||callId.isBlank()||!seenCalls.add(callId))return errorResult("工具次数上限或重复调用。")
         calls++
         val start=System.currentTimeMillis()
+        if(name=="voice_create")return executeVoice(spec,arguments,start)
         if(name in WRITE_NAMES)return executeWrite(spec,arguments,start)
         var success=false
         var output=buildJsonObject{put("ok",false);put("message","工具没有执行。")}
@@ -162,6 +165,37 @@ internal class LocalToolSession private constructor(
         reports.add(RemoteDeskToolResult(name=name,delivered=true,content=if(success&&spec.key.startsWith("web.independent_"))output.toString() else if(success)"成功返回 "+output.toString().length+" 字符"else output["message"]?.jsonPrimitive?.contentOrNull.orEmpty()))
         val run=RemoteFurnitureRun(id=auditId,toolKey=spec.key,label=spec.title,status=if(success)"success"else "error")
         return RemoteNativeToolResult(ok=success,output=output.toString(),furnitureRuns=listOf(run),deskSlip=receipt)
+    }
+    private var voiceAttempted=false
+    private fun executeVoice(spec:Spec,arguments:String,start:Long):RemoteNativeToolResult {
+        val auditId=UUID.randomUUID().toString()
+        val output=try{
+            require(arguments.length<=6000)
+            val input=parseInput(spec,arguments)
+            val text=input.getValue("text").jsonPrimitive.let{require(it.isString);it.content.trim()}
+            require(text.length in 1..2400)
+            val provider=voice?:error("语音未配置。")
+            fun allowed(s:LocalPersistence)=allowedNow(s,spec)&&LocalSideRecords(s).clips(cid).none{it["turn_id"]?.jsonPrimitive?.contentOrNull==turn&&it["source"]?.jsonPrimitive?.contentOrNull=="coast_chat"}
+            if(voiceAttempted||!store.readConsistent{allowed(it)}||!provider.configured())throw LocalToolFailure("permission_revoked","本轮已有语音尝试或授权已关闭。")
+            if(estimated+estimate(arguments)+512>toolBudget)throw LocalToolFailure("budget_exceeded","本轮工具预算不足，未发起语音生成。")
+            voiceAttempted=true
+            val audio=provider.generate(text)
+            store.atomic{s->
+                if(!allowed(s)||!provider.configured())throw LocalToolFailure("permission_revoked","原窗口或语音授权已变化；未保存。")
+                val row=saveLocalVoice(s,cid,turn,null,"coast_chat",modelId,audio)
+                val value=buildJsonObject{put("ok",true);put("id",row.getValue("id"));put("provider","elevenlabs");put("voice_id",audio.voiceId);put("audio_bytes",audio.bytes.size);put("saved",true);put("turn_id",turn)}
+                if(estimated+estimate(arguments)+estimate(value.toString())+32>toolBudget)throw LocalToolFailure("budget_exceeded","本轮工具预算不足，未保存。")
+                auditWrite(s,auditId,spec.key,start,true)
+                value
+            }
+        }catch(e:Exception){
+            runCatching{store.readConsistent{s->auditWrite(s,auditId,spec.key,start,false)}}
+            buildJsonObject{put("ok",false);put("code",when(e){is LocalToolFailure->e.code;is VoiceFailure->e.type;else->"voice_failed"});put("message",when(e){is LocalToolFailure->e.message.orEmpty();is VoiceFailure->e.message;else->"语音未成功保存。"})}
+        }
+        val success=output["ok"]?.jsonPrimitive?.booleanOrNull==true
+        estimated+=estimate(arguments.take(6000))+estimate(output.toString())+32
+        reports.add(RemoteDeskToolResult(name=spec.name,delivered=true,content=output.toString()))
+        return RemoteNativeToolResult(ok=success,output=output.toString(),deskSlip=receipt,furnitureRuns=listOf(RemoteFurnitureRun(id=auditId,toolKey=spec.key,label=spec.title,status=if(success)"success"else "error")))
     }
     private fun executeWrite(spec:Spec,arguments:String,start:Long):RemoteNativeToolResult {
         val auditId=UUID.randomUUID().toString()
@@ -296,15 +330,15 @@ internal class LocalToolSession private constructor(
     private fun JsonObject.filterMetadata()=JsonObject(filterKeys{it !in setOf("reading_logs","progress")})
     companion object {
         const val MAX_CALLS=12
-        private val WRITE_NAMES=setOf("create_moment","create_diary","moment_comment","moment_like","calendar_create","library_write","memory_write_candidate","global_excerpt_propose","user_portrait_propose")
-        fun open(store:LocalPersistence,cid:String,turn:String,request:RemoteCrossWindowRequest?,base:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null,web:LocalIndependentWeb?=null):LocalToolSession?{
+        private val WRITE_NAMES=setOf("voice_create","create_moment","create_diary","moment_comment","moment_like","calendar_create","library_write","memory_write_candidate","global_excerpt_propose","user_portrait_propose")
+        fun open(store:LocalPersistence,cid:String,turn:String,request:RemoteCrossWindowRequest?,base:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null,web:LocalIndependentWeb?=null,voice:LocalVoiceProvider?=null):LocalToolSession?{
             val h=RemoteCacheStore(store,strictReads=true).history(cid)?:return null
             val cross=h.contextSettings.crossWindowAuto&&request?.mode=="model_decides"
             val tools=h.contextSettings.localModelToolsEnabled
             val write=h.contextSettings.localModelWriteEnabled&&modelId.isNotBlank()
             if(!cross&&!tools&&!write)return null
             val sourceTurn=h.turns.firstOrNull{it.id==turn}?:return null
-            return LocalToolSession(store,cid,turn,sourceTurn,cross,tools,write,modelId,base,wireLimit,web?.takeIf{request?.mode!="keyword"&&LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")})
+            return LocalToolSession(store,cid,turn,sourceTurn,cross,tools,write,modelId,base,wireLimit,web?.takeIf{request?.mode!="keyword"&&LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},voice?.takeIf{LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")})
         }
     }
 }

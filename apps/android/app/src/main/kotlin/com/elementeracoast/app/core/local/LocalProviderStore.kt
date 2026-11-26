@@ -30,9 +30,9 @@ data class LocalProviderConfig(
 }
 
 /** Deliberately separate from workspace snapshots, online profile and OAuth credentials. */
-class LocalProviderStore(context: Context, searchOnly:Boolean=false) {
-    private val alias=if(searchOnly) "coast_local_search_aes_v1" else ALIAS
-    private val prefs = context.applicationContext.getSharedPreferences(if(searchOnly) "coast_local_search_v1" else "coast_local_providers_v1", Context.MODE_PRIVATE)
+class LocalProviderStore(context: Context, searchOnly:Boolean=false, voiceOnly:Boolean=false) {
+    private val alias=if(voiceOnly) "coast_local_voice_aes_v1" else if(searchOnly) "coast_local_search_aes_v1" else ALIAS
+    private val prefs = context.applicationContext.getSharedPreferences(if(voiceOnly) "coast_local_voice_v1" else if(searchOnly) "coast_local_search_v1" else "coast_local_providers_v1", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
 
     @Synchronized fun load(): List<LocalProviderConfig> {

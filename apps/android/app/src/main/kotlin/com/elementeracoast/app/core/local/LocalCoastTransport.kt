@@ -21,11 +21,12 @@ import okio.Buffer
  */
 class LocalCoastTransport(private val store: LocalPersistence,
     private val web:LocalIndependentWeb?=null,
+    private val voice:LocalVoiceProvider?=null,
     private val providerCatalog: () -> RemoteModelCatalogResponse = { RemoteModelCatalogResponse(ok = true) }
 ) : Interceptor {
     private val cache = RemoteCacheStore(store)
     private val calendar = LocalCalendarStore(store)
-    private val knowledge = LocalKnowledgeStore(store,web)
+    private val knowledge = LocalKnowledgeStore(store,web,voice)
     private val memory = LocalMemoryStore(store)
     private val portraits = LocalPortraitStore(store)
     private val soil = LocalSoilStore(store)
@@ -39,7 +40,14 @@ class LocalCoastTransport(private val store: LocalPersistence,
         return try {
             if (request.url.host != HOST) failure(request, 403, "local_boundary", "本机模式禁止连接海岸服务器。")
             else if(request.url.encodedPath=="/api/chat/native-tool"&&request.method=="POST") executeNativeTool(request)
+            else if(request.url.encodedPath=="/api/voice/clips"&&request.method=="POST") {
+                val provider=voice?:throw VoiceFailure("voice_not_configured","请在模型箱配置本机语音。",503)
+                val clip=generateLocalManualVoice(store,provider,body(request))
+                response(request,201,buildJsonObject{put("ok",true);put("clip",clip)})
+            }
             else synchronized(this){route(request)}
+        } catch (error: VoiceFailure) {
+            failure(request,error.status,error.type,error.message)
         } catch (error: LocalCalendarError) {
             failure(request, error.status, error.type, error.message.orEmpty())
         } catch (error: IllegalArgumentException) {

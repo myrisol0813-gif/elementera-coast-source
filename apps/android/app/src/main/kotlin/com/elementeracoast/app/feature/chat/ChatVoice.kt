@@ -82,7 +82,8 @@ internal fun VoiceSelectionDialog(
     message: ChatMessage,
     onDismiss: () -> Unit,
     onGenerate: (List<Int>) -> Unit,
-    working: Boolean
+    working: Boolean,
+    localMode:Boolean=false
 ) {
     val paragraphs = remember(message.remoteVariantId, message.text) {
         message.text.split(Regex("\\n\\s*\\n")).map { it.trim() }.filter(String::isNotEmpty)
@@ -94,7 +95,7 @@ internal fun VoiceSelectionDialog(
         title = { Text("留下 模型伙伴 的声音") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("勾选本条回复的段落，使用 ElevenLabs 模型伙伴 v0.1 声线生成，会消耗 ElevenLabs 额度。",
+                Text(if(localMode)"勾选本条回复的段落，使用模型箱配置的 ElevenLabs 声音，会消耗你的供应商额度。" else "勾选本条回复的段落，使用服务端配置的 ElevenLabs 声音，会消耗供应商额度。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("已选 ${count} / 2400 字 · 同一消息最多留存 12 段语音，单次最多选择 40 段",

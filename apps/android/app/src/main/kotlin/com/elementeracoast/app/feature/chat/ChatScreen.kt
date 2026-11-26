@@ -350,7 +350,7 @@ fun ChatWindow(
 
     voiceTarget?.let { message ->
         VoiceSelectionDialog(
-            message = message, working = voiceWorking,
+            message = message, working = voiceWorking, localMode=state.localMode,
             onDismiss = { voiceTarget = null },
             onGenerate = { indices ->
                 val variantId = message.remoteVariantId
