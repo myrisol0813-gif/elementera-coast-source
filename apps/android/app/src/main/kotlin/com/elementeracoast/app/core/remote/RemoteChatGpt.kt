@@ -20,4 +20,6 @@ data class RemoteNativeToolResult(
     @SerialName("private_continuation") val privateContinuation: List<JsonObject> = emptyList(),
     @SerialName("furniture_runs") val furnitureRuns: List<RemoteFurnitureRun> = emptyList(),
     @SerialName("desk_slip") val deskSlip: RemoteDeskSlip = RemoteDeskSlip()
-)
+) {
+    override fun toString()="RemoteNativeToolResult(ok="+ok+", output=redacted, privateContinuation=redacted, furnitureRuns="+furnitureRuns.size+")"
+}

@@ -7,6 +7,7 @@ import com.elementeracoast.app.core.remote.RemoteChatRequest
 import com.elementeracoast.app.core.remote.RemoteDeskSlip
 import com.elementeracoast.app.core.remote.RemoteFurnitureRun
 import com.elementeracoast.app.core.remote.RemoteNativeChatContext
+import com.elementeracoast.app.core.remote.RemoteNativeToolResult
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
@@ -81,6 +82,14 @@ internal fun normalizeNativeInput(obj: JsonObject): JsonObject {
             }
         })
     }
+}
+
+/** Keep trusted image readback outside the function-call output. */
+internal fun nativeSavedImageContinuation(name:String,result:RemoteNativeToolResult):Pair<Boolean,List<JsonObject>> {
+    if(name!="image_generate"||!result.ok)return false to emptyList()
+    val receipt=runCatching{Json.parseToJsonElement(result.output).jsonObject}.getOrNull()
+    if(receipt?.get("ok")?.jsonPrimitive?.booleanOrNull!=true||receipt["status"]?.jsonPrimitive?.contentOrNull!="saved")return false to emptyList()
+    return true to result.privateContinuation.take(1).map(::normalizeNativeInput)
 }
 
 internal data class NativeCoastToolCall(val callId: String, val name: String)
@@ -489,13 +498,8 @@ internal class ChatGptNativeInference(
                         desk = result.deskSlip
                         trySend(NativeChatEvent.Tool(callId, name, result.ok))
                         history.add(nativeCoastToolOutput(requestedTool, result.output))
-                        if(name=="image_generate"&&result.ok){
-                            val receipt=runCatching{json.parseToJsonElement(result.output).jsonObject}.getOrNull()
-                            if(receipt?.get("ok")?.jsonPrimitive?.booleanOrNull==true&&receipt["status"]?.jsonPrimitive?.contentOrNull=="saved"){
-                                generatedImageSaved=true
-                                privateImages.addAll(result.privateContinuation.take(1).map(::normalizeNativeInput))
-                            }
-                        }
+                        val (imageSaved,images)=nativeSavedImageContinuation(name,result)
+                        if(imageSaved){generatedImageSaved=true;privateImages.addAll(images)}
                     }
                     history.addAll(privateImages)
                     imageCount=nativeVisionCount(JsonArray(history))
