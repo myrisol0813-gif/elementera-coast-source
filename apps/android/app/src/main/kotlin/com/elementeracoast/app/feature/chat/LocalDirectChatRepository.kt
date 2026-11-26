@@ -40,7 +40,7 @@ internal class LocalDirectChatRepository(
         val cid=request.conversationId;val seq=request.sequenceId;val tid=request.turnId
         val plan=isChatGptPlanModel(request.model)
         val native=if(plan)planInference?:throw CoastApiException(CoastApiErrorKind.Model,"plan_sequence_unavailable","请先连接 ChatGPT 套餐。") else null
-        val resolved=if(plan)null else try{providers.resolve(request.model)}catch(_:Exception){null}?:throw CoastApiException(CoastApiErrorKind.Model,"local_provider_missing","请先选择本机供应商模型。")
+        val resolved=if(plan)null else (try{providers.resolve(request.model)}catch(_:Exception){null}?:throw CoastApiException(CoastApiErrorKind.Model,"local_provider_missing","请先选择本机供应商模型。"))
         fun number(key:String,fallback:Int)=request.settings[key]?.jsonPrimitive?.intOrNull?:fallback
         val recent=number("recentTurns",8).coerceAtLeast(1)
         val context=number("contextBudget",6000)
@@ -88,7 +88,7 @@ internal class LocalDirectChatRepository(
                 val sticker=claim.tools>0&&cfg.localModelWriteEnabled&&(cfg.stickerAddEnabled||cfg.stickerSendEnabled&&cfg.localModelToolsEnabled)
                 if(image!=null||sticker)require(withContext(Dispatchers.IO){ledger.reserveMedia(cid,seq,mid,request.model,image!=null)}){"媒体预约未确认。"}
                 val session=if(claim.tools>0)withContext(Dispatchers.IO){knowledge.toolSession(cid,tid,request.crossWindow,prepared.receipt,request.model,policy.wireLimit,image,mid,seq)}else null
-                var content="";var done:LocalProviderEvent.Done?=null
+                var content="";var done:LocalProviderEvent.Done?=null;var planStopReason:String?=null
                 val runs=mutableListOf<RemoteFurnitureRun>()
                 currentCoroutineContext().ensureActive()
                 emit(ReplyRunEvent.Begin(mid,index))
@@ -118,6 +118,7 @@ internal class LocalDirectChatRepository(
                                 is com.elementeracoast.app.feature.chatgpt.NativeChatEvent.Tool->ToolActivityBus.publish(event.id,event.name,event.ok)
                                 is com.elementeracoast.app.feature.chatgpt.NativeChatEvent.Completed->{
                                     content=event.text
+                                    planStopReason=event.sequenceStopReason
                                     runs.addAll(event.furnitureRuns)
                                     val usage=event.usage.takeIf{it.reported}?.let{
                                         com.elementeracoast.app.core.remote.RemoteModelUsage(promptTokens=it.input,completionTokens=it.output,cachedTokens=it.cached,totalTokens=it.input+it.output)
@@ -148,6 +149,7 @@ internal class LocalDirectChatRepository(
                 val savedVariant=canonical.turns.single{it.id==tid}.assistant.variantsByUserVariant.getValue(source.user.active.toString()).single{it.id==mid}
                 saved++
                 emit(ReplyRunEvent.Committed(mid,index,canonical,savedVariant))
+                if(planStopReason!=null){status="permission_or_budget";detail=planStopReason;break}
                 if(!result.second.continueRequested)break
                 if(!claim.mayContinue){status="limit_reached";break}
             }
