@@ -34,8 +34,8 @@ function action(name,label,disabled=false){
 function section(title,body){return '<div class="settings-group"><h2>'+escapeHtml(title)+'</h2>'+body+'</div>';}
 function line(title,description){return '<div class="feature-row static"><span><strong>'+escapeHtml(title)+'</strong><small>'+escapeHtml(description)+'</small></span></div>';}
 
-export function createTransferSettings({router,toast,chat}){
-  const v2=createV2Transfer({router,toast,chat});
+export function createTransferSettings({router,toast,chat,storage}){
+  const v2=createV2Transfer({router,toast,chat,storage});
   let payload=null, selection=new Set(), preview=null, result=null, busy=false, failure='',revision=0;
   const current=()=>router.current()?.name==='settings-transfer';
   const refresh=()=>current()?router.refresh():Promise.resolve();

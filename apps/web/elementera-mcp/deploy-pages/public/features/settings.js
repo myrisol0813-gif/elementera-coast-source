@@ -85,7 +85,7 @@ export function auditFullArchiveCompleteness(archive) {
 
 export function createSettings({ storage, shell, chat, router, toast, memory, daily, dogtalk }) {
   const preferences = () => storage.read().preferences;
-  const transfer = createTransferSettings({ router, toast, chat });
+  const transfer = createTransferSettings({ router, toast, chat, storage });
 
   router.register('wolf', () => {
     const currentModel = chat.getProfile().current_chat_model;
@@ -337,7 +337,7 @@ export function createSettings({ storage, shell, chat, router, toast, memory, da
     }
     if (name === 'export-v2') {
       try {
-        const manifest=await saveArchiveV2({applicationId:'com.elementeracoast.source',filename:`elementera-coast-v2-${timestampLabel()}.zip`});
+        const manifest=await saveArchiveV2({applicationId:'com.elementeracoast.source',filename:`elementera-coast-v2-${timestampLabel()}.zip`,deviceBasic:storage.read().runControl});
         toast('V2 已生成 · '+manifest.records.length+' 条记录；覆盖范围详见清单，尚非全量恢复包。',6500);
       } catch(error) { if(error.name!=='AbortError')toast('V2 导出失败：'+error.message,6500); }
       return;
