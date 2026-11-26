@@ -1,4 +1,5 @@
 import { recoverImageTasks, protectImageHistory } from './image-task-recovery.js';
+import { protectReplyGroupHistory } from './chat-reply-run.js';
 import { ensureChatSchema as ensureSchema } from './chat-schema.js';
 import { sanitizeFurnitureRuns } from './tool-furniture-summary.js';
 
@@ -567,12 +568,15 @@ export async function writeConversationState(db, id, value, {deleteRevision=null
   const previous = await first(db,'SELECT state_json FROM conversation_states WHERE conversation_id=?',[conversationId]);
   if(!previous?.state_json)throw new ChatStoreError('conversation_state_missing','聊天记录不存在，未创建替代数据。',409);
   const old=normalizeState(JSON.parse(previous.state_json));
-  const conflict=protectImageHistory(old,state,{allowDelete:deleteRevision!==null&&deleteRevision===old.updated_at});
+  const allowDelete=deleteRevision!==null&&deleteRevision===old.updated_at;
+  const groupConflict=protectReplyGroupHistory(old,state,{allowDelete});
+  if(groupConflict)throw new ChatStoreError(groupConflict,'连续回复历史已经变化；请刷新后按整组操作。',409);
+  const conflict=protectImageHistory(old,state,{allowDelete});
   if(conflict)throw new ChatStoreError(conflict,conflict==='image_pending'?'绘图仍在进行；请刷新原窗口，不覆盖任务。':'历史已包含新生成的图片，请刷新后再明确删除。',409);
   await carryArchiveDeskSlips(db, conversationId, state);
   const timestamp = nowMs();
   state.updated_at=iso(timestamp);
-  const changed=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS (SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL)',[JSON.stringify(normalizeState(state)),timestamp,conversationId,previous.state_json,conversationId]);
+  const changed=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS (SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL) AND NOT EXISTS (SELECT 1 FROM chat_reply_runs WHERE conversation_id=? AND status=\'running\')',[JSON.stringify(normalizeState(state)),timestamp,conversationId,previous.state_json,conversationId,conversationId]);
   if(changed.meta?.changes!==1)throw new ChatStoreError('history_changed','聊天在保存时发生变化，请刷新；未覆盖原记录。',409);
   await run(db, `UPDATE conversations SET updated_at = ?
     WHERE id = ? AND user_id = ? AND deleted_at IS NULL`, [timestamp, conversationId, USER_ID]);

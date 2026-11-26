@@ -91,3 +91,41 @@ assert.equal(resolveReplySequenceBudget(globalBudget,override,20).maxMessages,0)
 assert.deepEqual(remainingReplySequenceBudget(budget,[{toolCalls:0,totalTokens:6000},{toolCalls:0,totalTokens:3000}]),{known:true,tools:0,tokens:0});
 assert.equal(remainingReplySequenceBudget(budget,[{toolCalls:0}]).known,false);
 assert.equal(resolveReplySequenceBudget(globalBudget,{reply_sequence_enabled:true,reply_sequence_max_messages:-1},0).maxMessages,5);
+
+
+// Durable server-side reservation and canonical commit use real SQLite via D1.
+const {D1Database}=await import('./d1-helper.mjs');
+const {createConversation,writeConversationState,readConversationState}=await import('../functions/chat-store.js');
+const {acquireReplyRun,reserveReplyStep,claimReplyStep,commitReplyStep,settleReplyRun,recoverStaleReplyRuns}=await import('../functions/chat-reply-run.js');
+const db=new D1Database(),cv=await createConversation(db,'sequence','main');
+const ident={conversationId:cv.id,turnId:'durable-turn',userVariantId:'durable-user',sequenceId:'durable-seq'};
+const base={context_settings:{reply_sequence_enabled:true,reply_sequence_tool_budget:0},turns:[{id:ident.turnId,user:{variants:[{id:ident.userVariantId,content:'hello'}]}}]};
+await writeConversationState(db,cv.id,base);
+const quota={maxMessages:2,toolBudget:12,tokenBudget:200};
+assert.equal(await acquireReplyRun(db,ident,quota),true);
+assert.equal(await acquireReplyRun(db,{...ident,sequenceId:'racing'},quota),false);
+await assert.rejects(()=>writeConversationState(db,cv.id,base),e=>e.type==='history_changed');
+assert.equal(await reserveReplyStep(db,ident,'durable-first',0),true);
+assert.equal(await reserveReplyStep(db,ident,'durable-other',0),false);
+const claimed=await claimReplyStep(db,ident,'durable-first');
+assert.deepEqual(claimed,{index:0,mayContinue:true,toolBudget:0,tokenBudget:200,previous:[]});
+assert.equal(await claimReplyStep(db,ident,'durable-first'),null);
+assert.ok(await commitReplyStep(db,ident,'durable-first',{id:'durable-first',content:'first',finish_reason:'stop'},{tool_calls:0,total_tokens:80,continue_requested:true}));
+assert.equal(await reserveReplyStep(db,ident,'durable-second',1),true);
+assert.deepEqual(await claimReplyStep(db,ident,'durable-second'),{index:1,mayContinue:false,toolBudget:0,tokenBudget:120,previous:[{id:'durable-first',content:'first'}]});
+assert.ok(await commitReplyStep(db,ident,'durable-second',{id:'durable-second',content:'second',finish_reason:'stop'},{tool_calls:0,total_tokens:40,continue_requested:false}));
+assert.equal(await settleReplyRun(db,ident,'completed'),true);
+assert.equal(await acquireReplyRun(db,ident,quota),false);
+const canonical=await readConversationState(db,cv.id);
+assert.deepEqual(canonical.turns[0].assistant.variantsByUserVariant['0'].map(v=>[v.id,v.content,v.reply_sequence.index]),[['durable-first','first',0],['durable-second','second',1]]);
+await assert.rejects(()=>writeConversationState(db,cv.id,base),e=>e.type==='reply_group_history_changed');
+const half=structuredClone(canonical);half.turns[0].assistant.variantsByUserVariant['0'].pop();
+await assert.rejects(()=>writeConversationState(db,cv.id,half,{deleteRevision:canonical.updated_at}),e=>e.type==='reply_group_history_changed');
+const interrupted={...ident,sequenceId:'interrupted-seq'};
+assert.equal(await acquireReplyRun(db,interrupted,quota),true);
+assert.equal(await reserveReplyStep(db,interrupted,'uncertain',0),true);
+assert.ok(await claimReplyStep(db,interrupted,'uncertain'));
+assert.equal(await recoverStaleReplyRuns(db,Date.now()+31*60*1000),1);
+assert.equal(await claimReplyStep(db,interrupted,'uncertain'),null);
+assert.equal(await acquireReplyRun(db,interrupted,quota),false);
+assert.equal(await commitReplyStep(db,interrupted,'uncertain',{id:'uncertain',content:'late',finish_reason:'stop'},{tool_calls:0,total_tokens:1}),null);
