@@ -185,7 +185,7 @@ export async function assembleCleanContext(env, {
   const crossWindowRequest = permission === 'owner' && CROSS_WINDOW_SURFACES.has(surface)
     ? normalizeCrossWindowRequest(crossWindow || {})
     : { mode: 'off', sources: [] };
-  const selection = exposeTools ? resolveToolSelection({ permission, surface, authScope, visitorId, cross_window_mode: crossWindowRequest.mode, global_excerpt_write_enabled: globalExcerpt?.write_enabled === true }) : { backendTools: [], modelVisibleToolRecords: [], modelVisibleTools: [] };
+  const selection = exposeTools ? resolveToolSelection({ permission, surface, authScope, visitorId, cross_window_mode: crossWindowRequest.mode, global_excerpt_write_enabled: globalExcerpt?.write_enabled === true, user_portrait_write_enabled: userPortrait?.write_enabled === true && isThinkingSoilEnabled(papers.soil) }) : { backendTools: [], modelVisibleToolRecords: [], modelVisibleTools: [] };
   const webSearchEnabled = Boolean(exposeTools && permission === 'owner' && WEB_SEARCH_SURFACES.has(surface)
     && crossWindowRequest.mode !== 'keyword');
   const modelVisibleToolRecords = webSearchEnabled
@@ -262,6 +262,7 @@ export async function assembleCleanContext(env, {
         conversation_id: conversationId, source_turn_id: sourceTurnId, local_date: localDate, model_label: model, user_query: query,
         cross_window_mode: crossWindowRequest.mode,
         global_excerpt_write_enabled: globalExcerpt?.write_enabled === true,
+        user_portrait_write_enabled: userPortrait?.write_enabled === true && isThinkingSoilEnabled(papers.soil),
         cross_window_used_turns: () => modelCrossWindowReads?.total_delivered_turns || 0,
         cross_window_used_chars: () => modelCrossWindowReads?.total_delivered_chars || 0,
         on_cross_window_read: onCrossWindowRead,
