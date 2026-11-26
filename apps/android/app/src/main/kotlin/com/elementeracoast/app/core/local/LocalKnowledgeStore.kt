@@ -117,7 +117,7 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence,private va
         if(surfaceFor(cid) !in setOf("main_chat","radio")||cache.history(cid)?.contextSettings?.localModelWriteEnabled!=true)return null
         val selected=cache.profile()?.currentImageModel.orEmpty()
         if(selected.isBlank()||providers.resolveImageProvider(selected)==null)return null
-        return LocalImageTool(store,providers,cid,tid,uid,mid,selected,vision)
+        return LocalImageTool(store,providers::resolveImageProvider,cid,tid,uid,mid,selected,vision)
     }
     fun toolSession(cid:String,turn:String,request:RemoteCrossWindowRequest?,receipt:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null,image:LocalImageTool?=null)=LocalToolSession.open(store,cid,turn,request,receipt,modelId,wireLimit,web,voice,image)
     private fun portraitStatus(body:String,over:Boolean)=if(body.isEmpty())"empty"else if(over)"over_budget"else "complete"

@@ -49,6 +49,11 @@ internal class NativeChatGptTurnRepository(
         require(isChatGptPlanModel(selectedModel))
         val model = selectedModel.removePrefix(CHATGPT_PLAN_PREFIX)
         val assistantId = ChatSyncMapper.nextAssistantVariantId(historyWithUser, turnId)
+        val source=historyWithUser.turns.firstOrNull{it.id==turnId}
+        val uid=source?.user?.variants?.getOrNull(source.user.active)?.id.orEmpty()
+        val selectedImage=api.getProfile().currentImageModel
+        val imageEnabled=uid.isNotBlank()&&selectedImage.isNotBlank()
+        if(imageEnabled)historyRepository.persistHistory(conversationId,ChatSyncMapper.appendAssistant(historyWithUser,turnId,"",selectedModel,"image_tool_ready",assistantVariantId=assistantId))
         val request = RemoteChatRequest(
             conversationId = conversationId,
             sourceTurnId = turnId,
@@ -68,7 +73,9 @@ internal class NativeChatGptTurnRepository(
                 "maxOutputTokens" to maxOutputTokens.coerceIn(64, 65536).toString()
             ),
             crossWindow = crossWindow.toRemote(),
-            stream = true
+            stream = true,
+            imageToolEnabled=imageEnabled,
+            imageModelId=selectedImage.takeIf{imageEnabled}
         )
         val context = api.prepareNativeChatGpt(request)
         var content = ""
@@ -90,7 +97,8 @@ internal class NativeChatGptTurnRepository(
                 }
                 is NativeChatEvent.Completed -> {
                     completed = true
-                    val next = ChatSyncMapper.appendAssistant(
+                    val next = if(imageEnabled)ChatSyncMapper.completeReservedAssistant(historyRepository.loadHistory(conversationId),turnId,uid,assistantId,event.text,selectedModel,"stop",event.furnitureRuns,event.deskSlip)
+                    else ChatSyncMapper.appendAssistant(
                         history = ChatSyncMapper.clearUserFailure(historyWithUser, turnId),
                         turnId = turnId,
                         content = event.text,

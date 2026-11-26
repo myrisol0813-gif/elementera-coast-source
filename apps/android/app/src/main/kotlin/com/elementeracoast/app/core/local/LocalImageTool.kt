@@ -5,7 +5,7 @@ import kotlinx.serialization.json.*
 
 /** One turn, one selected provider, private pixels never serialized as a tool output. */
 internal class LocalImageTool(
-    private val store:LocalPersistence, private val providers:LocalProviderStore,
+    private val store:LocalPersistence, private val resolveProvider:(String)->LocalProviderConfig?,
     private val cid:String,private val tid:String,private val uid:String,val messageId:String,
     private val selected:String,private val vision:Boolean?
 ){
@@ -23,7 +23,7 @@ internal class LocalImageTool(
         require(prompt.length in 1..4000)
         if(attempted)return buildJsonObject{put("ok",false);put("code","image_already_reserved");put("message","本轮已尝试绘图，不自动重试。")}
         attempted=true
-        val config=providers.resolveImageProvider(selected)
+        val config=resolveProvider(selected)
         val result=runLocalManualImageGeneration(store,config,buildJsonObject{
             put("conversation_id",cid);put("turn_id",tid);put("user_variant_id",uid);put("message_id",messageId);put("prompt",prompt)
         },modelTool=true,visionSupported=vision,expectedModel=selected,onSaved={r->saved=true;continuation=r.readback.continuationMessage})

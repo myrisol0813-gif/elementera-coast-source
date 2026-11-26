@@ -278,6 +278,7 @@ internal class ChatGptNativeInference(
                 }
                 val instructions = nativeSystemInstructions(prepared.modelMessages) +
                     if (voiceToolAvailable) "\\n用户明确要求合成或留存语音时，使用 coast.voice_create 工具。没有成功的真实工具结果时，不得声称已生成语音，不得编造音频 URL 或输出占位变量。" else ""
+                var generatedImageSaved=false
                 val history = mutableListOf<JsonElement>()
                 prepared.modelMessages.forEach { message ->
                     val obj = message.jsonObject
@@ -426,7 +427,7 @@ internal class ChatGptNativeInference(
                     }
                     val pending = output.toolCalls
                     if (pending.isEmpty()) {
-                        if (text.isBlank()) {
+                        if (text.isBlank()&&!generatedImageSaved) {
                             val detail = when {
                                 output.hasReasoning -> "只有推理输出"
                                 output.items.isNotEmpty() -> "没有可显示的正文或可执行工具"
@@ -469,6 +470,7 @@ internal class ChatGptNativeInference(
                         CoastApiErrorKind.Model, "tool_limit", "这轮的工具调用超过 12 次。"
                     )
                     history.addAll(output.items)
+                    val privateImages=mutableListOf<JsonObject>()
                     for (tool in pending) {
                         stage = "coast_tool_execution"
                         val requestedTool = parseNativeCoastToolCall(tool)
@@ -487,7 +489,16 @@ internal class ChatGptNativeInference(
                         desk = result.deskSlip
                         trySend(NativeChatEvent.Tool(callId, name, result.ok))
                         history.add(nativeCoastToolOutput(requestedTool, result.output))
+                        if(name=="image_generate"&&result.ok){
+                            val receipt=runCatching{json.parseToJsonElement(result.output).jsonObject}.getOrNull()
+                            if(receipt?.get("ok")?.jsonPrimitive?.booleanOrNull==true&&receipt["status"]?.jsonPrimitive?.contentOrNull=="saved"){
+                                generatedImageSaved=true
+                                privateImages.addAll(result.privateContinuation.take(1).map(::normalizeNativeInput))
+                            }
+                        }
                     }
+                    history.addAll(privateImages)
+                    imageCount=nativeVisionCount(JsonArray(history))
                 }
             } catch (cancelled: CancellationException) {
                 close()

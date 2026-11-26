@@ -69,7 +69,8 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val call=b.getValue("tool_call").jsonObject
             val fn=call.getValue("function").jsonObject
             val result=session.execute(call.str("id").orEmpty(),fn.str("name").orEmpty(),fn.str("arguments").orEmpty())
-            return response(r,200,element(RemoteNativeToolResult.serializer(),result).jsonObject)
+            val privateContinuation=if(fn.str("name")=="image_generate"&&result.ok)session.takePrivateContinuation()else emptyList()
+            return response(r,200,element(RemoteNativeToolResult.serializer(),result.copy(privateContinuation=privateContinuation)).jsonObject)
     }
 
     fun uploadAttachment(cid:String,name:String,mime:String,bytes:ByteArray):RemoteAttachment=synchronized(this){
@@ -244,7 +245,14 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val policy = LocalInputBudget.resolve(requestedBudget,8000,false,null)
             val room=cache.conversations().first { it.id==request.conversationId }.roomType
             val prepared=knowledge.context(request.messages,policy.comfort,if(room=="main")"main_chat" else room,request.conversationId,request.attachmentIds,request.sourceTurnId.orEmpty(),request.crossWindow,request.realityContext?:RemoteRealityContext(),policy)
-            val session=knowledge.toolSession(request.conversationId,request.sourceTurnId,request.crossWindow,prepared.receipt,request.model.let{if(it.startsWith("chatgpt-plan:"))it else "chatgpt-plan:"+it})
+            val selected=cache.profile()?.currentImageModel.orEmpty()
+            val h=cache.history(request.conversationId)
+            val source=h?.turns?.firstOrNull{it.id==request.sourceTurnId}
+            val uid=source?.user?.variants?.getOrNull(source.user.active)?.id
+            val target=source?.assistant?.variantsByUserVariant?.get(source.user.active.toString())?.singleOrNull{it.id==request.messageId}
+            val image=if(request.imageToolEnabled&&request.imageModelId==selected&&selected.isNotBlank()&&uid!=null&&target?.finishReason=="image_tool_ready"&&h?.contextSettings?.localModelWriteEnabled==true&&room in setOf("main","radio")&&imageConfig(selected)!=null)
+                LocalImageTool(store,imageConfig,request.conversationId,request.sourceTurnId,uid,request.messageId,selected,true)else null
+            val session=knowledge.toolSession(request.conversationId,request.sourceTurnId,request.crossWindow,prepared.receipt,request.model.let{if(it.startsWith("chatgpt-plan:"))it else "chatgpt-plan:"+it},image=image)
             val key=request.conversationId+":"+request.messageId
             toolSessions.remove(key)
             if(session!=null){require(request.messageId.isNotBlank());while(toolSessions.size>=8)toolSessions.remove(toolSessions.keys.first());toolSessions[key]=session}

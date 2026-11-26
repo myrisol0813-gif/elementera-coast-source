@@ -6,18 +6,19 @@ const TOOL={type:'function',function:{name:'image_generate',description:'需要�
 
 /** Request-local session. The public tool receipt contains only metadata;
  * image pixels travel through a separate, one-shot continuation channel. */
-export async function attachImageTool(env,assembled,{conversationId,turnId,messageId,roomType,chatModel,enabled,signal}={},deps={}){
+export async function attachImageTool(env,assembled,{conversationId,turnId,messageId,roomType,chatModel,enabled,signal,visionOverride=null,expectedImageModel=null}={},deps={}){
   if(!enabled||!turnId||!messageId||!['main','radio'].includes(roomType)||!env.OPENROUTER_API_KEY?.trim()||!assembled.tools?.length)return assembled;
   const db=env.COAST_CHAT_DB;
   const profile=await readProfile(db);
   const selected=profile.current_image_model;
+  if(expectedImageModel!==null&&selected!==expectedImageModel)return assembled;
   if(!/^[a-z0-9][a-z0-9_.-]{0,79}\/[a-z0-9][a-z0-9_.-]{0,119}(?::free)?$/i.test(selected))return assembled;
   const state=await readConversationState(db,conversationId);
   const turn=state.turns.find(t=>t.id===turnId),uid=turn?.user?.variants?.[turn.user.active]?.id;
   const target=turn?.assistant?.variantsByUserVariant?.[String(turn.user.active)]?.find(v=>v.id===messageId);
   if(!uid||!target||target.hidden||target.finish_reason!=='image_tool_ready')return assembled;
-  let vision=null;
-  try{const catalog=await (deps.catalog||fetchModelCatalog)(env);const entry=Object.values(catalog.groups||{}).flat().find(m=>m.id===chatModel);
+  let vision=visionOverride;
+  if(visionOverride===null)try{const catalog=await (deps.catalog||fetchModelCatalog)(env);const entry=Object.values(catalog.groups||{}).flat().find(m=>m.id===chatModel);
     const modalities=entry?.architecture?.input_modalities;
     if(Array.isArray(modalities))vision=modalities.includes('image');
   }catch{/* unknown vision never gets pixels */}

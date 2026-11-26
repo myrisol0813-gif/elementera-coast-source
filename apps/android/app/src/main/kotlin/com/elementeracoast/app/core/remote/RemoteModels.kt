@@ -270,7 +270,8 @@ data class RemoteChatRequest(
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.ALWAYS)
     val stream: Boolean = true,
     @SerialName("client_info") val clientInfo: String = "native_android",
-    @SerialName("image_tool_enabled") val imageToolEnabled: Boolean = false
+    @SerialName("image_tool_enabled") val imageToolEnabled: Boolean = false,
+    @SerialName("image_model_id") val imageModelId: String? = null
 )
 
 @Serializable
