@@ -57,6 +57,10 @@ class LocalSideArchiveRoundtripTest {
             val bookId=book.getValue("id").jsonPrimitive.content
             side.progress(bookId,0,1)
             side.writeNote(bookId,buildJsonObject{put("kind","annotation");put("chapter_index",0);put("paragraph_index",1);put("body","原来的批注")})
+            val partnerNote=side.writeNote(bookId,buildJsonObject{put("kind","reflection");put("body","A synthetic reader note")},"assistant",cid,"turn1")
+            assertEquals("assistant",partnerNote.getValue("author").jsonPrimitive.content)
+            assertEquals(1,side.books().single().getValue("assistant_notes").jsonPrimitive.int)
+            assertEquals("assistant",side.notes(bookId).last().getValue("author").jsonPrimitive.content)
             val png=Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X4ZkAAAAASUVORK5CYII=")
             side.saveCover(bookId,png,"image/png")
             val image=LocalAttachmentStore(from).upload(cid,"photo.png","image/png",png)

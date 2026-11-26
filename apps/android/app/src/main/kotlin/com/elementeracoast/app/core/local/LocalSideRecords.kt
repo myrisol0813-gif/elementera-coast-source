@@ -58,7 +58,7 @@ internal class LocalSideRecords(private val store:LocalPersistence) {
             JsonObject(r.data+buildJsonObject{
                 put("chapters_count",list.count{it.kind=="library_chapters"});put("has_cover",list.any{it.kind=="library_covers"})
                 put("reader_chapter_index",progress?.get("chapter_index")?:JsonNull);put("reader_paragraph_index",progress?.get("paragraph_index")?:JsonNull)
-                for((author,key) in listOf("owner" to "owner_notes","assistant" to "model_partner_notes"))put(key,list.count{it.kind=="library_notes"&&it.data.str("author")==author&&it.data.str("kind")!="highlight"})
+                for((author,key) in listOf("owner" to "owner_notes","assistant" to "assistant_notes"))put(key,list.count{it.kind=="library_notes"&&it.data.str("author")==author&&it.data.str("kind")!="highlight"})
             })
         }
     }
@@ -199,7 +199,7 @@ internal class LocalSideRecords(private val store:LocalPersistence) {
         fun size(r:Row)=when(r.kind){"voice"->r.data.number("audio_bytes");"library_covers"->r.data.number("size");else->0L}
         fun limit(kind:String)=when(kind){"voice"->4L*1024*1024;"library_covers"->600L*1024;else->0L}
         fun paragraphs(text:String)=text.split(Regex("\\n\\s*\\n")).map{it.trim()}.filter{it.isNotEmpty()}
-        fun wireNote(v:JsonObject)=JsonObject(v+("author" to JsonPrimitive(if(v.str("author")=="owner")"owner" else "model_partner")))
+        fun wireNote(v:JsonObject)=JsonObject(v+("author" to JsonPrimitive(if(v.str("author")=="owner")"owner" else "assistant")))
         fun treasureWire(v:JsonObject)=JsonObject(v+("paragraph_indices" to Json.parseToJsonElement(v.str("selections_json"))))
         fun page(items:List<JsonObject>,cursor:Int):JsonObject{require(cursor>=0);return buildJsonObject{put("items",JsonArray(items.drop(cursor).take(40)));put("next_cursor",if(cursor+40<items.size)JsonPrimitive((cursor+40).toString())else JsonNull)}}
         fun validate(r:Row){
