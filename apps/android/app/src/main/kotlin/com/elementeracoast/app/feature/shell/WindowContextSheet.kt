@@ -80,7 +80,7 @@ internal fun WindowContextSheet(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val usable = conversationId.isNotBlank()
-    val sequenceSupported=roomType in setOf("main","radio")&&(localMode||!selectedModel.startsWith("chatgpt-plan:"))
+    val sequenceSupported=roomType in setOf("main","radio")
 
     var usageAccess by remember { mutableStateOf(AndroidRealityContextSource.hasUsageAccess(context)) }
     var stepsAccess by remember { mutableStateOf(AndroidRealityContextSource.hasActivityRecognitionPermission(context)) }
@@ -186,7 +186,7 @@ internal fun WindowContextSheet(
                 SettingSwitchRow(title="真实连续回复（实验）",note=when{
                     roomType !in setOf("main","radio")->"当前窗口不执行连续回复。"
                     localMode->"模型可主动追加独立回复。套餐 token 为软预算，单次可能超额；未报告用量则停止追加。"
-                    selectedModel.startsWith("chatgpt-plan:")->"在线套餐通道尚未开放；可关闭开关。"
+                    selectedModel.startsWith("chatgpt-plan:")->"在线套餐需已更新服务端；token 为软预算，单次可能超额，缺失用量则停止。"
                     else->"在线普通 API 需要已更新的服务端；模型可主动追加独立回复。"
                 },checked=settings.replySequenceEnabled,enabled=usable&&(sequenceSupported||settings.replySequenceEnabled),onCheckedChange={if(sequenceSupported||!it)onSettingsChange(settings.copy(replySequenceEnabled=it))})
                 androidx.compose.runtime.key(conversationId){

@@ -563,6 +563,16 @@ class CoastApiClient(
         awaitClose { call.cancel(); readerJob.cancel() }
     }
 
+    internal suspend fun nativePlanReplyRun(request:RemoteReplyRunRequest,action:String,extra:JsonObject=buildJsonObject{}):NativePlanRunResponse {
+        require(config.localTransport==null) { "本机连续回复不访问云端预约。" }
+        val payload=buildJsonObject{
+            json.encodeToJsonElement(RemoteReplyRunRequest.serializer(),request).jsonObject.forEach{(key,value)->put(key,value)}
+            put("action",action)
+            extra.forEach{(key,value)->put(key,value)}
+        }
+        return jsonRequest(Request.Builder().url(config.url("/api/chat/native-reply-sequence")).post(jsonBody(payload.toString())).build(),NativePlanRunResponse.serializer())
+    }
+
     /** Dedicated stream; legacy single-reply events cannot complete a group. */
     fun streamReplyRun(payload:RemoteReplyRunRequest):Flow<ReplyRunEvent> = callbackFlow {
         val body=json.encodeToString(RemoteReplyRunRequest.serializer(),payload)

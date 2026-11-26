@@ -568,11 +568,13 @@ internal class ChatGptNativeInference(
                             localTool(callId,name,tool["arguments"]?.jsonPrimitive?.contentOrNull ?: "{}")
                         }else requireNotNull(coast).executeNativeChatGptTool(request, params, callsMade++)
                         runs.addAll(result.furnitureRuns)
-                        desk = result.deskSlip
+                        // A tool preview is not the original delivered context. Preserve the actual input receipt in a sequence.
+                        if(sequence==null)desk = result.deskSlip
                         send(NativeChatEvent.Tool(callId, name, result.ok))
                         history.add(nativeCoastToolOutput(requestedTool, result.output))
                         val (imageSaved,images)=nativeSavedImageContinuation(name,result)
                         if(imageSaved){generatedImageSaved=true;privateImages.addAll(images)}
+                        if(sequence!=null&&name=="sticker_send"&&result.ok)generatedImageSaved=true
                     }
                     history.addAll(privateImages)
                     imageCount=nativeVisionCount(JsonArray(history))

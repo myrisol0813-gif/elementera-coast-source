@@ -18,7 +18,22 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.*
+import com.elementeracoast.app.core.network.RemoteReplyRunRequest
+import com.elementeracoast.app.core.network.ReplyRunEvent
+import com.elementeracoast.app.core.network.ReplyRunWire
+import com.elementeracoast.app.core.network.CoastSseEvent
+import com.elementeracoast.app.core.remote.RemoteVariant
+import com.elementeracoast.app.core.remote.RemoteModelUsage
+import com.elementeracoast.app.feature.chatgpt.NativePlanSequence
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withTimeout
+import java.util.UUID
 
 internal const val CHATGPT_PLAN_PREFIX = "chatgpt-plan:"
 
@@ -34,6 +49,111 @@ internal class NativeChatGptTurnRepository(
     private val toolLimit: () -> Int = { com.elementeracoast.app.core.network.TurnToolPolicy.DEFAULT_CALLS }
 ) : ChatRepository by historyRepository {
     private val inference = ChatGptNativeInference(account, api)
+
+    override fun streamReplyRun(request:RemoteReplyRunRequest):Flow<ReplyRunEvent> = flow {
+        require(isChatGptPlanModel(request.model))
+        val slug=request.model.removePrefix(CHATGPT_PLAN_PREFIX)
+        val json=Json{ignoreUnknownKeys=true;explicitNulls=false}
+        val wire=ReplyRunWire(request,json)
+        val settings=request.settings.mapValues{(_,v)->v.jsonPrimitive.content}
+        val effort=reasoningStore?.get(request.model,account.reasoningEffortsFor(slug))
+        var acquired=false
+        var settled=false
+        var saved=0
+        var status="completed"
+        var detail:String?=null
+        fun bad():Nothing=throw CoastApiException(CoastApiErrorKind.Stream,"native_plan_group_unconfirmed","套餐连续回复回执未确认；不会自动重试。")
+        try{
+            val start=api.nativePlanReplyRun(request,"start")
+            if(!start.ok)bad()
+            acquired=true
+            emit(wire.accept(CoastSseEvent("reply_group_start",buildJsonObject{
+                put("sequence_id",request.sequenceId);put("max_messages",start.maxMessages)
+            })))
+            for(index in 0 until start.maxMessages){
+                val mid=UUID.randomUUID().toString()
+                val step=api.nativePlanReplyRun(request,"next",buildJsonObject{put("message_id",mid);put("index",index)})
+                val context=step.context?:bad()
+                if(!step.ok||!context.ok||step.maxMessages!=start.maxMessages||
+                    step.toolBudget !in 0..request.budget.toolBudget||step.tokenBudget !in 1..request.budget.tokenBudget||
+                    step.mayContinue&&index+1>=start.maxMessages)bad()
+                emit(wire.accept(CoastSseEvent("reply_begin",buildJsonObject{put("message_id",mid);put("index",index)})))
+                val envelope=RemoteChatRequest(conversationId=request.conversationId,sourceTurnId=request.turnId,messageId=mid,
+                    model=slug,messages=emptyList(),localDate=request.localDate,localDateTime=request.localDateTime,
+                    realityContext=request.realityContext,settings=settings,crossWindow=request.crossWindow,
+                    imageToolEnabled=request.imageToolEnabled&&step.toolBudget>0,imageModelId=request.imageModelId,
+                    replySequenceId=request.sequenceId,userVariantId=request.userVariantId)
+                var done:NativeChatEvent.Completed?=null
+                coroutineScope{
+                    val heartbeat=launch{
+                        while(true){
+                            delay(60_000)
+                            val renewed=api.nativePlanReplyRun(request,"heartbeat",buildJsonObject{put("message_id",mid)})
+                            if(!renewed.ok)bad()
+                        }
+                    }
+                    try{
+                        inference.stream(slug,envelope,context,effort,NativePlanSequence(step.mayContinue,step.toolBudget,step.tokenBudget)).collect{event->
+                            when(event){
+                                is NativeChatEvent.Delta->emit(wire.accept(CoastSseEvent("reply_delta",buildJsonObject{put("message_id",mid);put("content",event.text)})))
+                                is NativeChatEvent.Tool->ToolActivityBus.publish(event.id,event.name,event.ok)
+                                is NativeChatEvent.Completed->{if(done!=null)bad();done=event}
+                            }
+                        }
+                    }finally{heartbeat.cancelAndJoin()}
+                }
+                val reply=done?:bad()
+                val usage=reply.usage.takeIf{it.reported}?.let{
+                    RemoteModelUsage(promptTokens=it.input,completionTokens=it.output,cachedTokens=it.cached,totalTokens=it.input+it.output)
+                }
+                val variant=RemoteVariant(id=mid,content=reply.text,modelId=request.model,finishReason="stop",
+                    generationSource="chat",usage=usage,furnitureRuns=reply.furnitureRuns,deskSlip=reply.deskSlip)
+                val committed=api.nativePlanReplyRun(request,"commit",buildJsonObject{
+                    put("message_id",mid);put("variant",json.encodeToJsonElement(RemoteVariant.serializer(),variant))
+                    putJsonObject("receipt"){
+                        put("tool_calls",reply.ordinaryToolCalls)
+                        put("total_tokens",usage?.totalTokens?.let(::JsonPrimitive)?:JsonNull)
+                        put("continue_requested",reply.continueRequested)
+                    }
+                })
+                val history=committed.history?:bad()
+                if(!committed.ok)bad()
+                val event=wire.accept(CoastSseEvent("reply_committed",buildJsonObject{
+                    put("message_id",mid);put("index",index);put("history",json.encodeToJsonElement(RemoteHistory.serializer(),history))
+                }))
+                saved++
+                historyRepository.cacheHistory(request.conversationId,history)
+                emit(event)
+                if(reply.sequenceStopReason!=null){status="permission_or_budget";detail=reply.sequenceStopReason;break}
+                if(!committed.continueRequested)break
+                if(!reply.continueRequested||!step.mayContinue)bad()
+                if(index+1>=start.maxMessages){status="limit_reached";break}
+            }
+            val end=api.nativePlanReplyRun(request,"settle",buildJsonObject{put("status",status)})
+            if(!end.ok||end.history==null)bad()
+            settled=true
+            historyRepository.cacheHistory(request.conversationId,end.history)
+            emit(wire.accept(CoastSseEvent("reply_group_end",buildJsonObject{
+                put("status",status);put("saved",saved);detail?.let{put("message",it)}
+                put("history",json.encodeToJsonElement(RemoteHistory.serializer(),end.history))
+            })))
+            wire.finish()
+        }catch(cancelled:CancellationException){
+            status="cancelled";throw cancelled
+        }catch(error:Exception){
+            status="failed"
+            if(error is CoastApiException)throw error
+            throw CoastApiException(CoastApiErrorKind.Stream,"native_plan_group_failed","套餐连续回复未确认完成；已保存内容保留，不会自动重试。",cause=error)
+        }finally{
+            if(acquired&&!settled)withContext(NonCancellable){
+                // At most one settlement attempt; do not retry an uncertain provider request.
+                runCatching{withTimeout(5000){
+                    val end=api.nativePlanReplyRun(request,"settle",buildJsonObject{put("status",if(status=="cancelled")status else "failed")})
+                    end.history?.let{historyRepository.cacheHistory(request.conversationId,it)}
+                }}
+            }
+        }
+    }
 
     override fun streamReply(
         conversationId: String,

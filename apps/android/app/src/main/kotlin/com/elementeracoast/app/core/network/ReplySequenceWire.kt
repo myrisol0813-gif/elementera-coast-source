@@ -29,6 +29,18 @@ data class RemoteReplyRunRequest(
     @SerialName("image_model_id") val imageModelId:String?=null
 )
 
+@Serializable
+internal data class NativePlanRunResponse(
+    val ok:Boolean=false,
+    @SerialName("max_messages") val maxMessages:Int=0,
+    @SerialName("tool_budget") val toolBudget:Int=0,
+    @SerialName("token_budget") val tokenBudget:Int=0,
+    @SerialName("may_continue") val mayContinue:Boolean=false,
+    @SerialName("continue_requested") val continueRequested:Boolean=false,
+    val context:com.elementeracoast.app.core.remote.RemoteNativeChatContext?=null,
+    val history:RemoteHistory?=null
+)
+
 sealed interface ReplyRunEvent {
     data class Start(val maxMessages:Int):ReplyRunEvent
     data class Begin(val messageId:String,val index:Int):ReplyRunEvent
