@@ -237,13 +237,26 @@ function safeToolFailure(error) {
   };
 }
 
-async function executeToolCalls(calls, executeTool) {
+const MAX_TURN_TOOLS = 24;
+const MAX_TOOL_ROUNDS = 24;
+const TOOL_LIMIT_NOTICE = '本轮工具额度已用完，额外调用未执行。已完成的操作保留。';
+const toolLimitReceipt = () => ({ok:false,error:{type:'tool_limit',message:'本轮工具额度已用完，此项未执行。请根据已有结果完成回复。'}});
+function finalToolPayload(payload, finalOnly) {
+  if (!finalOnly) return payload;
+  const next = {...payload};
+  // Keep schemas for compatibility with prior tool messages, but disable new tools,
+  // including provider-hosted search on the final request.
+  if (next.tools?.length) next.tool_choice = 'none';
+  return next;
+}
+
+async function executeToolCalls(calls, executeTool, remaining = MAX_TURN_TOOLS) {
   const results = [];
   const messages = [];
   for (const call of calls) {
     let value;
     try {
-      value = await executeTool(call);
+      value = remaining-- > 0 ? await executeTool(call) : toolLimitReceipt();
     } catch (error) {
       value = safeToolFailure(error);
     }
@@ -317,8 +330,10 @@ export async function performFormalChatWithTools(env, input = {}, {
   let usage = null;
   let messages = [...prepared.payload.messages];
 
+  let rounds = 0;
   while (true) {
-    const payload = { ...prepared.payload, messages };
+    const finalOnly = rounds++ >= MAX_TOOL_ROUNDS || allToolResults.length >= MAX_TURN_TOOLS;
+    const payload = finalToolPayload({ ...prepared.payload, messages }, finalOnly);
     assertWireInputBudget(payload, undefined, providerCalls.length > 0);
     const upstream = await requestOpenRouter(env, payload, 'Elementera Coast Formal Chat');
     providerCalls.push(upstream);
@@ -328,15 +343,17 @@ export async function performFormalChatWithTools(env, input = {}, {
     const message = choice?.message || {};
     const calls = normalizeToolCalls(message.tool_calls);
 
-    if (!calls.length) {
+    if (!calls.length || finalOnly) {
       const model = upstream?.model || prepared.modelId;
-      const content = completedReply(message, model, choice?.finish_reason, allToolResults.length, hasGeneratedImage());
+      const content = finalOnly && calls.length
+        ? [message.content, TOOL_LIMIT_NOTICE].filter(Boolean).join('\n\n')
+        : completedReply(message, model, choice?.finish_reason, allToolResults.length, hasGeneratedImage());
       const result = {
         ok: true,
         model,
         message: { role: 'assistant', content },
         usage: normalizeUsage(usage),
-        finish_reason: choice?.finish_reason || null,
+        finish_reason: finalOnly && calls.length ? 'stop' : choice?.finish_reason || null,
         tool_results: allToolResults,
         server_tools: webSearch.snapshot(),
       };
@@ -358,7 +375,7 @@ export async function performFormalChatWithTools(env, input = {}, {
     if (typeof executeTool !== 'function') {
       throw new ModelRequestError('tool_executor_missing', '模型请求了本地工具，但当前调用没有工具执行器。', 500);
     }
-    const executed = await executeToolCalls(calls, executeTool);
+    const executed = await executeToolCalls(calls, executeTool, Math.max(0, MAX_TURN_TOOLS - allToolResults.length));
     allToolResults.push(...executed.results);
     messages = [
       ...messages,
@@ -404,6 +421,7 @@ export async function* performFormalChatStream(env, input = {}, {
   let generationId = crypto.randomUUID();
   let totalUsage = null;
   let completedToolCalls = 0;
+  let rounds = 0;
   const metadataCollector = typeof onMetadata === 'function'
     ? createModelMetadataCollector({
       requestedModel: prepared.modelId,
@@ -414,12 +432,13 @@ export async function* performFormalChatStream(env, input = {}, {
 
   try {
     while (true) {
-      const payload = {
+      const finalOnly = rounds++ >= MAX_TOOL_ROUNDS || completedToolCalls >= MAX_TURN_TOOLS;
+      const payload = finalToolPayload({
         ...prepared.payload,
         messages,
         stream: true,
         stream_options: { include_usage: true },
-      };
+      }, finalOnly);
       assertWireInputBudget(payload, undefined, completedToolCalls > 0);
       const response = await requestOpenRouterStream(env, payload, 'Elementera Coast Formal Chat', signal);
       let finishReason = null;
@@ -471,14 +490,19 @@ export async function* performFormalChatStream(env, input = {}, {
         .sort(([left], [right]) => left - right)
         .map(([, call]) => call));
 
-      if (calls.length) {
+      if (calls.length && finalOnly) {
+        roundContent += '\n\n' + TOOL_LIMIT_NOTICE;
+        yield {event:'delta',data:{content:'\n\n' + TOOL_LIMIT_NOTICE}};
+        finishReason = 'stop';
+      }
+      if (calls.length && !finalOnly) {
         if (finishReason !== 'tool_calls') {
           throw new ModelRequestError('invalid_provider_response', '模型返回了工具调用，但 finish_reason 不是 tool_calls。', 502);
         }
         if (typeof executeTool !== 'function') {
           throw new ModelRequestError('tool_executor_missing', '模型请求了本地工具，但当前调用没有工具执行器。', 500);
         }
-        const executed = await executeToolCalls(calls, executeTool);
+        const executed = await executeToolCalls(calls, executeTool, Math.max(0, MAX_TURN_TOOLS - completedToolCalls));
         completedToolCalls += executed.results.length;
         metadataCollector?.addToolResults(executed.results);
         for (const result of executed.results) {
