@@ -6,6 +6,7 @@ export function createModelsActions({
   toast,
   getSearchDraft,
   setSearch,
+  setKind = () => {},
   fetchCatalog,
   quickPicker,
 }) {
@@ -48,6 +49,7 @@ export function createModelsActions({
       return router.open('models');
     }
     if (name === 'quick-select') return selectChat(target.dataset.id, { closePicker: true });
+    if (name === 'kind') {setKind(target.dataset.id);return router.refresh({preserveScroll:false});}
     if (name === 'quick-tab') return quickPicker.selectTab(target.dataset.id);
     if (name === 'title-preset') return quickPicker.setTitle(target.dataset.id);
     if (name === 'quick-image') {

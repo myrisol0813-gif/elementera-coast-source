@@ -8,11 +8,14 @@ import { createModelsActions } from './models/models-actions.js';
 export function createModels({ chat, router, toast }) {
   let catalog = null;
   let search = '';
+  let kind = 'chat';
   let searchDraft = '';
   let unsubscribeProfile = null;
 
   const getCatalog = () => catalog;
   const getSearch = () => search;
+  const getKind = () => kind;
+  const setKind = (value) => { if (['chat','image','voice'].includes(value)) {kind=value;search='';searchDraft='';} };
   const getSearchDraft = () => searchDraft;
   const setSearch = (value) => { search = value; };
 
@@ -48,13 +51,14 @@ export function createModels({ chat, router, toast }) {
   }
 
   quickPicker = createModelsQuickPicker({ chat, toast, getCatalog, fetchCatalog });
-  const view = createModelsView({ chat, getCatalog, getSearch, getSearchDraft });
+  const view = createModelsView({ chat, getCatalog, getSearch, getSearchDraft, getKind });
   const actions = createModelsActions({
     chat,
     router,
     toast,
     getSearchDraft,
     setSearch,
+    setKind,
     fetchCatalog,
     quickPicker,
   });
