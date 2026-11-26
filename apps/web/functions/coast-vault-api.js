@@ -8,6 +8,7 @@ import {
   TreasureError, listTreasures, saveTreasure, updateTreasure, removeTreasure,
 } from './coast-vault-treasures.js';
 
+import {StickerError,registerSticker,listOwnerStickers,updateOwnerSticker,removeOwnerSticker} from './sticker-library.js';
 const BASE = '/api/coast-vault';
 export function isCoastVaultApiPath(path) {
   return path === BASE || path.startsWith(BASE + '/');
@@ -18,6 +19,17 @@ async function route(request, env) {
   const url = new URL(request.url);
   const path = url.pathname.slice(BASE.length);
   const params = url.searchParams;
+  if(path==='/stickers'){
+    if(request.method==='GET')return json({ok:true,...await listOwnerStickers(env.COAST_CHAT_DB,{q:params.get('q')||'',cursor:Number(params.get('cursor')||0)},{actor:'owner'})});
+    if(request.method==='POST')return json({ok:true,item:await registerSticker(env.COAST_CHAT_DB,await readJson(request,4000),{actor:'owner'})},201);
+    return methodNotAllowed('GET, POST');
+  }
+  const sticker=/^\/stickers\/([a-zA-Z0-9_.:-]+)$/.exec(path);
+  if(sticker){
+    if(request.method==='PATCH')return json({ok:true,item:await updateOwnerSticker(env.COAST_CHAT_DB,sticker[1],await readJson(request,4000),{actor:'owner'})});
+    if(request.method==='DELETE')return json({ok:true,...await removeOwnerSticker(env.COAST_CHAT_DB,sticker[1],{actor:'owner'})});
+    return methodNotAllowed('PATCH, DELETE');
+  }
   if (path === '/media') {
     if (request.method !== 'GET') return methodNotAllowed('GET');
     return json({ ok: true, ...(await listMediaLibrary(env.COAST_CHAT_DB, {
@@ -75,7 +87,7 @@ async function route(request, env) {
 export async function routeCoastVaultApi(request, env) {
   try { return await route(request, env); }
   catch (error) {
-    if (error instanceof MediaLibraryError || error instanceof MediaLabelError || error instanceof TreasureError) {
+    if (error instanceof StickerError || error instanceof MediaLibraryError || error instanceof MediaLabelError || error instanceof TreasureError) {
       return apiError(error.type, error.message, error.status);
     }
     if (['invalid_json', 'body_too_large'].includes(error?.message)) {

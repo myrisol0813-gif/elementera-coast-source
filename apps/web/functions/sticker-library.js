@@ -161,3 +161,36 @@ export async function deliverSticker(db,input,{allowSend=false}={}){
     fail('sticker_original_mismatch','已发送原件读回校验失败。',500);
   return {status:'saved',attachment,reused:false};
 }
+
+/** Owner management view, separate from the model-facing minimal index. */
+export async function listOwnerStickers(db,{q='',cursor=0}={}, {actor}={}){
+  if(actor!=='owner')fail('sticker_manage_denied','只有屋主可以管理素材。',403);
+  if(typeof q!=='string'||q.length>100||!Number.isSafeInteger(cursor)||cursor<0||cursor>100000)fail('invalid_sticker_query','素材搜索参数无效。');
+  await ensureStickerLibrarySchema(db);
+  const like='%'+q.trim().replace(/[!%_]/g,x=>'!'+x)+'%';
+  const result=await query(db,`SELECT s.*,a.name,a.mime,a.size,a.turn_id,c.deleted_at
+    FROM coast_sticker_library s LEFT JOIN chat_attachments a ON a.id=s.attachment_id AND a.conversation_id=s.conversation_id
+    LEFT JOIN conversations c ON c.id=s.conversation_id AND c.user_id='owner' AND c.conversation_kind='chat'
+    WHERE s.description LIKE ? ESCAPE '!' ORDER BY s.created_at DESC,s.id DESC LIMIT 41 OFFSET ?`,[like,cursor]).all();
+  const rows=result.results||[];
+  return {items:rows.slice(0,40).map(row=>({...publicEntry(row),conversation_id:row.conversation_id,attachment_id:row.attachment_id,name:row.name||'',available:Boolean(row.mime&&!row.deleted_at)})),next_cursor:rows.length>40?cursor+40:null};
+}
+export async function updateOwnerSticker(db,id,input,{actor}={}){
+  if(actor!=='owner')fail('sticker_manage_denied','只有屋主可以管理素材。',403);
+  if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!['description','enabled'].includes(k))||!Object.keys(input).length)fail('invalid_sticker_update','素材修改无效。');
+  await ensureStickerLibrarySchema(db);
+  const key=identifier(id);
+  const row=await query(db,'SELECT * FROM coast_sticker_library WHERE id=?',[key]).first();
+  if(!row)fail('sticker_unavailable','素材不存在。',404);
+  const description='description' in input?cleanDescription(input.description):row.description;
+  if('enabled' in input&&typeof input.enabled!=='boolean')fail('invalid_sticker_enabled','素材开关无效。');
+  const enabled='enabled' in input?Number(input.enabled):row.enabled;
+  await query(db,'UPDATE coast_sticker_library SET description=?,enabled=?,updated_at=? WHERE id=?',[description,enabled,Date.now(),key]).run();
+  return {id:key,description,enabled:Boolean(enabled)};
+}
+export async function removeOwnerSticker(db,id,{actor}={}){
+  if(actor!=='owner')fail('sticker_manage_denied','只有屋主可以移除素材。',403);
+  await ensureStickerLibrarySchema(db);
+  const result=await query(db,'DELETE FROM coast_sticker_library WHERE id=?',[identifier(id)]).run();
+  return {deleted:result.meta?.changes===1,original_preserved:true};
+}
