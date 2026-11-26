@@ -59,6 +59,7 @@ fun WolfScreen(
     onChatGptDisconnect: () -> Unit,
     onChatGptRefresh: () -> Unit,
     onChatGptProbe: (String) -> Unit,
+    onEnterLocalWorkspace: () -> Unit,
     onLogout: () -> Unit,
     onImportMessages: (List<ChatMessage>) -> Unit,
     onActionLogged: (String, String, String) -> Unit,
@@ -127,7 +128,7 @@ fun WolfScreen(
             when (current) {
                 WolfDestination.Profile -> ProfileScreen(state, store, onAppearance = { page = WolfDestination.Appearance }, onSnackbar = onSnackbar)
                 WolfDestination.Appearance -> AppearanceScreen(state, store, onSnackbar)
-                WolfDestination.Account -> AccountScreen(shellState, onLogout)
+                WolfDestination.Account -> AccountScreen(shellState, onEnterLocalWorkspace, onLogout)
                 WolfDestination.ChatRecords -> ChatRecordsScreen(
                     profile = state.profile,
                     messages = messages,
@@ -201,6 +202,7 @@ private fun WolfHome(
 @Composable
 private fun AccountScreen(
     shellState: CoastShellState,
+    onEnterLocalWorkspace: () -> Unit,
     onLogout: () -> Unit
 ) {
     var confirming by remember { mutableStateOf(false) }
@@ -242,22 +244,29 @@ private fun AccountScreen(
                 }
             }
         }
+        if (!shellState.localMode) item {
+            Button(onClick = onEnterLocalWorkspace, modifier = Modifier.fillMaxWidth(),
+                enabled = !shellState.isStreaming && !shellState.isFinalizing && !shellState.backgroundGeneration && !shellState.attachmentUploading) {
+                Text("切换到本机模式")
+            }
+            Text("保留有效的在线登录状态；本机资料与在线资料独立保存。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         item {
             Button(onClick = { confirming = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(if (shellState.localMode) "返回开屏" else if (shellState.sessionPersistence == "source_tour") "离开参观" else "退出账号")
+                Text(if (shellState.localMode) "返回在线模式" else if (shellState.sessionPersistence == "source_tour") "离开参观" else "退出账号")
             }
         }
     }
     if (confirming) {
         AlertDialog(
             onDismissRequest = { confirming = false },
-            title = { Text(if (shellState.localMode) "返回开屏？" else if (shellState.sessionPersistence == "source_tour") "离开参观模式？" else "退出当前账号？") },
-            text = { Text(if (shellState.localMode) "本机资料会完整保留，下次仍可从本机模式进入。" else if (shellState.sessionPersistence == "source_tour") "返回入口；参观模式不创建云端会话。" else "只会清除当前登录态；聊天、记忆与后端数据不会被删除。") },
+            title = { Text(if (shellState.localMode) "返回在线模式？" else if (shellState.sessionPersistence == "source_tour") "离开参观模式？" else "退出当前账号？") },
+            text = { Text(if (shellState.localMode) "本机资料会完整保留；有效的在线登录会话将自动恢复，失效时需重新登录。" else if (shellState.sessionPersistence == "source_tour") "返回入口；参观模式不创建云端会话。" else "只会清除当前登录态；聊天、记忆与后端数据不会被删除。") },
             confirmButton = {
                 TextButton(onClick = {
                     confirming = false
                     onLogout()
-                }) { Text(if (shellState.localMode) "返回开屏" else "退出账号") }
+                }) { Text(if (shellState.localMode) "返回在线模式" else "退出账号") }
             },
             dismissButton = {
                 TextButton(onClick = { confirming = false }) { Text("取消") }

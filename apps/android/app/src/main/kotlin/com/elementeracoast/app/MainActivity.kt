@@ -114,7 +114,15 @@ class MainActivity : ComponentActivity() {
                         onChatGptDisconnect = vm::disconnectChatGpt,
                         onChatGptRefresh = vm::refreshChatGptModels,
                         onChatGptProbe = vm::probeChatGpt,
-                        onLogout = { if (state.localMode) switchWorkspace(false) else vm.logout() },
+                        onEnterLocalWorkspace = {
+                            if (state.isStreaming || state.isFinalizing || state.backgroundGeneration || state.attachmentUploading) vm.showPlaceholder("请等待本轮任务结束后再切换工作区。")
+                            else switchWorkspace(true)
+                        },
+                        onLogout = {
+                            if (!state.localMode) vm.logout()
+                            else if (state.isStreaming || state.isFinalizing || state.backgroundGeneration || state.attachmentUploading) vm.showPlaceholder("请等待本轮任务结束后再切换工作区。")
+                            else switchWorkspace(false)
+                        },
                         onPlaceholder = vm::showPlaceholder,
                         onSnackbarShown = vm::clearSnackbar
                     )
