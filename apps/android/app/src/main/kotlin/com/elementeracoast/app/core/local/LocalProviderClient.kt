@@ -22,8 +22,13 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 sealed interface LocalProviderEvent {
     data class Delta(val text: String) : LocalProviderEvent
-    data class Done(val reason: String, val metadata: com.elementeracoast.app.core.remote.RemoteModelMetadata? = null) : LocalProviderEvent
+    data class Done(val reason: String, val metadata: com.elementeracoast.app.core.remote.RemoteModelMetadata? = null,
+        val continueRequested:Boolean=false,val ordinaryToolCalls:Int?=null) : LocalProviderEvent
     data class Tool(val id:String,val name:String,val result:com.elementeracoast.app.core.remote.RemoteNativeToolResult):LocalProviderEvent
+}
+
+internal data class LocalSequenceControl(val mayContinue:Boolean,val toolBudget:Int,val tokenBudget:Int){
+    init{require(toolBudget in 0..128&&tokenBudget in 1..1000000)}
 }
 
 /** Only sends to the explicitly selected provider; no cookies, redirects, Coast fallback or raw logs. */
@@ -174,25 +179,50 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
     fun stream(p: LocalProviderConfig, model: String, messages: List<RemoteChatMessage>, maxTokens: Int,imageParts:List<JsonObject> = emptyList(),temperature:Double?=null): Flow<LocalProviderEvent> =
         streamWithTools(p,model,messages,maxTokens,imageParts,null,temperature)
 
-    internal fun streamWithTools(p:LocalProviderConfig, model:String, messages:List<RemoteChatMessage>,maxTokens:Int,imageParts:List<JsonObject>,session:LocalToolSession?,temperature:Double?=null):Flow<LocalProviderEvent> = callbackFlow {
+    internal fun streamWithTools(p:LocalProviderConfig, model:String, messages:List<RemoteChatMessage>,maxTokens:Int,imageParts:List<JsonObject>,session:LocalToolSession?,temperature:Double?=null,sequence:LocalSequenceControl?=null):Flow<LocalProviderEvent> = callbackFlow {
         val history=localMultimodalMessages(messages,imageParts).toMutableList()
         val echo=LocalProviderEcho(p,model,maxTokens)
         val active=java.util.concurrent.atomic.AtomicReference<okhttp3.Call?>()
         val reader=launch(Dispatchers.IO) {
             try {
                 var callsMade=0
-                val limit=session?.maxCalls?:TurnToolPolicy.DEFAULT_CALLS
-                for(round in 0..limit){
-                    val finalOnly=TurnToolPolicy.finalOnly(round,callsMade,limit)
+                val limit=if(sequence==null)session?.maxCalls?:TurnToolPolicy.DEFAULT_CALLS else minOf(session?.maxCalls?:0,sequence.toolBudget)
+                var controlSeen=false
+                var wantsMore=false
+                val control=buildJsonObject{
+                    put("type","function");putJsonObject("function"){
+                        put("name","continue_reply");put("description","仅当你确实希望当前回复结束并保存后，主动再生成一条独立回复时调用；不调用即结束。");putJsonObject("parameters"){put("type","object");putJsonObject("properties"){};put("additionalProperties",false)}
+                    }
+                }
+                val maxRounds=limit+if(sequence?.mayContinue==true)1 else 0
+                for(round in 0..maxRounds){
+                    val finalOnly=if(sequence==null)TurnToolPolicy.finalOnly(round,callsMade,limit) else round==maxRounds
+                    val exposed=if(sequence==null)session?.completionsTools else JsonArray(
+                        (if(!finalOnly&&callsMade<limit)session?.completionsTools.orEmpty()else emptyList())+
+                        (if(!finalOnly&&sequence.mayContinue&&!controlSeen)listOf(control)else emptyList()))
+                    val outputCap=if(sequence==null)maxTokens.coerceIn(64,65536) else {
+                        val used=if(round==0)0L else echo.metadata("stop").usage?.totalTokens
+                            ?:throw CoastApiException(CoastApiErrorKind.Model,"reply_sequence_usage_unknown","供应商未报告累计用量；不再发起续请求。")
+                        val withoutImages=history.map{m->
+                            val obj=m.jsonObject;val content=obj["content"]
+                            if(content is JsonArray)JsonObject(obj+("content" to JsonArray(content.filterNot{it is JsonObject&&it["type"]?.jsonPrimitive?.contentOrNull=="image_url"})))else obj
+                        }
+                        val estimate=LocalContextPolicy.estimate(JsonArray(withoutImages).toString())+imageParts.size*2048+
+                            LocalContextPolicy.estimate(exposed.toString())
+                        val left=sequence.tokenBudget.toLong()-used-estimate
+                        if(left<64)throw CoastApiException(CoastApiErrorKind.Model,"reply_sequence_budget","累计预算不足以发起新的供应商请求。")
+                        minOf(maxTokens.coerceIn(64,65536).toLong(),left).toInt()
+                    }
                     val payload=buildJsonObject {
                         put("model",model);put("stream",true)
                         val host=normalizeLocalProviderUrl(p.baseUrl).toHttpUrl().host
                         val official=host=="api.openai.com"
                         if(host in setOf("api.openai.com","openrouter.ai","qianfan.baidubce.com"))put("stream_options",buildJsonObject{put("include_usage",true)})
-                        put(if(official)"max_completion_tokens"else "max_tokens",maxTokens.coerceIn(64,65536))
+                        put(if(official)"max_completion_tokens"else "max_tokens",outputCap)
                         put("messages",JsonArray(history))
                         temperature?.let{put("temperature",it)}
-                        if(session!=null){put("tools",session.completionsTools);put("tool_choice",if(finalOnly)"none"else "auto")}
+                        if(sequence==null&&session!=null){put("tools",session.completionsTools);put("tool_choice",if(finalOnly)"none"else "auto")}
+                        else if(sequence!=null&&!exposed.isNullOrEmpty()){put("tools",exposed);put("tool_choice","auto")}
                     }
                     val call=http.newCall(request(p,"/chat/completions").header("Accept","text/event-stream").post(payload.toString().toRequestBody(media)).build())
                     active.set(call)
@@ -217,7 +247,7 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                                 roundText.append(it);send(LocalProviderEvent.Delta(it))
                             }
                             (delta?.get("tool_calls") as? JsonArray)?.forEach{raw->
-                                require(session!=null)
+                                require(session!=null||sequence!=null)
                                 val item=raw.jsonObject
                                 val index=item["index"]?.jsonPrimitive?.intOrNull?:0
                                 require(index in 0 until LocalToolSession.MAX_CALLS)
@@ -237,10 +267,13 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                     if(pending.isEmpty()){
                         if(reason in setOf("tool_calls","function_call"))throw CoastApiException(CoastApiErrorKind.Model,"local_tool_format","供应商未返回完整的工具调用。")
                         val finish=reason?:"stop"
-                        send(LocalProviderEvent.Done(finish,echo.metadata(finish)));close();return@launch
+                        val metadata=echo.metadata(finish)
+                        val more=sequence!=null&&sequence.mayContinue&&wantsMore&&finish=="stop"&&metadata.usage?.totalTokens?.let{it<sequence.tokenBudget}==true
+                        send(LocalProviderEvent.Done(finish,metadata,more,callsMade.takeIf{sequence!=null}));close();return@launch
                     }
-                    if(session==null||reason!="tool_calls")throw CoastApiException(CoastApiErrorKind.Model,"local_tool_format","供应商未返回兼容的工具调用。")
+                    if((session==null&&sequence==null)||reason!="tool_calls")throw CoastApiException(CoastApiErrorKind.Model,"local_tool_format","供应商未返回兼容的工具调用。")
                     if(finalOnly){
+                        if(sequence!=null)throw CoastApiException(CoastApiErrorKind.Model,"reply_sequence_tool_limit","供应商在最终请求中仍调用工具；没有追加回复。")
                         send(LocalProviderEvent.Delta(TurnToolPolicy.LIMIT_NOTICE))
                         send(LocalProviderEvent.Done("stop",echo.metadata("stop")));close();return@launch
                     }
@@ -251,6 +284,14 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                     }}
                     history.add(buildJsonObject{put("role","assistant");put("content",if(roundText.isEmpty())JsonNull else JsonPrimitive(roundText.toString()));put("tool_calls",JsonArray(calls))})
                     for(part in pending.values){
+                        if(sequence!=null&&part.name.toString()=="continue_reply"){
+                            val valid=!controlSeen&&sequence.mayContinue&&runCatching{json.parseToJsonElement(part.arguments.toString()).jsonObject.isEmpty()}.getOrDefault(false)
+                            controlSeen=true
+                            if(valid)wantsMore=true
+                            history.add(buildJsonObject{put("role","tool");put("tool_call_id",part.id.toString());put("content",if(valid)"""{"ok":true,"continue_requested":true}"""else """{"ok":false,"reason":"invalid_or_duplicate_control"}""")})
+                            continue
+                        }
+                        if(session==null)throw CoastApiException(CoastApiErrorKind.Model,"local_tool_not_exposed","供应商调用了未开放的工具。")
                         val result=if(TurnToolPolicy.canExecute(callsMade,limit)){
                             callsMade++
                             session.execute(part.id.toString(),part.name.toString(),part.arguments.toString())
@@ -258,8 +299,10 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                         history.add(buildJsonObject{put("role","tool");put("tool_call_id",part.id.toString());put("content",result.output)})
                         send(LocalProviderEvent.Tool(part.id.toString(),part.name.toString(),result))
                     }
-                    history.addAll(session.takePrivateContinuation())
-                    session.requireContinuationBudget(history)
+                    if(session!=null){
+                        history.addAll(session.takePrivateContinuation())
+                        session.requireContinuationBudget(history)
+                    }
                 }
             }catch(e:CancellationException){throw e}
             catch(e:CoastApiException){close(e)}

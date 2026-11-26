@@ -81,4 +81,23 @@ class LocalProviderClientTest {
         val c = client { 200 to "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n" }
         assertTrue(runCatching { c.stream(p, "test/model", listOf(RemoteChatMessage("user", "hi")), 128).toList() }.isFailure)
     }
+    @Test fun sequenceControlIsNotAnOrdinaryToolAndUsesCumulativeUsage()=runBlocking {
+        val payloads=mutableListOf<kotlinx.serialization.json.JsonObject>()
+        val c=client { r->
+            val buffer=Buffer();r.body!!.writeTo(buffer)
+            payloads.add(kotlinx.serialization.json.Json.parseToJsonElement(buffer.readUtf8()) as kotlinx.serialization.json.JsonObject)
+            val content=if(payloads.size==1)
+                """{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-1","function":{"name":"continue_reply","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}"""
+            else """{"choices":[{"delta":{"content":"first"},"finish_reason":"stop"}]}"""
+            200 to "data: $content\n\ndata: {\"choices\":[],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":10,\"total_tokens\":40}}\n\ndata: [DONE]\n\n"
+        }
+        val events=c.streamWithTools(p,"test/model",listOf(RemoteChatMessage("user","hi")),128,emptyList(),null,sequence=LocalSequenceControl(true,0,1000)).toList()
+        val done=events.last() as LocalProviderEvent.Done
+        assertTrue(done.continueRequested);assertEquals(0,done.ordinaryToolCalls);assertEquals(80L,done.metadata?.usage?.totalTokens)
+        assertEquals(2,payloads.size)
+        assertTrue(payloads.first().getValue("tools").toString().contains("continue_reply"))
+        assertFalse(payloads.last().containsKey("tools"))
+        assertTrue(events.none{it is LocalProviderEvent.Tool})
+    }
+
 }
