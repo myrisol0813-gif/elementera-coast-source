@@ -152,4 +152,40 @@ class ArchiveV2LocalTest {
         }finally{root.deleteRecursively()}
     }
 
+    @Test fun browserDeviceSettingsZipRestoresOnlyBasicSettings(){
+        val root=Files.createTempDirectory("coast-browser-device").toFile()
+        try{
+            val source=MemoryLocalPersistence();val target=MemoryLocalPersistence()
+            source.put("wolf.contextBudget","0");source.put("wolf.replySequenceToolBudget","0")
+            target.put("wolf.themePreset","unchanged");target.put("wolf.chatBackgroundPath","unchanged-background")
+            target.put("wolf.localFontPath","unchanged-font");target.put("provider.secret","target-secret")
+            target.put("wolf.replySequenceToolBudget","24")
+            val app="com.elementeracoast.source"
+            fun make(name:String,basic:JsonObject):Pair<ArchiveV2Manifest,ArchiveV2Stage>{
+                val raw=buildJsonObject{put("kind","device_basic_settings");put("data",buildJsonObject{put("basic_settings",basic)})}.toString().encodeToByteArray()
+                val d=ArchiveV2Object(raw.size.toLong(),listOf(ArchiveV2Chunks.digest(raw)),ArchiveV2Chunks.fingerprint(raw.size.toLong(),listOf(ArchiveV2Chunks.digest(raw))))
+                val m=ArchiveV2Manifest("elementera-coast-archive",2,"backend",app,"2026-11-26T00:00:00Z",
+                    ArchiveV2Manifests.modules.map{ArchiveV2Coverage(it,if(it=="appearance")"partial" else "unavailable",if(it=="appearance")1 else 0)},
+                    listOf(ArchiveV2Record("appearance",ArchiveV2Appearance.DEVICE_ID,d.objectSha256,emptyList(),emptyList())),listOf(d))
+                val file=File(root,name+".zip")
+                ArchiveV2ZipWriter(file.outputStream()).use{w->raw.inputStream().use{w.objectEntry(d,it)};w.finish(m)}
+                val stage=ArchiveV2Stage(File(root,name+"-stage"),name)
+                assertEquals(m,ArchiveV2ZipReader.stage(file,stage));return m to stage
+            }
+            val values=ArchiveV2Appearance.basic(source)
+            val (m,stage)=make("valid",values)
+            assertEquals(values,ArchiveV2Appearance.readDeviceBasic(m,stage))
+            assertEquals(1,ArchiveV2Local.restore(m,stage,setOf("appearance"),app,target,false,root).counts.getValue("appearance").ready)
+            assertEquals("24",target.get("wolf.replySequenceToolBudget"))
+            ArchiveV2Local.restore(m,stage,setOf("appearance"),app,target,true,root)
+            assertEquals("0",target.get("wolf.replySequenceToolBudget"));assertEquals("0",target.get("wolf.contextBudget"))
+            assertEquals("unchanged",target.get("wolf.themePreset"))
+            assertEquals("unchanged-background",target.get("wolf.chatBackgroundPath"));assertEquals("unchanged-font",target.get("wolf.localFontPath"))
+            assertEquals("target-secret",target.get("provider.secret"))
+            val (bad,bs)=make("bad",JsonObject(values+("replySequenceToolBudget" to JsonPrimitive("129"))))
+            assertTrue(runCatching{ArchiveV2Local.restore(bad,bs,setOf("appearance"),app,target,true,root)}.isFailure)
+            assertEquals("0",target.get("wolf.replySequenceToolBudget"))
+        }finally{root.deleteRecursively()}
+    }
+
 }

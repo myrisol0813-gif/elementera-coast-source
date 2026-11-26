@@ -12,7 +12,7 @@ internal object ArchiveV2Local {
     private val json=Json { ignoreUnknownKeys=false }
     private val modules=CoastTransferCodec.supportedModules
     val localModules=modules+ArchiveV2Knowledge.modules+setOf("attachments","appearance")+LocalSideRecords.modules+LocalDogtalkStore.modules
-    val cloudModules get()=ArchiveV2CloudToLocal.supportedModules+ArchiveV2Knowledge.modules+setOf("attachments")+LocalSideRecords.modules+LocalDogtalkStore.modules
+    val cloudModules get()=ArchiveV2CloudToLocal.supportedModules+ArchiveV2Knowledge.modules+setOf("attachments","appearance")+LocalSideRecords.modules+LocalDogtalkStore.modules
     private fun describe(bytes:ByteArray):ArchiveV2Object {
         val chunk=ArchiveV2Chunks.CHUNK_BYTES
         val hashes=(bytes.indices step chunk).map { ArchiveV2Chunks.digest(bytes.copyOfRange(it,minOf(it+chunk,bytes.size))) }

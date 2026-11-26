@@ -116,7 +116,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchive
                     } else Text("$label · "+m.count+" · "+if(m.coverage=="unavailable")"未采集" else if(m.module=="chat"&&choices.any { it.kind=="chat" })"可逐窗口恢复" else if(m.module=="library"&&choices.any { it.kind=="book" })"可逐本恢复" else if(choices.any { it.kind==m.module })"可逐项恢复" else "本次不恢复")
                 }
                 if(!localMode&&choices.isNotEmpty()) {
-                    Text("选择一项资料：仅上传所选项目及其归档依赖。")
+                    Text("选择一项资料：云端资料仅上传所选项目及其归档依赖；设备基本设置只写本机。")
                     choices.forEach { item->Row(verticalAlignment=Alignment.CenterVertically){
                         RadioButton(chosen==item,enabled=!busy&&preview==null,onClick={chosen=item});Text((if(item.kind=="book")"书房" else v2Labels[item.kind]?:item.kind)+" · "+item.title)
                     }}
@@ -127,6 +127,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchive
                         Text((v2Labels[k]?:k)+" · 新增 "+v["ready"]+" · 已有 "+v["existing"]+" · 冲突 "+v["conflicts"])
                         v["archived_only"]?.let{Text("其中 "+it+" 条旧快照仅保留历史原件，不重新关联消息或注入上下文。")}
                     } }
+                    else if(p["scope"]?.jsonPrimitive?.contentOrNull=="device_basic_settings")Text("仅替换当前设备的基本设置；背景、字体、账号和供应商密钥不变，不上传。")
                     else if(p["scope"]?.jsonPrimitive?.contentOrNull=="daily_group")Text("评论 "+p["comments"]+" · 点赞 "+p["likes"])
                     else if(p["scope"]?.jsonPrimitive?.contentOrNull=="portrait_group")Text("候选 "+p["candidates"]+" · 历史 "+p["revisions"])
                     else if(p["scope"]?.jsonPrimitive?.contentOrNull=="record_only")Text("新增 "+p["ready"]+" · 已有 "+p["existing"])
@@ -147,6 +148,9 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchive
                         if(localMode)preview=operations.localRestore(input,selected,confirm)
                         else {
                             val choice=requireNotNull(chosen)
+                            if(choice.kind=="appearance"){
+                                preview=operations.restoreDeviceBasic(input,confirm)
+                            }else{
                             if(session!=null&&stagedChoice!=choice){
                                 operations.cancelSession(requireNotNull(session))
                                 session=null;stagedChoice=null;uploaded=false
@@ -160,12 +164,13 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchive
                                 uploaded=true
                             }
                             preview=operations.cloudRestore(input,sid,choice,confirm)
+                            }
                         }
                         if(confirm)committed=true
                     }catch(e:CancellationException){throw e}catch(e:Exception){failure="操作未完成："+(e.message?.take(160)?:"资料校验或写入失败。")}
                     finally{busy=false}
                 }
-            }){Text(if(committed)"关闭并清理暂存" else if(preview!=null)"确认恢复" else if(localMode)"预览" else "上传并预览")}
+            }){Text(if(committed)"关闭并清理暂存" else if(preview!=null)"确认恢复" else if(localMode||chosen?.kind=="appearance")"预览" else "上传并预览")}
         },
         dismissButton={if(committed&&!localMode)TextButton(enabled=!busy,onClick={choices=choices.filter { it!=chosen };chosen=choices.firstOrNull();committed=false;preview=null;failure=""}){Text("继续恢复其他资料")} else if(!committed)TextButton(enabled=!busy,onClick={if(preview!=null){preview=null;failure=""}else dismiss()}){Text(if(preview!=null)"返回选择" else "取消并清理")}}
     )

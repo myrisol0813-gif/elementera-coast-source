@@ -9,6 +9,7 @@ import java.io.File
 internal object ArchiveV2Appearance {
     const val MODULE="appearance"
     const val ID="native-appearance"
+    const val DEVICE_ID="device-basic-settings"
     private const val ROOT="wolf."
     private const val ABSENT="\u0000absent"
     private val fields=setOf("themePreset","bubble","accent","fontMode","paperMode","cloudOutlineEnabled","readingWeight","messageSurfaceAlpha","chatBackgroundName","chatBackgroundDimAlpha","localFontName")
@@ -26,7 +27,7 @@ internal object ArchiveV2Appearance {
         "streamingEnabled","worldbookEnabled"->s in setOf("true","false")
         else->s.toIntOrNull()?.let{it in basicRanges.getValue(k)}==true
     }
-    private fun basic(store:LocalPersistence)=buildJsonObject{
+    fun basic(store:LocalPersistence)=buildJsonObject{
         for((k,d) in basicDefaults){val v=store.get(ROOT+k,d);put(k,if(validBasic(k,v))v else d)}
     }
     private fun checkBasic(v:JsonObject){
@@ -39,7 +40,7 @@ internal object ArchiveV2Appearance {
     data class Original(val role:String,val format:String,val bytes:ByteArray){
         val sha get()=ArchiveV2Chunks.digest(bytes)
     }
-    data class Snapshot(val settings:JsonObject,val originals:List<Original>,val basicSettings:JsonObject?=null){
+    data class Snapshot(val settings:JsonObject,val originals:List<Original>,val basicSettings:JsonObject?=null,val basicOnly:Boolean=false){
         fun data()=buildJsonObject{put("settings",settings);put("files",JsonArray(originals.map{v->buildJsonObject{put("role",v.role);put("format",v.format);put("size",v.bytes.size);put("sha256",v.sha)}}));basicSettings?.let{put("basic_settings",it)}}
     }
     private fun JsonObject.str(k:String):String{val v=getValue(k);require(v is JsonPrimitive&&v.isString);return v.content}
@@ -94,10 +95,14 @@ internal object ArchiveV2Appearance {
     }
     fun read(m:ArchiveV2Manifest,stage:ArchiveV2Stage,selection:Set<String>):Snapshot?{
         if(MODULE !in selection)return null
-        require(m.workspace=="local"){"外观只支持本机归档。"}
         val rows=m.records.filter{it.module==MODULE};require(rows.size<=1)
         val r=rows.singleOrNull()?:return null
-        require(r.id==ID&&r.dependencies.isEmpty())
+        require(r.dependencies.isEmpty())
+        if(r.id==DEVICE_ID){
+            require(m.workspace=="backend")
+            return Snapshot(JsonObject(emptyMap()),emptyList(),requireNotNull(readDeviceBasic(m,stage)),true)
+        }
+        require(m.workspace=="local"&&r.id==ID)
         val objects=m.objects.associateBy{it.objectSha256}
         val raw=Json.parseToJsonElement(stage.verify(objects.getValue(r.recordObject),1800000).readBytes().decodeToString(throwOnInvalidSequence=true)).jsonObject
         require(raw.keys==setOf("kind","data")&&raw.str("kind")==MODULE)
@@ -111,9 +116,37 @@ internal object ArchiveV2Appearance {
         }
         return Snapshot(data.getValue("settings").jsonObject,assets,data["basic_settings"]?.jsonObject).also(::validate)
     }
+    /** Read only the portable basic settings; never interpret an empty appearance as deletion. */
+    fun readDeviceBasic(m:ArchiveV2Manifest,stage:ArchiveV2Stage):JsonObject? {
+        val rows=m.records.filter{it.module==MODULE}
+        require(rows.size<=1)
+        val r=rows.singleOrNull()?:return null
+        require(r.dependencies.isEmpty())
+        val raw=Json.parseToJsonElement(stage.verify(m.objects.single{it.objectSha256==r.recordObject},1800000).readBytes().decodeToString(throwOnInvalidSequence=true)).jsonObject
+        require(raw.keys==setOf("kind","data"))
+        val data=raw.getValue("data").jsonObject
+        when(r.id){
+            DEVICE_ID->require(m.workspace=="backend"&&raw.str("kind")=="device_basic_settings"&&r.mediaObjects.isEmpty()&&data.keys==setOf("basic_settings"))
+            ID->require(m.workspace=="local"&&raw.str("kind")==MODULE&&(data.keys==setOf("settings","files")||data.keys==setOf("settings","files","basic_settings")))
+            else->error("未知设备设置记录。")
+        }
+        return data["basic_settings"]?.jsonObject?.also(::checkBasic)
+    }
+    fun applyBasic(values:JsonObject,store:LocalPersistence,write:Boolean):LocalRestoreCount {
+        checkBasic(values)
+        if(basic(store)==values)return LocalRestoreCount(0,1,0)
+        if(write){
+            val fields=values.mapKeys{ROOT+it.key}.mapValues{it.value.jsonPrimitive.content}
+            if(store is SharedPreferencesLocalPersistence)store.putDeviceSettings(fields)
+            else fields.forEach{(k,v)->store.put(k,v)}
+            require(basic(store)==values){"基本设置保存未确认。"}
+        }
+        return LocalRestoreCount(1,0,1)
+    }
     fun apply(v:Snapshot?,store:LocalPersistence,root:File,write:Boolean):LocalRestoreCount{
         if(v==null)return LocalRestoreCount(0,0,0)
         validate(v)
+        if(v.basicOnly)return applyBasic(requireNotNull(v.basicSettings),store,write)
         val old=capture(store,root)
         val same=old.settings==v.settings&&old.originals.map{it.role to it.sha}==v.originals.map{it.role to it.sha}&&(v.basicSettings==null||old.basicSettings==v.basicSettings)
         if(same)return LocalRestoreCount(0,1,0)
