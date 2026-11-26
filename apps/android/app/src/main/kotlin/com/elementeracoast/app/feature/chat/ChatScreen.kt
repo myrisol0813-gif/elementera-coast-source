@@ -64,6 +64,7 @@ fun ChatWindow(
     onCrossWindowChange: (CrossWindowUiState) -> Unit,
     onUploadAttachment: (String, String, ByteArray) -> Unit,
     onRemovePendingAttachment: (String) -> Unit,
+    onComposerDraftChange: (String) -> Unit,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
     onMessageAction: (MessageAction) -> Unit,
@@ -76,7 +77,7 @@ fun ChatWindow(
     guideTarget: String? = null,
     onGuideConsumed: () -> Unit = {}
 ) {
-    var input by rememberSaveable(state.activeConversationId) { mutableStateOf("") }
+    val input = state.composerDraft
     var avatarDialogOpen by rememberSaveable { mutableStateOf(false) }
     var editingMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var soilOpen by rememberSaveable { mutableStateOf(false) }
@@ -264,7 +265,7 @@ fun ChatWindow(
             CoastComposer(
                 conversationId = state.activeConversationId,
                 value = input,
-                onValueChange = { input = it },
+                onValueChange = onComposerDraftChange,
                 pendingAttachments = state.pendingAttachments,
                 attachmentUploading = state.attachmentUploading,
                 previewSource = attachmentPreviewSource,
@@ -276,7 +277,7 @@ fun ChatWindow(
                 onPickImage = { imagePicker.launch(arrayOf("image/png", "image/jpeg", "image/webp")) },
                 onPickFile = { filePicker.launch(arrayOf("*/*")) },
                 onRemoveAttachment = onRemovePendingAttachment,
-                onSend = { val outgoing = input; input = ""; onSend(outgoing) },
+                onSend = { onSend(input) },
                 onStop = onStop,
                 onPlaceholder = onPlaceholder
             )
