@@ -205,6 +205,19 @@ class SideRoomsRepository(private val config: CoastApiConfig, private val client
     suspend fun chatSearch(query: String, cursor: String = ""): JsonObject =
         request("/api/chat/search?q=" + encode(query) + "&cursor=" + encode(cursor))
 
+    suspend fun vaultStickers(query:String="",cursor:String=""):JsonObject =
+        request("/api/coast-vault/stickers?q="+encode(query)+"&cursor="+encode(cursor))
+    suspend fun vaultRegisterSticker(cid:String,aid:String,description:String):JsonObject =
+        request("/api/coast-vault/stickers","POST",kotlinx.serialization.json.buildJsonObject{
+            put("conversation_id",cid);put("attachment_id",aid);put("description",description)
+        })
+    suspend fun vaultUpdateSticker(id:String,description:String?=null,enabled:Boolean?=null):JsonObject =
+        request("/api/coast-vault/stickers/"+path(id),"PATCH",kotlinx.serialization.json.buildJsonObject{
+            if(description!=null)put("description",description)
+            if(enabled!=null)put("enabled",enabled)
+        })
+    suspend fun vaultRemoveSticker(id:String):JsonObject=request("/api/coast-vault/stickers/"+path(id),"DELETE")
+
     suspend fun vaultMedia(kind: String = "all", query: String = "", cursor: String = ""): JsonObject =
         request("/api/coast-vault/media?kind=" + encode(kind) + "&q=" + encode(query) + "&cursor=" + encode(cursor))
 

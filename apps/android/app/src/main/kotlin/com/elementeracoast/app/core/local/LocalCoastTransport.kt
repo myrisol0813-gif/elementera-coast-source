@@ -193,6 +193,26 @@ class LocalCoastTransport(private val store: LocalPersistence,
             return rows("clips",side.clips(cid))
         }
         if(parts.size==5&&parts.take(3)==listOf("api","voice","clips")&&parts.last()=="audio"&&method=="GET")return binary(side.audio(parts[3])?:return missing(r),"audio/mpeg")
+        if(path=="/api/coast-vault/stickers"){
+            val lib=LocalStickerLibrary(store)
+            if(method=="GET")return response(r,200,lib.ownerPage(r.url.queryParameter("q").orEmpty(),r.url.queryParameter("cursor")?.toIntOrNull()?:0))
+            if(method=="POST"){
+                val input=body(r)
+                require(input.keys==setOf("conversation_id","attachment_id","description"))
+                val e=lib.register(input.str("conversation_id").orEmpty(),input.str("attachment_id").orEmpty(),input.str("description").orEmpty(),"owner")
+                return ok(r,"item" to buildJsonObject{put("id",e.id);put("description",e.description);put("enabled",e.enabled)})
+            }
+        }
+        if(parts.size==4&&parts.take(3)==listOf("api","coast-vault","stickers")){
+            val lib=LocalStickerLibrary(store);val sid=parts.last()
+            if(method=="PATCH"){
+                val input=body(r);require(input.isNotEmpty()&&input.keys.all{it in setOf("description","enabled")})
+                val desc=input["description"]?.jsonPrimitive?.let{require(it.isString);it.content}
+                val enabled=input["enabled"]?.jsonPrimitive?.let{require(!it.isString);it.boolean}
+                lib.update(sid,"owner",desc,enabled);return ok(r)
+            }
+            if(method=="DELETE"){lib.remove(sid,"owner");return ok(r)}
+        }
         if(path=="/api/coast-vault/media"&&method=="GET")return response(r,200,JsonObject(side.media(r.url.queryParameter("kind")?:"all",r.url.queryParameter("q").orEmpty(),r.url.queryParameter("cursor")?.toIntOrNull()?:0)+("ok" to JsonPrimitive(true))))
         if(path=="/api/coast-vault/treasures"){
             if(method=="GET")return response(r,200,JsonObject(side.treasureRows(r.url.queryParameter("kind")?:"all",r.url.queryParameter("q").orEmpty(),r.url.queryParameter("conversation_id").orEmpty(),r.url.queryParameter("turn_id").orEmpty(),r.url.queryParameter("cursor")?.toIntOrNull()?:0)+("ok" to JsonPrimitive(true))))

@@ -134,7 +134,7 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
             // "writing" and "other" are view groups, never invented backend filters.
             // Preserve the real backend cursor so users can reach every subsequent page.
             val remoteKind = if (kind == "writing" || kind == "other") "all" else kind
-            val response = if (mode == "basic") {
+            val response = if(mode=="stickers") repository.vaultStickers(submittedQuery,cursor) else if (mode == "basic") {
                 repository.vaultMedia(remoteKind, submittedQuery, cursor)
             } else repository.vaultTreasures(remoteKind, submittedQuery, cursor)
             val received = response.vaultItems("items")
@@ -158,7 +158,7 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
         }
     }
     LaunchedEffect(mode, kind, submittedQuery, revision) { load() }
-    val labels = if (mode == "basic") basicKinds else treasureKinds
+    val labels = if(mode=="stickers") emptyList() else if (mode == "basic") basicKinds else treasureKinds
     val visibleRows = vaultVisibleRows(rows, mode, kind)
     val groupOrder = if (kind == "all") vaultSectionOrder(mode == "treasures")
         else vaultSectionOrder(mode == "treasures").filter { name ->
@@ -177,7 +177,7 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
         item(key = "controls") {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("basic" to "基本文件库", "treasures" to "收藏").forEach { (value, title) ->
+                    listOf("basic" to "基本文件库", "treasures" to "收藏", "stickers" to "表情包").forEach { (value, title) ->
                         SnowLetterSurface(
                             modifier = Modifier.weight(1f).height(44.dp).clickable {
                                 if (mode != value) {
@@ -270,14 +270,17 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
                     style = MaterialTheme.typography.bodySmall)
                 if (!loading && visibleRows.isEmpty() && failure.isBlank()) Text(
                     if (mode == "basic") "这里还没有符合条件的已存媒体。"
-                    else "还没有符合条件的收藏记录。",
+                    else if(mode=="stickers") "从文件库的图片菜单添加表情包。" else "还没有符合条件的收藏记录。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
 
-        groupOrder.forEach { name ->
+        if(mode=="stickers") items(visibleRows,key={"sticker-"+it.vaultText("id")}){entry->
+            CoastStickerCard(entry,repository,onSnackbar,onChanged={revision++})
+        }
+        else groupOrder.forEach { name ->
             val sectionRows = visibleRows.filter { vaultSection(it.vaultText("kind"), mode == "treasures") == name }
             if (sectionRows.isNotEmpty()) {
                 item(key = "section-" + name) {
@@ -355,6 +358,8 @@ private fun CoastVaultCard(
     var noteHasMore by remember(id) { mutableStateOf(false) }
     var noteEditing by remember(id) { mutableStateOf(false) }
     var showRename by remember(id) { mutableStateOf(false) }
+    var showSticker by remember(id) { mutableStateOf(false) }
+    var stickerText by remember(id) { mutableStateOf("") }
     var renameText by remember(id) { mutableStateOf(displayName) }
     LaunchedEffect(item.vaultText("notes")) { if (!noteEditing) note = item.vaultText("notes") }
     LaunchedEffect(displayName) { renameText = displayName }
@@ -630,7 +635,7 @@ private fun CoastVaultCard(
                         busy = busy, onFavorite = ::favorite, onSave = ::download,
                         onSource = ::openSource, onInfo = { showInfo = true },
                         onNote = { noteEditing = true; if (kind == "image") imageOpen = null; if (kind == "audio") audioExpanded = true }, onRead = { showText = true },
-                        hasMedia = true, hasText = false, onRename = { showRename = true })
+                        hasMedia = true, hasText = false, onRename = { showRename = true }, onSticker={showSticker=true;imageOpen=null})
                 }
             }
             Image(imageOpen!!.asImageBitmap(), contentDescription = "海岸影像原图",
@@ -641,6 +646,19 @@ private fun CoastVaultCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+    if(showSticker) AlertDialog(
+        onDismissRequest={if(!busy)showSticker=false},title={Text("加入表情包")},
+        text={Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
+            Text("写一句供模型选择时参考的说明。原图保留。",style=MaterialTheme.typography.bodySmall)
+            OutlinedTextField(stickerText,{stickerText=it.take(500)},label={Text("素材说明")})
+        }},
+        confirmButton={TextButton(enabled=!busy&&stickerText.isNotBlank(),onClick={scope.launch{
+            busy=true
+            try{repository.vaultRegisterSticker(conversation,sourceId,stickerText);showSticker=false;stickerText="";onSnackbar("已登记表情包。")}
+            catch(c:CancellationException){throw c}catch(e:Exception){onSnackbar("登记失败："+e.message)}finally{busy=false}
+        }}){Text("保存")}},
+        dismissButton={TextButton(enabled=!busy,onClick={showSticker=false}){Text("取消")}}
+    )
     if (showRename) AlertDialog(
         onDismissRequest = { if (!busy) showRename = false },
         title = { Text("修改图片展示名称") },
@@ -730,9 +748,11 @@ private fun VaultActions(
     onRead: () -> Unit,
     hasMedia: Boolean,
     hasText: Boolean,
-    onRename: (() -> Unit)? = null
+    onRename: (() -> Unit)? = null,
+    onSticker: (() -> Unit)? = null
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        if(onSticker!=null)DropdownMenuItem(text={Text("加入表情包")},enabled=!busy,onClick={onDismiss();onSticker()})
         if (onRename != null) DropdownMenuItem(
             text = { Text("修改名称") },
             enabled = !busy,
@@ -883,4 +903,40 @@ private fun CoastVaultAudio(
             }
         }
     }
+}
+
+
+@Composable
+private fun CoastStickerCard(item:JsonObject,repository:SideRoomsRepository,onSnackbar:(String)->Unit,onChanged:()->Unit){
+    val id=item.vaultText("id");val scope=rememberCoroutineScope()
+    var desc by remember(id,item.vaultText("description")){mutableStateOf(item.vaultText("description"))}
+    var busy by remember(id){mutableStateOf(false)}
+    var remove by remember(id){mutableStateOf(false)}
+    var preview by remember(id){mutableStateOf<Bitmap?>(null)}
+    fun change(action:suspend ()->Unit){scope.launch{
+        busy=true
+        try{action();remove=false;onChanged()}catch(c:CancellationException){throw c}catch(e:Exception){onSnackbar("素材操作失败："+e.message)}finally{busy=false}
+    }}
+    SnowLetterSurface(modifier=Modifier.fillMaxWidth(),role=SnowLetterSurfaceRole.StatusCard,fallbackColor=MaterialTheme.colorScheme.surface,fallbackShape=RoundedCornerShape(18.dp)){
+        Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalAlignment=Alignment.CenterVertically){
+                Box(Modifier.weight(1f)){
+                    if(item.vaultFlag("available"))CoastVaultImage(repository,item.vaultText("attachment_id"),item.vaultText("conversation_id"),onSnackbar){preview=it}
+                    else Text("原件不可访问")
+                }
+                Column(Modifier.weight(2f),verticalArrangement=Arrangement.spacedBy(4.dp)){
+                    Text(if(item.vaultText("author")=="assistant")"模型添加" else "屋主添加",style=MaterialTheme.typography.labelSmall)
+                    Text(if(item.vaultFlag("enabled"))"已启用" else "已停用",style=MaterialTheme.typography.labelMedium)
+                    OutlinedTextField(desc,{desc=it.take(500)},enabled=!busy,label={Text("素材说明")},modifier=Modifier.fillMaxWidth())
+                }
+            }
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly){
+                TextButton(enabled=!busy&&desc.isNotBlank(),onClick={change{repository.vaultUpdateSticker(id,description=desc)}}){Text("保存说明")}
+                TextButton(enabled=!busy,onClick={change{repository.vaultUpdateSticker(id,enabled=!item.vaultFlag("enabled"))}}){Text(if(item.vaultFlag("enabled"))"停用" else "启用")}
+                TextButton(enabled=!busy,onClick={remove=true}){Text("移除")}
+            }
+        }
+    }
+    if(remove)AlertDialog(onDismissRequest={if(!busy)remove=false},title={Text("移除表情包？")},text={Text("只移除素材索引，保留原图及已经发送的聊天。")},confirmButton={TextButton(enabled=!busy,onClick={change{repository.vaultRemoveSticker(id)}}){Text("移除")}},dismissButton={TextButton(onClick={remove=false},enabled=!busy){Text("取消")}})
+    preview?.let{image->Dialog(onDismissRequest={preview=null}){Image(image.asImageBitmap(),contentDescription="表情包原图",modifier=Modifier.fillMaxWidth().clickable{preview=null},contentScale=ContentScale.Fit)}}
 }

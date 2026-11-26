@@ -195,8 +195,8 @@ internal fun saveGeneratedImageOriginal(store:LocalPersistence,cid:String,tid:St
             val t=history.turns.first{it.id==tid}
             val i=t.user.variants.indexOfFirst{it.id==reservedUserId};require(i>=0)
             val k=i.toString();val branch=t.assistant.variantsByUserVariant[k].orEmpty()
-            require(branch.count{it.id==messageId&&it.finishReason=="image_pending"&&it.attachments.isEmpty()}==1){"原回复版本已不再等待生成图像。"}
-            val next=t.copy(assistant=t.assistant.copy(variantsByUserVariant=t.assistant.variantsByUserVariant+(k to branch.map{if(it.id==messageId)it.copy(content="",attachments=listOf(attachment),finishReason=if(modelTool)"image_saved"else "stop",errorDetail=null)else it})))
+            require(branch.count{it.id==messageId&&it.finishReason=="image_pending"&&it.attachments.size<12&&it.attachments.all{a->a.stickerDelivery?.messageId==messageId}}==1){"原回复版本已不再等待生成图像。"}
+            val next=t.copy(assistant=t.assistant.copy(variantsByUserVariant=t.assistant.variantsByUserVariant+(k to branch.map{if(it.id==messageId)it.copy(content="",attachments=it.attachments+attachment,finishReason=if(modelTool)"image_saved"else "stop",errorDetail=null)else it})))
             cache.putHistory(cid,history.copy(updatedAt=java.time.Instant.ofEpochMilli(stamp).toString(),turns=history.turns.map{if(it.id==tid)next else it}))
         }
         SavedGeneratedImage(attachment,prepareGeneratedImageReadback(id,saved,generated.mime,visionSupported))
@@ -232,7 +232,7 @@ internal fun runLocalManualImageGeneration(store:LocalPersistence,config:LocalPr
         val k=i.toString();val branch=t.assistant.variantsByUserVariant[k].orEmpty()
         val target=branch.singleOrNull{it.id==mid}
         if(modelTool&&!h.contextSettings.localModelWriteEnabled)fail("image_permission_revoked","本机模型写入权限未开启。",403)
-        if(existing.any{it.finishReason=="image_pending"}||(if(modelTool) target==null||target.hidden||target.finishReason!="image_tool_ready"||target.attachments.isNotEmpty()||existing.count{it.id==mid}!=1 else existing.any{it.id==mid}))fail("image_already_reserved","已有生成任务或此请求已使用；不会再次生成。",409)
+        if(existing.any{it.finishReason=="image_pending"}||(if(modelTool) target==null||target.hidden||target.finishReason !in setOf("image_tool_ready","sticker_saved")||target.attachments.size>=12||target.attachments.any{it.stickerDelivery?.messageId!=mid}||existing.count{it.id==mid}!=1 else existing.any{it.id==mid}))fail("image_already_reserved","已有生成任务或此请求已使用；不会再次生成。",409)
         if(!modelTool&&branch.size>=20)fail("image_branch_full","当前回复版本已满。",409)
         val now=java.time.Instant.now().toString()
         val pending=RemoteVariant(id=mid,content="",createdAt=now,modelId=model,finishReason="image_pending",generationSource="chat")

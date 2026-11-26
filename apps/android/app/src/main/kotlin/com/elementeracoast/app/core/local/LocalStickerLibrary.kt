@@ -41,6 +41,22 @@ internal class LocalStickerLibrary(private val store:LocalPersistence){
         return row to bytes
     }
     fun listOwner():List<Entry> = store.readConsistent{entries(it)}
+    fun ownerPage(query:String="",cursor:Int=0):JsonObject=store.readConsistent{s->
+        require(query.length<=100&&cursor in 0..100000)
+        val rows=entries(s).filter{it.description.contains(query.trim(),ignoreCase=true)}.sortedWith(compareByDescending<Entry>{it.createdAt}.thenByDescending{it.id}).drop(cursor).take(41)
+        buildJsonObject{
+            put("ok",true)
+            put("items",JsonArray(rows.take(40).map{e->
+                val a=source(s,e.conversationId,e.attachmentId)
+                buildJsonObject{
+                    put("id",e.id);put("conversation_id",e.conversationId);put("attachment_id",e.attachmentId)
+                    put("description",e.description);put("author",e.author);put("enabled",e.enabled);put("available",a!=null)
+                    put("name",a?.metadata?.str("name").orEmpty())
+                }
+            }))
+            put("next_cursor",if(rows.size>40)JsonPrimitive(cursor+40)else JsonNull)
+        }
+    }
     fun register(cid:String,aid:String,raw:String,actor:String,allowModelAdd:Boolean=false,activeConversationId:String?=null):Entry = store.atomic{s->
         require(actor in setOf("owner","assistant")&&ID.matches(cid)&&ID.matches(aid))
         val desc=description(raw)
@@ -79,7 +95,7 @@ internal class LocalStickerLibrary(private val store:LocalPersistence){
         val cache=RemoteCacheStore(s,strictReads=true)
         require(cache.conversations().any{it.id==cid&&it.deletedAt==null&&it.roomType in setOf("main","radio")})
         val h=requireNotNull(cache.history(cid))
-        require(h.contextSettings.stickerSendEnabled&&h.contextSettings.localModelWriteEnabled){"当前窗口未授权发送表情包。"}
+        require(h.contextSettings.stickerSendEnabled&&h.contextSettings.localModelWriteEnabled&&h.contextSettings.localModelToolsEnabled){"当前窗口未授权发送表情包。"}
         val t=h.turns.single{it.id==tid};val i=t.user.active
         require(t.user.variants.getOrNull(i)?.let{it.id==uid&&!it.hidden}==true)
         val key=i.toString();val variants=t.assistant.variantsByUserVariant[key].orEmpty()
