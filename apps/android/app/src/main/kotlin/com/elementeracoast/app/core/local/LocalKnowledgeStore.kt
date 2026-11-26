@@ -119,7 +119,7 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence,private va
         if(selected.isBlank()||providers.resolveImageProvider(selected)==null)return null
         return LocalImageTool(store,providers::resolveImageProvider,cid,tid,uid,mid,selected,vision)
     }
-    fun toolSession(cid:String,turn:String,request:RemoteCrossWindowRequest?,receipt:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null,image:LocalImageTool?=null)=LocalToolSession.open(store,cid,turn,request,receipt,modelId,wireLimit,web,voice,image)
+    fun toolSession(cid:String,turn:String,request:RemoteCrossWindowRequest?,receipt:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null,image:LocalImageTool?=null,messageId:String?=null)=LocalToolSession.open(store,cid,turn,request,receipt,modelId,wireLimit,web,voice,image,messageId)
     private fun portraitStatus(body:String,over:Boolean)=if(body.isEmpty())"empty"else if(over)"over_budget"else "complete"
     private fun portraitReceipt(label:String,body:String,over:Boolean)=RemoteDeskGlobalExcerpt(label=label,status=if(body.isEmpty())"未设置" else "已递给",delivered=body.isNotEmpty(),injection=if(body.isEmpty())"none" else if(over)"over_budget"else "full",estimatedTokens=LocalContextPolicy.estimate(body),length=body.length,content=body)
     companion object {

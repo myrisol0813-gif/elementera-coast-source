@@ -260,7 +260,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val target=source?.assistant?.variantsByUserVariant?.get(source.user.active.toString())?.singleOrNull{it.id==request.messageId}
             val image=if(request.imageToolEnabled&&request.imageModelId==selected&&selected.isNotBlank()&&uid!=null&&target?.finishReason=="image_tool_ready"&&h?.contextSettings?.localModelWriteEnabled==true&&room in setOf("main","radio")&&imageConfig(selected)!=null)
                 LocalImageTool(store,imageConfig,request.conversationId,request.sourceTurnId,uid,request.messageId,selected,true)else null
-            val session=knowledge.toolSession(request.conversationId,request.sourceTurnId,request.crossWindow,prepared.receipt,request.model.let{if(it.startsWith("chatgpt-plan:"))it else "chatgpt-plan:"+it},image=image)
+            val session=knowledge.toolSession(request.conversationId,request.sourceTurnId,request.crossWindow,prepared.receipt,request.model.let{if(it.startsWith("chatgpt-plan:"))it else "chatgpt-plan:"+it},image=image,messageId=request.messageId)
             val key=request.conversationId+":"+request.messageId
             toolSessions.remove(key)
             if(session!=null){require(request.messageId.isNotBlank());while(toolSessions.size>=8)toolSessions.remove(toolSessions.keys.first());toolSessions[key]=session}

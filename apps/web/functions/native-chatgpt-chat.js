@@ -1,4 +1,5 @@
 import { attachImageTool } from './chat-image-tool.js';
+import { attachStickerTools } from './chat-sticker-tool.js';
 import { assembleCleanContext } from './context-assemble-clean.js';
 import { resolveChatAttachmentsForModel, applyChatAttachmentsToMessages, attachmentDeskReceipt } from './chat-attachments.js';
 import { ChatStoreError, getConversation, readConversationState, sanitizeId } from './chat-store.js';
@@ -88,6 +89,7 @@ async function contextFromRequest(env, value, { preview = false } = {}) {
     chatModel:model,enabled:value.image_tool_enabled===true&&typeof value.image_model_id==='string'&&!!value.image_model_id,
     expectedImageModel:value.image_model_id??null,visionOverride:true
   });
+  assembled=await attachStickerTools(env,assembled,{conversationId,turnId,messageId:String(value.message_id||''),roomType:room.room_type});
   return { assembled, conversationId, turnId, model };
 }
 

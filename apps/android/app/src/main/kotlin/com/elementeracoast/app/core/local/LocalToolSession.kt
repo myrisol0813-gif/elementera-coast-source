@@ -18,7 +18,10 @@ internal class LocalToolSession private constructor(
     private val wireLimit:Int?=null,
     private val web:LocalIndependentWeb?=null,
     private val voice:LocalVoiceProvider?=null,
-    private val image:LocalImageTool?=null
+    private val image:LocalImageTool?=null,
+    private val stickerMessageId:String?=null,
+    private val stickerSend:Boolean=false,
+    private val stickerAdd:Boolean=false
 ) {
     private data class Spec(val name:String,val key:String,val title:String,val description:String,val parameters:JsonObject)
     private fun schema(fields:Map<String,JsonObject> = emptyMap(),required:List<String> = emptyList())=buildJsonObject {
@@ -28,6 +31,11 @@ internal class LocalToolSession private constructor(
     private fun integer(min:Int,max:Int)=buildJsonObject{put("type","integer");put("minimum",min);put("maximum",max)}
     private fun array(item:JsonObject,max:Int)=buildJsonObject{put("type","array");put("items",item);put("minItems",1);put("maxItems",max)}
     private val specs=buildList {
+        if(stickerSend){
+            add(Spec("sticker_search","sticker.search","查找表情包","按文字说明查找已启用的真实素材。不读取像素。",schema(mapOf("q" to string(100),"cursor" to integer(0,100000)))))
+            add(Spec("sticker_send","sticker.send","发送表情包","选择素材编号，将真实原件发送到当前回复，不调用生图 API。",schema(mapOf("sticker_id" to string()),listOf("sticker_id"))))
+        }
+        if(stickerAdd)add(Spec("sticker_add","sticker.add","登记表情包","登记本窗口自己已保存的生成图片，填写供以后选择的说明。",schema(mapOf("attachment_id" to string(),"description" to string(500)),listOf("attachment_id","description"))))
         if(crossAllowed){
             add(Spec("cross_window_search","cross_window.search","查找其他窗口","列出其他可读取的窗口标题与来源，不返回正文。可按标题查找。",schema(mapOf("query" to string(120),"limit" to integer(1,20)))))
             add(Spec("cross_window_read_recent","cross_window.read_recent","读取近期旧消息","按窗口 ID 读取近期聊天，默认4轮；返回完整消息，超出本轮预算时请减少轮数，不截断原文。",schema(mapOf("conversation_id" to string(200),"turns" to integer(1,9999)),listOf("conversation_id"))))
@@ -99,7 +107,19 @@ internal class LocalToolSession private constructor(
         val cache=RemoteCacheStore(s,strictReads=true)
         val h=cache.history(cid)?:return false
         val now=h.turns.firstOrNull{it.id==turn}?:return false
-        if(cache.conversations().none{it.id==cid&&it.deletedAt==null}||!(image?.sameTurn(sourceTurn,now)?: (now==sourceTurn)))return false
+        fun withoutTarget(t:RemoteTurn)=t.copy(assistant=t.assistant.copy(variantsByUserVariant=t.assistant.variantsByUserVariant.mapValues{(_,v)->v.filterNot{it.id==stickerMessageId}}))
+        val same=if(stickerMessageId!=null)withoutTarget(sourceTurn)==withoutTarget(now) else image?.sameTurn(sourceTurn,now)?: (now==sourceTurn)
+        if(cache.conversations().none{it.id==cid&&it.deletedAt==null}||!same)return false
+        if(spec.name.startsWith("sticker_")){
+            val v=now.assistant.variantsByUserVariant[now.user.active.toString()]?.singleOrNull{it.id==stickerMessageId}
+            if(v==null||v.hidden||now.user.variants.getOrNull(now.user.active)?.hidden!=false||v.finishReason !in setOf("sticker_tool_ready","sticker_saved","image_tool_ready","image_saved"))return false
+            return when(spec.name){
+                "sticker_add"->stickerAdd&&h.contextSettings.stickerAddEnabled&&h.contextSettings.localModelWriteEnabled
+                "sticker_search"->stickerSend&&h.contextSettings.stickerSendEnabled&&h.contextSettings.localModelToolsEnabled&&h.contextSettings.localModelWriteEnabled
+                "sticker_send"->stickerSend&&h.contextSettings.stickerSendEnabled&&h.contextSettings.localModelWriteEnabled&&h.contextSettings.localModelToolsEnabled
+                else->false
+            }
+        }
         return when {
             spec.name in setOf("global_excerpt_propose","user_portrait_propose") -> writeAllowed&&h.contextSettings.localModelWriteEnabled&&LocalSoilStore(s).current(cid)?.get("auto_refresh_enabled")?.jsonPrimitive?.int==1&&LocalPortraitStore(s).read(if(spec.name=="user_portrait_propose")"user_portrait" else "self_portrait")?.root?.get("write_enabled")?.jsonPrimitive?.int!=0
             spec.name in WRITE_NAMES -> writeAllowed&&h.contextSettings.localModelWriteEnabled
@@ -121,6 +141,7 @@ internal class LocalToolSession private constructor(
         if(calls>=maxCalls||callId.isBlank()||!seenCalls.add(callId))return errorResult("工具次数上限或重复调用。")
         calls++
         val start=System.currentTimeMillis()
+        if(name.startsWith("sticker_"))return executeSticker(spec,arguments,start)
         if(name=="image_generate")return executeImage(spec,arguments,start)
         if(name=="voice_create")return executeVoice(spec,arguments,start)
         if(name in WRITE_NAMES)return executeWrite(spec,arguments,start)
@@ -170,6 +191,43 @@ internal class LocalToolSession private constructor(
         reports.add(RemoteDeskToolResult(name=name,delivered=true,content=if(success&&spec.key.startsWith("web.independent_"))output.toString() else if(success)"成功返回 "+output.toString().length+" 字符"else output["message"]?.jsonPrimitive?.contentOrNull.orEmpty()))
         val run=RemoteFurnitureRun(id=auditId,toolKey=spec.key,label=spec.title,status=if(success)"success"else "error")
         return RemoteNativeToolResult(ok=success,output=output.toString(),furnitureRuns=listOf(run),deskSlip=receipt)
+    }
+    var stickerSaved=false;private set
+    private fun executeSticker(spec:Spec,arguments:String,start:Long):RemoteNativeToolResult {
+        val auditId=UUID.randomUUID().toString()
+        val output=try{
+            require(arguments.length<=6000)
+            val args=parseInput(spec,arguments)
+            if(!store.readConsistent{s->allowedNow(s,spec)})throw LocalToolFailure("permission_revoked","窗口授权或回复已变化。")
+            val lib=LocalStickerLibrary(store)
+            if(estimated+estimate(arguments)+512>toolBudget)throw LocalToolFailure("budget_exceeded","本轮工具预算不足。")
+            fun string(key:String,max:Int)=args.getValue(key).jsonPrimitive.let{require(it.isString&&it.content.length in 1..max);it.content}
+            when(spec.name){
+                "sticker_search"->{
+                    val q=args["q"]?.jsonPrimitive?.let{require(it.isString);it.content}.orEmpty()
+                    val cursor=args["cursor"]?.jsonPrimitive?.let{require(!it.isString);it.int}?:0
+                    val value=lib.search(cid,q,cursor,true)
+                    if(estimated+estimate(arguments)+estimate(value.toString())+32>toolBudget)throw LocalToolFailure("budget_exceeded","目录结果超出预算，请缩小检索范围。")
+                    JsonObject(value+("ok" to JsonPrimitive(true)))
+                }
+                "sticker_send"->{
+                    val uid=sourceTurn.user.variants[sourceTurn.user.active].id
+                    val sent=lib.deliver(cid,turn,uid,requireNotNull(stickerMessageId),string("sticker_id",160),true)
+                    stickerSaved=true
+                    buildJsonObject{put("ok",true);put("status","saved");put("reused",sent.reused);putJsonObject("attachment"){put("id",sent.attachment.id);put("type","image");put("mime",sent.attachment.mime);put("size",sent.attachment.size)}}
+                }
+                "sticker_add"->{
+                    val entry=lib.register(cid,string("attachment_id",160),string("description",500),"assistant",true,cid)
+                    buildJsonObject{put("ok",true);put("id",entry.id)}
+                }
+                else->error("unknown")
+            }
+        }catch(e:Exception){buildJsonObject{put("ok",false);put("code",if(e is LocalToolFailure)e.code else "sticker_failed");put("message","表情包操作未完成。")}}
+        val success=output["ok"]?.jsonPrimitive?.booleanOrNull==true
+        estimated+=estimate(arguments.take(6000))+estimate(output.toString())+32
+        runCatching{store.atomic{s->auditWrite(s,auditId,spec.key,start,success)}}
+        reports.add(RemoteDeskToolResult(name=spec.name,delivered=true,content=output.toString()))
+        return RemoteNativeToolResult(ok=success,output=output.toString(),deskSlip=receipt,furnitureRuns=listOf(RemoteFurnitureRun(id=auditId,toolKey=spec.key,label=spec.title,status=if(success)"success"else "error")))
     }
     fun takePrivateContinuation():List<JsonObject> = image?.takeContinuation().orEmpty()
     private fun executeImage(spec:Spec,arguments:String,start:Long):RemoteNativeToolResult {
@@ -352,14 +410,15 @@ internal class LocalToolSession private constructor(
     companion object {
         const val MAX_CALLS=com.elementeracoast.app.core.network.TurnToolPolicy.MAX_CALLS
         private val WRITE_NAMES=setOf("image_generate","voice_create","create_moment","create_diary","moment_comment","moment_like","calendar_create","library_write","memory_write_candidate","global_excerpt_propose","user_portrait_propose")
-        fun open(store:LocalPersistence,cid:String,turn:String,request:RemoteCrossWindowRequest?,base:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null,web:LocalIndependentWeb?=null,voice:LocalVoiceProvider?=null,image:LocalImageTool?=null):LocalToolSession?{
+        fun open(store:LocalPersistence,cid:String,turn:String,request:RemoteCrossWindowRequest?,base:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null,web:LocalIndependentWeb?=null,voice:LocalVoiceProvider?=null,image:LocalImageTool?=null,messageId:String?=null):LocalToolSession?{
             val h=RemoteCacheStore(store,strictReads=true).history(cid)?:return null
             val cross=h.contextSettings.crossWindowAuto&&request?.mode=="model_decides"
             val tools=h.contextSettings.localModelToolsEnabled
             val write=h.contextSettings.localModelWriteEnabled&&modelId.isNotBlank()
             if(!cross&&!tools&&!write)return null
             val sourceTurn=h.turns.firstOrNull{it.id==turn}?:return null
-            return LocalToolSession(store,cid,turn,sourceTurn,cross,tools,write,modelId,base,wireLimit,web?.takeIf{request?.mode!="keyword"&&LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},voice?.takeIf{LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},image)
+            val mediaId=messageId?.takeIf{mid->LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")&&sourceTurn.assistant.variantsByUserVariant[sourceTurn.user.active.toString()]?.any{it.id==mid&&!it.hidden&&it.finishReason in setOf("image_tool_ready","sticker_tool_ready")}==true}
+            return LocalToolSession(store,cid,turn,sourceTurn,cross,tools,write,modelId,base,wireLimit,web?.takeIf{request?.mode!="keyword"&&LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},voice?.takeIf{LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},image,mediaId,mediaId!=null&&tools&&write&&h.contextSettings.stickerSendEnabled,mediaId!=null&&write&&h.contextSettings.stickerAddEnabled)
         }
     }
 }

@@ -136,7 +136,9 @@ class DefaultChatRepository(
         val userId=sourceTurn?.user?.variants?.getOrNull(sourceTurn.user.active)?.id.orEmpty()
         val imageEnabled=cache.profile()?.currentImageModel?.isNotBlank()==true&&userId.isNotBlank()&&
             cache.conversations().any{it.id==conversationId&&it.roomType in setOf("main","radio")&&it.deletedAt==null}
-        if(imageEnabled)persistHistory(conversationId,ChatSyncMapper.appendAssistant(historyWithUser,turnId,"",modelId,"image_tool_ready",assistantVariantId=assistantVariantId))
+        val cfg=historyWithUser.contextSettings
+        val mediaReserved=imageEnabled||userId.isNotBlank()&&(cfg.stickerSendEnabled||cfg.stickerAddEnabled)&&cache.conversations().any{it.id==conversationId&&it.roomType in setOf("main","radio")&&it.deletedAt==null}
+        if(mediaReserved)persistHistory(conversationId,ChatSyncMapper.appendAssistant(historyWithUser,turnId,"",modelId,if(imageEnabled)"image_tool_ready"else "sticker_tool_ready",assistantVariantId=assistantVariantId))
         val offered = cache.modelCatalog()?.groups?.let { it.openAiChat + it.freeTest }
             ?.firstOrNull { it.id == modelId }?.reasoningEfforts.orEmpty()
         val effort = reasoningStore?.get(modelId, offered)
@@ -211,7 +213,7 @@ class DefaultChatRepository(
             "stream_incomplete",
             "回复流提前中断。"
         )
-        val completed = if(imageEnabled) ChatSyncMapper.completeReservedAssistant(loadHistory(conversationId),turnId,userId,assistantVariantId,content,actualModel,finishReason,mergeFurnitureRuns(furnitureRuns,deskSlip),deskSlip)
+        val completed = if(mediaReserved) ChatSyncMapper.completeReservedAssistant(loadHistory(conversationId),turnId,userId,assistantVariantId,content,actualModel,finishReason,mergeFurnitureRuns(furnitureRuns,deskSlip),deskSlip)
         else ChatSyncMapper.appendAssistant(
             history = ChatSyncMapper.clearUserFailure(historyWithUser, turnId),
             turnId = turnId,

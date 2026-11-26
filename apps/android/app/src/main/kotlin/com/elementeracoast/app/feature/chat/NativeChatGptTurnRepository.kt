@@ -54,7 +54,9 @@ internal class NativeChatGptTurnRepository(
         val uid=source?.user?.variants?.getOrNull(source.user.active)?.id.orEmpty()
         val selectedImage=api.getProfile().currentImageModel
         val imageEnabled=uid.isNotBlank()&&selectedImage.isNotBlank()
-        if(imageEnabled)historyRepository.persistHistory(conversationId,ChatSyncMapper.appendAssistant(historyWithUser,turnId,"",selectedModel,"image_tool_ready",assistantVariantId=assistantId))
+        val cfg=historyWithUser.contextSettings
+        val mediaReserved=imageEnabled||uid.isNotBlank()&&(cfg.stickerSendEnabled||cfg.stickerAddEnabled)
+        if(mediaReserved)historyRepository.persistHistory(conversationId,ChatSyncMapper.appendAssistant(historyWithUser,turnId,"",selectedModel,if(imageEnabled)"image_tool_ready"else "sticker_tool_ready",assistantVariantId=assistantId))
         val request = RemoteChatRequest(
             conversationId = conversationId,
             sourceTurnId = turnId,
@@ -99,7 +101,7 @@ internal class NativeChatGptTurnRepository(
                 }
                 is NativeChatEvent.Completed -> {
                     completed = true
-                    val next = if(imageEnabled)ChatSyncMapper.completeReservedAssistant(historyRepository.loadHistory(conversationId),turnId,uid,assistantId,event.text,selectedModel,"stop",event.furnitureRuns,event.deskSlip)
+                    val next = if(mediaReserved)ChatSyncMapper.completeReservedAssistant(historyRepository.loadHistory(conversationId),turnId,uid,assistantId,event.text,selectedModel,"stop",event.furnitureRuns,event.deskSlip)
                     else ChatSyncMapper.appendAssistant(
                         history = ChatSyncMapper.clearUserFailure(historyWithUser, turnId),
                         turnId = turnId,

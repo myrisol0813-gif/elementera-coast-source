@@ -87,10 +87,10 @@ internal fun normalizeNativeInput(obj: JsonObject): JsonObject {
 
 /** Keep trusted image readback outside the function-call output. */
 internal fun nativeSavedImageContinuation(name:String,result:RemoteNativeToolResult):Pair<Boolean,List<JsonObject>> {
-    if(name!="image_generate"||!result.ok)return false to emptyList()
+    if(name !in setOf("image_generate","sticker_send")||!result.ok)return false to emptyList()
     val receipt=runCatching{Json.parseToJsonElement(result.output).jsonObject}.getOrNull()
     if(receipt?.get("ok")?.jsonPrimitive?.booleanOrNull!=true||receipt["status"]?.jsonPrimitive?.contentOrNull!="saved")return false to emptyList()
-    return true to result.privateContinuation.take(1).map(::normalizeNativeInput)
+    return true to if(name=="image_generate")result.privateContinuation.take(1).map(::normalizeNativeInput)else emptyList()
 }
 
 internal data class NativeCoastToolCall(val callId: String, val name: String)
