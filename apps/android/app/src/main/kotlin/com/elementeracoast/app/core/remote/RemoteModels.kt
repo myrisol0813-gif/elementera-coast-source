@@ -148,6 +148,9 @@ data class RemoteImageGeneration(
 )
 
 @Serializable
+data class RemoteStickerDelivery(@SerialName("message_id") val messageId:String,@SerialName("sticker_id") val stickerId:String)
+
+@Serializable
 data class RemoteAttachment(
     val id: String,
     val type: String = "file",
@@ -156,7 +159,10 @@ data class RemoteAttachment(
     val size: Long = 0L,
     @SerialName("storage_key") val storageKey: String = "",
     @SerialName("created_at") val createdAt: String = "",
-    @SerialName("image_generation") val imageGeneration: RemoteImageGeneration? = null
+    @SerialName("image_generation") val imageGeneration: RemoteImageGeneration? = null,
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("sticker_delivery") val stickerDelivery: RemoteStickerDelivery? = null
 )
 
 @Serializable

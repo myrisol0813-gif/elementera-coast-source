@@ -29,7 +29,11 @@ data class ConversationContextSettings(
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     @SerialName("local_model_tools_enabled") val localModelToolsEnabled: Boolean = false,
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
-    @SerialName("local_model_write_enabled") val localModelWriteEnabled: Boolean = false
+    @SerialName("local_model_write_enabled") val localModelWriteEnabled: Boolean = false,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("sticker_send_enabled") val stickerSendEnabled: Boolean = false,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("sticker_add_enabled") val stickerAddEnabled: Boolean = false
 ) {
     fun normalized(): ConversationContextSettings = copy(
         realityFields = realityFields.filter(RealityContextFields.all::contains).distinct(),
