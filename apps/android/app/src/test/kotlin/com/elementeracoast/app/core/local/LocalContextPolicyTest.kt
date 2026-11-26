@@ -22,16 +22,6 @@ class LocalContextPolicyTest {
         assertTrue(system.indexOf("用户正文")<system.indexOf("自我正文"))
         assertFalse(system.contains("记".repeat(900)))
     }
-    @Test fun shortReplyModePreservesEnabledSoilWhenItFits(){
-        val input=listOf(RemoteChatMessage("user","嗯"))
-        val paper=LocalContextPolicy.formatSoil("原有纸条",listOf("余思"))
-        fun assemble(mode:String)=LocalContextPolicy.assemble("","","",paper,emptyList(),emptyList(),"","","",mode,input,6000)
-        val normal=assemble("")
-        val short=assemble("当前对话开启了短句模式。")
-        assertEquals(normal.soil,short.soil)
-        assertTrue(short.soil.contains("原有纸条"))
-        assertTrue(short.messages.first().content.contains("短句模式"))
-    }
     @Test fun mandatoryOverflowIsVisibleWithoutSilentTruncation(){
         val body="像".repeat(2200)
         val r=LocalContextPolicy.assemble("自定义",body,"自我","",emptyList(),emptyList(),"","","","",

@@ -113,7 +113,7 @@ export function createDeskSlip({
   ownerVisible = true, currentMessage = '', recentMessages = [], customInstructions = '', customInstructionsDelivered = false,
   userPortrait = '', userPortraitStatus = 'empty', userPortraitTokens = 0,
   globalExcerpt = '', globalExcerptStatus = 'empty', globalExcerptTokens = 0,
-  soil = false, soilEnabled = true, soilContextAvailable = false, soilContext = '', soilCurrentText = '', soilAfterthoughts = [],
+  soil = false, soilEnabled = true, soilContext = '', soilCurrentText = '', soilAfterthoughts = [],
   soilMemoryCandidatesCount = 0, soilSeedCandidatesCount = 0,
   memoryItems = [], memoryDeliveredTexts = [], worldbookItems = [], worldbookDeliveredCount = 0, worldbookDeliveredTexts = [],
   dogtalk = false, dogtalkContext = '', crossWindow = null, workbenchPrompt = false, workbenchPromptText = '',
@@ -168,7 +168,7 @@ export function createDeskSlip({
     },
     thinking_soil: {
       label: '整理当前对话的纸条', description: DESCRIPTIONS.thinking_soil,
-      status: !soilEnabled ? '已关闭 · 本轮未递给' : soil ? '已递给' : soilContextAvailable ? '预算裁剪 · 本轮未递给' : '纸条为空 · 本轮未递给',
+      status: !soilEnabled ? '已关闭 · 本轮未递给' : soil ? '已递给' : '未递给',
       enabled: Boolean(soilEnabled), delivered: Boolean(soilEnabled && soil), empty: !soilVisible,
       context: privateDetails && soilEnabled && soil ? soilText : '',
       current_text: privateDetails && soilEnabled && soil ? soilCurrent : '',
