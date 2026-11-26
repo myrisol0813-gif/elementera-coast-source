@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Elementera Coast",
-  "short_name": "前端",
-  "description": "Elementera Coast 主屋",
+  "name": "Tideloom",
+  "short_name": "Tideloom",
+  "description": "Tideloom · 织潮",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",

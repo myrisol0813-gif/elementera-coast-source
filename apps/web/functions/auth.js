@@ -131,7 +131,7 @@ function loginPage(message = '', previewPasswordHint = '') {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>一个开源前端</title>
+  <title>Tideloom</title>
   <style>
     :root {
       color-scheme: light;
@@ -584,7 +584,7 @@ function loginPage(message = '', previewPasswordHint = '') {
         role="img"
         aria-labelledby="coast-mark-title coast-mark-desc"
       >
-        <title id="coast-mark-title">一个开源前端开屏符号</title>
+        <title id="coast-mark-title">Tideloom 开屏符号</title>
         <desc id="coast-mark-desc">岸上的入口与两道海浪。</desc>
         <g class="mark" fill="none" stroke="#24252b" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
           <path d="M120 96v14M113 103h14M270 78v12M264 84h12" stroke="#9c8872" stroke-width="5" />
@@ -595,8 +595,7 @@ function loginPage(message = '', previewPasswordHint = '') {
           <path d="M90 337Q122 324 154 337Q186 350 218 337Q250 324 282 337Q306 347 322 340" />
         </g>
         <g text-anchor="middle">
-          <text id="coast-brand" class="brand" x="195" y="430" fill="#24252b" font-size="25" font-weight="650" letter-spacing=".8">一个开源前端</text>
-          <text class="tagline" x="195" y="466" fill="#9c8872" font-size="14" font-weight="450" letter-spacing="2.4">进入你的长期对话空间</text>
+          <text id="coast-brand" class="brand" x="195" y="430" fill="#24252b" font-size="25" font-weight="650" letter-spacing=".8">Tideloom</text>
         </g>
       </svg>
 

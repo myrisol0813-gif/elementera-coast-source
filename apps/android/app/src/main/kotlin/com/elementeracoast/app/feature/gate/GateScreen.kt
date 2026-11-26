@@ -82,7 +82,7 @@ fun GateScreen(
 
             Spacer(Modifier.height(GateVisualTokens.MarkToTitle))
             Text(
-                text = "一个开源前端",
+                text = "Tideloom",
                 modifier = Modifier.graphicsLayer {
                     alpha = motion.brand.coerceIn(0f, 1f)
                     translationY = textOffsetPx * (1f - motion.brand.coerceIn(0f, 1f))
@@ -91,20 +91,6 @@ fun GateScreen(
                 fontSize = GateVisualTokens.TitleSize,
                 fontWeight = FontWeight(650),
                 letterSpacing = GateVisualTokens.TitleLetterSpacing,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(Modifier.height(GateVisualTokens.TitleToTagline))
-            Text(
-                text = "进入你的长期对话空间",
-                modifier = Modifier.graphicsLayer {
-                    alpha = motion.tagline.coerceIn(0f, 1f)
-                    translationY = textOffsetPx * (1f - motion.tagline.coerceIn(0f, 1f))
-                },
-                color = CoastMuted,
-                fontSize = GateVisualTokens.TaglineSize,
-                fontWeight = FontWeight(450),
-                letterSpacing = GateVisualTokens.TaglineLetterSpacing,
                 textAlign = TextAlign.Center
             )
 
