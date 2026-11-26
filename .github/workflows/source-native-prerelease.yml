@@ -82,7 +82,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gradle :app:testDebugUnitTest :app:assembleRelease --no-daemon --stacktrace \
+          # Match Source check: avoid competing Debug and Release Kotlin compilers.
+          gradle :app:testDebugUnitTest --no-daemon --stacktrace \
+            -PSOURCE_TOUR_ENABLED=true \
+            -PCOAST_API_BASE_URL=https://elementera-coast-source.invalid
+          gradle :app:assembleRelease --no-daemon --stacktrace \
             -PSOURCE_TOUR_ENABLED=true \
             -PCOAST_API_BASE_URL=https://elementera-coast-source.invalid
           test -s app/build/outputs/apk/release/app-release-unsigned.apk
