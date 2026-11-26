@@ -1,5 +1,5 @@
 import { D1Database } from './d1-helper.mjs';
-import { createConversation, readConversationState, writeConversationState } from '../functions/chat-store.js';
+import { createConversation, readConversationState, writeConversationState, writeProfile } from '../functions/chat-store.js';
 import {
   applyChatAttachmentsToMessages,
   attachmentDeskReceipt,
@@ -128,19 +128,24 @@ await assert.rejects(()=>saveGeneratedImageOriginal(db,{conversationId:conversat
 const jobDb=new D1Database();
 const jobChat=await createConversation(jobDb,'图像任务','main');
 await writeConversationState(jobDb,jobChat.id,{turns:[{id:'job-turn',user:{variants:[{id:'job-user',content:'draw'}]}}]});
-const jobEnv={COAST_CHAT_DB:jobDb,COAST_INDEPENDENT_IMAGE_ENABLED:'true',COAST_INDEPENDENT_IMAGE_KEY:'test-key',COAST_INDEPENDENT_IMAGE_MODEL:'fixture/image:free'};
+const jobEnv={COAST_CHAT_DB:jobDb,OPENROUTER_API_KEY:'test-key'};
+const mockDiscover=async(_,key)=>{assert.equal(key,'test-key');return [{id:'fixture/paid'},{id:'fixture/image:free'}]};
 const jobInput={conversation_id:jobChat.id,turn_id:'job-turn',user_variant_id:'job-user',message_id:'job-assistant',prompt:'draw a wolf'};
 let jobCalls=0;
-const mockGenerate=async(config,input)=>{jobCalls++;assert.equal(config.allowPaid,false);assert.equal(input.prompt,'draw a wolf');const pending=(await readConversationState(jobDb,jobChat.id)).turns[0].assistant.variantsByUserVariant['0'][0];assert.equal(pending.finish_reason,'image_pending');return {bytes:generatedPng,mime:'image/png',provider:'openrouter',requested_model:config.model,reported_model:config.model,cost_usd:0,prompt:input.prompt}};
-await assert.rejects(()=>runManualImageGeneration({...jobEnv,COAST_INDEPENDENT_IMAGE_MODEL:'fixture/paid'},jobInput,{generate:mockGenerate}),e=>e.type==='image_not_configured');
-const jobResult=await runManualImageGeneration(jobEnv,jobInput,{generate:mockGenerate});
+const mockGenerate=async(config,input)=>{jobCalls++;assert.equal(config.allowPaid,true);assert.equal(config.model,'fixture/paid');assert.equal(input.prompt,'draw a wolf');const pending=(await readConversationState(jobDb,jobChat.id)).turns[0].assistant.variantsByUserVariant['0'][0];assert.equal(pending.finish_reason,'image_pending');return {bytes:generatedPng,mime:'image/png',provider:'openrouter',requested_model:config.model,reported_model:config.model,cost_usd:0.025,prompt:input.prompt}};
+await assert.rejects(()=>runManualImageGeneration(jobEnv,jobInput,{generate:mockGenerate,discover:mockDiscover}),e=>e.type==='image_not_configured');
+await writeProfile(jobDb,{current_image_model:'fixture/missing',model_box:{image:['fixture/missing']}});
+await assert.rejects(()=>runManualImageGeneration(jobEnv,jobInput,{generate:mockGenerate,discover:mockDiscover}),e=>e.type==='image_model_unavailable');
+await writeProfile(jobDb,{current_image_model:'fixture/paid',model_box:{image:['fixture/paid']}});
+const jobResult=await runManualImageGeneration(jobEnv,jobInput,{generate:mockGenerate,discover:mockDiscover});
 assert.equal(jobResult.history.turns[0].assistant.variantsByUserVariant['0'][0].content,'');
 assert.equal(jobResult.history.turns[0].assistant.variantsByUserVariant['0'][0].finish_reason,'stop');
 assert.deepEqual(jobResult.history.turns[0].assistant.variantsByUserVariant['0'][0].attachments,[jobResult.attachment]);
 assert.deepEqual(new Uint8Array((await getChatAttachmentRecord(jobDb,jobChat.id,jobResult.attachment.id)).data),generatedPng);
 assert.equal(jobResult.readback.status,'vision_unknown');
-await assert.rejects(()=>runManualImageGeneration(jobEnv,jobInput,{generate:mockGenerate}),e=>e.type==='image_already_reserved');
+assert.equal(jobResult.attachment.image_generation.cost_usd,0.025);
+await assert.rejects(()=>runManualImageGeneration(jobEnv,jobInput,{generate:mockGenerate,discover:mockDiscover}),e=>e.type==='image_already_reserved');
 assert.equal(jobCalls,1);
-await assert.rejects(()=>runManualImageGeneration(jobEnv,{...jobInput,message_id:'job-failed'},{generate:async()=>{throw Error('private upstream error')}}),e=>e.type==='image_generation_failed');
+await assert.rejects(()=>runManualImageGeneration(jobEnv,{...jobInput,message_id:'job-failed'},{discover:mockDiscover,generate:async()=>{throw Error('private upstream error')}}),e=>e.type==='image_generation_failed');
 assert.equal((await readConversationState(jobDb,jobChat.id)).turns[0].assistant.variantsByUserVariant['0'][1].finish_reason,'image_failed');
 assert.equal(jobDb.database.prepare('SELECT count(*) AS n FROM chat_attachments').get().n,1);

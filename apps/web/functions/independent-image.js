@@ -26,8 +26,8 @@ async function jsonRequest(url,options,fetcher,max=IMAGE_LIMITS.response_bytes){
     fail(controller.signal.aborted?'provider_timeout':'provider_unavailable','图像供应商连接或解析失败；不自动重试，可能已产生费用。');
   }finally{clearTimeout(timer);}
 }
-export async function discoverImageModels(fetcher=fetch){
-  const result=await jsonRequest(BASE+'/models',{method:'GET'},fetcher,4*1024*1024);
+export async function discoverImageModels(fetcher=fetch,key=''){
+  const result=await jsonRequest(BASE+'/models',{method:'GET',...(key?{headers:{Authorization:'Bearer '+key}}:{})},fetcher,4*1024*1024);
   if(!Array.isArray(result?.data))fail('catalog_invalid','图像模型目录不可用。');
   return result.data.filter(m=>typeof m?.id==='string'&&modelId.test(m.id)&&m.architecture?.output_modalities?.includes('image'))
     .map(m=>({id:m.id,name:String(m.name||m.id).slice(0,180),free:m.id.endsWith(':free')}))

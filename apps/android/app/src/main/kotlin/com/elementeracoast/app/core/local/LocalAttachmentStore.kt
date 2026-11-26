@@ -207,16 +207,20 @@ internal class ManualImageFailure(val type:String,override val message:String,va
 
 /** Explicit owner request, exact reserved branch, no repeated provider request.
  * The network is deliberately outside the workspace transaction and router lock. */
-internal fun runLocalManualImageGeneration(store:LocalPersistence,config:LocalProviderConfig?,input:JsonObject,generate:(LocalImageProvider.Config,JsonObject)->LocalImageProvider.Generated={c,p->LocalImageProvider().generate(c,p)}):JsonObject{
+internal fun runLocalManualImageGeneration(store:LocalPersistence,config:LocalProviderConfig?,input:JsonObject,discover:(String)->List<LocalImageProvider.Model> = {key->LocalImageProvider().discover(key)},generate:(LocalImageProvider.Config,JsonObject)->LocalImageProvider.Generated={c,p->LocalImageProvider().generate(c,p)}):JsonObject{
     fun fail(type:String,message:String,status:Int=400):Nothing=throw ManualImageFailure(type,message,status)
     if(input.keys!=setOf("conversation_id","turn_id","user_variant_id","message_id","prompt"))fail("image_request_invalid","生成图像请求无效。")
     fun str(k:String)=(input[k] as? JsonPrimitive)?.takeIf{it.isString}?.content?:fail("image_request_invalid","缺少消息版本或绘图提示。")
     val cid=str("conversation_id");val tid=str("turn_id");val uid=str("user_variant_id");val mid=str("message_id");val prompt=str("prompt").trim()
     if(listOf(cid,tid,uid,mid).any{!Regex("[A-Za-z0-9_.:-]{1,160}").matches(it)}||prompt.length !in 1..4000)fail("image_request_invalid","缺少明确的消息版本或绘图提示。")
-    val model=config?.models?.singleOrNull()?.takeIf{Regex("[a-z0-9][a-z0-9_.-]{0,79}/[a-z0-9][a-z0-9_.-]{0,119}:free",RegexOption.IGNORE_CASE).matches(it)}
-    if(config==null||model==null||config.apiKey.isBlank())fail("image_not_configured","尚未配置明确的免费独立生图模型。",503)
+    val selected=RemoteCacheStore(store,strictReads=true).profile()?.currentImageModel.orEmpty()
+    val model=config?.models?.firstOrNull{config.modelId(it)==selected&&Regex("[a-z0-9][a-z0-9_.-]{0,79}/[a-z0-9][a-z0-9_.-]{0,119}(:free)?",RegexOption.IGNORE_CASE).matches(it)}
+    if(config==null||model==null||config.apiKey.isBlank()||config.baseUrl.trimEnd('/')!="https://openrouter.ai/api/v1")fail("image_not_configured","请在模型箱选择已配置的 OpenRouter 生图模型。",503)
+    val catalog=try{discover(config.apiKey)}catch(_:Exception){fail("image_catalog_unavailable","无法核验生图模型目录，未发起生成。",502)}
+    if(catalog.none{it.id==model})fail("image_model_unavailable","所选模型不在独立生图 API 目录中，未发起生成。",409)
     store.atomic{s->
         val cache=RemoteCacheStore(s,strictReads=true)
+        if(cache.profile()?.currentImageModel!=selected)fail("image_model_changed","生成模型选择已变化，请重新发起。",409)
         if(cache.conversations().none{it.id==cid&&it.deletedAt==null&&it.roomType in setOf("main","radio")})fail("generated_surface_invalid","该窗口不允许生成图像。",403)
         val h=cache.history(cid)?:fail("generated_source_invalid","找不到原消息。",409)
         val t=h.turns.firstOrNull{it.id==tid}?:fail("generated_source_invalid","找不到原轮次。",409)
@@ -232,7 +236,7 @@ internal fun runLocalManualImageGeneration(store:LocalPersistence,config:LocalPr
         cache.putHistory(cid,h.copy(updatedAt=now,turns=h.turns.map{if(it.id==tid)next else it}))
     }
     try{
-        val generated=generate(LocalImageProvider.Config(config.apiKey,model,false),buildJsonObject{put("prompt",prompt)})
+        val generated=generate(LocalImageProvider.Config(config.apiKey,model,true),buildJsonObject{put("prompt",prompt)})
         val saved=saveGeneratedImageOriginal(store,cid,tid,mid,generated,null,uid)
         val history=store.readConsistent{requireNotNull(RemoteCacheStore(it,strictReads=true).history(cid))}
         val codec=Json{encodeDefaults=false;explicitNulls=false}

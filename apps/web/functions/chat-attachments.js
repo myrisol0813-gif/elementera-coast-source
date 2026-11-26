@@ -1,7 +1,7 @@
 import { fetchModelCatalog } from './models/model-catalog.js';
 import { ModelRequestError } from './models/model-validation.js';
-import { generateIndependentImage, prepareGeneratedImageReadback } from './independent-image.js';
-import { ensureChatSchema, getConversation, normalizeState, readConversationState, sanitizeId } from './chat-store.js';
+import { discoverImageModels, generateIndependentImage, prepareGeneratedImageReadback } from './independent-image.js';
+import { ensureChatSchema, getConversation, normalizeState, readConversationState, readProfile, sanitizeId } from './chat-store.js';
 
 export const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
 export const MAX_TEXT_ATTACHMENT_BYTES = 1024 * 1024;
@@ -510,16 +510,17 @@ export async function saveGeneratedImageOriginal(db,{conversationId,turnId,messa
 /** User-triggered independent image request, disabled unless explicitly
  * configured. Reserve an exact reply before any network call. A repeated
  * message ID never initiates a second provider request. */
-export async function runManualImageGeneration(env,input,{generate=generateIndependentImage}={}){
+export async function runManualImageGeneration(env,input,{generate=generateIndependentImage,discover=discoverImageModels}={}){
   const fail=(type,message,status=400)=>{throw new ChatAttachmentError(type,message,status);};
   const id=v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(v);
   const allowed=['conversation_id','turn_id','user_variant_id','message_id','prompt'];
   if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!allowed.includes(k)))fail('image_request_invalid','生成图像请求无效。');
   const {conversation_id:cid,turn_id:tid,user_variant_id:uid,message_id:mid,prompt}=input;
   if(![cid,tid,uid,mid].every(id)||typeof prompt!=='string'||!prompt.trim()||prompt.trim().length>4000)fail('image_request_invalid','缺少明确的消息版本或绘图提示。');
-  const model=String(env.COAST_INDEPENDENT_IMAGE_MODEL||'').trim(),key=String(env.COAST_INDEPENDENT_IMAGE_KEY||'').trim();
-  if(env.COAST_INDEPENDENT_IMAGE_ENABLED!=='true'||!key||! /^[a-z0-9][a-z0-9_.-]{0,79}\/[a-z0-9][a-z0-9_.-]{0,119}:free$/i.test(model))fail('image_not_configured','尚未配置明确的免费独立生图模型。',503);
   const db=env.COAST_CHAT_DB;
+  const profile=await readProfile(db);
+  const model=profile.current_image_model.trim(),key=String(env.OPENROUTER_API_KEY||'').trim();
+  if(!key||! /^[a-z0-9][a-z0-9_.-]{0,79}\/[a-z0-9][a-z0-9_.-]{0,119}(?::free)?$/i.test(model))fail('image_not_configured','请在模型箱选择生图模型，并配置 OpenRouter API Key。',503);
   const conv=await getConversation(db,cid);
   if(!['main','radio'].includes(conv.room_type))fail('generated_surface_invalid','该窗口不允许生成图像。',403);
   const snapshot=await first(db,'SELECT state_json FROM conversation_states WHERE conversation_id=?',[cid]);
@@ -532,6 +533,10 @@ export async function runManualImageGeneration(env,input,{generate=generateIndep
   if(existing.some(v=>v.id===mid)||existing.some(v=>v.finish_reason==='image_pending'))fail('image_already_reserved','已有生成任务或此请求已使用；不会再次生成。',409);
   const branch=turn.assistant.variantsByUserVariant[String(index)]||[];
   if(branch.length>=20)fail('image_branch_full','当前回复版本已满。',409);
+  let catalog;
+  try{catalog=await discover(fetch,key);}catch{fail('image_catalog_unavailable','无法核验生图模型目录，未发起生成。',502);}
+  if(!catalog.some(m=>m.id===model))fail('image_model_unavailable','所选模型不在独立生图 API 目录中，未发起生成。',409);
+  if((await readProfile(db)).current_image_model!==model)fail('image_model_changed','生成模型选择已变化，请重新发起。',409);
   const stamp=nowMs();
   branch.push({id:mid,content:'',created_at:iso(stamp),model_id:model,finish_reason:'image_pending',generation_source:'chat'});
   turn.assistant.variantsByUserVariant[String(index)]=branch;
@@ -540,7 +545,7 @@ export async function runManualImageGeneration(env,input,{generate=generateIndep
   const reserved=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS (SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL)',[JSON.stringify(normalizeState(state)),stamp,cid,snapshot.state_json,cid]);
   if(reserved.meta?.changes!==1)fail('image_state_changed','聊天已变化，未发起生成。',409);
   try{
-    const generated=await generate({key,model,allowPaid:false},{prompt:prompt.trim()});
+    const generated=await generate({key,model,allowPaid:true},{prompt:prompt.trim()});
     const result=await saveGeneratedImageOriginal(db,{conversationId:cid,turnId:tid,messageId:mid,generated,visionSupported:null,reservedUserId:uid});
     return {ok:true,attachment:result.attachment,readback:result.readback.receipt,history:{...await readConversationState(db,cid),conversation_id:cid}};
   }catch(error){

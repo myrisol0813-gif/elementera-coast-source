@@ -32,8 +32,9 @@ internal class LocalImageProvider(
         }catch(e:Failure){throw e}catch(_:Exception){fail("provider_unavailable","图像供应商连接或解析失败；不自动重试，可能已产生费用。")}
     }
     private fun JsonObject.str(k:String)=(this[k] as? JsonPrimitive)?.takeIf{it.isString}?.contentOrNull
-    fun discover():List<Model>{
-        val data=request(Request.Builder().url(BASE+"/models").get().build(),4L*1024*1024)
+    fun discover(key:String=""):List<Model>{
+        val req=Request.Builder().url(BASE+"/models").get().apply{if(key.isNotBlank())header("Authorization","Bearer "+key.trim())}.build()
+        val data=request(req,4L*1024*1024)
         val rows=data["data"] as? JsonArray?:fail("catalog_invalid","图像模型目录不可用。")
         return rows.mapNotNull{v->
             val m=v as? JsonObject?:return@mapNotNull null
