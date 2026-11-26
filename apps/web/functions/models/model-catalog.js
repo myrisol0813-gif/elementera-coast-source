@@ -1,3 +1,4 @@
+import { discoverImageModels } from '../independent-image.js';
 import { CATALOG_TTL_MS, OPENROUTER_MODELS_URL } from './model-constants.js';
 import { ModelRequestError } from './model-validation.js';
 
@@ -84,12 +85,18 @@ function chooseDefaultChat(models) {
   return models[0]?.id || '';
 }
 
-export function buildModelCatalog(raw) {
+export function buildModelCatalog(raw, imageDirectory = undefined) {
   const source = Array.isArray(raw?.data) ? raw.data : [];
   const openaiChat = sortModels(source.filter(isOpenAiChat).map((model) => safeModel(model)));
   const imageTwo = source.filter((model) => isOpenAiImage(model, 2)).map((model) => safeModel(model));
   const imageOne = source.filter((model) => isOpenAiImage(model, 1)).map((model) => safeModel(model));
-  const openaiImage = sortModels(imageTwo.length ? imageTwo : imageOne);
+  const legacyImages = sortModels(imageTwo.length ? imageTwo : imageOne);
+  // Retain the old group name for clients and archives, but populate the real
+  // independent-image directory when checked. Never guess support from a name.
+  const openaiImage = imageDirectory === undefined ? legacyImages : sortModels((imageDirectory || []).map(item => ({
+    ...safeModel(source.find(m => m.id === item.id) || {id:item.id,name:item.name,architecture:{output_modalities:['image']}}, {is_free:item.free}),
+    image_api_supported:true,
+  })));
   const freeModels = sortModels(source
     .filter((item) => hasOutput(item, 'text') && isFreeModel(item))
     .map((model) => safeModel(model, { is_free: true })));
@@ -105,6 +112,7 @@ export function buildModelCatalog(raw) {
       image: openaiImage[0]?.id || '',
       free: freeModels[0]?.id || '',
     },
+    ...(imageDirectory !== undefined ? { image_catalog_status: imageDirectory === null ? 'unavailable' : 'verified' } : {}),
     updated_at: new Date().toISOString(),
   };
 }
@@ -132,7 +140,9 @@ export async function fetchModelCatalog(env, force = false) {
   } catch {
     throw new ModelRequestError('models_parse_failed', 'Model catalog is invalid.', 502);
   }
-  catalogCache = buildModelCatalog(raw);
+  let images=null;
+  if(openRouterKey(env))try{images=await discoverImageModels(fetch,openRouterKey(env));}catch{ /* chat catalog remains usable */ }
+  catalogCache = buildModelCatalog(raw,images);
   catalogExpiresAt = now + CATALOG_TTL_MS;
   return catalogCache;
 }
