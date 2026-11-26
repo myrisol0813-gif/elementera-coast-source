@@ -190,7 +190,7 @@ internal fun BasicSettingsScreen(settings: BasicSettings, store: WolfStore, onSn
                 ReplyBudgetField("单组回复上限",settings.replySequenceMaxMessages,1..20,false){value->store.updateBasic{it.copy(replySequenceMaxMessages=requireNotNull(value))}}
                 ReplyBudgetField("累计工具调用预算",settings.replySequenceToolBudget,0..128,false){value->store.updateBasic{it.copy(replySequenceToolBudget=requireNotNull(value))}}
                 ReplyBudgetField("累计 token 预算",settings.replySequenceTokenBudget,1..1000000,false){value->store.updateBasic{it.copy(replySequenceTokenBudget=requireNotNull(value))}}
-                Text("预算可先保存；真实连续执行尚未开放。累计 token 不是精确费用上限。",style=MaterialTheme.typography.bodySmall)
+                Text("默认预算供启用真实连续回复的窗口继承；套餐 token 为软预算，单次可能超额，不是精确费用上限。",style=MaterialTheme.typography.bodySmall)
             }
         }
         item {
