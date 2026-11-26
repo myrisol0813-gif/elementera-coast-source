@@ -43,7 +43,9 @@ export function createChatActions({
       toast('正在只读预览旧版本，请先点「结束预览」再继续聊天。');
       return false;
     }
+    if (runtime.finalizing) return false;
     if (runtime.generation) {
+      if (runtime.generation.conversationId !== runtime.currentId) return false;
       runtime.generation.controller.abort();
       return;
     }
@@ -120,7 +122,7 @@ export function createChatActions({
       if (variant?.model_id) return toast(generationDetail(variant), 5200);
       return;
     }
-    if (runtime.generation && runtime.generation.conversationId === runtime.currentId
+    if ((runtime.generation || runtime.finalizing || runtime.pendingComposerSend)
       && ['switch-variant', 'edit-user', 'delete-user', 'delete-assistant', 'regenerate'].includes(name)) {
       return toast('请先停止或等待当前回复完成。');
     }
