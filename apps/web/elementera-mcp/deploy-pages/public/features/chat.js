@@ -55,6 +55,33 @@ export function createChat({ storage, toast, dogtalk }) {
   };
 
   const ui = {};
+  // Device-only composer text, isolated by the real conversation ID.
+  const drafts = new Map();
+  const draftKey = (id) => 'coast.composer.draft.v1.' + encodeURIComponent(id);
+  runtime.composerDrafts = {
+    read(id) {
+      if (!id) return '';
+      if (drafts.has(id)) return drafts.get(id).text;
+      try { return localStorage.getItem(draftKey(id)) || ''; }
+      catch { toast('本机输入草稿无法读取。'); return ''; }
+    },
+    write(id, text) {
+      if (!id) return null;
+      const revision = { text };
+      drafts.set(id, revision);
+      try {
+        if (text) localStorage.setItem(draftKey(id), text);
+        else localStorage.removeItem(draftKey(id));
+      } catch { toast('输入草稿未能保存，请暂勿刷新或关闭页面。'); }
+      return revision;
+    },
+    accepted(id, revision) {
+      if (!revision || drafts.get(id) !== revision) return;
+      this.write(id, '');
+      if (runtime.currentId === id && ui.input?.value === revision.text) ui.input.value = '';
+    },
+    remove(id) { this.write(id, ''); drafts.delete(id); },
+  };
 
   function bindUi() {
     ui.root = q('#chatWindow');
@@ -156,7 +183,7 @@ export function createChat({ storage, toast, dogtalk }) {
     const canSend = hasText || hasAttachments;
     const name = generating ? 'stop' : canSend ? 'send' : 'call';
     ui.primary.innerHTML = icon(name);
-    ui.primary.disabled = generating ? false : (!runtime.composerReady || uploading);
+    ui.primary.disabled = generating ? false : (!runtime.composerReady || uploading || Boolean(runtime.pendingComposerSend));
     ui.primary.setAttribute('aria-label', !runtime.composerReady && !generating
       ? '聊天正在载入'
       : uploading ? '附件正在上传'
