@@ -15,6 +15,7 @@ const CONVERSATION_ACCESS = Object.freeze({
     'memory.search',
     'memory.write_candidate',
     'memory.global_excerpt_propose',
+    'memory.user_portrait_propose',
     'cross_window.search',
     'cross_window.keyword_search',
     'cross_window.read_messages',
