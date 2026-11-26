@@ -1,5 +1,5 @@
 import { D1Database } from './d1-helper.mjs';
-import { createConversation } from '../functions/chat-store.js';
+import { createConversation, readConversationState, writeConversationState } from '../functions/chat-store.js';
 import {
   applyChatAttachmentsToMessages,
   attachmentDeskReceipt,
@@ -8,6 +8,7 @@ import {
   getChatAttachmentRecord,
   listChatAttachmentMetadata,
   uploadChatAttachment,
+  saveGeneratedImageOriginal,
 } from '../functions/chat-attachments.js';
 import assert from 'node:assert/strict';
 
@@ -107,3 +108,18 @@ await assert.rejects(
     && error?.status === 400
     && error?.message === '每轮最多 12 个附件。',
 );
+
+const generatedTurn='generated-turn-fixture', generatedMessage='generated-assistant-fixture';
+await writeConversationState(db,conversation.id,{turns:[{id:generatedTurn,user:{variants:[{id:'generated-user-fixture',content:'draw'}]}}]});
+const generatedPng=Uint8Array.from([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,6,0,0,0]);
+const savedImage=await saveGeneratedImageOriginal(db,{conversationId:conversation.id,turnId:generatedTurn,messageId:generatedMessage,generated:{bytes:generatedPng,mime:'image/png',provider:'openrouter',requested_model:'fixture/image:free',reported_model:'fixture/image:free',cost_usd:0,prompt:'draw a wolf'},visionSupported:true});
+const savedOriginal=await getChatAttachmentRecord(db,conversation.id,savedImage.attachment.id);
+assert.equal(savedOriginal.turn_id,generatedTurn);
+assert.deepEqual(new Uint8Array(savedOriginal.data),generatedPng);
+assert.equal(savedImage.readback.receipt.status,'prepared');
+assert.equal(savedImage.attachment.image_generation.message_id,generatedMessage);
+assert.equal(savedImage.attachment.image_generation.cost_usd,0);
+await writeConversationState(db,conversation.id,{turns:[{id:generatedTurn,user:{variants:[{id:'generated-user-fixture',content:'draw'}]},assistant:{variantsByUserVariant:{0:[{id:generatedMessage,content:'',attachments:[savedImage.attachment]}]}}}]});
+const persistedImage=(await readConversationState(db,conversation.id)).turns[0].assistant.variantsByUserVariant['0'][0].attachments[0];
+assert.deepEqual(persistedImage,savedImage.attachment);
+await assert.rejects(()=>saveGeneratedImageOriginal(db,{conversationId:conversation.id,turnId:'missing-turn',messageId:generatedMessage,generated:{}}),e=>e.type==='generated_source_invalid');

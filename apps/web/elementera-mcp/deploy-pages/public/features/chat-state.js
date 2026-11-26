@@ -78,7 +78,21 @@ function normalizeDeskSlip(value) {
   }
 }
 
-function normalizeAttachments(value) {
+
+ // Generated-image provenance belongs to the exact assistant variant reference.
+function normalizeImageGeneration(value, assistantId) {
+  const model = /^[a-z0-9][a-z0-9_.-]{0,79}\/[a-z0-9][a-z0-9_.-]{0,119}(?::free)?$/i;
+  if (!assistantId || !value || typeof value !== 'object' || Array.isArray(value) ||
+      value.message_id !== assistantId || value.provider !== 'openrouter' ||
+      typeof value.requested_model !== 'string' || !model.test(value.requested_model) ||
+      typeof value.prompt !== 'string' || !value.prompt.trim() || value.prompt.length > 4000) return null;
+  const out = {message_id:assistantId,provider:'openrouter',requested_model:value.requested_model,prompt:value.prompt};
+  if (typeof value.reported_model === 'string' && model.test(value.reported_model)) out.reported_model=value.reported_model;
+  if (typeof value.cost_usd === 'number' && Number.isFinite(value.cost_usd) && value.cost_usd>=0) out.cost_usd=value.cost_usd;
+  return out;
+}
+
+function normalizeAttachments(value, assistantId) {
   return (Array.isArray(value) ? value : []).slice(0, 12).map((item) => {
     const idValue = sanitizeId(item?.id || '', 'attachment');
     const type = item?.type === 'image' ? 'image' : 'file';
@@ -88,6 +102,7 @@ function normalizeAttachments(value) {
     const storageKey = String(item?.storage_key || '').trim().slice(0, 220);
     const createdAt = typeof item?.created_at === 'string' ? item.created_at : now();
     if (!item?.id || !name || !storageKey) return null;
+    const imageGeneration=type==='image'?normalizeImageGeneration(item.image_generation,assistantId):null;
     return {
       id: idValue,
       type,
@@ -96,6 +111,7 @@ function normalizeAttachments(value) {
       size,
       storage_key: storageKey,
       created_at: createdAt,
+      ...(imageGeneration?{image_generation:imageGeneration}:{}),
     };
   }).filter(Boolean);
 }
@@ -127,7 +143,7 @@ export function normalizeVariant(value = {}, prefix = 'variant') {
   const displayAuthor = String(value.display_author || '').trim().slice(0, 180);
   const sourceModelLabel = String(value.source_model_label || '').trim().slice(0, 180);
   const furnitureRuns = normalizeFurnitureRuns(value.furniture_runs);
-  const attachments = normalizeAttachments(value.attachments);
+  const attachments = normalizeAttachments(value.attachments, prefix.startsWith('assistant') ? value.id : null);
   const deskSlip = normalizeDeskSlip(value.desk_slip);
   return {
     id: sanitizeId(value.id || id(prefix), prefix),

@@ -1,6 +1,7 @@
 import { fetchModelCatalog } from './models/model-catalog.js';
 import { ModelRequestError } from './models/model-validation.js';
-import { ensureChatSchema, getConversation, sanitizeId } from './chat-store.js';
+import { prepareGeneratedImageReadback } from './independent-image.js';
+import { ensureChatSchema, getConversation, readConversationState, sanitizeId } from './chat-store.js';
 
 export const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
 export const MAX_TEXT_ATTACHMENT_BYTES = 1024 * 1024;
@@ -452,4 +453,36 @@ export function attachmentReceiptOnFailure(receipt, error) {
     }))],
     vision: { ...receipt.vision, images_delivered: 0 },
   };
+}
+
+/** Store a generated original in the existing chunk store, linked to the
+ * trusted current turn, and return its exact future assistant-variant reference.
+ * This is not a public upload endpoint. Caller must reserve/commit the
+ * assistant variant and handle cancellation/failure before exposing the tool. */
+export async function saveGeneratedImageOriginal(db,{conversationId,turnId,messageId,generated,visionSupported=null}={}){
+  const valid=v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(v);
+  if(![conversationId,turnId,messageId].every(valid))throw new ChatAttachmentError('generated_source_invalid','生成图像缺少确定的回复版本。');
+  const conv=await getConversation(db,conversationId);
+  if(!['main','radio'].includes(conv.room_type))throw new ChatAttachmentError('generated_surface_invalid','该窗口不允许保存生成图像。',403);
+  const state=await readConversationState(db,conversationId);
+  const turn=state.turns.find(t=>t.id===turnId);
+  if(!turn||!turn.user.variants.length||state.turns.some(t=>t.user.variants.some(v=>v.id===messageId)|| (t.id!==turnId&&Object.values(t.assistant.variantsByUserVariant).flat().some(v=>v.id===messageId))))throw new ChatAttachmentError('generated_source_invalid','生成图像的轮次或回复版本不匹配。',409);
+  const model=/^[a-z0-9][a-z0-9_.-]{0,79}\/[a-z0-9][a-z0-9_.-]{0,119}(?::free)?$/i;
+  if(generated?.provider!=='openrouter'||typeof generated.requested_model!=='string'||!model.test(generated.requested_model)||typeof generated.prompt!=='string'||!generated.prompt.trim()||generated.prompt.length>4000)throw new ChatAttachmentError('generated_metadata_invalid','生成图像供应商来源不完整。');
+  const id='att_'+crypto.randomUUID();
+  prepareGeneratedImageReadback({attachmentId:id,bytes:generated.bytes,mime:generated.mime,visionSupported:false});
+  const extension={'image/png':'png','image/jpeg':'jpg','image/webp':'webp'}[generated.mime];
+  const name='generated-'+id+'.'+extension;
+  await ensureChatAttachmentSchema(db);
+  const stamp=nowMs();
+  const statements=[db.prepare('INSERT INTO chat_attachments (id,conversation_id,turn_id,kind,name,mime,size,data,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)').bind(id,conversationId,turnId,'image',name,generated.mime,generated.bytes.length,new Uint8Array(),stamp,stamp)];
+  for(let i=0;i<generated.bytes.length;i+=ATTACHMENT_CHUNK_BYTES)statements.push(db.prepare('INSERT INTO chat_attachment_chunks (attachment_id,chunk_index,data) VALUES (?,?,?)').bind(id,Math.floor(i/ATTACHMENT_CHUNK_BYTES),generated.bytes.slice(i,i+ATTACHMENT_CHUNK_BYTES)));
+  await db.batch(statements);
+  const saved=await getChatAttachmentRecord(db,conversationId,id);
+  const original=bytes(saved.data);
+  if(saved.turn_id!==turnId||original.length!==generated.bytes.length||original.some((v,i)=>v!==generated.bytes[i]))throw new ChatAttachmentError('generated_original_mismatch','图像原件读回校验失败。',500);
+  const provenance={message_id:messageId,provider:'openrouter',requested_model:generated.requested_model,prompt:generated.prompt};
+  if(typeof generated.reported_model==='string'&&model.test(generated.reported_model))provenance.reported_model=generated.reported_model;
+  if(typeof generated.cost_usd==='number'&&Number.isFinite(generated.cost_usd)&&generated.cost_usd>=0)provenance.cost_usd=generated.cost_usd;
+  return {attachment:{...metadata(saved),image_generation:provenance},readback:prepareGeneratedImageReadback({attachmentId:id,bytes:original,mime:saved.mime,visionSupported})};
 }

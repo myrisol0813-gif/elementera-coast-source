@@ -164,3 +164,32 @@ internal object ArchiveV2Attachments{
         return LocalRestoreCount(ready,matched,conflicts)
     }
 }
+
+/** Store original atomically in the existing workspace, not in a human upload
+ * draft. The caller still owns committing the exact assistant variant. */
+internal data class SavedGeneratedImage(val attachment:RemoteAttachment,val readback:GeneratedImageReadback)
+internal fun saveGeneratedImageOriginal(store:LocalPersistence,cid:String,tid:String,messageId:String,generated:LocalImageProvider.Generated,visionSupported:Boolean?):SavedGeneratedImage{
+    val idPattern=Regex("[A-Za-z0-9_.:-]{1,160}")
+    require(listOf(cid,tid,messageId).all{idPattern.matches(it)})
+    val model=Regex("[a-z0-9][a-z0-9_.-]{0,79}/[a-z0-9][a-z0-9_.-]{0,119}(:free)?",RegexOption.IGNORE_CASE)
+    require(generated.provider=="openrouter"&&model.matches(generated.requestedModel)&&generated.prompt.isNotBlank()&&generated.prompt.length<=4000)
+    return store.atomic{s->
+        val cache=RemoteCacheStore(s)
+        require(cache.conversations().any{it.id==cid&&it.roomType in setOf("main","radio")}){"该窗口不允许保存生成图像。"}
+        val history=requireNotNull(cache.history(cid))
+        require(history.turns.any{it.id==tid&&it.user.variants.isNotEmpty()}&&history.turns.none{t->t.user.variants.any{it.id==messageId}||(t.id!=tid&&t.assistant.variantsByUserVariant.values.flatten().any{it.id==messageId})}){"生成图像的轮次或回复版本不匹配。"}
+        val attachments=LocalAttachmentStore(s)
+        val id="att_"+java.util.UUID.randomUUID()
+        prepareGeneratedImageReadback(id,generated.bytes,generated.mime,false)
+        val extension=when(generated.mime){"image/png"->"png";"image/jpeg"->"jpg";else->"webp"}
+        val name="generated-"+id+"."+extension
+        val stamp=System.currentTimeMillis()
+        val meta=buildJsonObject{put("id",id);put("conversation_id",cid);put("turn_id",tid);put("kind","image");put("name",name);put("mime",generated.mime);put("size",generated.bytes.size);put("created_at",stamp);put("updated_at",stamp)}
+        val original=LocalAttachmentStore.Original(meta,ArchiveV2Chunks.digest(generated.bytes))
+        attachments.publish(original,generated.bytes)
+        val saved=attachments.bytes(original)
+        val provenance=RemoteImageGeneration(messageId,"openrouter",generated.requestedModel,generated.prompt,generated.reportedModel?.takeIf{model.matches(it)},generated.costUsd?.takeIf{it.isFinite()&&it>=0})
+        val attachment=RemoteAttachment(id=id,type="image",name=name,mime=generated.mime,size=saved.size.toLong(),storageKey="chat-attachment:"+id,createdAt=java.time.Instant.ofEpochMilli(stamp).toString(),imageGeneration=provenance)
+        SavedGeneratedImage(attachment,prepareGeneratedImageReadback(id,saved,generated.mime,visionSupported))
+    }
+}
