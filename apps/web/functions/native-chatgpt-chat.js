@@ -36,9 +36,9 @@ function chatSettings(value) {
   const settings = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   return {
     recentTurns: Math.max(1, Math.min(400, Number(settings.recentTurns) || 8)),
-    contextBudget: Math.max(1800, Math.min(65536, Number(settings.contextBudget) || 6000)),
+    contextBudget: settings.contextBudget===0||settings.contextBudget==='0'?0:Math.max(1800, Math.min(65536, Number(settings.contextBudget) || 6000)),
     soilBudget: Math.max(300, Math.min(4000, Number(settings.soilBudget) || 1800)),
-    worldbookEnabled: settings.worldbookEnabled !== false,
+    worldbookEnabled: settings.worldbookEnabled !== false && settings.worldbookEnabled !== 'false',
     worldbookLimit: Math.max(0, Math.min(6, Number(settings.worldbookLimit ?? 6))),
     memoryLimit: Math.max(0, Math.min(12, Number(settings.memoryLimit ?? 8))),
   };

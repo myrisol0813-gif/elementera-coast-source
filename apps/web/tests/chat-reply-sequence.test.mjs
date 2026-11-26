@@ -329,3 +329,69 @@ try{
   assert.equal(claim.mayContinue,false);assert.equal(claim.toolBudget,0);assert.equal(claim.tokenBudget,2000);
   assert.equal(await settleReplyRun(routeDb,ident,'cancelled'),true);
 }
+
+
+// Cloud Native plan protocol: the actual model calls remain on the device.
+// Simulate only device-reported results, never make a real provider request.
+{
+  const cv=await createConversation(routeDb,'native plan group','main');
+  const model='chatgpt-plan:gpt-5.6-sol';
+  const body={conversation_id:cv.id,source_turn_id:'plan-turn',user_variant_id:'plan-user',sequence_id:'plan-group',model,
+    settings:{recentTurns:8,contextBudget:6000,toolCallLimit:4,worldbookEnabled:false},budget:{maxMessages:3,toolBudget:2,tokenBudget:1000}};
+  const env={COAST_CHAT_DB:routeDb};
+  const request=(value,path='/api/chat/native-reply-sequence')=>new Request('https://coast.test'+path,{method:'POST',headers:{Origin:'https://coast.test','Content-Type':'application/json'},body:JSON.stringify({...body,...value})});
+  const action=async(action,extra={},status=200)=>{
+    const r=await routeChatApi(request({action,...extra}),env);
+    const raw=await r.text();assert.equal(r.status,status,raw.slice(0,1200));return JSON.parse(raw);
+  };
+  await writeConversationState(routeDb,cv.id,{context_settings:{reply_sequence_enabled:true,sticker_send_enabled:true,short_reply_mode:true},
+    turns:[{id:'plan-turn',user:{variants:[{id:'plan-user',content:'hello plan'}]}}]});
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async()=>{throw Error('unexpected provider request in native plan protocol');};
+  try{
+    assert.equal((await action('start')).max_messages,3);
+    await action('start',{},409);
+    const first=await action('next',{message_id:'plan-a',index:0});
+    assert.ok(first.may_continue);assert.equal(first.token_budget,1000);
+    assert.ok(first.context.tools.some(t=>t.name==='sticker_send'));
+    assert.ok(first.context.desk_slip.response_mode.short_reply_mode);
+    await action('next',{message_id:'plan-other',index:0},409);
+    assert.equal((await action('heartbeat',{message_id:'plan-a'})).ok,true);
+    const toolBody={model:'gpt-5.6-sol',message_id:'plan-a',reply_sequence_id:'plan-group',tool_index:0,
+      tool_call:{id:'native-sticker',type:'function',function:{name:'sticker_send',arguments:JSON.stringify({sticker_id:sticker.id})}}};
+    const tool=await routeChatApi(request(toolBody,'/api/chat/native-tool'),env);
+    const toolResult=await tool.json();assert.equal(tool.status,200);assert.equal(toolResult.ok,true,JSON.stringify(toolResult));
+    assert.equal((await routeChatApi(request(toolBody,'/api/chat/native-tool'),env)).status,409);
+    const variant={id:'plan-a',content:'first plan reply',model_id:model,finish_reason:'stop',desk_slip:first.context.desk_slip};
+    await action('commit',{message_id:'plan-a',variant,receipt:{tool_calls:0,total_tokens:100,continue_requested:true}},409);
+    const committed=await action('commit',{message_id:'plan-a',variant,receipt:{tool_calls:1,total_tokens:100,continue_requested:true}});
+    assert.equal(committed.continue_requested,true);
+    assert.equal(committed.history.turns[0].assistant.variantsByUserVariant['0'][0].attachments.length,1);
+    await action('commit',{message_id:'plan-a',variant,receipt:{tool_calls:1,total_tokens:100,continue_requested:true}},409);
+    const second=await action('next',{message_id:'plan-b',index:1});
+    assert.equal(second.tool_budget,1);assert.equal(second.token_budget,900);
+    assert.ok(second.context.model_messages.some(m=>m.role==='assistant'&&m.content==='first plan reply'));
+    assert.ok(second.context.model_messages.some(m=>Array.isArray(m.content)&&m.content.some(p=>p.type==='image_url')));
+    assert.equal(second.context.desk_slip.reply_sequence_previous[0].message_id,'plan-a');
+    const secondCommit=await action('commit',{message_id:'plan-b',variant:{id:'plan-b',content:'second plan reply',model_id:model,finish_reason:'stop',desk_slip:second.context.desk_slip},receipt:{tool_calls:0,total_tokens:null,continue_requested:true}});
+    assert.equal(secondCommit.continue_requested,false,'missing usage must stop even if control requests more');
+    await action('next',{message_id:'plan-c',index:2},409);
+    await action('settle',{status:'permission_or_budget'});
+    const group=(await readConversationState(routeDb,cv.id)).turns[0].assistant.variantsByUserVariant['0'];
+    assert.deepEqual(group.map(v=>v.content),['first plan reply','second plan reply']);
+    assert.deepEqual(group.map(v=>v.reply_sequence.index),[0,1]);
+    const prepare={trigger:'reply',reply_sequence_id:'plan-group',model,plan_phase:'prepare'};
+    const prepared=await organizeConversationSoil(env,cv.id,prepare);
+    assert.equal(prepared.skipped,false,JSON.stringify(prepared));
+    assert.ok(prepared.prompt.includes('first plan reply')&&prepared.prompt.includes('second plan reply'));
+    assert.equal((await organizeConversationSoil(env,cv.id,prepare)).reason,'reply_sequence_already_claimed_or_unsettled');
+    const result={current_text:'two plan replies organized',afterthoughts:[],memory_candidates:[],seed_candidates:[],
+      user_portrait:{should_update:false},self_portrait:{should_update:false}};
+    const commit={...prepare,plan_phase:'commit',expected_turn_id:prepared.expected_turn_id,expected_assistant_id:prepared.expected_assistant_id,
+      expected_history_revision:prepared.expected_history_revision,expected_soil_revision:prepared.expected_soil_revision,result_text:JSON.stringify(result)};
+    const paper=await organizeConversationSoil(env,cv.id,commit);
+    assert.equal(paper.soil.current_text,result.current_text);
+    assert.equal((await organizeConversationSoil(env,cv.id,commit)).reason,'reply_sequence_plan_commit_unconfirmed');
+  }finally{globalThis.fetch=originalFetch;}
+}
+console.log('native plan cloud group: ok');
