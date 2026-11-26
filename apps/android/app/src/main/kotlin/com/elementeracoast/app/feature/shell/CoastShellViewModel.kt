@@ -59,7 +59,8 @@ class CoastShellViewModel(
     private val backend: CoastBackendGraph,
     private val workDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
     private val chatGpt: ChatGptPlanRepository? = null,
-    private val localMode: Boolean = false
+    private val localMode: Boolean = false,
+    private val foregroundLease: ((()->Unit,()->Unit)->AutoCloseable?)? = null
 ) : ViewModel() {
     private val _state = MutableStateFlow(CoastShellState(
         currentModel = chatGpt?.preferredModel()?.let { CHATGPT_PLAN_PREFIX + it }.orEmpty(),
@@ -85,6 +86,7 @@ class CoastShellViewModel(
     val archive: GlobalArchiveRepository get() = backend.archive
     private var generationJob: Job? = null
     private class GenerationRun(var ownerId: String) {
+        var lease: AutoCloseable? = null
         var preparing = true
         var streaming = false
         var messageId: Long? = null
@@ -108,11 +110,16 @@ class CoastShellViewModel(
     private fun beginGeneration(ownerId: String) {
         check(generationRun == null)
         historyJob?.cancel()
-        generationRun = GenerationRun(ownerId)
+        val run = GenerationRun(ownerId)
+        generationRun = run
         _state.update { generationUi(it.copy(historyLoading = false)) }
+        run.lease = foregroundLease?.invoke({ if (generationRun === run) generationJob?.cancel() }, {
+            if (generationRun === run) showPlaceholder("系统后台保护不可用；本轮仍可在应用内继续，切出应用可能中断。")
+        })
     }
 
     private fun finishGeneration() {
+        generationRun?.lease?.close()
         generationRun = null
         generationJob = null
         _state.update(::generationUi)
@@ -1555,6 +1562,12 @@ class CoastShellViewModel(
         )
     }
 
+    override fun onCleared() {
+        generationJob?.cancel()
+        generationRun?.lease?.close()
+        super.onCleared()
+    }
+
     companion object {
         private const val KEY_CURRENT_CONVERSATION = "remote.current-conversation.v1"
 
@@ -1566,7 +1579,8 @@ class CoastShellViewModel(
                 val persistence = NativeWorkspace.persistence(appContext)
                 val chatGpt = ChatGptPlanRepository(ChatGptSecureStore(appContext, localMode = isLocal))
                 val backend = CoastBackendGraph.production(appContext, persistence, chatGpt)
-                return CoastShellViewModel(persistence, backend, chatGpt = chatGpt, localMode = isLocal) as T
+                return CoastShellViewModel(persistence, backend, chatGpt = chatGpt, localMode = isLocal,
+                    foregroundLease = { cancel, unavailable -> GenerationForegroundService.acquire(appContext, cancel, unavailable) }) as T
             }
         }
     }
