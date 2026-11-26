@@ -166,6 +166,14 @@ for (let attempt = 0; attempt < 20 && !blockedSignal; attempt += 1) {
 }
 assert.ok(blockedSignal, 'generation reached the original request path before stop');
 const primaryButton = document.querySelector('#composerActionButton');
+await chat.handleAction('open', { dataset: { id: 'conversation-2' } });
+assert.equal(blockedSignal.aborted, false, 'navigation must not cancel the originating reply');
+assert.equal(primaryButton.disabled, true, 'other window cannot stop or start a reply during the active task');
+await chat.handleSubmit('composer');
+assert.equal(blockedSignal.aborted, false, 'submit in another window must not abort the original reply');
+await chat.handleAction('open', { dataset: { id: 'conversation-1' } });
+assert.equal(primaryButton.disabled, false, 'origin retains stop control');
+assert.ok(chat.getActiveMessages().some(message => message.content === 'please stop'), 'reopening origin must not replace pending history with stale server history');
 const stopOutcome = await spine.dispatch(syntheticEvent('click', primaryButton));
 assert.equal(stopOutcome.ownerId, 'chat');
 assert.equal(blockedSignal.aborted, true, 'Chat primary button keeps the original stop/abort behavior');
