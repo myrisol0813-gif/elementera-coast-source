@@ -20,9 +20,9 @@ class WolfLocalParityTest {
         assertEquals(12, BasicSettings.activeFieldNames.size)
         assertEquals(
             listOf(
-                "recentTurns", "toolCallLimit", "contextBudget", "outputLength", "maxOutputTokens", "creativity",
+                "recentTurns", "contextBudget", "outputLength", "maxOutputTokens", "creativity",
                 "streamingEnabled", "soilBudget", "seedCooldownTurns", "worldbookEnabled",
-                "worldbookLimit", "memoryLimit"
+                "worldbookLimit", "memoryLimit", "toolCallLimit"
             ), BasicSettings.activeFieldNames
         )
         val names = BasicSettings.activeFieldNames.joinToString(" ")
@@ -38,12 +38,13 @@ class WolfLocalParityTest {
         store.setTheme(CoastThemePreset.BlushModelPartner)
         store.setUserBubble("#f5e8ee")
         store.setAccent("#ec4899")
-        store.updateBasic { it.copy(memoryLimit = 5, outputLength = "long") }
+        store.updateBasic { it.copy(memoryLimit = 5, outputLength = "long", toolCallLimit = 37) }
         val reloaded = WolfStore(persistence).state.value
         assertEquals("Human Owner", reloaded.profile.nickname)
         assertEquals(CoastThemePreset.BlushModelPartner, reloaded.appearance.theme)
         assertEquals("#f5e8ee", reloaded.appearance.userBubbleHex)
         assertEquals(5, reloaded.basic.memoryLimit)
+        assertEquals(37, reloaded.basic.toolCallLimit)
         assertEquals("long", reloaded.basic.outputLength)
     }
 

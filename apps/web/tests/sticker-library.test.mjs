@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {D1Database} from './d1-helper.mjs';
-import {createConversation,writeConversationState} from '../functions/chat-store.js';
-import {uploadChatAttachment,saveGeneratedImageOriginal} from '../functions/chat-attachments.js';
+import {createConversation} from '../functions/chat-store.js';
+import {uploadChatAttachment} from '../functions/chat-attachments.js';
 import {registerSticker,listStickers,setStickerEnabled,resolveStickerOriginal} from '../functions/sticker-library.js';
 const db=new D1Database();
 const c=await createConversation(db,'素材','main');
@@ -11,9 +11,10 @@ const input={conversation_id:c.id,attachment_id:a.id,description:'摇尾巴 100%
 await assert.rejects(()=>listStickers(db),e=>e.type==='sticker_send_denied');
 await assert.rejects(()=>registerSticker(db,input,{actor:'assistant'}),e=>e.type==='sticker_add_denied');
 await assert.rejects(()=>registerSticker(db,input,{actor:'assistant',allowModelAdd:true,conversationId:c.id}),e=>e.type==='sticker_add_denied');
-const entry=await registerSticker(db,input);
+await assert.rejects(()=>registerSticker(db,input),e=>e.type==='sticker_add_denied');
+const entry=await registerSticker(db,input,{actor:'owner'});
 assert.equal(entry.author,'owner');
-assert.equal((await registerSticker(db,{...input,description:'duplicate'})).id,entry.id);
+assert.equal((await registerSticker(db,{...input,description:'duplicate'},{actor:'owner'})).id,entry.id);
 assert.equal((await listStickers(db,{q:'100%'},{allowSend:true})).items[0].description,'摇尾巴 100%');
 assert.equal((await listStickers(db,{q:'_'},{allowSend:true})).items.length,0);
 assert.equal(JSON.stringify(await listStickers(db,{}, {allowSend:true})).includes(a.id),false);
@@ -23,7 +24,7 @@ await assert.rejects(()=>setStickerEnabled(db,entry.id,false,{actor:'assistant'}
 await setStickerEnabled(db,entry.id,false,{actor:'owner'});
 assert.equal((await listStickers(db,{}, {allowSend:true})).items.length,0);
 await assert.rejects(()=>resolveStickerOriginal(db,entry.id,{allowSend:true}),e=>e.type==='sticker_unavailable');
-await registerSticker(db,input);
+await registerSticker(db,input,{actor:'owner'});
 assert.equal((await listStickers(db,{}, {allowSend:true})).items.length,0);
 await setStickerEnabled(db,entry.id,true,{actor:'owner'});
 await db.prepare('UPDATE conversations SET deleted_at=? WHERE id=?').bind(Date.now(),c.id).run();

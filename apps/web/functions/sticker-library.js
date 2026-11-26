@@ -47,7 +47,7 @@ async function verifiedOriginal(db,cid,aid){
 const publicEntry=row=>({id:row.id,description:row.description,author:row.author,mime:row.mime,size:Number(row.size),enabled:Boolean(row.enabled)});
 /** Internal service. Callers must supply permissions derived from trusted settings,
  * never accept them from model arguments. No route or model tool is installed here. */
-export async function registerSticker(db,input,{actor='owner',allowModelAdd=false,conversationId=null}={}){
+export async function registerSticker(db,input,{actor,allowModelAdd=false,conversationId=null}={}){
   if(!['owner','assistant'].includes(actor)||actor==='assistant'&&allowModelAdd!==true)
     fail('sticker_add_denied','未允许模型添加素材。',403);
   const cid=identifier(input.conversation_id),aid=identifier(input.attachment_id),description=cleanDescription(input.description);
