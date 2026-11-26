@@ -264,7 +264,10 @@ class ChatSyncMapperTest {
         assertEquals(listOf("question","first reply","second reply","next question"),
             ChatSyncMapper.contextMessages(failed,history.turnId,2).map{it.content})
         assertEquals(listOf("next question"),ChatSyncMapper.contextMessages(failed,history.turnId,1).map{it.content})
-        assertEquals(listOf("question"),ChatSyncMapper.contextMessages(failed,"group-turn",1).map{it.content})
+        // Before the target there is no selected multi-message group; preserve legacy
+        // context selection, including an older unanswered user message.
+        assertEquals(listOf("older question","question"),ChatSyncMapper.contextMessages(failed,"group-turn",1).map{it.content})
+        assertEquals(listOf("question"),ChatSyncMapper.contextMessages(RemoteHistory(turns=listOf(grouped)),"group-turn",1).map{it.content})
         val alternative=grouped.copy(assistant=grouped.assistant.copy(activeByUserVariant=mapOf("0" to 0)))
         val alternativeHistory=failed.copy(turns=listOf(alternative,failed.turns.last()))
         assertEquals(listOf("question","old alternative","next question"),
