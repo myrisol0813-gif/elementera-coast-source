@@ -3,8 +3,9 @@ const CONVERSATION_ACCESS = Object.freeze({
   soil: 'conversation',
   memory: 'conversation_and_global',
   worldbook: ['owner', 'both'],
-  backendTools: ['daily.*', 'dogtalk.*', 'memory.*', 'cross_window.*', 'calendar.*', 'library.*', 'voice.create', 'vault.*'],
+  backendTools: ['web.independent_search', 'web.independent_read', 'daily.*', 'dogtalk.*', 'memory.*', 'cross_window.*', 'calendar.*', 'library.*', 'voice.create', 'vault.*'],
   modelVisibleTools: [
+    'web.independent_search', 'web.independent_read',
     'daily.create_moment',
     'daily.create_diary',
     'daily.moment_comment',

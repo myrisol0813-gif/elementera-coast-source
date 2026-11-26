@@ -155,3 +155,36 @@ const highlightReceipt = buildFurnitureSummary({id:'receipt-h',toolKey:'library.
 assert.match(highlightReceipt.label,/划线/);
 assert.equal(highlightReceipt.target.note_id,'note-h');
 assert.doesNotMatch(summarizeToolValue('memory.user_portrait_propose',{proposed_body:'fixture-private-body'}),/fixture-private-body/);
+
+const {independentSearch,independentRead}=await import('../functions/independent-web.js');
+const webEnv={COAST_INDEPENDENT_WEB_ENABLED:'true',TAVILY_API_KEY:'fixture-secret'};
+const webCtx={permission:'owner',surface:'main_chat',env:webEnv,independent_web_enabled:true};
+const names=c=>resolveToolSelection(c).modelVisibleTools.map(t=>t.function.name);
+assert.ok(names(webCtx).includes('independent_web_search')&&names(webCtx).includes('independent_web_read'));
+assert.ok(!names({...webCtx,independent_web_enabled:false}).includes('independent_web_search'));
+assert.ok(!names({...webCtx,env:{}}).includes('independent_web_search'));
+assert.ok(!names({...webCtx,surface:'official_mcp'}).includes('independent_web_read'));
+assert.ok(!names({...webCtx,permission:'visitor',surface:'mailbox_visitor',visitorId:'fixture'}).includes('independent_web_search'));
+let webCalls=0;
+const fakeWeb=async(url,req)=>{
+  webCalls++;assert.equal(req.headers.Authorization,'Bearer fixture-secret');assert.equal(req.redirect,'error');
+  const b=JSON.parse(req.body);assert.ok(!Object.hasOwn(b,'history')&&!Object.hasOwn(b,'api_key'));
+  if(url==='https://api.tavily.com/search'){
+    assert.deepEqual(b,{query:'public fixture',max_results:3,search_depth:'basic',include_answer:false,include_raw_content:false});
+    return new Response(JSON.stringify({results:[{url:'https://www.iana.org/domains',title:'IANA',content:'a'.repeat(900)},{url:'http://127.0.0.1/',title:'bad'}]}));
+  }
+  assert.equal(url,'https://api.tavily.com/extract');
+  return new Response(JSON.stringify({results:[{url:b.urls[0],raw_content:'b'.repeat(6100)}]}));
+};
+const found=await independentSearch(webEnv,{query:'public fixture',limit:3},fakeWeb);
+assert.equal(found.count,1);assert.equal(found.sources[0].truncated,true);assert.equal(found.sources[0].excerpt.length,800);
+assert.ok(!JSON.stringify(found).includes('fixture-secret'));
+const readWeb=await independentRead(webEnv,{url:found.sources[0].url},fakeWeb);
+assert.equal(readWeb.content.length,6000);assert.equal(readWeb.truncated,true);
+await assert.rejects(()=>independentRead(webEnv,{url:'https://private.local/a'},fakeWeb));
+await assert.rejects(()=>independentRead(webEnv,{url:'https://www.iana.org/?token=secret'},fakeWeb));
+await assert.rejects(()=>independentSearch(webEnv,{query:'q',history:'private'},fakeWeb));
+assert.equal(webCalls,2);
+assert.doesNotMatch(summarizeToolValue('web.independent_search',{query:'private-test'}),/private-test/);
+const {SAFE_TOOL_KEYS}=await import('../functions/coast-archive-v2-tool-audit.js');
+assert.ok(SAFE_TOOL_KEYS.includes('web.independent_search')&&SAFE_TOOL_KEYS.includes('web.independent_read'));
