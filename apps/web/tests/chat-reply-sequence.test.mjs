@@ -53,3 +53,15 @@ assert.deepEqual(client(normalized),normalized);
 assert.throws(()=>selectedReplyGroup([v('missing-first',1)],0));
 assert.equal(server({turns:[{...raw.turns[0],user:{variants:[v('user',0)]}}]}).turns[0].user.variants[0].reply_sequence,undefined);
 console.log('real reply sequence contract: ok');
+
+const {contextMessages}=await import('../elementera-mcp/deploy-pages/public/features/chat/chat-context.js');
+const {activeMessages}=await import('../elementera-mcp/deploy-pages/public/features/chat-state.js');
+const target={id:'next-turn',user:{variants:[{id:'next-user',content:'next question'}]},assistant:{activeByUserVariant:{0:0},variantsByUserVariant:{0:[{id:'failed',content:'not part of retry'}]}}};
+const oldTurn={id:'older-turn',user:{variants:[{id:'older-user',content:'older question'}]},assistant:{variantsByUserVariant:{0:[{id:'older-answer',content:'older answer'}]}}};
+const history={turns:[oldTurn,raw.turns[0],target]};
+assert.deepEqual(contextMessages(history,target.id,{recentTurns:2}).map(x=>[x.role,x.content]),[['user','hello'],['assistant','first'],['assistant','second'],['user','next question']]);
+assert.deepEqual(contextMessages(history,target.id,{recentTurns:1}).map(x=>x.content),['next question']);
+assert.deepEqual(activeMessages(raw).map(x=>x.content),['hello','first','second']);
+const alternative={...raw.turns[0],assistant:{...raw.turns[0].assistant,activeByUserVariant:{0:0}}};
+assert.deepEqual(contextMessages({turns:[alternative,target]},target.id,{recentTurns:2}).map(x=>x.content),['hello','old','next question']);
+assert.deepEqual(contextMessages({turns:[raw.turns[0]]},'turn',{recentTurns:2}).map(x=>x.content),['hello']);

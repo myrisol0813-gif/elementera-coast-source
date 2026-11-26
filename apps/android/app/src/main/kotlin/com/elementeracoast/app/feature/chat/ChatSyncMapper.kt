@@ -139,8 +139,10 @@ object ChatSyncMapper {
     }
 
     fun contextMessages(history: RemoteHistory, targetTurnId: String, recentTurns: Int): List<RemoteChatMessage> {
-        val messages = buildList {
-            for (turn in history.turns) {
+        val rounds = mutableListOf<List<RemoteChatMessage>>()
+        var grouped = false
+        for (turn in history.turns) {
+            val messages = buildList {
                 val userIndex = turn.user.active.coerceIn(0, (turn.user.variants.size - 1).coerceAtLeast(0))
                 val user = turn.user.variants.getOrNull(userIndex)
                 if (user != null && !user.hidden && (user.content.isNotBlank() || user.attachments.isNotEmpty())) {
@@ -150,23 +152,29 @@ object ChatSyncMapper {
                         if (user.messageSource == "official_mcp") "[来源：官端 ChatGPT / official_mcp]\n$body" else body
                     ))
                 }
-                if (turn.id == targetTurnId) break
-
-                val key = userIndex.toString()
-                val assistants = turn.assistant.variantsByUserVariant[key].orEmpty()
-                val assistantIndex = (turn.assistant.activeByUserVariant[key] ?: 0)
-                    .coerceIn(0, (assistants.size - 1).coerceAtLeast(0))
-                val assistant = assistants.getOrNull(assistantIndex)
-                if (assistant != null && assistant.content.isNotBlank()) {
-                    add(RemoteChatMessage("assistant", assistant.content))
+                if (turn.id != targetTurnId) {
+                    val key = userIndex.toString()
+                    val assistants = turn.assistant.variantsByUserVariant[key].orEmpty()
+                    val assistantIndex = (turn.assistant.activeByUserVariant[key] ?: 0)
+                        .coerceIn(0, (assistants.size - 1).coerceAtLeast(0))
+                    val group = ReplySequence.selectedGroup(assistants, assistantIndex)
+                    if (group.size > 1) grouped = true
+                    for (assistant in group) {
+                        if (assistant.content.isNotBlank()) add(RemoteChatMessage("assistant", assistant.content))
+                    }
                 }
             }
+            rounds.add(messages)
+            if (turn.id == targetTurnId) break
         }
         val requestedMessages = recentTurns.coerceAtLeast(1).toLong() * 2L
-        val recent = if (requestedMessages >= messages.size.toLong()) {
-            messages.toMutableList()
+        val all = rounds.flatten()
+        val recent = if (grouped) {
+            rounds.takeLast(recentTurns.coerceAtLeast(1)).flatten().toMutableList()
+        } else if (requestedMessages >= all.size.toLong()) {
+            all.toMutableList()
         } else {
-            messages.takeLast(requestedMessages.toInt()).toMutableList()
+            all.takeLast(requestedMessages.toInt()).toMutableList()
         }
         while (recent.firstOrNull()?.role == "assistant") recent.removeAt(0)
         return recent

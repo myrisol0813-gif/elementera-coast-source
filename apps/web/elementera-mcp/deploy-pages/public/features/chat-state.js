@@ -1,4 +1,5 @@
 import { clamp, id, sanitizeId } from '../core/dom.js';
+import { selectedReplyGroup } from './chat/chat-reply-sequence.js';
 
 const MAX_ERROR_DETAIL = 12000;
 const MAX_TURNS = 400;
@@ -270,7 +271,9 @@ export function activeMessages(value) {
   for (const turn of normalizeState(value).turns) {
     const branch = activeBranch(turn);
     if (branch.user?.content) result.push({ role: 'user', ...branch.user });
-    if (branch.assistant?.content) result.push({ role: 'assistant', ...branch.assistant });
+    for (const assistant of selectedReplyGroup(branch.assistants, branch.assistantIndex)) {
+      if (assistant.content) result.push({ role: 'assistant', ...assistant });
+    }
   }
   return result;
 }
