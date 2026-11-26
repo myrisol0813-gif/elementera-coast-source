@@ -141,6 +141,7 @@ export async function commitReplyStep(db,identity,messageId,variant,receipt){
   const originals=(slot?.attachments||[]).filter(a=>a.image_generation?.message_id===messageId||a.sticker_delivery?.message_id===messageId);
   if((slot?list.length>20:list.length>=20)||!budget||typeof variant?.content!=='string'||(!variant.content.trim()&&!originals.length)||variant.id!==messageId)return null;
   const calls=receipt?.tool_calls,tokens=receipt?.total_tokens;
+  if(row.native_plan_model){const executed=JSON.parse(row.native_plan_calls_json||'[]');if(executed.some(c=>!c.done)||calls!==executed.length||variant.model_id!==row.native_plan_model)return null;}
   const known=Number.isSafeInteger(calls)&&calls>=0&&calls<=budget.tools&&Number.isSafeInteger(tokens)&&tokens>=0;
   const record={message_id:messageId,tool_calls:known?calls:null,total_tokens:known?tokens:null,
     continue_requested:known&&tokens<budget.tokens&&receipt?.continue_requested===true&&variant.finish_reason==='stop'};
@@ -153,10 +154,10 @@ export async function commitReplyStep(db,identity,messageId,variant,receipt){
   // Both writes run in one D1 transaction. The ledger advance requires the
   // exact new canonical history, while the history requires the claimed step.
   const result=await db.batch([
-    stmt(db,`UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS(SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL) AND EXISTS(SELECT 1 FROM chat_reply_runs WHERE sequence_id=? AND status='running' AND pending_id=? AND pending_state='claimed' AND receipts_json=?)`,
-      newRaw,stamp,identity.conversationId,raw,identity.conversationId,identity.sequenceId,messageId,row.receipts_json),
-    stmt(db,`UPDATE chat_reply_runs SET pending_id=NULL,pending_state=NULL,receipts_json=?,updated_at=? WHERE sequence_id=? AND status='running' AND pending_id=? AND pending_state='claimed' AND receipts_json=? AND EXISTS(SELECT 1 FROM conversation_states WHERE conversation_id=? AND state_json=?)`,
-      newReceipts,stamp,identity.sequenceId,messageId,row.receipts_json,identity.conversationId,newRaw),
+    stmt(db,`UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS(SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL) AND EXISTS(SELECT 1 FROM chat_reply_runs WHERE sequence_id=? AND status='running' AND pending_id=? AND pending_state='claimed' AND receipts_json=? AND native_plan_calls_json=?)`,
+      newRaw,stamp,identity.conversationId,raw,identity.conversationId,identity.sequenceId,messageId,row.receipts_json,row.native_plan_calls_json),
+    stmt(db,`UPDATE chat_reply_runs SET pending_id=NULL,pending_state=NULL,receipts_json=?,updated_at=? WHERE sequence_id=? AND status='running' AND pending_id=? AND pending_state='claimed' AND receipts_json=? AND native_plan_calls_json=? AND EXISTS(SELECT 1 FROM conversation_states WHERE conversation_id=? AND state_json=?)`,
+      newReceipts,stamp,identity.sequenceId,messageId,row.receipts_json,row.native_plan_calls_json,identity.conversationId,newRaw),
     stmt(db,`UPDATE conversations SET updated_at=? WHERE id=? AND deleted_at IS NULL AND EXISTS(SELECT 1 FROM chat_reply_runs WHERE sequence_id=? AND receipts_json=?)`,
       stamp,identity.conversationId,identity.sequenceId,newReceipts),
   ]);
@@ -354,12 +355,12 @@ export async function nativePlanClaim(db,identity,model,messageId){
 export async function reserveNativePlanTool(db,identity,model,messageId,callId,name,index){
   ids(callId);
   const claim=await nativePlanClaim(db,identity,model,messageId),{row,calls}=claim;
-  if(!Number.isSafeInteger(index)||index!==calls.length||index>=claim.toolBudget||calls.some(c=>c.id===callId)||
+  if(!Number.isSafeInteger(index)||index!==calls.length||index>=claim.toolBudget||calls.some(c=>c.id===callId||!c.done)||
       (['image_generate','voice_create'].includes(name)&&calls.some(c=>c.name===name)))return false;
   // Reserve before a write or paid tool. Lost responses are not replayed.
   return changes(await stmt(db,`UPDATE chat_reply_runs SET native_plan_calls_json=?,updated_at=?
     WHERE sequence_id=? AND status='running' AND pending_state='claimed' AND pending_id=? AND native_plan_model=? AND native_plan_calls_json=?`,
-    JSON.stringify([...calls,{id:callId,name}]),Date.now(),identity.sequenceId,messageId,model,row.native_plan_calls_json).run());
+    JSON.stringify([...calls,{id:callId,name,done:false}]),Date.now(),identity.sequenceId,messageId,model,row.native_plan_calls_json).run());
 }
 export async function claimNativePlanSoilCommit(db,conversationId,sequenceId,model,tailId,revision){
   await ensureChatSchema(db);
@@ -375,4 +376,13 @@ export async function claimNativePlanSoilCommit(db,conversationId,sequenceId,mod
     WHERE sequence_id=? AND soil_state='claimed' AND native_plan_soil_revision=? AND EXISTS(SELECT 1 FROM conversation_states WHERE conversation_id=? AND state_json=?)
     AND NOT EXISTS(SELECT 1 FROM chat_reply_runs WHERE conversation_id=? AND status='running')`,
     Date.now(),sequenceId,revision,conversationId,raw,conversationId).run());
+}
+
+export async function finishNativePlanTool(db,identity,model,messageId,callId){
+  const {row,calls}=await nativePlanClaim(db,identity,model,messageId);
+  if(calls.at(-1)?.id!==callId||calls.at(-1)?.done)return false;
+  const next=calls.map(c=>c.id===callId?{...c,done:true}:c);
+  return changes(await stmt(db,`UPDATE chat_reply_runs SET native_plan_calls_json=?,updated_at=?
+    WHERE sequence_id=? AND native_plan_model=? AND status='running' AND pending_id=? AND pending_state='claimed' AND native_plan_calls_json=?`,
+    JSON.stringify(next),Date.now(),identity.sequenceId,model,messageId,row.native_plan_calls_json).run());
 }
