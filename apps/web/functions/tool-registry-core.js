@@ -455,7 +455,7 @@ const REGISTRY = Object.freeze([
   entry({
     tool_key: 'library.books', display_name: '查看书架', description: '查看书房有哪些书或某本书的目录。',
     model_exposed: true, model_group: 'library', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
-    model_tool: modelTool('library_books', '查看书房里的书，提供 book_id 可查看章节目录。', {
+    model_tool: modelTool('library_books', '不填 book_id 时返回书籍列表与真实 id；从列表选择 id，再传 book_id 查看目录，不能用书名代替 id。', {
       properties: { book_id: { type: 'string' } },
     }),
     official_mcp: officialMcpTool({
@@ -469,7 +469,7 @@ const REGISTRY = Object.freeze([
   entry({
     tool_key: 'library.read', display_name: '读一段书', description: '按章节和段落范围取书页正文。',
     model_exposed: true, model_group: 'library', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
-    model_tool: modelTool('library_read', '从书房读某书指定章节的一页原文。start_paragraph 是从零起的段落号，默认每页 12 段，不会暗中裁剪。', {
+    model_tool: modelTool('library_read', '使用书架返回的真实 book_id 与目录中的 chapter_index；章节和段落从0开始，默认12段，最多12段。', {
       properties: {
         book_id: { type: 'string' }, chapter_index: { type: 'integer', minimum: 0 },
         start_paragraph: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 12 },
@@ -638,7 +638,13 @@ export async function executeModelTool(db, toolCall, context = {}) {
   const name = String(toolCall?.function?.name || toolCall?.name || '');
   const definition = BY_MODEL_NAME.get(name);
   if (!definition) throw new ToolRegistryError('unknown_model_tool', '模型调用了未注册工具。', 400);
-  const input = parseArguments(toolCall?.function?.arguments ?? toolCall?.arguments);
+  let input = parseArguments(toolCall?.function?.arguments ?? toolCall?.arguments);
+  if (definition.tool_key.startsWith('library.')) {
+    const schema = definition.model_tool.function.parameters;
+    if (Object.keys(input).some(key => !Object.hasOwn(schema.properties, key))) throw new ToolRegistryError('invalid_arguments', '书房工具包含未声明字段。');
+    if (schema.required.some(key => input[key] == null || input[key] === '')) throw new ToolRegistryError('invalid_arguments', '缺少书房工具必填字段，请先使用书架返回的真实 ID。');
+    input = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== null));
+  }
   const call = { id: String(toolCall?.id || '').slice(0, 160), type: 'function', function: { name, arguments: JSON.stringify(input) } };
   const output = await executeRegisteredTool(db, definition.tool_key, definition.tool_key.startsWith('daily.') || definition.tool_key === 'dogtalk.read' ? call : input, context);
   return cleanModelToolResult(definition.tool_key, output);
