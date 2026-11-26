@@ -186,7 +186,7 @@ fun TidalLibraryScreen(
     }
     fun openBook(entry: JsonObject) {
         if (bookId != entry.s("id")) { book = null; chapter = null; notes = emptyList() }
-        noteFilter = "all"; showDirectory = false
+        openNoteGroups = emptySet(); showDirectory = false
         loadedNotesKey = ""
         bookId = entry.s("id")
         index = entry["reader_chapter_index"]?.jsonPrimitive?.intOrNull ?: 0
