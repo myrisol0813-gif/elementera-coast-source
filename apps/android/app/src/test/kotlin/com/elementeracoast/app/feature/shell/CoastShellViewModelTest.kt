@@ -107,6 +107,33 @@ class CoastShellViewModelTest {
     }
 
     @Test
+    fun foregroundLeaseSpansReplyAndSoilAndReleasesAfterCompletion() {
+        val fixture = Fixture()
+        val a = fixture.conversations.seed(RoomType.Main, "Origin")
+        val b = fixture.conversations.seed(RoomType.Main, "Other")
+        var opened = 0
+        var closed = 0
+        var organizedAtClose: String? = null
+        val vm = fixture.vm { _, _ ->
+            opened++
+            AutoCloseable { closed++; organizedAtClose = fixture.thoughtSoil.lastOrganizedConversationId }
+        }
+        vm.selectConversation(a.id)
+        val gate = CompletableDeferred<Unit>()
+        fixture.chat.streamGate = gate
+        vm.sendMessage("original question")
+        assertEquals(1, opened)
+        assertEquals(0, closed)
+        vm.selectConversation(b.id)
+        assertEquals(0, closed)
+        gate.complete(Unit)
+        assertEquals(1, closed)
+        assertEquals(a.id, organizedAtClose)
+        assertEquals(1, fixture.chat.streamCalls)
+        assertFalse(vm.state.value.backgroundGeneration)
+    }
+
+    @Test
     fun composerDraftsSurviveWindowChangesAndRecreationAndClearAfterAcceptedSend() {
         val fixture = Fixture()
         val a = fixture.conversations.seed(RoomType.Main, "Draft A")
@@ -446,7 +473,7 @@ class CoastShellViewModelTest {
         val archive = FakeGlobalArchiveRepository()
         val persistence = MemoryLocalPersistence()
 
-        fun vm(): CoastShellViewModel = CoastShellViewModel(
+        fun vm(foregroundLease: ((()->Unit,()->Unit)->AutoCloseable?)? = null): CoastShellViewModel = CoastShellViewModel(
             persistence = persistence,
             backend = CoastBackendGraph(
                 auth = auth,
@@ -461,7 +488,8 @@ class CoastShellViewModelTest {
                 crossWindow = crossWindow,
                 archive = archive
             ),
-            workDispatcher = Dispatchers.Unconfined
+            workDispatcher = Dispatchers.Unconfined,
+            foregroundLease = foregroundLease
         )
     }
 

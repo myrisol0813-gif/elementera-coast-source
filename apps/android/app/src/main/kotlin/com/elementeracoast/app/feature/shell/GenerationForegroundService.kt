@@ -23,6 +23,7 @@ import java.util.UUID
  */
 class GenerationForegroundService : Service() {
     private var started = false
+    private var promotedToken: String? = null
     private var lastStartId = 0
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onCreate() {
@@ -44,10 +45,12 @@ class GenerationForegroundService : Service() {
         // Even if the request completed before Android delivered this start,
         // promote first and then stop; do not leave a pending FGS start.
         try {
-            val notification = notification(registry.current()?.token)
+            val token = registry.current()?.token
+            val notification = notification(token)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
             } else startForeground(NOTIFICATION_ID, notification)
+            promotedToken = token
             started = true
             reconcile()
         } catch (_: RuntimeException) {
@@ -87,7 +90,8 @@ class GenerationForegroundService : Service() {
     override fun onDestroy() {
         if (instance === this) {
             instance = null
-            registry.current()?.let { if (registry.release(it.token)) it.unavailable() }
+            // Destruction of an earlier service cannot revoke a newer queued start.
+            registry.current()?.takeIf { it.token == promotedToken }?.let { if (registry.release(it.token)) it.unavailable() }
         }
         super.onDestroy()
     }
