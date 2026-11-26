@@ -60,3 +60,9 @@ export function tagText(model) {
   if (!model?.available) tags.unshift('unavailable');
   return tags.length ? tags.join(' · ') : 'no tags';
 }
+
+export function imageGroupKey(id) {
+  const raw=String(id||'').toLowerCase();
+  if(raw.endsWith(':free'))return 'Free';
+  return raw.startsWith('openai/')||raw.split('/').at(-1).startsWith('gpt-')?'GPT':'其他模型';
+}
