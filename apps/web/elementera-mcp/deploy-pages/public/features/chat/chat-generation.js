@@ -1,11 +1,6 @@
 import { createManualImageSender, prepareAutonomousImageTurn, imageToolSucceeded } from './chat-manual-image.js';
 import { API, requestJson } from '../../core/api.js';
-import {
-  activeBranch,
-  appendAssistantVariant,
-  appendTurn,
-  updateAssistantVariant,
-} from '../chat-state.js';
+import { activeBranch, appendAssistantVariant, appendTurn, updateAssistantVariant } from '../chat-state.js';
 import { DEFAULT_MODEL, isImageModel } from './chat-profile.js';
 import { contextMessages as buildContextMessages } from './chat-context.js';
 import { chatRequestContext as buildChatRequestContext } from './chat-request-context.js';
