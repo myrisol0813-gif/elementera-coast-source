@@ -159,6 +159,10 @@ export function normalizeContextSettings(value = {}) {
     ...(raw.local_model_write_enabled === true ? { local_model_write_enabled: true } : {}),
     ...(raw.sticker_send_enabled === true ? { sticker_send_enabled: true } : {}),
     ...(raw.sticker_add_enabled === true ? { sticker_add_enabled: true } : {}),
+    ...(raw.reply_sequence_enabled === true ? { reply_sequence_enabled: true } : {}),
+    ...(Number.isSafeInteger(raw.reply_sequence_max_messages) && raw.reply_sequence_max_messages >= 1 && raw.reply_sequence_max_messages <= 20 ? { reply_sequence_max_messages: raw.reply_sequence_max_messages } : {}),
+    ...(Number.isSafeInteger(raw.reply_sequence_tool_budget) && raw.reply_sequence_tool_budget >= 0 && raw.reply_sequence_tool_budget <= 128 ? { reply_sequence_tool_budget: raw.reply_sequence_tool_budget } : {}),
+    ...(Number.isSafeInteger(raw.reply_sequence_token_budget) && raw.reply_sequence_token_budget >= 1 && raw.reply_sequence_token_budget <= 1000000 ? { reply_sequence_token_budget: raw.reply_sequence_token_budget } : {}),
     weather_city: weatherCity,
   };
 }

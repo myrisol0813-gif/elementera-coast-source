@@ -34,6 +34,32 @@ internal object ReplySequence {
             }
         }
     }
+    data class Budget(val enabled:Boolean,val maxMessages:Int,val toolBudget:Int,val tokenBudget:Int)
+    data class Usage(val toolCalls:Int?,val totalTokens:Long?)
+    data class Remaining(val known:Boolean,val tools:Int,val tokens:Long)
+    fun resolveBudget(global:com.elementeracoast.app.feature.wolf.BasicSettings,
+        window:com.elementeracoast.app.core.model.ConversationContextSettings,usedVariants:Int):Budget{
+        require(usedVariants>=0)
+        val settings=window.normalized()
+        fun choose(override:Int?,value:Int,fallback:Int,range:IntRange)=
+            override?.takeIf{it in range}?:value.takeIf{it in range}?:fallback
+        val count=if(settings.replySequenceEnabled)choose(settings.replySequenceMaxMessages,global.replySequenceMaxMessages,3,1..20)else 1
+        return Budget(settings.replySequenceEnabled,minOf(count,(20-usedVariants).coerceAtLeast(0)),
+            choose(settings.replySequenceToolBudget,global.replySequenceToolBudget,24,0..128),
+            choose(settings.replySequenceTokenBudget,global.replySequenceTokenBudget,48000,1..1000000))
+    }
+    fun remainingBudget(budget:Budget,receipts:List<Usage>):Remaining{
+        var tools=budget.toolBudget
+        var tokens=budget.tokenBudget.toLong()
+        for(r in receipts){
+            val calls=r.toolCalls?:return Remaining(false,0,0)
+            val count=r.totalTokens?:return Remaining(false,0,0)
+            if(calls<0||count<0)return Remaining(false,0,0)
+            tools=(tools-calls.coerceAtMost(tools)).coerceAtLeast(0)
+            tokens=(tokens-count.coerceAtMost(tokens)).coerceAtLeast(0)
+        }
+        return Remaining(true,tools,tokens)
+    }
     fun limit(n:Int)=n.also{require(it in 1..20){"invalid_reply_sequence_limit"}}
 
     suspend fun <T> run(identity:Identity,maxMessages:Int,newId:()->String,

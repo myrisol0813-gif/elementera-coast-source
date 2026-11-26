@@ -79,3 +79,15 @@ const full={turns:[{...raw.turns[0],assistant:{activeByUserVariant:{0:19},varian
 const rejected=appendAssistantVariant(full,'turn',{id:'new',content:'new'});
 assert.equal(rejected.variant,null);
 assert.equal(activeBranch(rejected.state.turns[0]).assistants.length,20);
+
+const {resolveReplySequenceBudget,remainingReplySequenceBudget}=await import('../elementera-mcp/deploy-pages/public/features/chat/chat-reply-sequence.js');
+const globalBudget={replySequenceMaxMessages:5,replySequenceToolBudget:18,replySequenceTokenBudget:12000};
+const override={reply_sequence_enabled:true,reply_sequence_max_messages:4,reply_sequence_tool_budget:0,reply_sequence_token_budget:9000};
+assert.deepEqual(server(client({context_settings:override})).context_settings,{reality_enabled:false,reality_fields:[],short_reply_mode:false,...override,weather_city:''});
+const budget=resolveReplySequenceBudget(globalBudget,override,18);
+assert.deepEqual(budget,{enabled:true,maxMessages:2,toolBudget:0,tokenBudget:9000});
+assert.equal(resolveReplySequenceBudget(globalBudget,{},0).maxMessages,1);
+assert.equal(resolveReplySequenceBudget(globalBudget,override,20).maxMessages,0);
+assert.deepEqual(remainingReplySequenceBudget(budget,[{toolCalls:0,totalTokens:6000},{toolCalls:0,totalTokens:3000}]),{known:true,tools:0,tokens:0});
+assert.equal(remainingReplySequenceBudget(budget,[{toolCalls:0}]).known,false);
+assert.equal(resolveReplySequenceBudget(globalBudget,{reply_sequence_enabled:true,reply_sequence_max_messages:-1},0).maxMessages,5);

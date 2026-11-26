@@ -47,4 +47,17 @@ class ReplySequenceTest {
         assertTrue(runCatching{ReplySequence.selectedGroup(listOf(second),0)}.isFailure)
     }
 
+    @org.junit.Test
+    fun humanBudgetOverridesInheritAndRespectCapacity(){
+        val global=com.elementeracoast.app.feature.wolf.BasicSettings(replySequenceMaxMessages=5,replySequenceToolBudget=18,replySequenceTokenBudget=12000)
+        val window=com.elementeracoast.app.core.model.ConversationContextSettings(replySequenceEnabled=true,replySequenceMaxMessages=4,replySequenceToolBudget=0,replySequenceTokenBudget=9000)
+        val budget=ReplySequence.resolveBudget(global,window,18)
+        org.junit.Assert.assertEquals(ReplySequence.Budget(true,2,0,9000),budget)
+        org.junit.Assert.assertEquals(1,ReplySequence.resolveBudget(global,window.copy(replySequenceEnabled=false),0).maxMessages)
+        org.junit.Assert.assertEquals(0,ReplySequence.resolveBudget(global,window,20).maxMessages)
+        org.junit.Assert.assertEquals(ReplySequence.Remaining(true,0,0),ReplySequence.remainingBudget(budget,listOf(ReplySequence.Usage(0,9000))))
+        org.junit.Assert.assertFalse(ReplySequence.remainingBudget(budget,listOf(ReplySequence.Usage(0,null))).known)
+        org.junit.Assert.assertEquals(5,ReplySequence.resolveBudget(global,window.copy(replySequenceMaxMessages=-1),0).maxMessages)
+    }
+
 }

@@ -91,3 +91,28 @@ export function replyAlternatives(variants){
   });
   return out;
 }
+
+// A snapshot of human-editable group settings. Window overrides do not
+// mutate device defaults. Capacity is a physical storage bound, not a quota.
+export function resolveReplySequenceBudget(global={},window={},usedVariants=0){
+  const valid=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
+  const choose=(override,value,fallback,min,max)=>valid(override,min,max)?override:valid(value,min,max)?value:fallback;
+  if(!Number.isSafeInteger(usedVariants)||usedVariants<0)throw Error('invalid_reply_sequence_capacity');
+  const enabled=window.reply_sequence_enabled===true;
+  const maxMessages=Math.min(enabled?choose(window.reply_sequence_max_messages,global.replySequenceMaxMessages,3,1,20):1,Math.max(0,20-usedVariants));
+  return Object.freeze({enabled,maxMessages,
+    toolBudget:choose(window.reply_sequence_tool_budget,global.replySequenceToolBudget,24,0,128),
+    tokenBudget:choose(window.reply_sequence_token_budget,global.replySequenceTokenBudget,48000,1,1000000)});
+}
+// Authoritative completed-request receipts only. A missing/invalid usage
+// receipt cannot be treated as free. This is a continuation gate, not a
+// promise that a provider will enforce an exact token or monetary ceiling.
+export function remainingReplySequenceBudget(budget,receipts){
+  let tools=0,tokens=0;
+  for(const r of receipts){
+    if(!Number.isSafeInteger(r?.toolCalls)||r.toolCalls<0||!Number.isSafeInteger(r?.totalTokens)||r.totalTokens<0)
+      return {known:false,tools:0,tokens:0};
+    tools+=r.toolCalls;tokens+=r.totalTokens;
+  }
+  return {known:true,tools:Math.max(0,budget.toolBudget-tools),tokens:Math.max(0,budget.tokenBudget-tokens)};
+}
