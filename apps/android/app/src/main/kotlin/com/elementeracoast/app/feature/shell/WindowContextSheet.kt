@@ -69,6 +69,7 @@ internal fun WindowContextSheet(
     conversationId: String,
     settings: ConversationContextSettings,
     thoughtSoilEnabled: Boolean,
+    localMode:Boolean=false,
     onSettingsChange: (ConversationContextSettings) -> Unit,
     onSetThoughtSoilEnabled: (Boolean) -> Unit,
     onOpenIslandLetter: () -> Unit,
@@ -179,8 +180,8 @@ internal fun WindowContextSheet(
             }
 
             SoftSettingsCard {
-                Text("真实连续回复",style=MaterialTheme.typography.titleSmall)
-                SettingSwitchRow(title="真实连续回复",note="执行链施工中，暂不自动追加回复；预算可先保存。",checked=false,enabled=false,onCheckedChange={})
+                SettingSwitchRow(title="真实连续回复（实验）",note=if(localMode)"模型可主动追加独立回复。套餐 token 为软预算，单次可能超额；未报告用量则停止追加。" else "在线执行尚未开放；预算可先保存。",
+                    checked=settings.replySequenceEnabled,enabled=usable&&localMode,onCheckedChange={onSettingsChange(settings.copy(replySequenceEnabled=it))})
                 androidx.compose.runtime.key(conversationId){
                     com.elementeracoast.app.feature.wolf.ReplyBudgetField("单组回复上限",settings.replySequenceMaxMessages,1..20,true,usable){onSettingsChange(settings.copy(replySequenceMaxMessages=it))}
                     com.elementeracoast.app.feature.wolf.ReplyBudgetField("累计工具调用预算",settings.replySequenceToolBudget,0..128,true,usable){onSettingsChange(settings.copy(replySequenceToolBudget=it))}

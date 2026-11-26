@@ -1289,8 +1289,8 @@ class CoastShellViewModel(
 
     private suspend fun generateReplyRun(cid:String,initial:RemoteHistory,tid:String,model:String,crossWindow:CrossWindowRequest){
         // Never silently switch a requested group into a paid single reply.
-        if(isChatGptPlanModel(model)){
-            showPlaceholder("ChatGPT 套餐通道尚不能执行本组累计 token 上限；请关闭连续回复后使用原套餐模型。未发起请求，也不会切换供应商。");return
+        if(isChatGptPlanModel(model)&&!localMode){
+            showPlaceholder("在线 ChatGPT 套餐连续回复尚未开放；本机模式可以使用软预算实验功能。未发起请求，也不会切换供应商。");return
         }
         val window=initial.contextSettings
         val imageModel=_state.value.currentImageModel
