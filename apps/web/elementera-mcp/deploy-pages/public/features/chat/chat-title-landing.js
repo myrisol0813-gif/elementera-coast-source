@@ -54,7 +54,7 @@ export function createChatTitleLanding({
   }
 
   async function sendLandingLetter({ conversationId, modelId, letterText }) {
-    if (runtime.generation) throw new Error('请先停止或等待当前回复完成。');
+    if (runtime.generation || runtime.finalizing || runtime.pendingComposerSend) throw new Error('请先停止或等待当前回复完成。');
     if (runtime.deletedIds.has(conversationId)) throw new Error('这个聊天窗口已经删除。');
     const pendingSave = runtime.saveChains.get(conversationId);
     if (pendingSave) await pendingSave;
@@ -83,8 +83,10 @@ export function createChatTitleLanding({
         }),
       });
       setHistory(conversationId, data.history || {});
-      runtime.desk?.captureSlip(data.desk_slip);
-      runtime.desk?.captureModelEcho(data.history || {}, conversationId);
+      if (runtime.currentId === conversationId) {
+        runtime.desk?.captureSlip(data.desk_slip);
+        runtime.desk?.captureModelEcho(data.history || {}, conversationId);
+      }
       if (data.conversation) {
         runtime.conversations = runtime.conversations.map((item) => (
           item.id === conversationId ? data.conversation : item

@@ -71,8 +71,8 @@ function portraitViews({
         <button type="button" class="choice-pill ${current.write_enabled ? 'is-active' : ''}" data-action="memory:${actionPrefix}-toggle" data-value="${current.write_enabled ? 'false' : 'true'}">${current.write_enabled ? '已开启' : '已关闭'}</button>
       </section>
       <details class="global-excerpt-guidance">
-        <summary>收录准则</summary>
-        <p class="feature-note">${escapeHtml(current.write_guidance || '')}</p>
+        <summary>书写时的目光</summary>
+        <p class="feature-note" style="white-space: pre-wrap">${escapeHtml(current.write_guidance || '')}</p>
       </details>
       <section class="feature-group">
         <h2>正式正文</h2>

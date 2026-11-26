@@ -91,6 +91,7 @@ class MainActivity : ComponentActivity() {
                         onUpdateModelPartnerAvatar = vm::updateModelPartnerAvatar,
                         onUploadAttachment = vm::uploadAttachment,
                         onRemovePendingAttachment = vm::removePendingAttachment,
+                        onComposerDraftChange = vm::updateComposerDraft,
                         onSend = vm::sendMessage,
                         onStop = vm::stopGeneration,
                         onMessageAction = vm::handleMessageAction,

@@ -321,7 +321,10 @@ internal class ChatGptNativeInference(
                                 put("type", "namespace")
                                 put("name", "coast")
                                 put("description", "海岸授权工具：记忆、日记、日历、书房、语音生成和开发工具。语音创建请使用 voice_create，未执行不能声称完成。")
-                                put("tools", prepared.tools)
+                                put("tools", JsonArray(prepared.tools.map{ item ->
+                                    val tool=item.jsonObject
+                                    if(tool["type"]?.jsonPrimitive?.contentOrNull=="function") JsonObject(tool+("strict" to JsonPrimitive(false))) else tool
+                                }))
                             })
                             if (searchEnabled) add(buildJsonObject { put("type", "web_search") })
                         })

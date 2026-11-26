@@ -88,27 +88,32 @@ export function createChatConversations({
 
   async function loadConversation(value) {
     const conversationId = sanitizeId(value, 'conversation');
+    const loadRevision = runtime.loadRevision = (runtime.loadRevision || 0) + 1;
     runtime.searchPreview?.clear(); // Reopening a room returns to the persisted branch.
     if (runtime.deletedIds.has(conversationId)) return false;
     const conversation = runtime.conversations.find((item) => item.id === conversationId) || null;
     setComposerReady(false, '正在载入聊天记录…');
     runtime.currentId = conversationId;
+    if (ui.input && runtime.composerDrafts) ui.input.value = runtime.composerDrafts.read(conversationId);
     storage.setCurrentConversation(conversationId);
     renderConversationList();
     setStatus('正在载入聊天记录…', 'loading');
     const cached = runtime.histories.get(conversationId) || createState();
+    const hasTask = () => runtime.generation?.conversationId === conversationId || runtime.pendingComposerSend === conversationId || runtime.finalizingConversationId === conversationId;
+    const cachedOnly = hasTask();
     runtime.desk?.onConversationChanged(cached, conversationId);
     if (conversation?.source !== 'rikkahub') runtime.rikkahubAttachments.delete(conversationId);
     if (!runtime.histories.has(conversationId)) runtime.histories.set(conversationId, cached);
     renderMessages(conversationId);
     try {
       const [data, attachments] = await Promise.all([
-        requestJson(`${API.history}?conversation_id=${encodeURIComponent(conversationId)}`),
+        cachedOnly ? Promise.resolve({ history: cached }) : requestJson(`${API.history}?conversation_id=${encodeURIComponent(conversationId)}`),
         conversation?.source === 'rikkahub'
           ? fetchRikkaHubAttachments(conversationId)
           : Promise.resolve(new Map()),
       ]);
-      setHistory(conversationId, data.history || {});
+      if (runtime.loadRevision !== loadRevision || runtime.currentId !== conversationId) return false;
+      if (!cachedOnly && !hasTask()) setHistory(conversationId, data.history || {});
       runtime.rikkahubAttachments.set(conversationId, attachments);
       setStatus('');
       renderMessages(conversationId);
@@ -118,13 +123,14 @@ export function createChatConversations({
       });
       void voice?.load(conversationId);
       runtime.memory?.onConversationChanged(conversationId)?.catch((error) => console.warn('[memory:conversation]', error));
-      runtime.desk?.onConversationChanged(data.history || {}, conversationId);
+      runtime.desk?.onConversationChanged(runtime.histories.get(conversationId) || {}, conversationId);
       dogtalk?.mountComposer(ui.dogtalk, {
         room_scope: 'conversation',
         conversation_id: conversationId,
       });
       return true;
     } catch (error) {
+      if (runtime.loadRevision !== loadRevision || runtime.currentId !== conversationId) return false;
       setComposerReady(false, '聊天记录载入失败');
       setStatus(`聊天记录载入失败：${error.message}`, 'error');
       return false;
@@ -193,9 +199,11 @@ export function createChatConversations({
   }
 
   async function deleteConversation(conversationId) {
+    if (runtime.generation?.conversationId === conversationId || runtime.pendingComposerSend === conversationId || runtime.finalizingConversationId === conversationId) {
+      toast('这个窗口仍有未结束的生成任务，请先停止或等待完成。'); return;
+    }
     runtime.deletedIds.add(conversationId);
     closeMenu();
-    if (runtime.generation?.conversationId === conversationId) runtime.generation.controller.abort();
     const deleted = runtime.conversations.find((item) => item.id === conversationId) || null;
     try {
       await requestJson(`${API.conversations}/${encodeURIComponent(conversationId)}`, { method: 'DELETE' });
@@ -204,6 +212,7 @@ export function createChatConversations({
       throw error;
     }
     runtime.conversations = runtime.conversations.filter((item) => item.id !== conversationId);
+    runtime.composerDrafts?.remove(conversationId);
     runtime.histories.delete(conversationId);
     runtime.searchPreview?.delete(conversationId);
     runtime.treasureIndicators?.delete(conversationId);

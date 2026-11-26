@@ -56,6 +56,7 @@ import com.elementeracoast.app.feature.wolf.GlobalArchiveRepository
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -66,6 +67,87 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CoastShellViewModelTest {
+    @Test
+    fun streamingReplyAndSoilFinishInOriginalWindowAfterNavigation() {
+        val fixture = Fixture()
+        val a = fixture.conversations.seed(RoomType.Main, "Origin")
+        val b = fixture.conversations.seed(RoomType.Main, "Other")
+        val vm = fixture.vm()
+        vm.selectConversation(a.id)
+        val gate = CompletableDeferred<Unit>()
+        fixture.chat.streamGate = gate
+        vm.sendMessage("original question")
+        assertTrue(vm.state.value.isStreaming)
+        assertEquals("真实流", vm.state.value.messages.last().text)
+        vm.selectConversation(b.id)
+        assertEquals(b.id, vm.state.value.activeConversationId)
+        assertFalse(vm.state.value.isStreaming)
+        assertTrue(vm.state.value.backgroundGeneration)
+        vm.updateComposerDraft("other draft")
+        vm.stopGeneration()
+        vm.selectConversation(a.id)
+        assertTrue(vm.state.value.isStreaming)
+        assertEquals("真实流", vm.state.value.messages.last().text)
+        vm.openFeature(com.elementeracoast.app.core.model.FeatureDestination.ActionLog)
+        assertTrue(vm.state.value.backgroundGeneration)
+        vm.backToChat()
+        assertTrue(vm.state.value.isStreaming)
+        vm.selectConversation(b.id)
+        gate.complete(Unit)
+        assertEquals(b.id, vm.state.value.activeConversationId)
+        assertEquals("other draft", vm.state.value.composerDraft)
+        assertFalse(vm.state.value.backgroundGeneration)
+        assertFalse(vm.state.value.isFinalizing)
+        assertEquals(1, fixture.chat.streamCalls)
+        assertEquals(a.id, fixture.thoughtSoil.lastOrganizedConversationId)
+        assertEquals("真实流回复", ChatSyncMapper.toUi(fixture.chat.histories.getValue(a.id)).last().text)
+        assertTrue(fixture.chat.histories[b.id]?.turns.orEmpty().isEmpty())
+        vm.selectConversation(a.id)
+        assertEquals("真实流回复", vm.state.value.messages.last().text)
+    }
+
+    @Test
+    fun composerDraftsSurviveWindowChangesAndRecreationAndClearAfterAcceptedSend() {
+        val fixture = Fixture()
+        val a = fixture.conversations.seed(RoomType.Main, "Draft A")
+        val b = fixture.conversations.seed(RoomType.Main, "Draft B")
+        val vm = fixture.vm()
+        vm.selectConversation(a.id)
+        vm.updateComposerDraft("unfinished A ")
+        vm.selectConversation(b.id)
+        assertEquals("", vm.state.value.composerDraft)
+        vm.updateComposerDraft("unfinished B")
+        vm.selectConversation(a.id)
+        assertEquals("unfinished A ", vm.state.value.composerDraft)
+        val restored = fixture.vm()
+        assertEquals("unfinished A ", restored.state.value.composerDraft)
+        restored.sendMessage(restored.state.value.composerDraft)
+        assertEquals("", restored.state.value.composerDraft)
+        restored.selectConversation(b.id)
+        assertEquals("unfinished B", restored.state.value.composerDraft)
+        restored.updateComposerDraft("")
+        restored.selectConversation(a.id)
+        restored.selectConversation(b.id)
+        assertEquals("", restored.state.value.composerDraft)
+    }
+
+    @Test
+    fun firstSendMovesLandingDraftToCreatedWindowAndClearsIt() {
+        val fixture = Fixture()
+        fixture.conversations.seed(RoomType.Main, "Main")
+        val vm = fixture.vm()
+        vm.openRoomType(RoomType.Radio)
+        vm.updateComposerDraft("radio draft")
+        vm.openRoomType(RoomType.Main)
+        vm.openRoomType(RoomType.Radio)
+        assertEquals("radio draft", vm.state.value.composerDraft)
+        vm.sendMessage(vm.state.value.composerDraft)
+        assertTrue(vm.state.value.activeConversationId.isNotBlank())
+        assertEquals("", vm.state.value.composerDraft)
+        vm.openRoomType(RoomType.Radio)
+        assertEquals("", vm.state.value.composerDraft)
+    }
+
     @Test
     fun historicalSearchPreviewDoesNotChangeWritableCachedBranchOrNextReply() {
         val fixture = Fixture()
@@ -546,6 +628,7 @@ class CoastShellViewModelTest {
 
     private class FakeThoughtSoilRepository : ThoughtSoilRepository {
         var organizeCalls = 0
+        var lastOrganizedConversationId: String? = null
         var setEnabledCalls = 0
         var lastEnabled = true
 
@@ -568,6 +651,7 @@ class CoastShellViewModelTest {
 
         override suspend fun organizeAfterReply(conversationId: String, modelId: String): ThoughtSoilSnapshot {
             organizeCalls += 1
+            lastOrganizedConversationId = conversationId
             return soil(
                 conversationId,
                 listOf("新芽")
@@ -592,6 +676,7 @@ class CoastShellViewModelTest {
         var streamCalls = 0
         var persistCalls = 0
         var failStream = false
+        var streamGate: CompletableDeferred<Unit>? = null
         var lastRecentTurns = 0
         var lastContextBudget = 0
         var lastOutputLength = ""
@@ -651,6 +736,7 @@ class CoastShellViewModelTest {
                 "无法连接海岸后端。"
             )
             emit(ChatProgress.Delta("真实流"))
+            streamGate?.await()
             emit(ChatProgress.Delta("回复"))
             val completed = ChatSyncMapper.appendAssistant(
                 ChatSyncMapper.clearUserFailure(historyWithUser, turnId),

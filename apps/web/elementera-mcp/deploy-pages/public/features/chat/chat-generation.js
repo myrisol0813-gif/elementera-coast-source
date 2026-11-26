@@ -91,7 +91,7 @@ export function createChatGeneration({
   }
 
   async function generate(conversationId, turnId, { dogtalkSubmission = null, crossWindowSubmission = null } = {}) {
-    if (runtime.generation || runtime.deletedIds.has(conversationId)) return;
+    if (runtime.generation || runtime.finalizing || runtime.deletedIds.has(conversationId)) return;
     const targetConversation = runtime.conversations.find((item) => item.id === conversationId);
     if (targetConversation?.room_type === 'lighthouse') return;
     const original = runtime.histories.get(conversationId);
@@ -157,7 +157,7 @@ export function createChatGeneration({
           body: JSON.stringify(payload),
         });
         finishReason = String(data?.finish_reason || '');
-        runtime.desk?.captureSlip(data.desk_slip);
+        if (runtime.currentId === conversationId) runtime.desk?.captureSlip(data.desk_slip);
         patch = {
           content: data?.message?.content || '模型没有返回文本。',
           errorDetail: '',
@@ -198,12 +198,14 @@ export function createChatGeneration({
       return;
     }
 
+    runtime.finalizing = true; runtime.finalizingConversationId = conversationId;
+    try {
     const latest = patchGeneratedVariant(conversationId, turnId, appended, patch, { render: false });
     if (runtime.generation?.controller === controller) runtime.generation = null;
     renderMessages(conversationId);
     composerState();
-    await saveHistory(conversationId, latest).catch(() => undefined);
-    runtime.desk?.onConversationChanged(latest, conversationId);
+    if (!await saveHistory(conversationId, latest).then(() => !runtime.deletedIds.has(conversationId), () => false)) return false;
+    if (runtime.currentId === conversationId) runtime.desk?.onConversationChanged(latest, conversationId);
     if (generated) void voice?.load(conversationId, { force: true });
     if (generated) { dogtalk?.resetCrossWindow?.({ room_scope: 'conversation', conversation_id: conversationId }); autoTitle(conversationId, latest, turnId).catch(() => undefined); }
     if (generated) {
@@ -221,12 +223,14 @@ export function createChatGeneration({
       else if (soilFailed) toast('回复已保存，整理当前对话的纸条已保底整理。', 3000);
       else if (lockedBlank) toast('整理当前对话的纸条目前为空且已手动锁定；恢复自动整理后会继续更新。', 3200);
     }
+    return true;
+    } finally { runtime.finalizing = false; runtime.finalizingConversationId = null; composerState(); }
   }
 
   async function send(text, attachments = []) {
     const content = String(text || '').trim();
     const attachmentList = (Array.isArray(attachments) ? attachments : []).filter((item) => item?.id).slice(0, 12);
-    if ((!content && !attachmentList.length) || !runtime.currentId || runtime.generation || !runtime.composerReady) return false;
+    if ((!content && !attachmentList.length) || !runtime.currentId || runtime.generation || runtime.finalizing || !runtime.composerReady) return false;
     if (isImageModel(runtime.profile.current_chat_model, runtime.profile.model_box.image)) {
       toast('当前是生图模型，不能用于聊天。请切换聊天模型。');
       return false;
@@ -240,14 +244,15 @@ export function createChatGeneration({
       attachments: attachmentList,
     });
     setHistory(runtime.currentId, appended.state);
-    ui.input.value = '';
     composerState();
     renderMessages();
     const conversation = runtime.conversations.find((item) => item.id === runtime.currentId);
-    if (conversation?.room_type === 'lighthouse') await saveHistory(runtime.currentId, appended.state).catch(() => undefined);
-    else await generate(runtime.currentId, appended.turn.id, turnPapers);
-    dogtalk?.mountComposer(ui.dogtalk, target);
-    return true;
+    const id = target.conversation_id;
+    const accepted = conversation?.room_type === 'lighthouse'
+      ? await saveHistory(id, appended.state).then(() => !runtime.deletedIds.has(id), () => false)
+      : await generate(id, appended.turn.id, turnPapers);
+    if (runtime.currentId === id) dogtalk?.mountComposer(ui.dogtalk, target);
+    return accepted === true;
   }
 
   return Object.freeze({ contextMessages, chatRequestContext, patchGeneratedVariant, generate, sendLandingLetter, autoTitle, autoTitleFromLanding, send });

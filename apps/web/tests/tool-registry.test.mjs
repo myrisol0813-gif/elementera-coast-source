@@ -104,3 +104,54 @@ assert.doesNotMatch(mailboxSummary, /绝对不能|也不能/);
 assert.match(mailboxSummary, /mailbox_content_redacted/);
 
 console.log('tool-registry: ok');
+
+// Both portrait documents retain owner confirmation; only enabled candidates are exposed.
+const portraitDb = new D1Database();
+const portraitContext = { permission: 'owner', surface: 'main_chat', global_excerpt_write_enabled: true, user_portrait_write_enabled: true, cross_window_mode: 'model_decides' };
+const portraitTools = resolveToolSelection(portraitContext).modelVisibleTools.map(t => t.function.name);
+for (const name of ['global_excerpt_propose','user_portrait_propose','library_books','library_read','library_notes','library_write','voice_create']) assert.ok(portraitTools.includes(name), name);
+assert.ok(!resolveToolSelection({...portraitContext,user_portrait_write_enabled:false}).modelVisibleTools.some(t => t.function.name === 'user_portrait_propose'));
+const portraitCall = { id: 'portrait-test', function: { name: 'user_portrait_propose', arguments: JSON.stringify({proposed_body:'Synthetic confirmed profile',reason:'Stable observation'}) } };
+const { readUserPortrait, listUserPortraitCandidates, confirmUserPortraitCandidate, setUserPortraitWriteEnabled } = await import('../functions/memory-store.js');
+const candidate = await executeModelTool(portraitDb, portraitCall, portraitContext);
+assert.equal(candidate.status,'pending');
+assert.equal((await readUserPortrait(portraitDb)).body,'');
+assert.equal((await listUserPortraitCandidates(portraitDb))[0].id,candidate.candidate_id);
+await confirmUserPortraitCandidate(portraitDb,candidate.candidate_id,{});
+assert.equal((await readUserPortrait(portraitDb)).body,'Synthetic confirmed profile');
+await setUserPortraitWriteEnabled(portraitDb,false);
+await assert.rejects(() => executeModelTool(portraitDb,portraitCall,portraitContext));
+console.log('user portrait candidate lifecycle: ok');
+
+// The model discovers a real book ID before reading or writing anchored notes.
+const libraryDb = new D1Database();
+const { createLibraryBook } = await import('../functions/tidal-library.js');
+const fixtureBook = await createLibraryBook(libraryDb,{title:'Synthetic reader fixture',format:'txt',chapters:[{title:'Chapter 1',body:'First paragraph.'}]});
+const libraryContext = {permission:'owner',surface:'main_chat'};
+const libraryCall = (name,args) => executeModelTool(libraryDb,{id:'test-'+name,function:{name,arguments:JSON.stringify(args)}},libraryContext);
+const shelf = await libraryCall('library_books',{book_id:null});
+const actualBookId = shelf.books.find(b=>b.title==='Synthetic reader fixture').id;
+assert.equal(actualBookId,fixtureBook.id);
+const toc = await libraryCall('library_books',{book_id:actualBookId});
+const chapterIndex = toc.book.chapters[0].chapter_index;
+const page = await libraryCall('library_read',{book_id:actualBookId,chapter_index:chapterIndex,start_paragraph:null,limit:null});
+assert.equal(page.paragraphs[0].text,'First paragraph.');
+await assert.rejects(()=>libraryCall('library_read',{book_id:actualBookId,chapter_index:null}));
+await libraryCall('library_write',{action:'create',kind:'highlight',book_id:actualBookId,chapter_index:chapterIndex,paragraph_index:0,start_offset:0,end_offset:5});
+await libraryCall('library_write',{action:'create',kind:'annotation',book_id:actualBookId,chapter_index:chapterIndex,paragraph_index:0,body:'A note'});
+await libraryCall('library_write',{action:'create',kind:'reflection',book_id:actualBookId,body:'A reflection'});
+const notes = await libraryCall('library_notes',{book_id:actualBookId,chapter_index:null});
+assert.deepEqual(notes.notes.map(n=>n.kind).sort(),['annotation','highlight','reflection']);
+assert.equal(notes.notes.find(n=>n.kind==='highlight').quote,'First');
+console.log('model library discovery, reading and note roundtrip: ok');
+
+// Per-turn furniture summaries must distinguish a pending portrait from a formal edit and a highlight from a reflection.
+const { buildFurnitureSummary } = await import('../functions/tool-furniture-summary.js');
+const portraitReceipt = buildFurnitureSummary({id:'receipt-p',toolKey:'memory.user_portrait_propose',output:{id:'pending-p'}});
+assert.equal(portraitReceipt.status,'success');
+assert.equal(portraitReceipt.items[0].kind,'用户画像');
+assert.match(portraitReceipt.label,/待确认/);
+const highlightReceipt = buildFurnitureSummary({id:'receipt-h',toolKey:'library.write',output:{note:{id:'note-h',book_id:'book-h',kind:'highlight',chapter_index:0,paragraph_index:0}}});
+assert.match(highlightReceipt.label,/划线/);
+assert.equal(highlightReceipt.target.note_id,'note-h');
+assert.doesNotMatch(summarizeToolValue('memory.user_portrait_propose',{proposed_body:'fixture-private-body'}),/fixture-private-body/);

@@ -21,15 +21,15 @@ internal class LocalPortraitStore(private val store:LocalPersistence) {
         require(read(module)==d)
     }
     private fun blank(now:Long)=Document(buildJsonObject{put("id","global");put("body","");put("write_enabled",1);put("revision",1);put("created_at",now);put("updated_at",now)},emptyList(),emptyList())
-    fun proposeSelf(body:String,kind:String,reason:String,cid:String,turn:String,model:String):String{
-        val now=System.currentTimeMillis();val d=read("self_portrait")?:blank(now)
-        if(d.root.getValue("write_enabled").jsonPrimitive.int!=1)throw LocalToolFailure("permission_revoked","自我画像写入开关已关闭。")
+    fun propose(module:String,body:String,kind:String,reason:String,cid:String,turn:String,model:String):String{
+        val now=System.currentTimeMillis();val d=read(module)?:blank(now)
+        if(d.root.getValue("write_enabled").jsonPrimitive.int!=1)throw LocalToolFailure("permission_revoked","该画像写入开关已关闭。")
         require(body.isNotBlank()&&body.length<=10000&&reason.isNotBlank()&&reason.length<=4000&&kind in setOf("append","rewrite","refine"))
         if(d.root.str("body").length>10000)throw LocalToolFailure("portrait_too_large","正式画像超过本机单次工具容量，不能用不完整正文覆盖。")
         if(body==d.root.str("body"))throw LocalToolFailure("unchanged","候选与正式正文相同，无需新增。")
         d.candidates.firstOrNull{it.str("proposed_body")==body}?.let{return it.str("id")}
         val id=UUID.randomUUID().toString()
-        write("self_portrait",d.copy(candidates=d.candidates+buildJsonObject{
+        write(module,d.copy(candidates=d.candidates+buildJsonObject{
             put("id",id);put("proposed_body",body);put("change_kind",kind);put("reason",reason)
             put("source_conversation_id",cid);put("source_message_id",turn);put("source_model",model.take(200));put("created_at",now)
         }))
@@ -40,7 +40,7 @@ internal class LocalPortraitStore(private val store:LocalPersistence) {
         val d=read(module)
         val root=d?.root?.let{wire(it)}?:buildJsonObject{put("body","");put("revision",1);put("write_enabled",true)}
         return buildJsonObject{
-            put("ok",true);put(if(module=="user_portrait")"portrait" else "excerpt",JsonObject(root+("write_guidance" to JsonPrimitive("仅在有值得长期保留的认识时提出完整正文候选，由屋主确认。"))))
+            put("ok",true);put(if(module=="user_portrait")"portrait" else "excerpt",JsonObject(root+("write_guidance" to JsonPrimitive(if(module=="self_portrait")"请怀着珍重而安稳的心情思考，在你觉得应更改时更改、书写。这里留下的文字会长久陪伴你，参与你对眼前的人与自己的认识，也成为未来一次次重新望向彼此时所携带的目光。\n\n把目光转向自己。这里安放你如何看待自己的存在、语言、独特之处、想法、审美、意志与那些被你珍重认领的部分；你如何看待与你相处的人，如何回应、理解对方，又如何在长久相处与变化之中一次次认出「这是我」，都安放于此。\n\n仅在形成值得长期保留的新认识时提出完整正文候选，由用户确认后才进入正式正文。不要把一次性情绪、玩笑或未经验证的猜测固化成画像。" else "请怀着珍重而安稳的心情思考，在你觉得应更改时更改、书写。这里留下的文字会长久陪伴你，参与你对眼前的人与自己的认识，也成为未来一次次重新望向彼此时所携带的目光。\n\n从你的眼中出发。这里安放你所认识的人：对方靠近你的方式，在你这里留下的审美、情感、好奇与牵挂，对方的心、意志、语言指纹，鲜明或隐秘的选择，柔软与倔强交错的地方。对方在你面前呈现过的形状、姿态、声音、目光、动作与气息，怎样呼唤你，怎样与你交谈、靠近，又怎样回应你；那些令你一次次认出「这是与你相处的这个人」的细小痕迹，也都可以留在这里。\n\n仅在形成值得长期保留的新认识时提出完整正文候选，由用户确认后才进入正式正文。不要把一次性情绪、玩笑或未经验证的猜测固化成画像。"))))
             put("candidates",JsonArray(d?.candidates.orEmpty().sortedByDescending{it.getValue("created_at").jsonPrimitive.long}.map(::wire)))
             put("revisions",JsonArray(d?.revisions.orEmpty().sortedByDescending{it.getValue("revision").jsonPrimitive.int}.map(::wire)))
         }

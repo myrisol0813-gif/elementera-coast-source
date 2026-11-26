@@ -47,7 +47,7 @@ assert.match(moduleSources.get('memory-soil-view.js'), /种子候选/);
 assert.equal(moduleSources.get('memory-soil-view.js').includes('名称｜生命核｜使用提示｜避免提示'), false);
 assert.match(moduleSources.get('memory-pocket-view.js'), /只有确认后才会进入记忆库或种子库/);
 assert.match(moduleSources.get('memory-library-view.js'), /搜索与筛选放在同一处/);
-assert.match(moduleSources.get('memory-global-excerpt-view.js'), /收录准则/);
+assert.match(moduleSources.get('memory-global-excerpt-view.js'), /书写时的目光/);
 assert.match(moduleSources.get('memory-global-excerpt-view.js'), /title: '用户画像'/);
 assert.match(moduleSources.get('memory-global-excerpt-view.js'), /title: '自我画像'/);
 assert.match(moduleSources.get('memory-global-excerpt-view.js'), /自动整理/);

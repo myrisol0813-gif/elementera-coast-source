@@ -35,9 +35,9 @@ internal class LocalToolSession private constructor(
             add(Spec("read_mystic_dogtalk","dogtalk.read","读取私人草稿","仅检查当前轮用户明确授权的私人草稿；已经递入本轮的内容不重复读取。保留私密或困惑时阅读的草稿不会通过此工具公开。",schema()))
             add(Spec("memory_search","memory.search","搜索正式记忆","检索已确认的正式记忆，按本机语义索引与关键词返回少量匹配内容；索引不可用时使用关键词。",schema(mapOf("query" to string()),listOf("query"))))
             add(Spec("calendar_list","calendar.list","查看公历日程","读取指定月份本机日历。",schema(mapOf("month" to string(7)),listOf("month"))))
-            add(Spec("library_books","library.books","翻阅书架","列出本机书籍；指定 book_id 时返回目录。",schema(mapOf("book_id" to string()))))
-            add(Spec("library_read","library.read","读书页","读取指定书籍的一页，最多6个段落。",schema(mapOf("book_id" to string(),"chapter_index" to integer(0,100000),"start_paragraph" to integer(0,100000),"limit" to integer(1,6)),listOf("book_id","chapter_index"))))
-            add(Spec("library_notes","library.notes","读书房笔记","读取指定书籍最近20条笔记。",schema(mapOf("book_id" to string()),listOf("book_id"))))
+            add(Spec("library_books","library.books","翻阅书架","不填 book_id 时列出本机书籍及真实 id；从返回的 id 选择书，再指定 book_id 查看目录。不要用书名代替 id。",schema(mapOf("book_id" to string()))))
+            add(Spec("library_read","library.read","读书页","使用书架返回的真实 book_id；chapter_index 与 start_paragraph 从0开始，默认3段、最多6段。",schema(mapOf("book_id" to string(),"chapter_index" to integer(0,100000),"start_paragraph" to integer(0,100000),"limit" to integer(1,6)),listOf("book_id","chapter_index"))))
+            add(Spec("library_notes","library.notes","读书房笔记","读取指定书籍最近20条笔记；可指定从0开始的 chapter_index。",schema(mapOf("book_id" to string(),"chapter_index" to integer(0,100000)),listOf("book_id"))))
             add(Spec("vault_search","vault.search","翻拾潮目录","按关键词查找拾潮，返回短摘录和收藏ID。",schema(mapOf("query" to string()),listOf("query"))))
             add(Spec("vault_read","vault.read","精读拾潮","读取指定收藏的文字与备注。其他窗口原聊天仍受跨窗口权限控制。",schema(mapOf("id" to string()),listOf("id"))))
             add(Spec("list_daily_moments","daily.moments.list","读碳硅圈","读取最近的本机动态，最多8条。",schema()))
@@ -47,11 +47,13 @@ internal class LocalToolSession private constructor(
         if(writeAllowed){
             if(base.thinkingSoil.enabled && LocalPortraitStore(store).read("self_portrait")?.root?.get("write_enabled")?.jsonPrimitive?.int != 0)
                 add(Spec("global_excerpt_propose","memory.global_excerpt_propose","提出自我画像修改稿","仅在自动整理和画像写入均开启时提出整篇完整修改稿，说明长期价值；只进入待确认区，不覆盖正式正文。本机单次工具参数最多12000字符；不要提交截断的正文。",schema(mapOf("proposed_body" to string(10000),"reason" to string(4000),"change_kind" to string(40)),listOf("proposed_body","reason"))))
+            if(base.thinkingSoil.enabled && LocalPortraitStore(store).read("user_portrait")?.root?.get("write_enabled")?.jsonPrimitive?.int != 0)
+                add(Spec("user_portrait_propose","memory.user_portrait_propose","提出用户画像修改稿","仅在自动整理和画像写入均开启时提出整篇完整修改稿，说明长期价值；只进入待确认区，不覆盖正式正文。本机单次工具参数最多12000字符；不要提交截断的正文。",schema(mapOf("proposed_body" to string(10000),"reason" to string(4000),"change_kind" to string(40)),listOf("proposed_body","reason"))))
             add(Spec("create_moment","daily.create_moment","写碳硅圈","以模型身份新增正式动态。",schema(mapOf("date" to string(10),"text" to string(4000)),listOf("date","text"))))
             add(Spec("create_diary","daily.create_diary","写日记","以模型身份新增日记。",schema(mapOf("date" to string(10),"text" to string(6000),"weather" to string(80),"mood" to string(80),"tags" to array(string(80),12)),listOf("date","text"))))
             add(Spec("moment_comment","daily.moment_comment","评论碳硅圈","以模型身份评论指定动态。",schema(mapOf("moment_id" to string(),"text" to string(2000)),listOf("moment_id","text"))))
             add(Spec("moment_like","daily.moment_like","点赞碳硅圈","仅改变模型自己的点赞。",schema(mapOf("moment_id" to string(),"liked" to buildJsonObject{put("type","boolean")}),listOf("moment_id","liked"))))
-            add(Spec("calendar_create","calendar.create","写日历","新增一条模型日历事项，不修改或删除既有事项。",schema(mapOf("date" to string(10),"title" to string(120),"body" to string(4000),"kind" to string(10)),listOf("date","title"))))
+            add(Spec("calendar_create","calendar.create","写日历","新增日程、随记或纪念日，不修改或删除既有事项。随记 kind=note；纪念日提供 anniversary（date 为起始日期，kind 为 event）。",schema(mapOf("date" to string(10),"title" to string(120),"body" to string(4000),"kind" to buildJsonObject{put("type","string");put("enum",JsonArray(listOf("event","note").map(::JsonPrimitive)))},"recurrence" to buildJsonObject{put("type","string");put("enum",JsonArray(listOf("none","yearly").map(::JsonPrimitive)))},"anniversary" to schema(mapOf("startDay" to string(10),"mode" to buildJsonObject{put("type","string");put("enum",JsonArray(listOf("elapsed","milestone","yearly").map(::JsonPrimitive)))},"targetDays" to integer(1,109938),"pinned" to buildJsonObject{put("type","boolean")}),listOf("startDay","mode","pinned"))),listOf("date","title"))))
             add(Spec("library_write","library.write","写书房笔记","action=create/edit/delete；创建批注 annotation、读后感 reflection 或划线 highlight。章节、段落从0开始；划线需指定 UTF-16 start_offset（含）与 end_offset（不含），不填正文；修改或删除仅限自己的笔记 id。",schema(mapOf("action" to string(8),"id" to string(),"book_id" to string(),"kind" to string(16),"body" to string(4000),"chapter_index" to integer(0,100000),"paragraph_index" to integer(0,100000),"start_offset" to integer(0,100000),"end_offset" to integer(0,100000)),listOf("action"))))
             add(Spec("memory_write_candidate","memory.write_candidate","放入待确认袋","提出记忆或种子候选，由屋主确认，不直接写入正式记忆。",schema(mapOf("title" to string(120),"content" to string(2000),"destination" to string(8)),listOf("title","content","destination"))))
         }
@@ -88,11 +90,20 @@ internal class LocalToolSession private constructor(
         val h=cache.history(cid)?:return false
         if(cache.conversations().none{it.id==cid&&it.deletedAt==null}||h.turns.firstOrNull{it.id==turn}!=sourceTurn)return false
         return when {
-            spec.name=="global_excerpt_propose" -> writeAllowed&&h.contextSettings.localModelWriteEnabled&&LocalSoilStore(s).current(cid)?.get("auto_refresh_enabled")?.jsonPrimitive?.int==1&&LocalPortraitStore(s).read("self_portrait")?.root?.get("write_enabled")?.jsonPrimitive?.int!=0
+            spec.name in setOf("global_excerpt_propose","user_portrait_propose") -> writeAllowed&&h.contextSettings.localModelWriteEnabled&&LocalSoilStore(s).current(cid)?.get("auto_refresh_enabled")?.jsonPrimitive?.int==1&&LocalPortraitStore(s).read(if(spec.name=="user_portrait_propose")"user_portrait" else "self_portrait")?.root?.get("write_enabled")?.jsonPrimitive?.int!=0
             spec.name in WRITE_NAMES -> writeAllowed&&h.contextSettings.localModelWriteEnabled
             spec.key.startsWith("cross_window.") -> crossAllowed&&h.contextSettings.crossWindowAuto
             else -> readAllowed&&h.contextSettings.localModelToolsEnabled
         }
+    }
+    // Optional nulls emitted by function-call providers mean omission; required nulls remain invalid.
+    private fun parseInput(spec:Spec,arguments:String):JsonObject {
+        val raw=Json.parseToJsonElement(arguments).jsonObject
+        val fields=spec.parameters.getValue("properties").jsonObject.keys
+        val required=spec.parameters.getValue("required").jsonArray.map{it.jsonPrimitive.content}.toSet()
+        if(raw.keys.any{it !in fields})throw LocalToolFailure("invalid_arguments","工具包含未声明字段。")
+        if(required.any{raw[it]==null||raw[it]==JsonNull})throw LocalToolFailure("invalid_arguments","缺少必填工具字段："+required.filter{raw[it]==null||raw[it]==JsonNull}.joinToString(","))
+        return JsonObject(raw.filterValues{it!=JsonNull})
     }
     @Synchronized fun execute(callId:String,name:String,arguments:String):RemoteNativeToolResult {
         val spec=specs.firstOrNull{it.name==name}?:return errorResult("工具未授权。")
@@ -104,8 +115,7 @@ internal class LocalToolSession private constructor(
         var output=buildJsonObject{put("ok",false);put("message","工具没有执行。")}
         try {
             require(arguments.length<=6000){"工具参数超限。"}
-            val input=Json.parseToJsonElement(arguments).jsonObject
-            require(input.keys.all{it in spec.parameters.getValue("properties").jsonObject.keys}&&spec.parameters.getValue("required").jsonArray.all{it.jsonPrimitive.content in input})
+            val input=parseInput(spec,arguments)
             val candidate=store.readConsistent{s->
                 if(!allowedNow(s,spec))throw LocalToolFailure("permission_revoked","窗口权限已关闭或来源轮次已变化。")
                 run(s,spec,input)
@@ -146,8 +156,7 @@ internal class LocalToolSession private constructor(
         val auditId=UUID.randomUUID().toString()
         val output=try {
             require(arguments.length<=12000)
-            val input=Json.parseToJsonElement(arguments).jsonObject
-            require(input.keys.all{it in spec.parameters.getValue("properties").jsonObject.keys}&&spec.parameters.getValue("required").jsonArray.all{it.jsonPrimitive.content in input})
+            val input=parseInput(spec,arguments)
             store.atomic{s->
                 if(!allowedNow(s,spec))throw LocalToolFailure("permission_revoked","当前窗口写入权限已关闭或窗口已变化。")
                 val value=LocalToolWrites(s,cid,turn,modelId,auditId).execute(spec.name,input)
@@ -247,9 +256,9 @@ internal class LocalToolSession private constructor(
                 return JsonObject(rows(items)+("retrieval_status" to JsonPrimitive(recall.retrievalStatus))) to {}
             }
             "calendar_list"->return rows(LocalCalendarStore(s).list(str("month",7)).take(40)) to {}
-            "library_books"->return (if("book_id" in input)buildJsonObject{put("ok",true);put("book",side.book(str("book_id")).filterMetadata())}else rows(side.books().take(40))) to {}
+            "library_books"->return (if(input["book_id"]?.jsonPrimitive?.contentOrNull?.isNotBlank()==true)buildJsonObject{put("ok",true);put("book",side.book(str("book_id")).filterMetadata())}else rows(side.books().take(40))) to {}
             "library_read"->return buildJsonObject{put("ok",true);put("page",side.chapter(str("book_id"),int("chapter_index",0,0..100000),int("start_paragraph",0,0..100000),int("limit",3,1..6)))} to {}
-            "library_notes"->return rows(side.notes(str("book_id")).takeLast(20)) to {}
+            "library_notes"->return rows(side.notes(str("book_id")).filter{note->"chapter_index" !in input || note["chapter_index"]?.jsonPrimitive?.intOrNull==int("chapter_index",0,0..100000)}.takeLast(20)) to {}
             "vault_search"->{
                 val q=str("query")
                 val found=side.treasureRows("all",q,"","",0).getValue("items").jsonArray.take(10).map{v->
@@ -276,7 +285,7 @@ internal class LocalToolSession private constructor(
     private fun JsonObject.filterMetadata()=JsonObject(filterKeys{it !in setOf("reading_logs","progress")})
     companion object {
         const val MAX_CALLS=12
-        private val WRITE_NAMES=setOf("create_moment","create_diary","moment_comment","moment_like","calendar_create","library_write","memory_write_candidate","global_excerpt_propose")
+        private val WRITE_NAMES=setOf("create_moment","create_diary","moment_comment","moment_like","calendar_create","library_write","memory_write_candidate","global_excerpt_propose","user_portrait_propose")
         fun open(store:LocalPersistence,cid:String,turn:String,request:RemoteCrossWindowRequest?,base:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null):LocalToolSession?{
             val h=RemoteCacheStore(store,strictReads=true).history(cid)?:return null
             val cross=h.contextSettings.crossWindowAuto&&request?.mode=="model_decides"

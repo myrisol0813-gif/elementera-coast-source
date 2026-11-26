@@ -42,11 +42,11 @@ function markCrossWindowFailure(slip, error) {
   };
 }
 
-function annotateCrossWindowError(error, slip, runtime) {
+function annotateCrossWindowError(error, slip, runtime, conversationId) {
   const failedSlip = markCrossWindowFailure(slip, error);
   const section = failedSlip?.cross_window;
   if (!section || section.mode === 'off') return error;
-  runtime.desk?.captureSlip(failedSlip);
+  if (runtime.currentId === conversationId) runtime.desk?.captureSlip(failedSlip);
   error.details = {
     ...(error.details && typeof error.details === 'object' ? error.details : {}),
     cross_window: section,
@@ -149,7 +149,7 @@ export async function runChatStreamFlow({
       onEvent(item) {
         if (item.event === 'desk_slip') {
           streamState.deskSlip = item.data && typeof item.data === 'object' ? item.data : null;
-          runtime.desk?.captureSlip(streamState.deskSlip);
+          if (runtime.currentId === conversationId) runtime.desk?.captureSlip(streamState.deskSlip);
           return;
         }
         if (item.event === 'meta') {
@@ -205,7 +205,7 @@ export async function runChatStreamFlow({
       },
     });
   } catch (error) {
-    if (error?.name !== 'AbortError') throw annotateCrossWindowError(error, streamState.deskSlip, runtime);
+    if (error?.name !== 'AbortError') throw annotateCrossWindowError(error, streamState.deskSlip, runtime, conversationId);
     throw error;
   }
 
@@ -214,12 +214,12 @@ export async function runChatStreamFlow({
   if (!streamState.done) {
     const error = new Error('流式响应在完成事件前中断。');
     error.type = 'stream_incomplete';
-    throw annotateCrossWindowError(error, streamState.deskSlip, runtime);
+    throw annotateCrossWindowError(error, streamState.deskSlip, runtime, conversationId);
   }
   if (!streamState.partialContent.trim()) {
     const error = new Error('模型完成了这次请求，但没有返回文字。');
     error.type = 'empty_model_reply';
-    throw annotateCrossWindowError(error, streamState.deskSlip, runtime);
+    throw annotateCrossWindowError(error, streamState.deskSlip, runtime, conversationId);
   }
 
   const furnitureRuns = mergeFurniture(streamState.furnitureRuns, streamState.deskSlip);

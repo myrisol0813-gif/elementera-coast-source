@@ -64,6 +64,7 @@ fun ChatWindow(
     onCrossWindowChange: (CrossWindowUiState) -> Unit,
     onUploadAttachment: (String, String, ByteArray) -> Unit,
     onRemovePendingAttachment: (String) -> Unit,
+    onComposerDraftChange: (String) -> Unit,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
     onMessageAction: (MessageAction) -> Unit,
@@ -76,7 +77,7 @@ fun ChatWindow(
     guideTarget: String? = null,
     onGuideConsumed: () -> Unit = {}
 ) {
-    var input by rememberSaveable(state.activeConversationId) { mutableStateOf("") }
+    val input = state.composerDraft
     var avatarDialogOpen by rememberSaveable { mutableStateOf(false) }
     var editingMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var soilOpen by rememberSaveable { mutableStateOf(false) }
@@ -260,11 +261,14 @@ fun ChatWindow(
                 isStreaming = state.isStreaming,
                 onNotice = onPlaceholder
             )
+            if (state.backgroundGeneration) {
+                androidx.compose.material3.Text("另一个窗口正在生成或整理；可以先写草稿。", style = androidx.compose.material3.MaterialTheme.typography.labelSmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+            }
             HorizontalDivider(color = androidx.compose.material3.MaterialTheme.colorScheme.outlineVariant.copy(alpha = .55f))
             CoastComposer(
                 conversationId = state.activeConversationId,
                 value = input,
-                onValueChange = { input = it },
+                onValueChange = onComposerDraftChange,
                 pendingAttachments = state.pendingAttachments,
                 attachmentUploading = state.attachmentUploading,
                 previewSource = attachmentPreviewSource,
@@ -276,7 +280,7 @@ fun ChatWindow(
                 onPickImage = { imagePicker.launch(arrayOf("image/png", "image/jpeg", "image/webp")) },
                 onPickFile = { filePicker.launch(arrayOf("*/*")) },
                 onRemoveAttachment = onRemovePendingAttachment,
-                onSend = { val outgoing = input; input = ""; onSend(outgoing) },
+                onSend = { onSend(input) },
                 onStop = onStop,
                 onPlaceholder = onPlaceholder
             )

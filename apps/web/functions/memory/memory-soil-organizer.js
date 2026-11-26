@@ -286,12 +286,16 @@ export function soilPrompt(turns, oldSoil, options = {}) {
     ...baseContext,
     portraits: {
       user: {
-        auto_organize_enabled: portraits.user?.write_enabled === true,
-        current_body: String(portraits.user?.body || '').slice(0, 12000),
+        auto_organize_enabled: portraits.user?.write_enabled === true && String(portraits.user?.body || '').length <= 12000,
+        current_body: String(portraits.user?.body || '').length <= 12000 ? String(portraits.user?.body || '') : '',
+        body_chars: String(portraits.user?.body || '').length,
+        auto_body_limit: 12000,
       },
       self: {
-        auto_organize_enabled: portraits.self?.write_enabled === true,
-        current_body: String(portraits.self?.body || '').slice(0, 12000),
+        auto_organize_enabled: portraits.self?.write_enabled === true && String(portraits.self?.body || '').length <= 12000,
+        current_body: String(portraits.self?.body || '').length <= 12000 ? String(portraits.self?.body || '') : '',
+        body_chars: String(portraits.self?.body || '').length,
+        auto_body_limit: 12000,
       },
     },
   };
@@ -538,7 +542,7 @@ export async function organizeConversationSoil(env, conversationId, value) {
   };
   const normalizePortraitProposal = (value) => ({
     should_update: value?.should_update === true,
-    proposed_body: String(value?.proposed_body || '').trim().slice(0, 24000),
+    proposed_body: String(value?.proposed_body || '').trim(),
     reason: String(value?.reason || '').trim().slice(0, 4000),
     source_refs: (Array.isArray(value?.source_refs) ? value.source_refs : [])
       .filter((ref) => allowedTurnIds.has(String(ref?.turn_id || '')))
@@ -549,7 +553,8 @@ export async function organizeConversationSoil(env, conversationId, value) {
   const selfPortraitProposal = normalizePortraitProposal(organized.self_portrait);
 
   const createPortraitRevision = async (kind, current, proposal) => {
-    if (!current?.write_enabled || !proposal.should_update || !proposal.proposed_body || proposal.proposed_body === String(current.body || '').trim()) return null;
+    if (!current?.write_enabled || String(current.body || '').length > 12000 || !proposal.should_update || !proposal.proposed_body || proposal.proposed_body.length > 24000 || proposal.proposed_body === String(current.body || '').trim()) return null;
+    // Never propose a replacement assembled from a silently truncated portrait.
     const value = {
       proposed_body: proposal.proposed_body,
       change_kind: 'rewrite',

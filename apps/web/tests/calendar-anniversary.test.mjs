@@ -63,3 +63,16 @@ const statusRequest = day => new Request('https://coast.test/api/calendar/entrie
 const statusReply = await routeApi(statusRequest('2026-11-24'), { COAST_CHAT_DB: statusDb }, owner);
 assert.equal((await statusReply.json()).entries[0].status.days, 1);
 assert.equal((await routeApi(statusRequest('2026-02-29'), { COAST_CHAT_DB: statusDb }, owner)).status, 400);
+
+// Model calendar creation shares the same durable calendar/anniversary contract.
+import { executeRegisteredTool } from '../functions/tool-registry.js';
+const modelCalendarDb = new D1Database();
+const modelCalendarContext = { permission: 'owner', surface: 'main_chat' };
+const modelNote = await executeRegisteredTool(modelCalendarDb, 'calendar.create', { day: '2030-06-12', title: 'Synthetic note', kind: 'note' }, modelCalendarContext);
+assert.equal(modelNote.kind, 'note');
+const modelAnniversary = await executeRegisteredTool(modelCalendarDb, 'calendar.create', { day: '2030-06-12', title: 'Synthetic anniversary', anniversary: { startDay: '2030-06-12', mode: 'milestone', targetDays: 10, pinned: true } }, modelCalendarContext);
+assert.equal(modelAnniversary.day, '2030-06-21');
+assert.equal(modelAnniversary.anniversary.mode, 'milestone');
+assert.equal((await listCalendarEntries(modelCalendarDb, { pinned: true }))[0].id, modelAnniversary.id);
+assert.equal((await listCalendarEntries(modelCalendarDb, { month: '2030-06' })).length, 2);
+console.log('model calendar note and anniversary persistence: ok');

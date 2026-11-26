@@ -16,7 +16,7 @@ import {
 import { DOGTALK_MODEL_TOOL, executeDogtalkModelTool } from './dogtalk-model-tool.js';
 import { dogtalkContext, saveMysticDogtalkWithSnapshot } from './dogtalk-store.js';
 import { safeLogError } from './http.js';
-import { GLOBAL_EXCERPT_WRITE_GUIDANCE, createGlobalExcerptCandidate, createPocket } from './memory-store.js';
+import { GLOBAL_EXCERPT_WRITE_GUIDANCE, USER_PORTRAIT_WRITE_GUIDANCE, createUserPortraitCandidate, createGlobalExcerptCandidate, createPocket } from './memory-store.js';
 import { searchMemory } from './memory-recall.js';
 import {
   listRoomConversation,
@@ -113,6 +113,7 @@ async function dogtalkHandler(db, input, context) {
 }
 
 const globalExcerptGate = (context) => context.permission === 'owner' && context.global_excerpt_write_enabled === true;
+const userPortraitGate = (context) => context.permission === 'owner' && context.user_portrait_write_enabled === true;
 const crossWindowBaseGate = (context) => context.permission === 'owner'
   && ['main_chat', 'radio'].includes(context.surface);
 const crossWindowLetterGate = (context) => crossWindowBaseGate(context)
@@ -212,6 +213,26 @@ const REGISTRY = Object.freeze([
         reason: { type: 'string', minLength: 1, maxLength: 4000 },
       }, required: ['proposed_body', 'reason'] }),
     handler: (db, input, context) => createGlobalExcerptCandidate(db, {
+      ...input,
+      source_conversation_id: context.conversation_id || null,
+      source_message_id: context.source_turn_id || null,
+      source_model: context.model_label || '',
+    }),
+  }),
+  entry({
+    tool_key: 'memory.user_portrait_propose',
+    display_name: '提出用户画像修改稿',
+    description: '为用户画像提出完整修改稿；只进入待确认区。',
+    model_exposed: true, model_group: 'core',
+    auth_scopes: ['write:soil'], turn_gate: userPortraitGate, summary_policy: 'content_redacted',
+    model_tool: modelTool('user_portrait_propose',
+      `${USER_PORTRAIT_WRITE_GUIDANCE} 提交完整的新正文及理由，不直接改写正式画像。`,
+      { properties: {
+        proposed_body: { type: 'string', minLength: 1, maxLength: 240000 },
+        change_kind: { type: 'string', enum: ['append', 'rewrite', 'refine'] },
+        reason: { type: 'string', minLength: 1, maxLength: 4000 },
+      }, required: ['proposed_body', 'reason'] }),
+    handler: (db, input, context) => createUserPortraitCandidate(db, {
       ...input,
       source_conversation_id: context.conversation_id || null,
       source_message_id: context.source_turn_id || null,
@@ -341,27 +362,30 @@ const REGISTRY = Object.freeze([
     handler: async (db, input) => ({ entries: await listCalendarEntries(db, input) }),
   }),
   entry({
-    tool_key: 'calendar.create', display_name: '写入公历日程', description: '新增日程或随记。',
+    tool_key: 'calendar.create', display_name: '写入公历日程', description: '新增日程、随记或纪念日。',
     model_exposed: true, model_group: 'calendar', auth_scopes: ['write:soil'],
-    model_tool: modelTool('calendar_create', '新增一条海岸公历记录。', {
+    model_tool: modelTool('calendar_create', '新增日程、随记或纪念日。随记使用 kind=note；纪念日使用 anniversary 对象（day 为起始日期，kind 为 event）。', {
       properties: {
         day: { type: 'string', description: 'YYYY-MM-DD' }, title: { type: 'string', maxLength: 120 },
         body: { type: 'string', maxLength: 4000 }, kind: { type: 'string', enum: ['event', 'note'] },
         recurrence: { type: 'string', enum: ['none', 'yearly'] },
+        anniversary: objectSchema({ startDay: { type: 'string', format: 'date' }, mode: { type: 'string', enum: ['elapsed', 'milestone', 'yearly'] }, targetDays: { type: 'integer', minimum: 1, maximum: 109938 }, pinned: { type: 'boolean' } }, ['startDay', 'mode', 'pinned']),
       },
       required: ['day', 'title'],
     }),
     official_mcp: officialMcpTool({
-      order: 170, name: 'create_calendar_entry', title: '写入海岸日程', description: '新增一条公历日程或随记。',
+      order: 170, name: 'create_calendar_entry', title: '写入海岸日程', description: '新增公历日程、随记或纪念日；纪念日提供 anniversary 对象。',
       inputSchema: objectSchema({
         day: { type: 'string', format: 'date' }, title: { type: 'string', minLength: 1, maxLength: 120 },
         body: { type: 'string', maxLength: 4000 }, kind: { type: 'string', enum: ['event', 'note'] },
-        recurrence: { type: 'string', enum: ['none', 'yearly'] }, ...MCP_MODEL_IDENTITY_PROPERTIES,
+        recurrence: { type: 'string', enum: ['none', 'yearly'] },
+        anniversary: objectSchema({ startDay: { type: 'string', format: 'date' }, mode: { type: 'string', enum: ['elapsed', 'milestone', 'yearly'] }, targetDays: { type: 'integer', minimum: 1, maximum: 109938 }, pinned: { type: 'boolean' } }, ['startDay', 'mode', 'pinned']), ...MCP_MODEL_IDENTITY_PROPERTIES,
       }, ['day', 'title', 'model_label']),
       invoking: '正在写下日程…', invoked: '日程已经记下',
     }),
     handler: (db, input, context) => createCalendarEntry(db, {
       day: input.day, title: input.title, body: input.body, kind: input.kind, recurrence: input.recurrence,
+      ...(Object.hasOwn(input, 'anniversary') ? { anniversary: input.anniversary } : {}),
     }, {
       author: 'assistant', source: context.surface === 'official_mcp' ? 'official_mcp' : 'coast_chat',
       conversation_id: context.conversation_id || input.source_conversation_id || null,
@@ -431,7 +455,7 @@ const REGISTRY = Object.freeze([
   entry({
     tool_key: 'library.books', display_name: '查看书架', description: '查看书房有哪些书或某本书的目录。',
     model_exposed: true, model_group: 'library', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
-    model_tool: modelTool('library_books', '查看书房里的书，提供 book_id 可查看章节目录。', {
+    model_tool: modelTool('library_books', '不填 book_id 时返回书籍列表与真实 id；从列表选择 id，再传 book_id 查看目录，不能用书名代替 id。', {
       properties: { book_id: { type: 'string' } },
     }),
     official_mcp: officialMcpTool({
@@ -445,7 +469,7 @@ const REGISTRY = Object.freeze([
   entry({
     tool_key: 'library.read', display_name: '读一段书', description: '按章节和段落范围取书页正文。',
     model_exposed: true, model_group: 'library', auth_scopes: ['read:coast'], summary_policy: 'content_redacted',
-    model_tool: modelTool('library_read', '从书房读某书指定章节的一页原文。start_paragraph 是从零起的段落号，默认每页 12 段，不会暗中裁剪。', {
+    model_tool: modelTool('library_read', '使用书架返回的真实 book_id 与目录中的 chapter_index；章节和段落从0开始，默认12段，最多12段。', {
       properties: {
         book_id: { type: 'string' }, chapter_index: { type: 'integer', minimum: 0 },
         start_paragraph: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 12 },
@@ -605,6 +629,7 @@ function cleanModelToolResult(toolKey, output) {
     return { memories, count: memories.length, vector_enabled: output?.vector_enabled === true };
   }
   if (toolKey === 'memory.write_candidate') return { created: true, candidate_id: String(output?.id || ''), title: String(output?.title || '').slice(0, 120), status: 'pending' };
+  if (toolKey === 'memory.user_portrait_propose') return { created: true, candidate_id: String(output?.id || ''), status: 'pending', area: 'user_portrait' };
   if (toolKey === 'memory.global_excerpt_propose') return { created: true, candidate_id: String(output?.id || ''), status: 'pending', area: 'global_excerpt' };
   return output;
 }
@@ -613,7 +638,13 @@ export async function executeModelTool(db, toolCall, context = {}) {
   const name = String(toolCall?.function?.name || toolCall?.name || '');
   const definition = BY_MODEL_NAME.get(name);
   if (!definition) throw new ToolRegistryError('unknown_model_tool', '模型调用了未注册工具。', 400);
-  const input = parseArguments(toolCall?.function?.arguments ?? toolCall?.arguments);
+  let input = parseArguments(toolCall?.function?.arguments ?? toolCall?.arguments);
+  if (definition.tool_key.startsWith('library.')) {
+    const schema = definition.model_tool.function.parameters;
+    if (Object.keys(input).some(key => !Object.hasOwn(schema.properties, key))) throw new ToolRegistryError('invalid_arguments', '书房工具包含未声明字段。');
+    if (schema.required.some(key => input[key] == null || input[key] === '')) throw new ToolRegistryError('invalid_arguments', '缺少书房工具必填字段，请先使用书架返回的真实 ID。');
+    input = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== null));
+  }
   const call = { id: String(toolCall?.id || '').slice(0, 160), type: 'function', function: { name, arguments: JSON.stringify(input) } };
   const output = await executeRegisteredTool(db, definition.tool_key, definition.tool_key.startsWith('daily.') || definition.tool_key === 'dogtalk.read' ? call : input, context);
   return cleanModelToolResult(definition.tool_key, output);
