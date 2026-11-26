@@ -111,20 +111,24 @@ object ChatHistoryMutations {
             remaining to (alternatives.getOrNull(selected.coerceAtMost(alternatives.lastIndex))?.activeIndex ?: 0)
         }
 
-    fun toggleActiveAssistantLike(history: RemoteHistory, turnId: String): RemoteHistory =
-        patchActiveAssistant(history, turnId) { it.copy(liked = !it.liked) }
+    fun toggleActiveAssistantLike(history: RemoteHistory, turnId: String, messageId: String? = null): RemoteHistory =
+        patchActiveAssistant(history, turnId, messageId) { it.copy(liked = !it.liked) }
 
-    fun toggleActiveAssistantFavorite(history: RemoteHistory, turnId: String): RemoteHistory =
-        patchActiveAssistant(history, turnId) { it.copy(favorite = !it.favorite) }
+    fun toggleActiveAssistantFavorite(history: RemoteHistory, turnId: String, messageId: String? = null): RemoteHistory =
+        patchActiveAssistant(history, turnId, messageId) { it.copy(favorite = !it.favorite) }
 
     private fun patchActiveAssistant(
         history: RemoteHistory,
         turnId: String,
+        messageId: String?,
         transform: (RemoteVariant) -> RemoteVariant
     ): RemoteHistory = patchAssistantBranch(history, turnId) { assistants, activeIndex ->
         if (assistants.isEmpty()) return@patchAssistantBranch assistants to 0
-        assistants.mapIndexed { index, variant ->
-            if (index == activeIndex) transform(variant) else variant
+        val target=if(messageId==null) assistants[activeIndex] else
+            ReplySequence.selectedGroup(assistants,activeIndex).firstOrNull{it.id==messageId}
+        if(target==null) return@patchAssistantBranch assistants to activeIndex
+        assistants.map { variant ->
+            if (variant.id == target.id) transform(variant) else variant
         } to activeIndex
     }
 

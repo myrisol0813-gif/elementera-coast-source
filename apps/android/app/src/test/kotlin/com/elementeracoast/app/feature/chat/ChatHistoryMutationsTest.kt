@@ -97,4 +97,26 @@ class ChatHistoryMutationsTest {
         assertTrue(favoriteVariant.liked)
         assertTrue(favoriteVariant.favorite)
     }
+    @org.junit.Test
+    fun groupedMessagesHaveIndependentIdentityAndExactReactions() {
+        val original=branchedHistory()
+        val turn=original.turns.single()
+        val source=turn.assistant.variantsByUserVariant.getValue("0")
+        val first=source[0].copy(replySequence=com.elementeracoast.app.core.remote.RemoteReplySequence("group",0))
+        val second=source[1].copy(replySequence=com.elementeracoast.app.core.remote.RemoteReplySequence("group",1))
+        val history=original.copy(turns=listOf(turn.copy(assistant=turn.assistant.copy(
+            variantsByUserVariant=mapOf("0" to listOf(first,second)),
+            activeByUserVariant=mapOf("0" to 1)))))
+        val rows=ChatSyncMapper.toUi(history).filter{it.role==com.elementeracoast.app.core.model.MessageRole.Assistant}
+        org.junit.Assert.assertEquals(listOf(first.id,second.id),rows.map{it.remoteVariantId})
+        org.junit.Assert.assertEquals(2,rows.map{it.id}.distinct().size)
+        org.junit.Assert.assertEquals(listOf(false,true),rows.map{it.replyGroupTail})
+        val liked=ChatHistoryMutations.toggleActiveAssistantLike(history,turn.id,first.id)
+        val variants=liked.turns.single().assistant.variantsByUserVariant.getValue("0")
+        org.junit.Assert.assertTrue(variants[0].liked)
+        org.junit.Assert.assertEquals(second.liked,variants[1].liked)
+        val stale=ChatHistoryMutations.toggleActiveAssistantLike(liked,turn.id,"stale")
+        org.junit.Assert.assertEquals(liked.turns,stale.turns)
+    }
+
 }

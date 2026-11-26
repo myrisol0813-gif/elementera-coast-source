@@ -137,7 +137,7 @@ internal fun ChatTimeline(
                         it.turnId == message.turnId && it.assistantMessageId == message.remoteVariantId
                     }
                     val inlineSoil = when {
-                        message.role != MessageRole.Assistant -> null
+                        message.role != MessageRole.Assistant || !message.replyGroupTail -> null
                         isLatestAssistant -> thoughtSoil
                         history == null -> null
                         else -> thoughtSoil.copy(
@@ -183,7 +183,7 @@ internal fun ChatTimeline(
                         onAvatarClick = onAvatarClick,
                         onOpenThoughtSoil = { inlineSoil?.let(onOpenThoughtSoil) },
                         onCopy = onCopy,
-                        voiceClips = voiceClips.filter { it.messageId == message.remoteVariantId || (it.messageId.isBlank() && it.turnId == message.turnId) },
+                        voiceClips = voiceClips.filter { it.messageId == message.remoteVariantId || (message.replyGroupTail && it.messageId.isBlank() && it.turnId == message.turnId) },
                         onVoice = { onVoice(message) },
                         onPlayVoice = onPlayVoice,
                         onEdit = onEdit,

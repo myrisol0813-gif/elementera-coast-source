@@ -122,9 +122,9 @@ internal fun AssistantMessage(
                     MessageActionButton(Icons.Default.ContentCopy, "复制", enabled = message.text.isNotBlank(), onClick = onCopy)
                     MessageActionButton(Icons.Default.Mic, "生成语音", enabled = !isStreamingTail && message.text.isNotBlank() && !message.remoteVariantId.isNullOrBlank(), onClick = onVoice)
                     MessageActionButton(Icons.Default.ThumbUp, "点赞", active = message.liked, onClick = { onAction(MessageAction.ToggleLike(message.id)) })
-                    MessageActionButton(Icons.Default.Refresh, "重新生成", enabled = !isStreamingTail, onClick = { onAction(MessageAction.Regenerate(message.id)) })
+                    if (message.replyGroupTail) MessageActionButton(Icons.Default.Refresh, "重新生成", enabled = !isStreamingTail, onClick = { onAction(MessageAction.Regenerate(message.id)) })
                     MessageActionButton(Icons.Default.FavoriteBorder, "收藏", active = message.favorite, onClick = { onAction(MessageAction.ToggleFavorite(message.id)) })
-                    MessageActionButton(Icons.Default.DeleteOutline, "删除", enabled = !isStreamingTail, onClick = { onAction(MessageAction.Delete(message.id)) })
+                    if (message.replyGroupTail) MessageActionButton(Icons.Default.DeleteOutline, "删除", enabled = !isStreamingTail, onClick = { onAction(MessageAction.Delete(message.id)) })
                     if (metadataTraceState != null) {
                         Spacer(Modifier.weight(1f))
                         ModelMetadataTraceChip(state = metadataTraceState, compact = compactTraceLabel)
@@ -140,7 +140,7 @@ internal fun AssistantMessage(
                     Text("▶ 语音留存", style = MaterialTheme.typography.labelSmall)
                 }
             }
-            if (message.variantCount > 1) {
+            if (message.replyGroupTail && message.variantCount > 1) {
                 Spacer(Modifier.height(4.dp))
                 Row(modifier = Modifier.align(Alignment.End)) {
                     VariantControl(

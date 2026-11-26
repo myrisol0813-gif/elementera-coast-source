@@ -208,13 +208,15 @@ object ChatSyncMapper {
             val assistants = turn.assistant.variantsByUserVariant[key].orEmpty()
             val assistantIndex = (turn.assistant.activeByUserVariant[key] ?: 0)
                 .coerceIn(0, (assistants.size - 1).coerceAtLeast(0))
-            val assistant = assistants.getOrNull(assistantIndex)
+            val selected = assistants.getOrNull(assistantIndex)
             val alternatives=ReplySequence.alternatives(assistants)
-            val alternativeIndex=alternatives.indexOfFirst{assistant in it.messages}
-            if (assistant != null) {
+            val alternativeIndex=alternatives.indexOfFirst{selected in it.messages}
+            val group=alternatives.getOrNull(alternativeIndex)?.messages.orEmpty()
+            group.forEachIndexed { index, assistant ->
+                val tail=index==group.lastIndex
                 add(
                     ChatMessage(
-                        id = stableLong("assistant:${turn.id}:$key"),
+                        id = if (assistant.replySequence != null) stableLong("assistant:${turn.id}:$key:${assistant.id}") else stableLong("assistant:${turn.id}:$key"),
                         role = MessageRole.Assistant,
                         text = assistant.content.ifBlank{when(assistant.finishReason){"image_pending"->"正在绘制图片 · 重新打开窗口查看结果";"image_tool_ready"->"等待回复 · 重新打开窗口查看结果";else->""}},
                         turnId = turn.id,
@@ -232,7 +234,8 @@ object ChatSyncMapper {
                         createdAtLabel = assistant.createdAt,
                         attachments = assistant.attachments.map(::toChatAttachment),
                         furnitureRuns = assistant.furnitureRuns.map(::toFurnitureRun),
-                        deskReceipt = assistant.deskSlip?.let(TurnDeskMapper::toUi)
+                        deskReceipt = assistant.deskSlip?.let(TurnDeskMapper::toUi),
+                        replyGroupTail = tail
                     )
                 )
             }

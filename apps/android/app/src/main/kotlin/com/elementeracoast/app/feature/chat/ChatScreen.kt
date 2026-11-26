@@ -337,7 +337,7 @@ fun ChatWindow(
             message = message,
             voiceClips = voiceClips.filter {
                 it.messageId == message.remoteVariantId ||
-                    (it.messageId.isBlank() && it.turnId == message.turnId &&
+                    (message.replyGroupTail && it.messageId.isBlank() && it.turnId == message.turnId &&
                         message.role == MessageRole.Assistant)
             },
             repository = sideRooms,

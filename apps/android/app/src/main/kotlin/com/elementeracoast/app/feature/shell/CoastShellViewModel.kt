@@ -844,10 +844,10 @@ class CoastShellViewModel(
             is MessageAction.Retry -> retryMessage(message)
             is MessageAction.SelectVariant -> selectVariantForViewing(message, action.index)
             is MessageAction.ToggleLike -> mutateMessageHistory("点赞写回失败", "已同步点赞") { history ->
-                ChatHistoryMutations.toggleActiveAssistantLike(history, message.turnId ?: return@mutateMessageHistory history)
+                ChatHistoryMutations.toggleActiveAssistantLike(history, message.turnId ?: return@mutateMessageHistory history, message.remoteVariantId)
             }
             is MessageAction.ToggleFavorite -> mutateMessageHistory("收藏写回失败", "已同步收藏") { history ->
-                ChatHistoryMutations.toggleActiveAssistantFavorite(history, message.turnId ?: return@mutateMessageHistory history)
+                ChatHistoryMutations.toggleActiveAssistantFavorite(history, message.turnId ?: return@mutateMessageHistory history, message.remoteVariantId)
             }
             is MessageAction.Delete -> deleteMessage(message)
             is MessageAction.Edit -> editMessage(message, action.text)
