@@ -98,4 +98,32 @@ class LocalAttachmentArchiveTest {
             assertEquals(1,LocalAttachmentStore(store).entries().size)
         }finally{dir.deleteRecursively()}
     }
+
+    @Test fun manualImageTaskReservesBeforeProviderAndCommitsOriginalWithReply(){
+        val store=MemoryLocalPersistence();val cid="image-job"
+        val cache=RemoteCacheStore(store)
+        cache.putConversations(listOf(RemoteConversation(cid,"图片","main")))
+        cache.putHistory(cid,RemoteHistory(conversationId=cid,turns=listOf(RemoteTurn("turn1",user=RemoteUserBranch(0,listOf(RemoteVariant("user1","draw")))))))
+        val config=LocalProviderConfig("image","image","https://openrouter.ai/api/v1","test-key",listOf("fixture/image:free"))
+        val input=buildJsonObject{put("conversation_id",cid);put("turn_id","turn1");put("user_variant_id","user1");put("message_id","assistant1");put("prompt","draw a wolf")}
+        val png=byteArrayOf(137.toByte(),80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,6,0,0,0)
+        var calls=0
+        val mock:(LocalImageProvider.Config,JsonObject)->LocalImageProvider.Generated={c,p->
+            calls++;assertFalse(c.allowPaid)
+            assertEquals("image_pending",cache.history(cid)!!.turns.single().assistant.variantsByUserVariant.getValue("0").single().finishReason)
+            LocalImageProvider.Generated(png,"image/png","openrouter",c.model,null,0.0,p["prompt"]!!.jsonPrimitive.content)
+        }
+        assertTrue(runCatching{runLocalManualImageGeneration(store,config.copy(models=listOf("fixture/paid")),input,mock)}.isFailure)
+        val result=runLocalManualImageGeneration(store,config,input,mock)
+        assertTrue(result["ok"]!!.jsonPrimitive.boolean)
+        val reply=cache.history(cid)!!.turns.single().assistant.variantsByUserVariant.getValue("0").single()
+        assertEquals("",reply.content);assertEquals("stop",reply.finishReason);assertEquals("assistant1",reply.attachments.single().imageGeneration!!.messageId)
+        val original=LocalAttachmentStore(store).entries().single()
+        assertArrayEquals(png,LocalAttachmentStore(store).bytes(original))
+        assertTrue(runCatching{runLocalManualImageGeneration(store,config,input,mock)}.isFailure);assertEquals(1,calls)
+        val failed=JsonObject(input+("message_id" to JsonPrimitive("assistant2")))
+        assertTrue(runCatching{runLocalManualImageGeneration(store,config,failed){_,_->error("private upstream failure")}}.isFailure)
+        assertEquals("image_failed",cache.history(cid)!!.turns.single().assistant.variantsByUserVariant.getValue("0").last().finishReason)
+        assertEquals(1,LocalAttachmentStore(store).entries().size)
+    }
 }

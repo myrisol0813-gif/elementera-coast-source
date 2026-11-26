@@ -24,6 +24,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
     private val voice:LocalVoiceProvider?=null,
     private val providerCatalog: () -> RemoteModelCatalogResponse = { RemoteModelCatalogResponse(ok = true) }
 ) : Interceptor {
+    internal var imageConfig:()->LocalProviderConfig?={null}
     private val cache = RemoteCacheStore(store)
     private val calendar = LocalCalendarStore(store)
     private val knowledge = LocalKnowledgeStore(store,web,voice)
@@ -45,7 +46,10 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 val clip=generateLocalManualVoice(store,provider,body(request))
                 response(request,201,buildJsonObject{put("ok",true);put("clip",clip)})
             }
+            else if(request.url.encodedPath=="/api/chat/image-generate"&&request.method=="POST") response(request,201,runLocalManualImageGeneration(store,imageConfig(),body(request)))
             else synchronized(this){route(request)}
+        } catch (error: ManualImageFailure) {
+            failure(request,error.status,error.type,error.message)
         } catch (error: VoiceFailure) {
             failure(request,error.status,error.type,error.message)
         } catch (error: LocalCalendarError) {

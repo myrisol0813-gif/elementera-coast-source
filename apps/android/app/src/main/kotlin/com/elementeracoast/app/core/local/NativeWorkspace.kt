@@ -30,7 +30,7 @@ object NativeWorkspace {
             val store = FileLocalPersistence(File(context.noBackupFilesDir, "coast-local-v1"))
             store.semanticIndex = LocalSemanticIndex(File(context.noBackupFilesDir, "coast-embedding-index-v1"), { LocalMemoryStore(store).snapshot().entries }, { CoastEmbedding(context.applicationContext) }).also { it.requestRefresh() }
             localStore = store
-            current = LocalCoastTransport(store,LocalIndependentWeb(context.applicationContext),LocalVoiceProvider(context.applicationContext)) { LocalProviderStore(context).catalog() }
+            current = LocalCoastTransport(store,LocalIndependentWeb(context.applicationContext),LocalVoiceProvider(context.applicationContext)) { LocalProviderStore(context).catalog() }.also{transport->transport.imageConfig={LocalProviderStore(context.applicationContext,imageOnly=true).load().firstOrNull{it.id=="openrouter-image"}}}
         } else {
             (localStore as? FileLocalPersistence)?.semanticIndex?.close()
             current = null
