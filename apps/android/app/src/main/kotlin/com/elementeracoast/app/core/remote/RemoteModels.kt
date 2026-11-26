@@ -172,6 +172,9 @@ data class RemoteAttachmentResponse(
 )
 
 @Serializable
+data class RemoteReplySequence(val id:String,val index:Int)
+
+@Serializable
 data class RemoteVariant(
     val id: String,
     val content: String = "",
@@ -193,7 +196,10 @@ data class RemoteVariant(
     @SerialName("input_type") val inputType: String? = null,
     @SerialName("source_model_label") val sourceModelLabel: String? = null,
     @SerialName("dogtalk_snapshot_id") val dogtalkSnapshotId: String? = null,
-    @SerialName("archive_retained_desk_slip") val archiveRetainedDeskSlip: Boolean = false
+    @SerialName("archive_retained_desk_slip") val archiveRetainedDeskSlip: Boolean = false,
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("reply_sequence") val replySequence: RemoteReplySequence? = null
 )
 
 @Serializable

@@ -65,3 +65,16 @@ export async function runReplySequence({conversationId,turnId,userVariantId,sequ
   if(messages.length)await organize(receipt);
   return {status,messages:messages.slice(),...(failure?{error:failure}:{})};
 }
+
+/** A selected regeneration alternative is either a legacy single message
+ * or the entire contiguous sequence. Keep raw indices for exact operations;
+ * a sequence is not a list of replacement candidates. */
+export function selectedReplyGroup(variants,activeIndex){
+  const active=variants[activeIndex];
+  if(!active)return [];
+  const id=active.reply_sequence?.id;
+  if(!id)return [active];
+  const group=variants.filter(v=>v.reply_sequence?.id===id).sort((a,b)=>a.reply_sequence.index-b.reply_sequence.index);
+  if(group.some((v,i)=>v.reply_sequence.index!==i))throw Error('invalid_reply_sequence_group');
+  return group;
+}

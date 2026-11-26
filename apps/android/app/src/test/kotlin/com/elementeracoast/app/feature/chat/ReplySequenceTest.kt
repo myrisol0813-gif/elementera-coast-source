@@ -32,4 +32,19 @@ class ReplySequenceTest {
             commit={step,result->ReplySequence.Saved(step.messageId,result.value)},settle={},organize={organized++},canContinue={_,_->false})
         assertEquals("permission_or_budget",r.status);assertEquals(1,n);assertEquals(1,organized)
     }
+    @Test fun groupIdentitySurvivesWireFormatWithoutChangingLegacyVariants(){
+        val first=com.elementeracoast.app.core.remote.RemoteVariant("first",replySequence=com.elementeracoast.app.core.remote.RemoteReplySequence("group",0))
+        val second=first.copy(id="second",replySequence=first.replySequence!!.copy(index=1))
+        val old=com.elementeracoast.app.core.remote.RemoteVariant("old")
+        val codec=kotlinx.serialization.json.Json{encodeDefaults=true}
+        val ser=com.elementeracoast.app.core.remote.RemoteVariant.serializer()
+        assertFalse(codec.encodeToString(ser,old).contains("reply_sequence"))
+        val decoded=codec.decodeFromString(ser,codec.encodeToString(ser,second))
+        assertEquals(second,decoded)
+        val rows=listOf(old,first,decoded)
+        assertEquals(listOf(first,second),ReplySequence.selectedGroup(rows,2))
+        assertEquals(listOf(old),ReplySequence.selectedGroup(rows,0))
+        assertTrue(runCatching{ReplySequence.selectedGroup(listOf(second),0)}.isFailure)
+    }
+
 }

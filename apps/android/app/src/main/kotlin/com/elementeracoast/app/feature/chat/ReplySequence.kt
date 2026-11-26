@@ -14,6 +14,13 @@ internal object ReplySequence {
     data class Saved<T>(val id:String,val value:T)
     data class Receipt<T>(val identity:Identity,val status:String,val pending:Step?,val messages:List<Saved<T>>)
     private val id=Regex("[A-Za-z0-9_.:-]{1,160}")
+    fun selectedGroup(variants:List<com.elementeracoast.app.core.remote.RemoteVariant>,activeIndex:Int):List<com.elementeracoast.app.core.remote.RemoteVariant>{
+        val active=variants.getOrNull(activeIndex)?:return emptyList()
+        val seq=active.replySequence?:return listOf(active)
+        val group=variants.filter{it.replySequence?.id==seq.id}.sortedBy{it.replySequence!!.index}
+        require(group.withIndex().all{(i,v)->v.replySequence!!.index==i}){"invalid_reply_sequence_group"}
+        return group
+    }
     fun limit(n:Int)=n.also{require(it in 1..20){"invalid_reply_sequence_limit"}}
 
     suspend fun <T> run(identity:Identity,maxMessages:Int,newId:()->String,

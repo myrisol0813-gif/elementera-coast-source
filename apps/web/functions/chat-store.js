@@ -230,6 +230,8 @@ function normalizeVariant(value = {}, prefix = 'variant') {
   const furnitureRuns = sanitizeFurnitureRuns(value.furniture_runs);
   const attachments = normalizeAttachments(value.attachments, prefix.startsWith('assistant') ? value.id : null);
   const deskSlip = normalizeDeskSlip(value.desk_slip);
+  const seq=value.reply_sequence;
+  const sequence=prefix.startsWith('assistant')&&seq&&typeof seq.id==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(seq.id)&&Number.isInteger(seq.index)&&seq.index>=0&&seq.index<20?{id:seq.id,index:seq.index}:null;
   return {
     id: sanitizeId(value.id || crypto.randomUUID(), prefix),
     content: String(value.content),
@@ -242,6 +244,7 @@ function normalizeVariant(value = {}, prefix = 'variant') {
     ...(usage ? { usage } : {}),
     ...(modelEcho ? { model_echo: modelEcho } : {}),
     ...(finishReason ? { finish_reason: finishReason } : {}),
+    ...(sequence ? { reply_sequence: sequence } : {}),
     ...(generationSource ? { generation_source: generationSource } : {}),
     ...(dogtalkSnapshotId ? { dogtalk_snapshot_id: dogtalkSnapshotId } : {}),
     ...(messageSource ? { message_source: messageSource } : {}),
