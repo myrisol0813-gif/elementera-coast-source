@@ -197,3 +197,32 @@ export async function removeOwnerSticker(db,id,{actor}={}){
 }
 
 export async function verifyStickerArchiveOriginal(db,cid,aid){await verifiedOriginal(db,identifier(cid),identifier(aid));}
+
+/** Upload a new original without manufacturing any chat messages.
+ * The archive-only source reuses the attachment/zip pipeline. Its identifier is
+ * workspace-specific and never selected from arbitrary caller input. */
+export async function uploadOwnerSticker(db,{name,mime,description,bytes},{actor}={}){
+  if(actor!=='owner')fail('sticker_manage_denied','只有屋主可以上传素材。',403);
+  const desc=cleanDescription(description);
+  if(!mimeTypes.has(mime)||!(bytes instanceof Uint8Array)||bytes.length<1||bytes.length>MAX_ATTACHMENT_BYTES)
+    fail('invalid_sticker_image','请选择不超过8 MiB的 PNG、JPEG 或 WebP 图片。');
+  const aid='att_'+crypto.randomUUID(),sid='sticker_'+crypto.randomUUID();
+  try{prepareGeneratedImageReadback({attachmentId:aid,bytes,mime,visionSupported:false});}
+  catch{fail('invalid_sticker_image','图片原件格式不符。');}
+  const safeName=String(name||'表情包').replace(/[\\/\r\n\t]+/g,' ').trim().slice(0,180)||'表情包';
+  await ensureStickerLibrarySchema(db);
+  const now=Date.now(),candidate='sticker-source-'+crypto.randomUUID();
+  const source="SELECT id FROM conversations WHERE user_id='owner' AND deleted_at IS NULL AND conversation_kind='chat' AND source='sticker_library' ORDER BY created_at,id LIMIT 1";
+  const stmts=[
+    query(db,"INSERT INTO conversations(id,user_id,title,created_at,updated_at,deleted_at,title_manual,conversation_kind,room_type,source) SELECT ?,'owner','表情包原件',?,?,NULL,1,'chat','main','sticker_library' WHERE NOT EXISTS ("+source+")",[candidate,now,now]),
+    query(db,"INSERT OR IGNORE INTO conversation_states(conversation_id,state_json,updated_at) SELECT id,?,? FROM ("+source+")",[JSON.stringify(normalizeState({updated_at:new Date(now).toISOString()})),now]),
+    query(db,"INSERT INTO chat_attachments(id,conversation_id,turn_id,kind,name,mime,size,data,created_at,updated_at) SELECT ?,id,NULL,'image',?,?,?,?,?,? FROM ("+source+")",[aid,safeName,mime,bytes.length,new Uint8Array(),now,now])
+  ];
+  for(let offset=0;offset<bytes.length;offset+=1500000)stmts.push(query(db,'INSERT INTO chat_attachment_chunks(attachment_id,chunk_index,data) VALUES(?,?,?)',[aid,Math.floor(offset/1500000),bytes.slice(offset,offset+1500000)]));
+  stmts.push(query(db,"INSERT INTO coast_sticker_library(id,conversation_id,attachment_id,description,author,enabled,created_at,updated_at) SELECT ?,conversation_id,id,?,'owner',1,?,? FROM chat_attachments WHERE id=?",[sid,desc,now,now,aid]));
+  await db.batch(stmts);
+  const row=await query(db,'SELECT conversation_id FROM chat_attachments WHERE id=?',[aid]).first();
+  const saved=await verifiedOriginal(db,row.conversation_id,aid);
+  if(saved.bytes.length!==bytes.length||saved.bytes.some((v,i)=>v!==bytes[i]))fail('sticker_original_mismatch','素材原件读回校验失败。',500);
+  return {id:sid,description:desc,author:'owner',mime,size:bytes.length,enabled:true,conversation_id:row.conversation_id,attachment_id:aid};
+}

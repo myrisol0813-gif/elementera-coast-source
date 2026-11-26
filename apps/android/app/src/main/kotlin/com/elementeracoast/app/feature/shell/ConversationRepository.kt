@@ -20,12 +20,12 @@ class DefaultConversationRepository(
     private val cache: RemoteCacheStore,
     private val titleRemote: ConversationTitleRemoteDataSource
 ) : ConversationRepository {
-    override fun cached(): List<ConversationSummary> = cache.conversations().map(::toSummary)
+    override fun cached(): List<ConversationSummary> = cache.conversations().filter{it.source!="sticker_library"}.map(::toSummary)
 
     override suspend fun refresh(): List<ConversationSummary> {
         val remote = api.listConversations()
         cache.putConversations(remote)
-        return remote.map(::toSummary)
+        return remote.filter{it.source!="sticker_library"}.map(::toSummary)
     }
 
     override suspend fun create(roomType: RoomType, title: String): ConversationSummary {

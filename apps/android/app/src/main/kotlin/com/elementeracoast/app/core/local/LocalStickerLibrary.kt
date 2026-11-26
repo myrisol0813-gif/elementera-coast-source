@@ -41,6 +41,22 @@ internal class LocalStickerLibrary(private val store:LocalPersistence){
         prepareGeneratedImageReadback(aid,bytes,row.metadata.str("mime"),false)
         return row to bytes
     }
+    fun upload(name:String,mime:String,raw:String,bytes:ByteArray):Entry=store.atomic{s->
+        val desc=description(raw)
+        require(mime in MIMES&&bytes.size in 1..8*1024*1024){"请选择8 MiB以内的 PNG、JPEG 或 WebP。"}
+        prepareGeneratedImageReadback("upload",bytes,mime,false)
+        val safeName=name.map{if(it in listOf('\\\\','/','\\r','\\n','\\t'))' ' else it}.joinToString("").trim().take(180).ifBlank{"表情包"}
+        val cache=RemoteCacheStore(s,strictReads=true);val all=cache.conversations()
+        val now=Instant.now().toString()
+        val source=all.filter{it.source=="sticker_library"&&it.deletedAt==null}.sortedWith(compareBy<RemoteConversation>{it.createdAt.orEmpty()}.thenBy{it.id}).firstOrNull()
+            ?:RemoteConversation("sticker-source-"+UUID.randomUUID(),"表情包原件","main",now,now,source="sticker_library",titleManual=true).also{c->
+                cache.putConversations(all+c);cache.putHistory(c.id,RemoteHistory(conversationId=c.id,updatedAt=now))
+            }
+        val attachment=LocalAttachmentStore(s).upload(source.id,safeName,mime,bytes)
+        require(original(s,source.id,attachment.id).second.contentEquals(bytes))
+        val e=Entry("sticker_"+UUID.randomUUID(),source.id,attachment.id,desc,"owner",true,System.currentTimeMillis())
+        write(s,entries(s)+e);e
+    }
     fun listOwner():List<Entry> = store.readConsistent{entries(it)}
     fun archiveRows():List<JsonObject>{
         val live=RemoteCacheStore(store,strictReads=true).conversations().filter{it.deletedAt==null}.map{it.id}.toSet()

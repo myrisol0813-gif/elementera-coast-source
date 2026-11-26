@@ -206,6 +206,17 @@ class SideRoomsRepository(private val config: CoastApiConfig, private val client
     suspend fun chatSearch(query: String, cursor: String = ""): JsonObject =
         request("/api/chat/search?q=" + encode(query) + "&cursor=" + encode(cursor))
 
+    suspend fun vaultUploadSticker(name:String,mime:String,description:String,bytes:ByteArray):JsonObject=withContext(Dispatchers.IO){
+        require(bytes.size in 1..8*1024*1024&&mime in setOf("image/png","image/jpeg","image/webp")&&description.trim().length in 1..500)
+        val request=Request.Builder().url(config.url("/api/coast-vault/stickers/upload"))
+            .header("X-Sticker-Name",encode(name)).header("X-Sticker-Description",encode(description.trim()))
+            .header("Content-Type",mime).post(bytes.toRequestBody(mime.toMediaType())).build()
+        client.newCall(request).execute().use{response->
+            val data=runCatching{json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject}.getOrNull()
+            if(!response.isSuccessful||data?.get("ok")?.toString()!="true")throw IllegalStateException("上传未确认完成，请刷新目录核对。")
+            requireNotNull(data)
+        }
+    }
     suspend fun vaultStickers(query:String="",cursor:String=""):JsonObject =
         request("/api/coast-vault/stickers?q="+encode(query)+"&cursor="+encode(cursor))
     suspend fun vaultRegisterSticker(cid:String,aid:String,description:String):JsonObject =

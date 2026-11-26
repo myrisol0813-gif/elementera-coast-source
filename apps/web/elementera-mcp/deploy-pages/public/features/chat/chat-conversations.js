@@ -23,7 +23,7 @@ export function createChatConversations({
     const data = await requestJson(API.conversations);
     const seen = new Set();
     runtime.conversations = (Array.isArray(data.conversations) ? data.conversations : [])
-      .filter((conversation) => conversation?.id && !seen.has(conversation.id) && seen.add(conversation.id))
+      .filter((conversation) => conversation?.id && conversation.source !== 'sticker_library' && !seen.has(conversation.id) && seen.add(conversation.id))
       .map((conversation) => ({
         ...conversation,
         source: conversation.source || 'coast',

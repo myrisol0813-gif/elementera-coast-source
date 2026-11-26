@@ -126,6 +126,37 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
     var nextCursor by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var failure by remember { mutableStateOf("") }
+    val context=LocalContext.current
+    var stickerUri by remember{mutableStateOf<android.net.Uri?>(null)}
+    var uploadDescription by remember{mutableStateOf("")}
+    var uploadBusy by remember{mutableStateOf(false)}
+    val chooseSticker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->stickerUri=uri;uploadDescription=""}
+    if(stickerUri!=null)AlertDialog(onDismissRequest={if(!uploadBusy)stickerUri=null},title={Text("加入表情包")},text={
+        Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
+            Text("保存原图，不必发送聊天。",style=MaterialTheme.typography.bodySmall)
+            OutlinedTextField(uploadDescription,{uploadDescription=it.take(500)},enabled=!uploadBusy,label={Text("素材说明")})
+        }
+    },confirmButton={TextButton(enabled=!uploadBusy&&uploadDescription.isNotBlank(),onClick={
+        val uri=stickerUri?:return@TextButton
+        val desc=uploadDescription
+        uploadBusy=true
+        scope.launch{
+            try{
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){
+                    val resolver=context.contentResolver
+                    val mime=resolver.getType(uri).orEmpty()
+                    val name=resolver.query(uri,arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),null,null,null)?.use{c->if(c.moveToFirst())c.getString(0)else null}?:"表情包"
+                    val bytes=requireNotNull(resolver.openInputStream(uri)).use{input->
+                        val out=java.io.ByteArrayOutputStream();val buf=ByteArray(65536);var size=0
+                        while(true){val n=input.read(buf);if(n<0)break;size+=n;require(size<=8*1024*1024){"图片超过8 MiB。"};out.write(buf,0,n)}
+                        out.toByteArray()
+                    }
+                    repository.vaultUploadSticker(name,mime,desc,bytes)
+                }
+                stickerUri=null;uploadDescription="";revision++;onSnackbar("表情包已保存。")
+            }catch(c:CancellationException){throw c}catch(e:Exception){onSnackbar("上传未确认完成："+(e.message?:"请刷新目录核对。"))}finally{uploadBusy=false}
+        }
+    }){Text(if(uploadBusy)"正在保存" else "保存")}},dismissButton={TextButton(enabled=!uploadBusy,onClick={stickerUri=null}){Text("取消")}})
 
     suspend fun load(cursor: String = "") {
         loading = true
@@ -200,6 +231,7 @@ fun CoastVaultScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Un
                         }
                     }
                 }
+                if(mode=="stickers")TextButton(onClick={chooseSticker.launch(arrayOf("image/png","image/jpeg","image/webp"))},enabled=!uploadBusy){Text("＋ 添加图片")}
                 SnowLetterSurface(
                     modifier = Modifier.fillMaxWidth(),
                     role = SnowLetterSurfaceRole.StatusCard,

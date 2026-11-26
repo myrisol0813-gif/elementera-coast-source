@@ -218,6 +218,7 @@ export function createCoastVault({ router, chat, toast }) {
       : '<p class="coast-vault-empty">'
         + escapeHtml(message || (mode === 'basic' ? '还没有能够读取的已保存媒体。'
           : '还没有符合条件的收藏记录。')) + '</p>';
+    const upload=mode==='stickers'?'<form class="feature-card coast-sticker-upload" data-submit="vault:sticker-upload"><label>添加图片<input type="file" name="file" accept="image/png,image/jpeg,image/webp" required></label><label>素材说明<textarea name="description" rows="2" maxlength="500" required></textarea></label><button type="submit">加入表情包</button></form>':'';
     const migration = mode === 'treasures'
       ? '<p class="coast-vault-hint"><button type="button" class="coast-vault-next"'
         + ' data-action="vault:legacy">检查旧红心 · 确认后迁入收藏</button>'
@@ -227,7 +228,7 @@ export function createCoastVault({ router, chat, toast }) {
       title: '文件库',
       subtitle: mode==='stickers'?'从文件库图片菜单添加素材，独立管理说明与发送权限':mode === 'basic' ? '自动归集真实媒体 · 不收录聊天文字' : '收藏 · 只收录你主动珍藏的东西',
       className: 'daily-panel coast-vault-panel',
-      body: modeBar + searchForm + migration + itemsHtml + (next
+      body: modeBar + searchForm + upload + migration + itemsHtml + (next
         ? '<button type="button" class="coast-vault-next" data-action="vault:more" data-cursor="' +
           escapeAttribute(next) + '">下一页</button>' : '') +
         '<p class="coast-vault-hint">媒体库收录当前可访问的海岸附件和已生成语音；原来不存在或已经失效的文件无法凭索引恢复。</p>',
@@ -441,7 +442,19 @@ export function createCoastVault({ router, chat, toast }) {
       if (context.namespace !== 'vault') return false;
       return { preventDefault: context.eventType === 'click' || context.eventType === 'submit' };
     },
-    handleEvent(_event, context) {
+    async handleEvent(_event, context) {
+      if(context.eventType==='submit'&&context.name==='sticker-upload'){
+        const form=context.target,file=form.elements.namedItem('file')?.files?.[0],description=form.elements.namedItem('description')?.value?.trim();
+        if(form.dataset.busy==='1')return;
+        if(!file||!description)return toast('请选择图片并填写素材说明。');
+        if(file.size>8*1024*1024||!['image/png','image/jpeg','image/webp'].includes(file.type))return toast('请选择8 MiB以内的 PNG、JPEG 或 WebP。');
+        form.dataset.busy='1';const button=form.querySelector('button[type=submit]');if(button)button.disabled=true;
+        try{await requestJson('/api/coast-vault/stickers/upload',{method:'POST',body:file,headers:{'Content-Type':file.type,'X-Sticker-Name':encodeURIComponent(file.name),'X-Sticker-Description':encodeURIComponent(description)}});
+          toast('表情包已保存。');return router.refresh({preserveScroll:true});
+        }catch(error){toast('上传未确认完成：'+(error.message||'请刷新目录核对。'));}
+        finally{delete form.dataset.busy;if(button)button.disabled=false;}
+        return;
+      }
       if (context.eventType === 'submit' && context.name === 'search') {
         const form = context.target;
         return router.open('vault-home', params({

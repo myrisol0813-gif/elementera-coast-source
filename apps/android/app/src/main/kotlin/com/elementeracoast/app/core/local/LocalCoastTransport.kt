@@ -193,6 +193,13 @@ class LocalCoastTransport(private val store: LocalPersistence,
             return rows("clips",side.clips(cid))
         }
         if(parts.size==5&&parts.take(3)==listOf("api","voice","clips")&&parts.last()=="audio"&&method=="GET")return binary(side.audio(parts[3])?:return missing(r),"audio/mpeg")
+        if(path=="/api/coast-vault/stickers/upload"&&method=="POST"){
+            val b=requireNotNull(r.body);require(b.contentLength() in 1L..(8L*1024*1024))
+            val buffer=Buffer();b.writeTo(buffer);require(buffer.size in 1L..(8L*1024*1024))
+            fun header(key:String)=java.net.URLDecoder.decode(r.header(key).orEmpty(),"UTF-8")
+            val item=LocalStickerLibrary(store).upload(header("X-Sticker-Name"),r.header("Content-Type")?:b.contentType()?.toString().orEmpty(),header("X-Sticker-Description"),buffer.readByteArray())
+            return response(r,201,buildJsonObject{put("ok",true);putJsonObject("item"){put("id",item.id);put("description",item.description);put("enabled",item.enabled)}})
+        }
         if(path=="/api/coast-vault/stickers"){
             val lib=LocalStickerLibrary(store)
             if(method=="GET")return response(r,200,lib.ownerPage(r.url.queryParameter("q").orEmpty(),r.url.queryParameter("cursor")?.toIntOrNull()?:0))

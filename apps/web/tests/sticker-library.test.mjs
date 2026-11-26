@@ -8,7 +8,7 @@ import {normalizeState as normalizeClientState} from '../elementera-mcp/deploy-p
 import {D1Database} from './d1-helper.mjs';
 import {createConversation,writeConversationState,readConversationState} from '../functions/chat-store.js';
 import {uploadChatAttachment,getChatAttachmentRecord,saveGeneratedImageOriginal} from '../functions/chat-attachments.js';
-import {registerSticker,listStickers,setStickerEnabled,resolveStickerOriginal,deliverSticker,listOwnerStickers,updateOwnerSticker,removeOwnerSticker} from '../functions/sticker-library.js';
+import {registerSticker,listStickers,setStickerEnabled,resolveStickerOriginal,deliverSticker,listOwnerStickers,updateOwnerSticker,removeOwnerSticker,uploadOwnerSticker} from '../functions/sticker-library.js';
 const db=new D1Database();
 const c=await createConversation(db,'素材','main');
 const png=Uint8Array.from([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,6,0,0,0]);
@@ -100,4 +100,13 @@ await updateOwnerSticker(db,entry.id,{description:'新说明',enabled:false},{ac
 assert.equal((await listOwnerStickers(db,{q:'新说明'},{actor:'owner'})).items[0].enabled,false);
 await removeOwnerSticker(db,entry.id,{actor:'owner'});
 assert.deepEqual(new Uint8Array((await getChatAttachmentRecord(db,target.id,sent.attachment.id)).data),png);
+const directDb=new D1Database();
+await assert.rejects(()=>uploadOwnerSticker(directDb,{name:'wolf.png',mime:'image/png',description:'新素材',bytes:png},{actor:'assistant'}));
+await assert.rejects(()=>uploadOwnerSticker(directDb,{name:'wolf.png',mime:'image/png',description:'新素材',bytes:Uint8Array.of(1,2,3)},{actor:'owner'}));
+const direct=await uploadOwnerSticker(directDb,{name:'wolf.png',mime:'image/png',description:'新素材',bytes:png},{actor:'owner'});
+const direct2=await uploadOwnerSticker(directDb,{name:'wolf2.png',mime:'image/png',description:'再一张',bytes:png},{actor:'owner'});
+assert.equal(direct.conversation_id,direct2.conversation_id);
+assert.deepEqual((await readConversationState(directDb,direct.conversation_id)).turns,[]);
+assert.deepEqual((await resolveStickerOriginal(directDb,direct.id,{allowSend:true})).bytes,png);
+assert.equal((await archiveDetailPage(directDb,'vault_stickers')).items.length,2);
 console.log('sticker library index: ok');

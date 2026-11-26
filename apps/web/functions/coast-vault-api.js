@@ -8,7 +8,7 @@ import {
   TreasureError, listTreasures, saveTreasure, updateTreasure, removeTreasure,
 } from './coast-vault-treasures.js';
 
-import {StickerError,registerSticker,listOwnerStickers,updateOwnerSticker,removeOwnerSticker} from './sticker-library.js';
+import {StickerError,registerSticker,listOwnerStickers,updateOwnerSticker,removeOwnerSticker,uploadOwnerSticker} from './sticker-library.js';
 const BASE = '/api/coast-vault';
 export function isCoastVaultApiPath(path) {
   return path === BASE || path.startsWith(BASE + '/');
@@ -19,6 +19,17 @@ async function route(request, env) {
   const url = new URL(request.url);
   const path = url.pathname.slice(BASE.length);
   const params = url.searchParams;
+  if(path==='/stickers/upload'){
+    if(request.method!=='POST')return methodNotAllowed('POST');
+    const length=Number(request.headers.get('content-length')||0),max=8*1024*1024;
+    if(length>max)return apiError('file_too_large','表情包不能超过8 MiB。',413);
+    const reader=request.body?.getReader();if(!reader)return apiError('invalid_sticker_image','没有收到图片。',400);
+    const parts=[];let size=0;
+    try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>max){await reader.cancel();return apiError('file_too_large','表情包不能超过8 MiB。',413);}parts.push(value);}}finally{reader.releaseLock();}
+    const bytes=new Uint8Array(size);let offset=0;for(const part of parts){bytes.set(part,offset);offset+=part.length;}
+    let name,description;try{name=decodeURIComponent(request.headers.get('x-sticker-name')||'');description=decodeURIComponent(request.headers.get('x-sticker-description')||'');}catch{return apiError('invalid_sticker_metadata','素材说明格式不符。',400);}
+    return json({ok:true,item:await uploadOwnerSticker(env.COAST_CHAT_DB,{name,description,mime:request.headers.get('content-type')||'',bytes},{actor:'owner'})},201);
+  }
   if(path==='/stickers'){
     if(request.method==='GET')return json({ok:true,...await listOwnerStickers(env.COAST_CHAT_DB,{q:params.get('q')||'',cursor:Number(params.get('cursor')||0)},{actor:'owner'})});
     if(request.method==='POST')return json({ok:true,item:await registerSticker(env.COAST_CHAT_DB,await readJson(request,4000),{actor:'owner'})},201);
