@@ -104,3 +104,21 @@ assert.doesNotMatch(mailboxSummary, /绝对不能|也不能/);
 assert.match(mailboxSummary, /mailbox_content_redacted/);
 
 console.log('tool-registry: ok');
+
+// Both portrait documents retain owner confirmation; only enabled candidates are exposed.
+const portraitDb = new D1Database();
+const portraitContext = { permission: 'owner', surface: 'main_chat', global_excerpt_write_enabled: true, user_portrait_write_enabled: true, cross_window_mode: 'model_decides' };
+const portraitTools = resolveToolSelection(portraitContext).modelVisibleTools.map(t => t.function.name);
+for (const name of ['global_excerpt_propose','user_portrait_propose','library_books','library_read','library_notes','library_write','voice_create']) assert.ok(portraitTools.includes(name), name);
+assert.ok(!resolveToolSelection({...portraitContext,user_portrait_write_enabled:false}).modelVisibleTools.some(t => t.function.name === 'user_portrait_propose'));
+const portraitCall = { id: 'portrait-test', function: { name: 'user_portrait_propose', arguments: JSON.stringify({proposed_body:'Synthetic confirmed profile',reason:'Stable observation'}) } };
+const { readUserPortrait, listUserPortraitCandidates, confirmUserPortraitCandidate, setUserPortraitWriteEnabled } = await import('../functions/memory-store.js');
+const candidate = await executeModelTool(portraitDb, portraitCall, portraitContext);
+assert.equal(candidate.status,'pending');
+assert.equal((await readUserPortrait(portraitDb)).body,'');
+assert.equal((await listUserPortraitCandidates(portraitDb))[0].id,candidate.candidate_id);
+await confirmUserPortraitCandidate(portraitDb,candidate.candidate_id,{});
+assert.equal((await readUserPortrait(portraitDb)).body,'Synthetic confirmed profile');
+await setUserPortraitWriteEnabled(portraitDb,false);
+await assert.rejects(() => executeModelTool(portraitDb,portraitCall,portraitContext));
+console.log('user portrait candidate lifecycle: ok');
