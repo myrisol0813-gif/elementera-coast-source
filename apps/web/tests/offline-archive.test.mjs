@@ -20,3 +20,24 @@ test('truncated media is reported, never presented as a complete original',()=>{
   const r=buildOfflineArchive({attachments:{payloads:[{id:'bad',size:9,data_base64:'AQID'}]}});
   assert.equal(r.mediaCount,0);assert.equal(r.warnings.length,1);
 });
+
+test('verified V2 reading copy keeps library anchors, original media and signature',async()=>{
+  const {writeOfflineV2}=await import('../elementera-mcp/deploy-pages/public/features/offline-v2-archive.js');
+  const rows=[
+    ['library','b','library_books',{id:'b',title:'Fixture <script>',format:'txt'}],
+    ['library','c','library_chapters',{book_id:'b',chapter_index:0,title:'Chapter',body:'one\n\ntwo'}],
+    ['library','n','library_notes',{book_id:'b',chapter_index:0,paragraph_index:1,kind:'annotation',author:'assistant',quote:'two',body:'note'}],
+    ['library','cover','library_covers',{book_id:'b',mime:'image/png'},['image']],
+    ['voice','v','voice',{id:'v',mime:'audio/mpeg'},['audio']],
+    ['chat','chat','chat',{conversation:{id:'chat',title:'chat'},history_json:JSON.stringify({turns:[{user:{variants:[{content:'署名测试'}]},assistant:{variantsByUserVariant:{}}}]})}]
+  ];
+  const enc=new TextEncoder(),values=new Map([['image',new Uint8Array([1,2,3])],['audio',new Uint8Array([4,5])]]);
+  const records=rows.map(([module,id,kind,data,media_objects=[]],i)=>{const record_object='r'+i;values.set(record_object,enc.encode(JSON.stringify({kind,data})));return {module,id,record_object,media_objects,dependencies:[]};});
+  const manifest={workspace:'backend',exported_at:'2026-01-01T00:00:00Z',modules:['library','voice','chat'].map(module=>({module,coverage:'partial',count:records.filter(r=>r.module===module).length})),records,objects:[...values].map(([object_sha256,b])=>({object_sha256,size:b.length}))};
+  const parts=[];
+  const result=await writeOfflineV2({manifest,objectChunks:async function*(d){yield values.get(d.object_sha256);}}, {write:async b=>parts.push(b.slice()),close:async()=>{},abort:async()=>{}},{ownerLabel:'归档署名'});
+  const text=new TextDecoder().decode(await new Blob(parts).arrayBuffer());
+  assert.equal(result.mediaCount,2);assert.deepEqual(result.warnings,[]);
+  assert.match(text,/2\.html#p-1/);assert.match(text,/id="p-1"/);assert.match(text,/&lt;script&gt;/);
+  assert.match(text,/归档署名/);assert.match(text,/media\/1\.png/);assert.match(text,/media\/2\.mp3/);
+});

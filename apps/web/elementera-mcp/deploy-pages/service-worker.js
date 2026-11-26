@@ -87,6 +87,7 @@ const CORE = Object.freeze([
   '/public/features/models/models-view.js',
   '/public/features/settings.js',
   '/public/features/offline-archive.js',
+  '/public/features/offline-v2-archive.js',
   '/public/features/settings-transfer.js',
   '/public/core/archive-v2-collect.js',
   '/public/core/archive-v2-read.js',
