@@ -3,10 +3,11 @@ import {archiveDetailPage} from '../functions/coast-archive-v2-details.js';
 import {prepareArchiveVault} from '../functions/coast-archive-v2-restore-vault.js';
 import {digestBytes} from '../functions/coast-archive-v2-chunks.js';
 import {safeToolPage} from '../functions/coast-archive-v2-tool-audit.js';
+import {attachImageTool} from '../functions/chat-image-tool.js';
 import {attachStickerTools} from '../functions/chat-sticker-tool.js';
 import {normalizeState as normalizeClientState} from '../elementera-mcp/deploy-pages/public/features/chat-state.js';
 import {D1Database} from './d1-helper.mjs';
-import {createConversation,writeConversationState,readConversationState} from '../functions/chat-store.js';
+import {createConversation,writeConversationState,readConversationState,writeProfile} from '../functions/chat-store.js';
 import {uploadChatAttachment,getChatAttachmentRecord,saveGeneratedImageOriginal} from '../functions/chat-attachments.js';
 import {registerSticker,listStickers,setStickerEnabled,resolveStickerOriginal,deliverSticker,listOwnerStickers,updateOwnerSticker,removeOwnerSticker,uploadOwnerSticker} from '../functions/sticker-library.js';
 const db=new D1Database();
@@ -109,4 +110,28 @@ assert.equal(direct.conversation_id,direct2.conversation_id);
 assert.deepEqual((await readConversationState(directDb,direct.conversation_id)).turns,[]);
 assert.deepEqual((await resolveStickerOriginal(directDb,direct.id,{allowSend:true})).bytes,png);
 assert.equal((await archiveDetailPage(directDb,'vault_stickers')).items.length,2);
+await writeProfile(directDb,{current_image_model:'fixture/paid',model_box:{image:['fixture/paid']}});
+for(const order of [['sticker_send','image_generate'],['image_generate','sticker_send']]){
+  const chat=await createConversation(directDb,'混合图片','main');
+  const tid='mix-turn',mid='mix-assistant',uid='mix-user';
+  await writeConversationState(directDb,chat.id,{context_settings:{sticker_send_enabled:true},turns:[{id:tid,user:{variants:[{id:uid,content:'图片'}]},assistant:{variantsByUserVariant:{0:[{id:mid,content:'',finish_reason:'image_tool_ready'}]}}}]});
+  const env={COAST_CHAT_DB:directDb,OPENROUTER_API_KEY:'fixture'};
+  const opts={conversationId:chat.id,turnId:tid,messageId:mid,roomType:'main',chatModel:'fixture/chat',enabled:true,visionOverride:false};
+  let calls=0;
+  const base={...blank,tools:[{type:'function',function:{name:'fixture'}}]};
+  const image=await attachImageTool(env,base,opts,{discover:async()=>[{id:'fixture/paid'}],generate:async(c,p)=>{calls++;return {bytes:png,mime:'image/png',provider:'openrouter',requested_model:c.model,prompt:p.prompt}}});
+  const tools=await attachStickerTools(env,image,opts);
+  for(const name of order){
+    const result=await tools.executeTool(call(name,name==='sticker_send'?{sticker_id:direct.id}:{prompt:'draw a wolf'}));
+    assert.equal(result.ok,true,JSON.stringify(result));
+  }
+  const v=(await readConversationState(directDb,chat.id)).turns[0].assistant.variantsByUserVariant['0'][0];
+  assert.equal(v.attachments.length,2);
+  assert.equal(v.attachments.filter(a=>a.image_generation).length,1);
+  assert.equal(v.attachments.filter(a=>a.sticker_delivery).length,1);
+  for(const a of v.attachments)assert.deepEqual(new Uint8Array((await getChatAttachmentRecord(directDb,chat.id,a.id)).data),png);
+  assert.equal((await tools.executeTool(call('sticker_send',{sticker_id:direct.id}))).reused,true);
+  assert.equal((await tools.executeTool(call('image_generate',{prompt:'again'}))).ok,false);
+  assert.equal(calls,1);
+}
 console.log('sticker library index: ok');

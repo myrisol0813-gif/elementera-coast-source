@@ -492,7 +492,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
     private fun search(r: Request): Response {
         val q = r.url.queryParameter("q").orEmpty().trim()
         val results = mutableListOf<JsonObject>()
-        if (q.isNotBlank()) for (c in cache.conversations()) {
+        if (q.isNotBlank()) for (c in cache.conversations().filter{it.source!="sticker_library"}) {
             fun hit(kind: String, snippet: String, turn: String = "", msg: String = "", role: String = "") =
                 buildJsonObject {
                     put("kind", kind); put("conversation_id", c.id); put("conversation_title", c.title)

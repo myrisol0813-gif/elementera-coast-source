@@ -105,7 +105,7 @@ async function eligibleConversations(db) {
     listConversations(db),
     archivedConversationIds(db),
   ]);
-  return conversations.filter((conversation) => !archived.has(conversation.id));
+  return conversations.filter((conversation) => conversation.source!=='sticker_library'&&!archived.has(conversation.id));
 }
 
 async function sourceRecord(db, conversation, currentConversationId = '') {

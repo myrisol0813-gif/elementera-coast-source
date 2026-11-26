@@ -123,4 +123,31 @@ class LocalStickerLibraryTest {
         assertTrue(raw.entries().all{raw.bytes(it).contentEquals(png)})
     }
 
+    @Test fun mixedMediaInBothOrdersPreservesBothOriginals(){
+        for(stickerFirst in listOf(true,false)){
+            val store=MemoryLocalPersistence();val cache=RemoteCacheStore(store);val cid="target"
+            val png=byteArrayOf(137.toByte(),80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,6,0,0,0)
+            val lib=LocalStickerLibrary(store);val sticker=lib.upload("wolf.png","image/png","小狼",png)
+            cache.putConversations(cache.conversations()+RemoteConversation(cid,"聊天"))
+            val t=RemoteTurn("turn",user=RemoteUserBranch(0,listOf(RemoteVariant("user","hello"))),assistant=RemoteAssistantBranches(mapOf("0" to 0),mapOf("0" to listOf(RemoteVariant("assistant",finishReason="image_tool_ready",createdAt=java.time.Instant.now().toString())))))
+            val settings=com.elementeracoast.app.core.model.ConversationContextSettings(localModelToolsEnabled=true,localModelWriteEnabled=true,stickerSendEnabled=true)
+            cache.putHistory(cid,RemoteHistory(conversationId=cid,turns=listOf(t),contextSettings=settings))
+            fun send()=lib.deliver(cid,"turn","user","assistant",sticker.id,true)
+            fun draw(){
+                val h=cache.history(cid)!!;val turn=h.turns.single()
+                val v=turn.assistant.variantsByUserVariant.getValue("0").single()
+                cache.putHistory(cid,h.copy(turns=listOf(turn.copy(assistant=turn.assistant.copy(variantsByUserVariant=mapOf("0" to listOf(v.copy(finishReason="image_pending"))))))))
+                saveGeneratedImageOriginal(store,cid,"turn","assistant",LocalImageProvider.Generated(png,"image/png","openrouter","fixture/paid",null,null,"draw"),false,"user",true)
+            }
+            if(stickerFirst){send();draw()}else{draw();send()}
+            val v=cache.history(cid)!!.turns.single().assistant.variantsByUserVariant.getValue("0").single()
+            assertEquals(2,v.attachments.size)
+            assertEquals(1,v.attachments.count{it.stickerDelivery!=null})
+            assertEquals(1,v.attachments.count{it.imageGeneration!=null})
+            assertTrue(send().reused)
+            val originals=LocalAttachmentStore(store)
+            assertTrue(originals.entries().all{originals.bytes(it).contentEquals(png)})
+        }
+    }
+
 }
