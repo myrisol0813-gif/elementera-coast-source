@@ -68,7 +68,7 @@ internal class LocalStickerLibrary(private val store:LocalPersistence){
         val next=old+fresh
         require(next.map{it.conversationId to it.attachmentId}.distinct().size==next.size){"素材已用另一编号登记。"}
         if(write){incoming.forEach{original(store,it.conversationId,it.attachmentId)};write(store,next)}
-        return LocalRestoreCount(ready=fresh.size,existing=incoming.size-fresh.size)
+        return LocalRestoreCount(ready=fresh.size,existing=incoming.size-fresh.size,conflicts=0)
     }
     fun ownerPage(query:String="",cursor:Int=0):JsonObject=store.readConsistent{s->
         require(query.length<=100&&cursor in 0..100000)

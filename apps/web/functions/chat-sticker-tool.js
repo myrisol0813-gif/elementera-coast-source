@@ -1,5 +1,6 @@
 import {readConversationState} from './chat-store.js';
 import {listStickers,registerSticker,deliverSticker} from './sticker-library.js';
+import {startToolRun,finishToolRun} from './tool-run-log.js';
 import {buildFurnitureSummary,sanitizeFurnitureRuns} from './tool-furniture-summary.js';
 const fn=(name,description,properties,required)=>({type:'function',function:{name,description,parameters:{type:'object',properties,required,additionalProperties:false}}});
 const search=fn('sticker_search','按说明查找已登记的表情包。仅返回素材编号和文字说明，不读取像素；按需使用，不必每轮发送。',{q:{type:'string',maxLength:100},cursor:{type:'integer',minimum:0}},[]);
@@ -25,8 +26,10 @@ export async function attachStickerTools(env,assembled,{conversationId,turnId,me
  executeTool:async call=>{
   const name=call?.function?.name;
   if(!names.has(name))return assembled.executeTool(call);
-  let result;
+  let result,auditId;
+  const toolKey='sticker.'+name.slice('sticker_'.length);
   try{
+   auditId=await startToolRun(db,{tool_key:toolKey},{},{actor:'api_model_partner',room_scope:roomType==='main'?'main_chat':roomType,conversation_id:conversationId});
    if(signal?.aborted)throw Object.assign(new Error('本轮已取消。'),{type:'cancelled'});
    const fresh=await readConversationState(db,conversationId),current=target(fresh,turnId,messageId),cfg=fresh.context_settings||{};
    if(!current||current.uid!==ready.uid||!tools.some(t=>t.function?.name===name))throw Object.assign(new Error('本轮回复已变化。'),{type:'sticker_reservation_lost'});
@@ -43,7 +46,8 @@ export async function attachStickerTools(env,assembled,{conversationId,turnId,me
     result={ok:true,status:'saved',attachment:{id:a.id,type:a.type,mime:a.mime,size:a.size},reused:sent.reused};
    }
   }catch(error){result={ok:false,error:String(error?.type||'sticker_operation_failed'),message:'表情包操作未完成。'};}
-  runs.push(buildFurnitureSummary({id:'sticker:'+crypto.randomUUID(),toolKey:name,displayName:name==='sticker_search'?'查找了表情包':name==='sticker_add'?'登记了表情包':'发送了表情包',status:result.ok?'success':'error',output:{count:name==='sticker_search'?result.items?.length:1},error:{type:result.error}}));
+  if(auditId)await finishToolRun(db,auditId,{status:result.ok?'success':'error',output:{ok:result.ok,count:name==='sticker_search'?result.items?.length:1}}).catch(()=>{});
+  runs.push(buildFurnitureSummary({id:auditId||'sticker:'+crypto.randomUUID(),toolKey,displayName:name==='sticker_search'?'查找了表情包':name==='sticker_add'?'登记了表情包':'发送了表情包',status:result.ok?'success':'error',output:{count:name==='sticker_search'?result.items?.length:1},error:{type:result.error}}));
   return result;
  }};
 }
