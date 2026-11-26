@@ -33,3 +33,14 @@ try {
   assert.equal(decodeTaggedTxt('让 <p> 标签留在技术文档中。'),'让 <p> 标签留在技术文档中。');
 } finally { globalThis.DOMParser=old; }
 console.log('tidal reader: ok (lossless pages, exact highlights, settings, tagged TXT)');
+
+// Reading dossier uses actual note locations and omits non-applicable reflection anchors.
+const {libraryDisplayAuthor,libraryDisplayCount,libraryNoteAnchor,libraryNotePayload}=await import('../elementera-mcp/deploy-pages/public/features/library.js');
+assert.equal(libraryDisplayAuthor('model_partner'),'assistant');
+assert.equal(libraryDisplayCount({model_partner_notes:4},true),4);
+assert.deepEqual(libraryNoteAnchor({chapter_index:2,paragraph_index:3,start_offset:400}),{index:2,paragraph:3,offset:400});
+assert.equal(libraryNoteAnchor({chapter_index:null,paragraph_index:null}),null);
+assert.deepEqual(libraryNotePayload('reflection','fixture',0,0),{kind:'reflection',body:'fixture'});
+assert.deepEqual(libraryNotePayload('annotation','fixture',1,2),{kind:'annotation',body:'fixture',chapter_index:1,paragraph_index:2});
+const longPages=paginateReaderParagraphs([{index:0,text:'x'.repeat(1200)}],180);
+assert.equal(readerPageForParagraph(longPages,0,400),2);
