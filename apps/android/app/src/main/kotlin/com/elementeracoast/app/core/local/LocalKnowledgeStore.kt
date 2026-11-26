@@ -7,7 +7,7 @@ import java.util.UUID
 
 /** Local owner knowledge uses the same typed store as the existing memory UI.
  * Both inference transports use the same assembly and record only delivered text. */
-internal class LocalKnowledgeStore(private val store:LocalPersistence) {
+internal class LocalKnowledgeStore(private val store:LocalPersistence,private val web:LocalIndependentWeb?=null) {
     private val cache=RemoteCacheStore(store,strictReads=true)
     private val memory=LocalMemoryStore(store)
     private val portraits=LocalPortraitStore(store)
@@ -113,7 +113,7 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence) {
                 sourcesPreserved=(if(recent.isEmpty())emptyList()else listOf("recent_context"))+(if(currentMessage==null)emptyList()else listOf("current_message"))+(if(real.delivered)listOf("reality_context")else emptyList())+(if(responseMode.delivered)listOf("response_mode")else emptyList())+(if(soilContext.isNotEmpty())listOf("thinking_soil")else emptyList())+(if(cross.receipt.delivered)listOf("cross_window")else emptyList())+(if(comfort.dogtalk.isNotEmpty())listOf("dogtalk")else emptyList())+(if(instructions.isEmpty())emptyList()else listOf("custom_instructions"))+(if(deliveredWorld.isEmpty())emptyList()else listOf("worldbook"))+(if(deliveredMemory.isEmpty())emptyList()else listOf("related_memory"))+(if(userPortrait.isEmpty())emptyList()else listOf("user_portrait"))+(if(selfPortrait.isEmpty())emptyList()else listOf("global_excerpt")),userPortrait=portraitStatus(userPortrait,comfort.over),globalExcerpt=portraitStatus(selfPortrait,comfort.over))
         ),attachmentContext.imageParts)
     }
-    fun toolSession(cid:String,turn:String,request:RemoteCrossWindowRequest?,receipt:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null)=LocalToolSession.open(store,cid,turn,request,receipt,modelId,wireLimit)
+    fun toolSession(cid:String,turn:String,request:RemoteCrossWindowRequest?,receipt:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null)=LocalToolSession.open(store,cid,turn,request,receipt,modelId,wireLimit,web)
     private fun portraitStatus(body:String,over:Boolean)=if(body.isEmpty())"empty"else if(over)"over_budget"else "complete"
     private fun portraitReceipt(label:String,body:String,over:Boolean)=RemoteDeskGlobalExcerpt(label=label,status=if(body.isEmpty())"未设置" else "已递给",delivered=body.isNotEmpty(),injection=if(body.isEmpty())"none" else if(over)"over_budget"else "full",estimatedTokens=LocalContextPolicy.estimate(body),length=body.length,content=body)
     companion object {

@@ -30,8 +30,9 @@ data class LocalProviderConfig(
 }
 
 /** Deliberately separate from workspace snapshots, online profile and OAuth credentials. */
-class LocalProviderStore(context: Context) {
-    private val prefs = context.applicationContext.getSharedPreferences("coast_local_providers_v1", Context.MODE_PRIVATE)
+class LocalProviderStore(context: Context, searchOnly:Boolean=false) {
+    private val alias=if(searchOnly) "coast_local_search_aes_v1" else ALIAS
+    private val prefs = context.applicationContext.getSharedPreferences(if(searchOnly) "coast_local_search_v1" else "coast_local_providers_v1", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
 
     @Synchronized fun load(): List<LocalProviderConfig> {
@@ -81,9 +82,9 @@ class LocalProviderStore(context: Context) {
 
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        (store.getKey(ALIAS, null) as? SecretKey)?.let { return it }
+        (store.getKey(alias, null) as? SecretKey)?.let { return it }
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
-        generator.init(KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+        generator.init(KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
             .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
             .setRandomizedEncryptionRequired(true).build())

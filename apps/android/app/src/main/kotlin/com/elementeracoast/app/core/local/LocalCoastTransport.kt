@@ -20,11 +20,12 @@ import okio.Buffer
  * The existing repositories, chat branching and UI remain the same.
  */
 class LocalCoastTransport(private val store: LocalPersistence,
+    private val web:LocalIndependentWeb?=null,
     private val providerCatalog: () -> RemoteModelCatalogResponse = { RemoteModelCatalogResponse(ok = true) }
 ) : Interceptor {
     private val cache = RemoteCacheStore(store)
     private val calendar = LocalCalendarStore(store)
-    private val knowledge = LocalKnowledgeStore(store)
+    private val knowledge = LocalKnowledgeStore(store,web)
     private val memory = LocalMemoryStore(store)
     private val portraits = LocalPortraitStore(store)
     private val soil = LocalSoilStore(store)
@@ -32,12 +33,13 @@ class LocalCoastTransport(private val store: LocalPersistence,
     private val toolSessions=linkedMapOf<String,LocalToolSession>()
     private val media = "application/json; charset=utf-8".toMediaType()
 
-    override fun intercept(chain: Interceptor.Chain): Response = synchronized(this) {
+    override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         // Never proceed to a real network, even for an unexpected host.
-        try {
+        return try {
             if (request.url.host != HOST) failure(request, 403, "local_boundary", "本机模式禁止连接海岸服务器。")
-            else route(request)
+            else if(request.url.encodedPath=="/api/chat/native-tool"&&request.method=="POST") executeNativeTool(request)
+            else synchronized(this){route(request)}
         } catch (error: LocalCalendarError) {
             failure(request, error.status, error.type, error.message.orEmpty())
         } catch (error: IllegalArgumentException) {
@@ -45,6 +47,17 @@ class LocalCoastTransport(private val store: LocalPersistence,
         } catch (_: Exception) {
             failure(request, 500, "local_storage_error", "本机读写失败，原始资料未自动转发到服务器。")
         }
+    }
+
+    private fun executeNativeTool(r:Request):Response {
+            val b=body(r)
+            val request=json.decodeFromJsonElement(RemoteChatRequest.serializer(),b)
+            val session=synchronized(this){toolSessions[request.conversationId+":"+request.messageId]}
+                ?:return failure(r,403,"local_tool_session_missing","本轮没有已授权的本机工具会话。")
+            val call=b.getValue("tool_call").jsonObject
+            val fn=call.getValue("function").jsonObject
+            val result=session.execute(call.str("id").orEmpty(),fn.str("name").orEmpty(),fn.str("arguments").orEmpty())
+            return response(r,200,element(RemoteNativeToolResult.serializer(),result).jsonObject)
     }
 
     fun uploadAttachment(cid:String,name:String,mime:String,bytes:ByteArray):RemoteAttachment=synchronized(this){
@@ -229,16 +242,6 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 modelMessages = localMultimodalMessages(prepared.messages,prepared.imageParts),
                 deskSlip = session?.receipt?:prepared.receipt
             )).jsonObject)
-        }
-        if (path == "/api/chat/native-tool" && method == "POST") {
-            val b=body(r)
-            val request=json.decodeFromJsonElement(RemoteChatRequest.serializer(),b)
-            val session=toolSessions[request.conversationId+":"+request.messageId]
-                ?:return failure(r,403,"local_tool_session_missing","本轮没有已授权的本机工具会话。")
-            val call=b.getValue("tool_call").jsonObject
-            val fn=call.getValue("function").jsonObject
-            val result=session.execute(call.str("id").orEmpty(),fn.str("name").orEmpty(),fn.str("arguments").orEmpty())
-            return response(r,200,element(RemoteNativeToolResult.serializer(),result).jsonObject)
         }
         if (path == "/api/chat/message-metadata" && method == "GET") {
             val cid=r.url.queryParameter("conversation_id").orEmpty()
