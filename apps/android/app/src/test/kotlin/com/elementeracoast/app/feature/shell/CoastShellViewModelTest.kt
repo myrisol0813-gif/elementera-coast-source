@@ -67,6 +67,48 @@ import org.junit.Test
 
 class CoastShellViewModelTest {
     @Test
+    fun composerDraftsSurviveWindowChangesAndRecreationAndClearAfterAcceptedSend() {
+        val fixture = Fixture()
+        val a = fixture.conversations.seed(RoomType.Main, "Draft A")
+        val b = fixture.conversations.seed(RoomType.Main, "Draft B")
+        val vm = fixture.vm()
+        vm.selectConversation(a.id)
+        vm.updateComposerDraft("unfinished A ")
+        vm.selectConversation(b.id)
+        assertEquals("", vm.state.value.composerDraft)
+        vm.updateComposerDraft("unfinished B")
+        vm.selectConversation(a.id)
+        assertEquals("unfinished A ", vm.state.value.composerDraft)
+        val restored = fixture.vm()
+        assertEquals("unfinished A ", restored.state.value.composerDraft)
+        restored.sendMessage(restored.state.value.composerDraft)
+        assertEquals("", restored.state.value.composerDraft)
+        restored.selectConversation(b.id)
+        assertEquals("unfinished B", restored.state.value.composerDraft)
+        restored.updateComposerDraft("")
+        restored.selectConversation(a.id)
+        restored.selectConversation(b.id)
+        assertEquals("", restored.state.value.composerDraft)
+    }
+
+    @Test
+    fun firstSendMovesLandingDraftToCreatedWindowAndClearsIt() {
+        val fixture = Fixture()
+        fixture.conversations.seed(RoomType.Main, "Main")
+        val vm = fixture.vm()
+        vm.openRoomType(RoomType.Radio)
+        vm.updateComposerDraft("radio draft")
+        vm.openRoomType(RoomType.Main)
+        vm.openRoomType(RoomType.Radio)
+        assertEquals("radio draft", vm.state.value.composerDraft)
+        vm.sendMessage(vm.state.value.composerDraft)
+        assertTrue(vm.state.value.activeConversationId.isNotBlank())
+        assertEquals("", vm.state.value.composerDraft)
+        vm.openRoomType(RoomType.Radio)
+        assertEquals("", vm.state.value.composerDraft)
+    }
+
+    @Test
     fun historicalSearchPreviewDoesNotChangeWritableCachedBranchOrNextReply() {
         val fixture = Fixture()
         val conversation = fixture.conversations.seed(RoomType.Main, "有两个版本的窗口")
