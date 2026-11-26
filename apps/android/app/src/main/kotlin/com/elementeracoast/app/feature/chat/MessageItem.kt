@@ -44,6 +44,7 @@ internal fun MessageItem(
             timeLabel = timeLabel,
             metadataMessageId = metadataMessageId,
             metadataSource = metadataSource,
+            attachmentPreviewSource = attachmentPreviewSource,
             isStreamingTail = isStreamingTail,
             avatarBitmap = avatarBitmap,
             thoughtSoil = thoughtSoil,

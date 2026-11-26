@@ -38,4 +38,34 @@ class LocalAttachmentArchiveTest {
             assertTrue(runCatching{ArchiveV2Local.export(dest,app,File(dir,"corrupt.zip"))}.isFailure)
         }finally{dir.deleteRecursively()}
     }
+
+    @Test fun assistantImageRetainsOriginalVariantAndFavoriteAcrossRestore(){
+        val dir=Files.createTempDirectory("assistant-image").toFile()
+        try{
+            val app="com.elementeracoast.source";val from=MemoryLocalPersistence();val cid="picture-chat"
+            val cache=RemoteCacheStore(from)
+            cache.putConversations(listOf(RemoteConversation(cid,"图片","main","2026-11-24T00:00:00Z","2026-11-24T00:00:00Z")))
+            val data=byteArrayOf(137.toByte(),80,78,71,13,10,26,10)
+            val history=Json.decodeFromString(RemoteHistory.serializer(),"""{"conversation_id":"picture-chat","updated_at":"2026-11-24T00:00:00Z","turns":[{"id":"turn1","user":{"variants":[{"id":"user1","content":"draw"}]},"assistant":{"activeByUserVariant":{"0":0},"variantsByUserVariant":{"0":[{"id":"assistant1","content":"picture","attachments":[{"id":"picture1","type":"image","name":"picture.png","mime":"image/png","size":8}]}]}}}]}""")
+            val meta=buildJsonObject{put("id","picture1");put("conversation_id",cid);put("turn_id","turn1");put("kind","image");put("name","picture.png");put("mime","image/png");put("size",data.size);put("created_at",10L);put("updated_at",20L)}
+            val original=LocalAttachmentStore.Original(meta,ArchiveV2Chunks.digest(data))
+            cache.putHistory(cid,history)
+            from.atomic{LocalAttachmentStore(it).publish(original,data)}
+            val side=LocalSideRecords(from)
+            val item=side.media("image","",0).getValue("items").jsonArray.single().jsonObject
+            assertEquals("assistant",item["role"]!!.jsonPrimitive.content)
+            assertEquals("assistant1",item["message_id"]!!.jsonPrimitive.content)
+            val favorite=side.saveTreasure(buildJsonObject{put("kind","image");put("conversation_id",cid);put("source_id","picture1");put("notes","original drawing")})
+            assertEquals("assistant",favorite["role"]!!.jsonPrimitive.content)
+            assertEquals("assistant1",favorite["message_id"]!!.jsonPrimitive.content)
+            val zip=File(dir,"complete.zip");val manifest=ArchiveV2Local.export(from,app,zip)
+            val stage=ArchiveV2Stage(dir,"verified");ArchiveV2ZipReader.stage(zip,stage)
+            val dest=MemoryLocalPersistence()
+            ArchiveV2Local.restore(manifest,stage,setOf("chat","attachments","vault"),app,dest,true)
+            assertArrayEquals(data,LocalAttachmentStore(dest).bytes(original))
+            val restored=LocalSideRecords(dest).treasureRows("image","",cid,"",0).getValue("items").jsonArray.single().jsonObject
+            assertEquals("assistant",restored["role"]!!.jsonPrimitive.content)
+            assertEquals("assistant1",restored["message_id"]!!.jsonPrimitive.content)
+        }finally{dir.deleteRecursively()}
+    }
 }
