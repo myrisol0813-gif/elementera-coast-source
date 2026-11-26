@@ -157,7 +157,7 @@ fun WolfScreen(
                 )
                 WolfDestination.BasicSettings -> BasicSettingsScreen(state.basic, store, onSnackbar)
                 WolfDestination.Diagnostics -> DiagnosticsScreen(shellState, state)
-                WolfDestination.Update -> if (shellState.localMode) LocalGithubUpdateScreen(onSnackbar) else WolfUpdateScreen(devHands, onSnackbar)
+                WolfDestination.Update -> if (shellState.sessionPersistence == "source_tour") WolfUpdateScreen(devHands, onSnackbar) else LocalGithubUpdateScreen(onSnackbar, if (shellState.localMode) null else devHands)
             }
         }
     }

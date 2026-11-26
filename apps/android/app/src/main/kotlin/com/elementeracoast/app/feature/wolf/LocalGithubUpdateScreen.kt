@@ -11,17 +11,20 @@ import androidx.compose.ui.unit.dp
 import com.elementeracoast.app.BuildConfig
 import com.elementeracoast.app.ui.theme.SnowLetterSurface
 import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
+import com.elementeracoast.app.feature.serpentdesk.DevHandsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @Composable
-internal fun LocalGithubUpdateScreen(onSnackbar: (String) -> Unit) {
+internal fun LocalGithubUpdateScreen(onSnackbar: (String) -> Unit, onlineRepository: DevHandsRepository? = null) {
     val context = LocalContext.current
     val updater = remember { LocalGithubUpdater() }
     val scope = rememberCoroutineScope()
     var release by remember { mutableStateOf<LocalRelease?>(null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
+    var pwaCache by remember { mutableStateOf<String?>(null) }
+    var pwaReadFailed by remember { mutableStateOf(false) }
     fun refresh() {
         if (busy) return
         busy = true; error = ""
@@ -45,6 +48,13 @@ internal fun LocalGithubUpdateScreen(onSnackbar: (String) -> Unit) {
         }
     }
     LaunchedEffect(Unit) { refresh() }
+    LaunchedEffect(onlineRepository) {
+        if (onlineRepository != null) {
+            try { pwaCache = onlineRepository.latestUpdate().update?.pwaCacheVersion }
+            catch (e: CancellationException) { throw e }
+            catch (_: Exception) { pwaReadFailed = true }
+        }
+    }
     val latest = release
     LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
@@ -55,6 +65,7 @@ internal fun LocalGithubUpdateScreen(onSnackbar: (String) -> Unit) {
                     WolfUpdateFact("本机版本", BuildConfig.VERSION_NAME)
                     WolfUpdateFact("versionCode", BuildConfig.VERSION_CODE.toString())
                     WolfUpdateFact("applicationId", BuildConfig.APPLICATION_ID)
+                    if (onlineRepository != null) WolfUpdateFact("PWA cache", pwaCache ?: if (pwaReadFailed) "暂无法读取" else "—")
                     WolfUpdateFact("交付来源", "GitHub Releases · 本机直连")
                     latest?.let {
                         WolfUpdateFact("最新版本", it.version)
