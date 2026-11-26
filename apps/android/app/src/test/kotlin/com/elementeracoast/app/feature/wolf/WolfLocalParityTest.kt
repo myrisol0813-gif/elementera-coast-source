@@ -16,11 +16,11 @@ class WolfLocalParityTest {
         )
     }
 
-    @Test fun basicSettingsExposeExactlyElevenActiveFieldsAndNoOldRunControl() {
-        assertEquals(11, BasicSettings.activeFieldNames.size)
+    @Test fun basicSettingsExposeExactlyTwelveActiveFieldsAndNoOldRunControl() {
+        assertEquals(12, BasicSettings.activeFieldNames.size)
         assertEquals(
             listOf(
-                "recentTurns", "contextBudget", "outputLength", "maxOutputTokens", "creativity",
+                "recentTurns", "toolCallLimit", "contextBudget", "outputLength", "maxOutputTokens", "creativity",
                 "streamingEnabled", "soilBudget", "seedCooldownTurns", "worldbookEnabled",
                 "worldbookLimit", "memoryLimit"
             ), BasicSettings.activeFieldNames

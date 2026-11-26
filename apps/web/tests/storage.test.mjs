@@ -9,7 +9,7 @@ const window = new Window({ url: 'http://coast.test/' });
 Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: window.localStorage });
 
 const ACTIVE_RUN_KEYS = [
-  'recentTurns', 'contextBudget', 'outputLength', 'maxOutputTokens', 'creativity',
+  'recentTurns', 'toolCallLimit', 'contextBudget', 'outputLength', 'maxOutputTokens', 'creativity',
   'streamingEnabled', 'soilBudget', 'seedCooldownTurns', 'worldbookEnabled',
   'worldbookLimit', 'memoryLimit',
 ];
@@ -112,6 +112,7 @@ assert.equal(migrated.read().preferences.ownerName, '旧资料名');
 assert.equal(migrated.read().preferences.ownerSignature, '旧资料名');
 assert.deepEqual(Object.keys(migrated.read().runControl), ACTIVE_RUN_KEYS);
 assert.equal(migrated.read().runControl.recentTurns, 4);
+assert.equal(migrated.read().runControl.toolCallLimit, 24);
 assert.equal(migrated.read().runControl.maxHandSeeds, undefined);
 assert.deepEqual(migrated.read().daily.cache.moments, [], 'retired top-level Daily payload must not become active cache');
 assert.deepEqual(migrated.read().daily.cache.diaries, []);
