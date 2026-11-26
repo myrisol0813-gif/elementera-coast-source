@@ -1,4 +1,5 @@
 import {readConversationState} from './chat-store.js';
+import {canUseReplyMedia} from './reply-media-guard.js';
 import {listStickers,registerSticker,deliverSticker} from './sticker-library.js';
 import {startToolRun,finishToolRun} from './tool-run-log.js';
 import {buildFurnitureSummary,sanitizeFurnitureRuns} from './tool-furniture-summary.js';
@@ -12,11 +13,12 @@ function target(state,tid,mid){
  const v=t?.assistant?.variantsByUserVariant?.[String(i)]?.find(v=>v.id===mid);
  return uid&&!t.user.variants[i].hidden&&v&&!v.hidden&&['sticker_tool_ready','sticker_saved','image_tool_ready','image_saved'].includes(v.finish_reason)?{uid,v}:null;
 }
-export async function attachStickerTools(env,assembled,{conversationId,turnId,messageId,roomType,signal}={}){
+export async function attachStickerTools(env,assembled,{conversationId,turnId,messageId,roomType,signal,sequenceId=null}={}){
  if(!conversationId||!turnId||!messageId||!['main','radio'].includes(roomType))return assembled;
  const db=env.COAST_CHAT_DB,state=await readConversationState(db,conversationId);
  const ready=target(state,turnId,messageId),settings=state.context_settings||{};
  if(!ready||(!settings.sticker_send_enabled&&!settings.sticker_add_enabled))return assembled;
+ if(!await canUseReplyMedia(db,{conversationId,turnId,userId:ready.uid,messageId,sequenceId}))return assembled;
  const tools=[...(assembled.tools||[]),...(settings.sticker_send_enabled?[search,send]:[]),...(settings.sticker_add_enabled?[add]:[])];
  let saved=false;const runs=[];
  const originalHasImage=assembled.hasGeneratedImage;
@@ -33,6 +35,7 @@ export async function attachStickerTools(env,assembled,{conversationId,turnId,me
    if(signal?.aborted)throw Object.assign(new Error('本轮已取消。'),{type:'cancelled'});
    const fresh=await readConversationState(db,conversationId),current=target(fresh,turnId,messageId),cfg=fresh.context_settings||{};
    if(!current||current.uid!==ready.uid||!tools.some(t=>t.function?.name===name))throw Object.assign(new Error('本轮回复已变化。'),{type:'sticker_reservation_lost'});
+   if(!await canUseReplyMedia(db,{conversationId,turnId,userId:current.uid,messageId,sequenceId}))throw Object.assign(new Error('原任务已结束。'),{type:'reply_run_active'});
    const permit=name==='sticker_add'?cfg.sticker_add_enabled:cfg.sticker_send_enabled;
    if(permit!==true)throw Object.assign(new Error('当前窗口未授权该表情包操作。'),{type:'sticker_permission_denied'});
    const args=JSON.parse(call.function.arguments||'{}');
@@ -41,7 +44,7 @@ export async function attachStickerTools(env,assembled,{conversationId,turnId,me
    if(name==='sticker_search')result={ok:true,...await listStickers(db,args,{allowSend:true})};
    if(name==='sticker_add')result={ok:true,item:await registerSticker(db,{...args,conversation_id:conversationId},{actor:'assistant',allowModelAdd:true,conversationId})};
    if(name==='sticker_send'){
-    const sent=await deliverSticker(db,{conversation_id:conversationId,turn_id:turnId,user_variant_id:current.uid,message_id:messageId,sticker_id:args.sticker_id},{allowSend:true});
+    const sent=await deliverSticker(db,{conversation_id:conversationId,turn_id:turnId,user_variant_id:current.uid,message_id:messageId,sticker_id:args.sticker_id},{allowSend:true,sequenceId});
     saved=true;const a=sent.attachment;
     result={ok:true,status:'saved',attachment:{id:a.id,type:a.type,mime:a.mime,size:a.size},reused:sent.reused};
    }

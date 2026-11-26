@@ -1,4 +1,5 @@
 import { fetchModelCatalog } from './models/model-catalog.js';
+import {canUseReplyMedia,replyMediaGuard} from './reply-media-guard.js';
 import { ModelRequestError } from './models/model-validation.js';
 import { discoverImageModels, generateIndependentImage, prepareGeneratedImageReadback } from './independent-image.js';
 import { ensureChatSchema, getConversation, normalizeState, readConversationState, readProfile, sanitizeId } from './chat-store.js';
@@ -459,7 +460,7 @@ export function attachmentReceiptOnFailure(receipt, error) {
  * trusted current turn, and return its exact future assistant-variant reference.
  * This is not a public upload endpoint. Caller must reserve/commit the
  * assistant variant and handle cancellation/failure before exposing the tool. */
-export async function saveGeneratedImageOriginal(db,{conversationId,turnId,messageId,generated,visionSupported=null,reservedUserId=null,modelTool=false}={}){
+export async function saveGeneratedImageOriginal(db,{conversationId,turnId,messageId,generated,visionSupported=null,reservedUserId=null,modelTool=false,sequenceId=null}={}){
   const valid=v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(v);
   if(![conversationId,turnId,messageId].every(valid))throw new ChatAttachmentError('generated_source_invalid','生成图像缺少确定的回复版本。');
   const conv=await getConversation(db,conversationId);
@@ -493,10 +494,11 @@ export async function saveGeneratedImageOriginal(db,{conversationId,turnId,messa
     next.updated_at=iso(stamp);
     const expected=snap.state_json,encoded=JSON.stringify(normalizeState(next));
     // All writes share the same CAS guard, and the batch rolls back on any SQL error.
-    const guard='EXISTS (SELECT 1 FROM conversation_states s JOIN conversations c ON c.id=s.conversation_id WHERE s.conversation_id=? AND s.state_json=? AND c.deleted_at IS NULL)';
-    const guarded=[db.prepare('INSERT INTO chat_attachments (id,conversation_id,turn_id,kind,name,mime,size,data,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,?,? WHERE '+guard).bind(id,conversationId,turnId,'image',name,generated.mime,generated.bytes.length,new Uint8Array(),stamp,stamp,conversationId,expected)];
-    for(let i=0;i<generated.bytes.length;i+=ATTACHMENT_CHUNK_BYTES)guarded.push(db.prepare('INSERT INTO chat_attachment_chunks (attachment_id,chunk_index,data) SELECT ?,?,? WHERE '+guard).bind(id,Math.floor(i/ATTACHMENT_CHUNK_BYTES),generated.bytes.slice(i,i+ATTACHMENT_CHUNK_BYTES),conversationId,expected));
-    guarded.push(db.prepare('UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS (SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL)').bind(encoded,stamp,conversationId,expected,conversationId));
+    const cap=replyMediaGuard({conversationId,turnId,userId:reservedUserId,messageId,sequenceId});
+    const guard='EXISTS (SELECT 1 FROM conversation_states s JOIN conversations c ON c.id=s.conversation_id WHERE s.conversation_id=? AND s.state_json=? AND c.deleted_at IS NULL) AND '+cap.sql;
+    const guarded=[db.prepare('INSERT INTO chat_attachments (id,conversation_id,turn_id,kind,name,mime,size,data,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,?,? WHERE '+guard).bind(id,conversationId,turnId,'image',name,generated.mime,generated.bytes.length,new Uint8Array(),stamp,stamp,conversationId,expected,...cap.args)];
+    for(let i=0;i<generated.bytes.length;i+=ATTACHMENT_CHUNK_BYTES)guarded.push(db.prepare('INSERT INTO chat_attachment_chunks (attachment_id,chunk_index,data) SELECT ?,?,? WHERE '+guard).bind(id,Math.floor(i/ATTACHMENT_CHUNK_BYTES),generated.bytes.slice(i,i+ATTACHMENT_CHUNK_BYTES),conversationId,expected,...cap.args));
+    guarded.push(db.prepare('UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS (SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL) AND '+cap.sql).bind(encoded,stamp,conversationId,expected,conversationId,...cap.args));
     guarded.push(db.prepare('UPDATE conversations SET updated_at=? WHERE id=? AND deleted_at IS NULL AND EXISTS (SELECT 1 FROM conversation_states WHERE conversation_id=? AND state_json=?)').bind(stamp,conversationId,conversationId,encoded));
     const results=await db.batch(guarded);
     if(results.at(-2)?.meta?.changes!==1)throw new ChatAttachmentError('image_state_changed','聊天在保存时发生变化，未覆盖新记录。',409);
@@ -510,7 +512,7 @@ export async function saveGeneratedImageOriginal(db,{conversationId,turnId,messa
 /** User-triggered independent image request, disabled unless explicitly
  * configured. Reserve an exact reply before any network call. A repeated
  * message ID never initiates a second provider request. */
-export async function runManualImageGeneration(env,input,{generate=generateIndependentImage,discover=discoverImageModels,modelTool=false,visionSupported=null,onSaved=null,expectedModel=null}={}){
+export async function runManualImageGeneration(env,input,{generate=generateIndependentImage,discover=discoverImageModels,modelTool=false,visionSupported=null,onSaved=null,expectedModel=null,sequenceId=null}={}){
   const fail=(type,message,status=400)=>{throw new ChatAttachmentError(type,message,status);};
   const id=v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(v);
   const allowed=['conversation_id','turn_id','user_variant_id','message_id','prompt'];
@@ -522,6 +524,8 @@ export async function runManualImageGeneration(env,input,{generate=generateIndep
   const model=profile.current_image_model.trim(),key=String(env.OPENROUTER_API_KEY||'').trim();
   if(!key||! /^[a-z0-9][a-z0-9_.-]{0,79}\/[a-z0-9][a-z0-9_.-]{0,119}(?::free)?$/i.test(model))fail('image_not_configured','请在模型箱选择生图模型，并配置 OpenRouter API Key。',503);
   const conv=await getConversation(db,cid);
+  const capability={conversationId:cid,turnId:tid,userId:uid,messageId:mid,sequenceId};
+  if(!await canUseReplyMedia(db,capability))fail('reply_run_active','当前媒体请求不属于已领取的回复任务。',409);
   if(!['main','radio'].includes(conv.room_type))fail('generated_surface_invalid','该窗口不允许生成图像。',403);
   await readConversationState(db,cid); // recover expired reservations without calling the provider
   const snapshot=await first(db,'SELECT state_json FROM conversation_states WHERE conversation_id=?',[cid]);
@@ -548,11 +552,12 @@ export async function runManualImageGeneration(env,input,{generate=generateIndep
     turn.assistant.activeByUserVariant[String(index)]=branch.length-1;
   }
   state.updated_at=iso(stamp);
-  const reserved=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS (SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL)',[JSON.stringify(normalizeState(state)),stamp,cid,snapshot.state_json,cid]);
+  const cap=replyMediaGuard(capability);
+  const reserved=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS (SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL) AND '+cap.sql,[JSON.stringify(normalizeState(state)),stamp,cid,snapshot.state_json,cid,...cap.args]);
   if(reserved.meta?.changes!==1)fail('image_state_changed','聊天已变化，未发起生成。',409);
   try{
     const generated=await generate({key,model,allowPaid:true},{prompt:prompt.trim()});
-    const result=await saveGeneratedImageOriginal(db,{conversationId:cid,turnId:tid,messageId:mid,generated,visionSupported,reservedUserId:uid,modelTool});
+    const result=await saveGeneratedImageOriginal(db,{conversationId:cid,turnId:tid,messageId:mid,generated,visionSupported,reservedUserId:uid,modelTool,sequenceId});
     if(onSaved)onSaved(result);
     return {ok:true,attachment:result.attachment,readback:result.readback.receipt,history:{...await readConversationState(db,cid),conversation_id:cid}};
   }catch(error){
@@ -568,7 +573,7 @@ export async function runManualImageGeneration(env,input,{generate=generateIndep
       if(!v||v.finish_reason!=='image_pending')break;
       v.finish_reason='image_failed';v.errorDetail='图像生成或保存未完成；不自动重试，供应商可能已计费。';
       const ts=nowMs();next.updated_at=iso(ts);
-      const changed=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS (SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL)',[JSON.stringify(normalizeState(next)),ts,cid,row.state_json,cid]);
+      const changed=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS (SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL) AND '+cap.sql,[JSON.stringify(normalizeState(next)),ts,cid,row.state_json,cid,...cap.args]);
       if(changed.meta?.changes===1)break;
     }
     if(error instanceof ChatAttachmentError)throw error;

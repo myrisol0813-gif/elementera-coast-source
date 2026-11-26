@@ -2,6 +2,7 @@ import {ensureChatAttachmentSchema,getChatAttachmentRecord,MAX_ATTACHMENT_BYTES}
 import {readConversationState,normalizeState} from './chat-store.js';
 import {attachmentOrigin} from './attachment-origin.js';
 import {prepareGeneratedImageReadback} from './independent-image.js';
+import {canUseReplyMedia,replyMediaGuard} from './reply-media-guard.js';
 
 export class StickerError extends Error {
   constructor(type,message,status=400){super(message);this.type=type;this.status=status;}
@@ -106,10 +107,12 @@ export async function resolveStickerOriginal(db,id,{allowSend=false}={}){
  * This internal operation is not an upload endpoint or a provider request.
  * The caller must supply trusted current-window permission and reserve the reply.
  * Repeated selection of the same sticker on that reply returns its original receipt. */
-export async function deliverSticker(db,input,{allowSend=false}={}){
+export async function deliverSticker(db,input,{allowSend=false,sequenceId=null}={}){
   if(allowSend!==true)fail('sticker_send_denied','当前窗口未允许发送表情包。',403);
   const cid=identifier(input.conversation_id),tid=identifier(input.turn_id),uid=identifier(input.user_variant_id);
   const mid=identifier(input.message_id),sid=identifier(input.sticker_id);
+  const capability={conversationId:cid,turnId:tid,userId:uid,messageId:mid,sequenceId};
+  if(!await canUseReplyMedia(db,capability))fail('reply_run_active','当前媒体请求不属于已领取的回复任务。',409);
   const original=await resolveStickerOriginal(db,sid,{allowSend});
   const snap=await query(db,`SELECT s.state_json FROM conversation_states s JOIN conversations c ON c.id=s.conversation_id
     WHERE s.conversation_id=? AND c.user_id='owner' AND c.deleted_at IS NULL AND c.conversation_kind='chat'
@@ -143,8 +146,8 @@ export async function deliverSticker(db,input,{allowSend=false}={}){
     WHERE s.conversation_id=? AND s.state_json=? AND c.deleted_at IS NULL AND c.user_id='owner')
     AND EXISTS (SELECT 1 FROM coast_sticker_library x JOIN chat_attachments a
       ON a.id=x.attachment_id AND a.conversation_id=x.conversation_id JOIN conversations c ON c.id=a.conversation_id
-      WHERE x.id=? AND x.enabled=1 AND c.deleted_at IS NULL AND c.user_id='owner')`;
-  const args=[cid,snap.state_json,sid];
+      WHERE x.id=? AND x.enabled=1 AND c.deleted_at IS NULL AND c.user_id='owner') AND ${replyMediaGuard(capability).sql}`;
+  const args=[cid,snap.state_json,sid,...replyMediaGuard(capability).args];
   const stmts=[query(db,'INSERT INTO chat_attachments (id,conversation_id,turn_id,kind,name,mime,size,data,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,?,? WHERE '+guard,
     [id,cid,tid,'image',original.name,original.mime,original.bytes.length,new Uint8Array(),stamp,stamp,...args])];
   const chunkSize=1500000;

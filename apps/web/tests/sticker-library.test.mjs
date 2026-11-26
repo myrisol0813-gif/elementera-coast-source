@@ -153,7 +153,10 @@ for(const order of [['sticker_send','image_generate'],['image_generate','sticker
   assert.equal(await reserveReplyMedia(directDb,identity,'group-first','fixture/chat',{image:true,sticker:true}),true);
   assert.equal(await reserveReplyMedia(directDb,identity,'group-first','fixture/chat',{image:true}),false);
   const env={COAST_CHAT_DB:directDb,OPENROUTER_API_KEY:'fixture'};
-  const opts={conversationId:chat.id,turnId:identity.turnId,messageId:'group-first',roomType:'main',chatModel:'fixture/chat',enabled:true,visionOverride:false};
+  const opts={conversationId:chat.id,turnId:identity.turnId,messageId:'group-first',roomType:'main',chatModel:'fixture/chat',enabled:true,visionOverride:false,sequenceId:identity.sequenceId};
+  const unauthorized=await attachStickerTools(env,blank,{...opts,sequenceId:null});
+  assert.equal(unauthorized.tools.length,0);
+  await assert.rejects(()=>deliverSticker(directDb,{conversation_id:chat.id,turn_id:identity.turnId,user_variant_id:identity.userVariantId,message_id:'group-first',sticker_id:direct.id},{allowSend:true}),e=>e.type==='reply_run_active');
   const image=await attachImageTool(env,{...blank,tools:[{type:'function',function:{name:'fixture'}}]},opts,{discover:async()=>[{id:'fixture/paid'}],generate:async(c,p)=>({bytes:png,mime:'image/png',provider:'openrouter',requested_model:c.model,prompt:p.prompt})});
   const tools=await attachStickerTools(env,image,opts);
   for(const name of order)assert.equal((await tools.executeTool(call(name,name==='sticker_send'?{sticker_id:direct.id}:{prompt:'draw wolf'}))).ok,true);
