@@ -42,6 +42,7 @@ sealed interface ChatProgress {
 
 interface ChatRepository {
     fun cachedHistory(conversationId: String): RemoteHistory?
+    suspend fun generateImage(conversationId:String,turnId:String,userId:String,messageId:String,prompt:String):RemoteHistory = error("Image generation unavailable")
     suspend fun loadHistory(conversationId: String): RemoteHistory
     suspend fun persistHistory(conversationId: String, history: RemoteHistory): RemoteHistory
     suspend fun uploadAttachment(conversationId: String, name: String, mime: String, bytes: ByteArray): RemoteAttachment
@@ -83,6 +84,9 @@ class DefaultChatRepository(
     private val reasoningStore: ReasoningEffortStore? = null
 ) : ChatRepository {
     override fun cachedHistory(conversationId: String): RemoteHistory? = cache.history(conversationId)
+
+    override suspend fun generateImage(conversationId:String,turnId:String,userId:String,messageId:String,prompt:String):RemoteHistory =
+        api.generateChatImage(conversationId,turnId,userId,messageId,prompt).also { cache.putHistory(conversationId,it) }
 
     override suspend fun loadHistory(conversationId: String): RemoteHistory =
         api.getHistory(conversationId).also { cache.putHistory(conversationId, it) }

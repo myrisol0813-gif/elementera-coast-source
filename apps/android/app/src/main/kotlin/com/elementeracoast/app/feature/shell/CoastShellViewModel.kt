@@ -633,6 +633,46 @@ class CoastShellViewModel(
         }
     }
 
+    fun sendImage(text: String) {
+        val prompt=text.trim()
+        val current=_state.value
+        if(generationJob?.isActive==true||generationRun!=null||current.isStreaming||current.isFinalizing||current.attachmentUploading||current.historyLoading)return
+        if(prompt.length !in 1..4000){showPlaceholder("请输入1—4000字符的绘图提示。");return}
+        if(current.currentImageModel.isBlank()){showPlaceholder("请先在模型箱选择生图模型。");return}
+        if(current.activeRoomType==RoomType.Lighthouse){showPlaceholder("灯塔窗口不支持生图。");return}
+        if(current.pendingAttachments.isNotEmpty()){showPlaceholder("手动生图暂不接收参考图或文件，请先移除待发送附件。");return}
+        if(current.searchFocus!=null){showPlaceholder("请先结束旧版本预览。");return}
+        beginGeneration(current.activeConversationId)
+        generationJob=viewModelScope.launch(workDispatcher){
+            var cid=""
+            var requested=false
+            try{
+                val conversation=ensureRemoteConversation()
+                cid=conversation.id
+                generationRun?.ownerId=cid
+                val base=backend.chat.loadHistory(cid)
+                val appended=ChatSyncMapper.appendUser(base,prompt)
+                val persisted=backend.chat.persistHistory(cid,appended.history)
+                val turn=persisted.turns.first{it.id==appended.turnId}
+                val uid=turn.user.variants[turn.user.active].id
+                val mid=ChatSyncMapper.nextAssistantVariantId(persisted,turn.id)
+                clearAcceptedDraft(cid,conversation.roomType,text)
+                showHistory(cid,persisted)
+                showPlaceholder("正在绘制图片…")
+                requested=true
+                val result=backend.chat.generateImage(cid,turn.id,uid,mid,prompt)
+                showHistory(cid,result)
+                showPlaceholder("图片已保存。")
+            }catch(error:kotlinx.coroutines.CancellationException){
+                if(requested&&cid.isNotBlank())kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable){runCatching{backend.chat.loadHistory(cid)}.onSuccess{showHistory(cid,it)}}
+                throw error
+            }catch(error:Exception){
+                if(requested&&cid.isNotBlank())runCatching{backend.chat.loadHistory(cid)}.onSuccess{showHistory(cid,it)}
+                showPlaceholder("生图未确认完成；请刷新窗口检查，不会自动重试。")
+            }finally{finishGeneration()}
+        }
+    }
+
     fun sendMessage(text: String) {
         if (tourBlocksCloudAction()) return
         val clean = text.trim()

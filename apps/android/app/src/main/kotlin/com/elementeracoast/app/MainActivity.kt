@@ -93,6 +93,7 @@ class MainActivity : ComponentActivity() {
                         onRemovePendingAttachment = vm::removePendingAttachment,
                         onComposerDraftChange = vm::updateComposerDraft,
                         onSend = vm::sendMessage,
+                        onSendImage = vm::sendImage,
                         onStop = vm::stopGeneration,
                         onMessageAction = vm::handleMessageAction,
                         onOpenActionLog = vm::openActionLog,

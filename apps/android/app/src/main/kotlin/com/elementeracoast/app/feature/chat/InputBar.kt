@@ -72,7 +72,8 @@ fun CoastComposer(
     onRemoveAttachment: (String) -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
-    onPlaceholder: (String) -> Unit
+    onPlaceholder: (String) -> Unit,
+    onGenerateImage: (() -> Unit)? = null
 ) {
     val focus = LocalFocusManager.current
     var attachmentMenuOpen by remember { mutableStateOf(false) }
@@ -135,6 +136,12 @@ fun CoastComposer(
                             attachmentMenuOpen = false
                             onPickImage()
                         }
+                    )
+                    if(onGenerateImage!=null)DropdownMenuItem(
+                        text={AttachmentMenuText("生成图片","使用当前输入作为绘图提示 · 正常 API 计费")},
+                        leadingIcon={Icon(Icons.Default.Image,contentDescription=null)},
+                        enabled=enabled&&!isStreaming&&!isFinalizing&&!attachmentUploading,
+                        onClick={attachmentMenuOpen=false;focus.clearFocus();onGenerateImage()}
                     )
                     DropdownMenuItem(
                         text = {

@@ -66,6 +66,7 @@ fun ChatWindow(
     onRemovePendingAttachment: (String) -> Unit,
     onComposerDraftChange: (String) -> Unit,
     onSend: (String) -> Unit,
+    onSendImage: (String) -> Unit = {},
     onStop: () -> Unit,
     onMessageAction: (MessageAction) -> Unit,
     onOpenActionLog: (Set<String>) -> Unit,
@@ -281,6 +282,7 @@ fun ChatWindow(
                 onPickFile = { filePicker.launch(arrayOf("*/*")) },
                 onRemoveAttachment = onRemovePendingAttachment,
                 onSend = { onSend(input) },
+                onGenerateImage = { onSendImage(input) },
                 onStop = onStop,
                 onPlaceholder = onPlaceholder
             )
