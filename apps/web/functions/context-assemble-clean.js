@@ -1,4 +1,4 @@
-import { trimContextToComfortRange } from './context-comfort-range.js';
+import { cleanMessages, trimContextToComfortRange } from './context-comfort-range.js';
 import { contextBudgetForModel } from './context-budget.js';
 import {
   crossWindowDeskSection,
@@ -66,8 +66,7 @@ function effectiveRecentTurns(request, access) {
     : request.recentTurns;
 }
 function cleanHistory(messages, recentTurns) {
-  const cleaned = (Array.isArray(messages) ? messages : []).filter((message) => ['user', 'assistant'].includes(message?.role) && typeof message.content === 'string' && message.content.trim()).map((message) => ({ role: message.role, content: message.content }));
-  const current = cleaned.at(-1)?.role === 'user' ? cleaned.pop() : null; const recent = cleaned.slice(-recentTurns * 2); return current ? [...recent, current] : recent;
+  return cleanMessages(messages,recentTurns);
 }
 function ensureCurrentUser(messages, lastUser) { const content = String(lastUser?.content ?? lastUser ?? '').trim(); if (!content) return messages; const last = messages.at(-1); return last?.role === 'user' && last.content === content ? messages : [...messages, { role: 'user', content }]; }
 function mailboxHistory(records) { return (Array.isArray(records) ? records : []).map((message) => ({ role: message.role === 'visitor' ? 'user' : 'assistant', content: String(message.content || '') })).filter((message) => message.content.trim()); }

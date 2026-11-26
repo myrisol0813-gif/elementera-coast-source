@@ -103,3 +103,12 @@ assert.throws(() => assertWireInputBudget({ ...wire, messages: [...wire.messages
   { role: 'tool', content: '汉'.repeat(4000) }] }, { context_length: 8000 }, true),
   e => e.type === 'context_window_estimate_exceeded' && e.details.continuation === true);
 console.log('clean-context: ok');
+
+{
+  const {cleanMessages,trimContextToComfortRange}=await import('../functions/context-comfort-range.js');
+  const recent=[{role:'user',content:'old'},{role:'assistant',content:'old answer'},
+    {role:'user',content:'group question'},{role:'assistant',content:'one'},{role:'assistant',content:'two'},{role:'assistant',content:'three'},{role:'user',content:'current'}];
+  assert.deepEqual(cleanMessages(recent,1).map(m=>m.content),['group question','one','two','three','current']);
+  const result=trimContextToComfortRange({messages:recent.map((m,i)=>i<2?{...m,content:m.content+'旧'.repeat(1500)}:m),recentTurns:8,maxTokens:1800});
+  assert.deepEqual(result.keptMessages.map(m=>m.content),['group question','one','two','three','current']);
+}
