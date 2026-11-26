@@ -110,6 +110,41 @@ class LocalToolWriteTest {
         store.patch("self_portrait",buildJsonObject{put("write_enabled",false)})
         assertFalse(enabled.execute("2","global_excerpt_propose",args).ok)
         assertEquals(1,store.read("self_portrait")!!.candidates.size)
+        val userResult=enabled.execute("3","user_portrait_propose",args)
+        assertTrue(userResult.output,userResult.ok)
+        assertEquals("",store.body("user_portrait"))
+        val userCandidate=store.read("user_portrait")!!.candidates.single().getValue("id").jsonPrimitive.content
+        store.confirm("user_portrait",userCandidate,RemoteGlobalExcerptConfirmRequest("confirm",null,"user"))
+        assertEquals("完整的候选正文",store.body("user_portrait"))
+        store.patch("user_portrait",buildJsonObject{put("write_enabled",false)})
+        assertFalse(enabled.execute("4","user_portrait_propose",args).ok)
+    }
+
+    @Test fun bookshelfReadUsesRealIdAndAcceptsOptionalNulls(){
+        val s=MemoryLocalPersistence();val cache=RemoteCacheStore(s);val cid="books";val tid="turn1"
+        cache.putConversations(listOf(RemoteConversation(cid,"阅读")))
+        cache.putHistory(cid,RemoteHistory(conversationId=cid,contextSettings=ConversationContextSettings(localModelToolsEnabled=true,localModelWriteEnabled=true),
+            turns=listOf(RemoteTurn(tid,user=RemoteUserBranch(variants=listOf(RemoteVariant("u1","阅读")))))))
+        val side=LocalSideRecords(s)
+        val book=side.importBook(buildJsonObject{put("title","Fixture book");put("format","txt")
+            putJsonArray("chapters"){add(buildJsonObject{put("title","Chapter");put("body","第一段原文")})}
+        }).getValue("id").jsonPrimitive.content
+        val k=LocalKnowledgeStore(s)
+        val session=k.toolSession(cid,tid,null,k.context(listOf(RemoteChatMessage("user","阅读")),18000,"main_chat",cid).receipt,"fixture-model")!!
+        fun call(id:String,name:String,args:String):JsonObject {
+            val response=session.execute(id,name,args)
+            assertTrue(response.output,response.ok)
+            return Json.parseToJsonElement(response.output).jsonObject
+        }
+        val shelf=call("read1","library_books","""{"book_id":null}""")
+        assertEquals(book,shelf.getValue("items").jsonArray.single().jsonObject.getValue("id").jsonPrimitive.content)
+        val toc=call("read2","library_books",buildJsonObject{put("book_id",book)}.toString())
+        assertEquals(0,toc.getValue("book").jsonObject.getValue("chapters").jsonArray.single().jsonObject.getValue("chapter_index").jsonPrimitive.int)
+        val page=call("read3","library_read",buildJsonObject{put("book_id",book);put("chapter_index",0);put("start_paragraph",JsonNull);put("limit",JsonNull)}.toString())
+        assertEquals("第一段原文",page.getValue("page").jsonObject.getValue("paragraphs").jsonArray.single().jsonObject.getValue("text").jsonPrimitive.content)
+        val notes=call("read4","library_notes",buildJsonObject{put("book_id",book);put("chapter_index",JsonNull)}.toString())
+        assertTrue(notes.getValue("items").jsonArray.isEmpty())
+        assertFalse(session.execute("read5","library_read","""{"book_id":null,"chapter_index":0}""").ok)
     }
 
 }
