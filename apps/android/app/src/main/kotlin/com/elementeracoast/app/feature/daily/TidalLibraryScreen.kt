@@ -48,6 +48,20 @@ private fun JsonObject.n(name: String): Int = this[name]?.jsonPrimitive?.intOrNu
 internal fun JsonObject.hasLibraryCover(): Boolean = this["has_cover"]?.jsonPrimitive?.contentOrNull in setOf("1", "true")
 private fun JsonObject.rows(name: String): List<JsonObject> = (this[name] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
 
+// Normalize transport aliases at the display boundary; never rewrite stored notes.
+internal fun JsonObject.libraryDisplayNote(): JsonObject {
+    val author = when (s("author")) {
+        "owner", "xiaohan" -> "owner"
+        "assistant", "model_partner", "myri" -> "assistant"
+        else -> return this
+    }
+    return JsonObject(this + ("author" to kotlinx.serialization.json.JsonPrimitive(author)))
+}
+internal fun JsonObject.libraryDisplayCount(model: Boolean): Int {
+    val keys = if (model) listOf("assistant_notes", "model_partner_notes", "myri_notes") else listOf("owner_notes", "xiaohan_notes")
+    return keys.firstNotNullOfOrNull { this[it]?.jsonPrimitive?.intOrNull } ?: 0
+}
+
 private enum class LibraryPage { Shelf, Chapter, Notes }
 @Composable
 fun TidalLibraryScreen(
@@ -131,14 +145,14 @@ fun TidalLibraryScreen(
                 LibraryPage.Shelf -> { books = repository.books().rows("books") }
                 LibraryPage.Notes -> {
                     if (book?.s("id") != bookId) book = repository.book(bookId)["book"]?.jsonObject
-                    notes = repository.notes(bookId).rows("notes")
+                    notes = repository.notes(bookId).rows("notes").map { it.libraryDisplayNote() }
                     loadedNotesKey = "$bookId:$revision"
                 }
                 LibraryPage.Chapter -> {
                     if (book?.s("id") != bookId) book = repository.book(bookId)["book"]?.jsonObject
                     chapter = repository.fullChapter(bookId, index)["chapter"]?.jsonObject
                     if (loadedNotesKey != "$bookId:$revision") {
-                        notes = repository.notes(bookId).rows("notes")
+                        notes = repository.notes(bookId).rows("notes").map { it.libraryDisplayNote() }
                         loadedNotesKey = "$bookId:$revision"
                     }
                 }
@@ -210,9 +224,9 @@ fun TidalLibraryScreen(
                                     else "阅读进度 · 第 ${chapterIndex+1} / ${chapterCount} 个分段",
                                     style = MaterialTheme.typography.labelSmall,
                                     color=MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text("屋主 · ${entry.n("owner_notes")} 条批注与读后感",
+                                Text("屋主 · ${entry.libraryDisplayCount(false)} 条批注与读后感",
                                     style=MaterialTheme.typography.labelSmall)
-                                Text("模型伙伴 · ${entry.n("assistant_notes")} 条批注与读后感",
+                                Text("模型伙伴 · ${entry.libraryDisplayCount(true)} 条批注与读后感",
                                     style=MaterialTheme.typography.labelSmall)
                             }
                             TidalCoverSlot(
