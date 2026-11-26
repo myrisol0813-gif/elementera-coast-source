@@ -75,36 +75,7 @@ internal class LocalDirectChatRepository(
                     knowledge.context(ChatSyncMapper.contextMessages(claim.history,tid,recent),policy.comfort,knowledge.surfaceFor(cid),cid,attachmentIds,tid,request.crossWindow,request.realityContext?:RemoteRealityContext(),policy,groupDogtalk=if(index==0)null else deliveredDogtalk)
                 }
                 if(index==0)deliveredDogtalk=prepared.receipt.dogtalk.context.takeIf{prepared.receipt.dogtalk.delivered}.orEmpty()
-                val previous=withContext(Dispatchers.IO){
-                    val wire=mutableListOf<JsonObject>()
-                    val receipts=mutableListOf<com.elementeracoast.app.core.remote.RemoteDeskSequenceMessage>()
-                    val originals=LocalAttachmentStore(store)
-                    for(v in claim.previous){
-                        if(v.content.isNotBlank())wire.add(buildJsonObject{put("role","assistant");put("content",v.content)})
-                        val refs=v.attachments.filter{it.imageGeneration?.messageId==v.id||it.stickerDelivery?.messageId==v.id}
-                        val delivered=mutableListOf<com.elementeracoast.app.core.remote.RemoteDeskAttachmentItem>()
-                        val withheld=mutableListOf<com.elementeracoast.app.core.remote.RemoteDeskAttachmentItem>()
-                        val parts=mutableListOf<JsonObject>()
-                        for(a in refs){
-                            val row=originals.entries().singleOrNull{it.metadata["id"]?.jsonPrimitive?.content==a.id&&it.metadata["conversation_id"]?.jsonPrimitive?.content==cid}
-                            val read=row?.let{prepareGeneratedImageReadback(a.id,originals.bytes(it),a.mime,policy.vision)}
-                            if(read?.continuationMessage!=null){
-                                parts.addAll(read.continuationMessage.getValue("content").jsonArray.map{it.jsonObject}.filter{it["type"]?.jsonPrimitive?.content=="image_url"})
-                                delivered.add(com.elementeracoast.app.core.remote.RemoteDeskAttachmentItem(id=a.id,name=a.name,type="image",mode="image"))
-                            }else withheld.add(com.elementeracoast.app.core.remote.RemoteDeskAttachmentItem(id=a.id,name=a.name,type="image",reason=read?.receipt?.get("status")?.jsonPrimitive?.contentOrNull?:"attachment_not_found"))
-                        }
-                        if(refs.isNotEmpty()){
-                            val note="【本组前序媒体 · 系统转交，非人类新发言】原助手消息 "+v.id+"；已保存图像 "+refs.joinToString("、"){it.id}+"。"+if(parts.isEmpty())"本次未递入像素，不要声称看见。" else "附已核验的部分或全部像素；未递入："+withheld.joinToString("、"){it.id}
-                            wire.add(buildJsonObject{
-                                if(parts.isEmpty()){put("role","system");put("content",note)}
-                                else{put("role","user");put("content",JsonArray(listOf(buildJsonObject{put("type","text");put("text",note)})+parts))}
-                            })
-                        }
-                        receipts.add(com.elementeracoast.app.core.remote.RemoteDeskSequenceMessage(v.id,v.content,
-                            if(refs.isEmpty())null else com.elementeracoast.app.core.remote.RemoteDeskAttachments(uploaded=refs.size,deliveredToModel=delivered.size,delivered=delivered,notDelivered=withheld,vision=com.elementeracoast.app.core.remote.RemoteDeskAttachmentVision(supported=policy.vision==true,imagesDelivered=parts.size))))
-                    }
-                    wire to receipts
-                }
+                val previous=withContext(Dispatchers.IO){localReplyPreviousMedia(store,cid,claim.previous,policy.vision)}
                 val image=if(claim.tools>0&&request.imageToolEnabled)withContext(Dispatchers.IO){
                     knowledge.imageTool(cid,tid,request.userVariantId,mid,providers,policy.vision,seq)
                         ?:throw CoastApiException(CoastApiErrorKind.Request,"local_image_unavailable","所选本机生图模型或写入授权不可用。")
