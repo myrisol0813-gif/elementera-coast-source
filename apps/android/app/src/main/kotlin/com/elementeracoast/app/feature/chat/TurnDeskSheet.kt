@@ -36,7 +36,8 @@ import com.elementeracoast.app.ui.theme.snowLetterSheetContainerColor
 @Composable
 internal fun TurnDeskBottomSheet(
     receipt: TurnDeskReceipt,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    historical:Boolean=false
 ) {
     var expanded by remember(receipt) { mutableStateOf<Set<Int>>(emptySet()) }
     ModalBottomSheet(
@@ -51,7 +52,7 @@ internal fun TurnDeskBottomSheet(
             verticalArrangement = Arrangement.spacedBy(9.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("本轮上下文预览", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text(if(historical)"历史桌面" else "本轮上下文预览", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                 FeatureGuideButton(FeatureGuides.desk)
             }
             Text(

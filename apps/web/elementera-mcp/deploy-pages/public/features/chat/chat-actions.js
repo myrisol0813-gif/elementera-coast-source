@@ -119,12 +119,19 @@ export function createChatActions({
       return;
     }
     const inPreview = runtime.searchPreview?.has(runtime.currentId);
-    if (inPreview && !['favorite', 'copy'].includes(name)) {
+    if (inPreview && !['favorite', 'copy','history-desk'].includes(name)) {
       toast('旧版本正在只读预览。请先结束预览，再修改或生成聊天。');
       return;
     }
     const turnId = turnIdFrom(target);
     const messageId=target.closest('[data-message-id]')?.dataset.messageId || '';
+    if(name==='history-desk'){
+      const history=runtime.searchPreview?.get(runtime.currentId)||currentHistory();
+      const turn=history.turns.find(t=>t.id===turnId);
+      const variant=turn?selectedAssistantMessage(turn,messageId):null;
+      if(variant?.desk_slip)return runtime.desk?.openMessageDesk(runtime.currentId,variant);
+      return toast('此条回复没有保存历史桌面。');
+    }
     if (name === 'generation-detail') {
       const turn = currentHistory().turns.find((item) => item.id === turnId);
       const variant = turn ? selectedAssistantMessage(turn,messageId) : null;

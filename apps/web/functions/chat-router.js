@@ -539,9 +539,11 @@ async function replySequenceChat(request,env){
               await saveModelEcho(env,identity.conversationId,step.messageId,data.model_metadata);
             }
             if(!receipt||!content.trim()||!finishReason)throw new ChatStoreError('reply_sequence_incomplete','模型未返回可保存的完整回复。',502);
+            const desk=withRuntimeDeskSlip(assembled.deskSlip(),{attachments:attachmentDeskReceipt(resolved),serverTools});
+            if(step.previous.length)desk.reply_sequence_previous=step.previous.map(v=>({message_id:v.id,content:v.content}));
             return {variant:{id:step.messageId,content,model_id:model,finish_reason:finishReason,generation_source:'chat',
               ...(usage?{usage}:{}),furniture_runs:assembled.furnitureRuns(),
-              desk_slip:withRuntimeDeskSlip(assembled.deskSlip(),{attachments:attachmentDeskReceipt(resolved),serverTools})},receipt};
+              desk_slip:desk},receipt};
           }
         });
         emit('reply_group_end',result);

@@ -42,6 +42,7 @@ data class RemoteDeskSlip(
     @SerialName("web_search") val webSearch: RemoteDeskWebSearch? = null,
     @SerialName("external_tide") val externalTide: RemoteDeskExternalTide = RemoteDeskExternalTide(),
     @SerialName("context_budget") val contextBudget: RemoteDeskContextBudget = RemoteDeskContextBudget(),
+    @SerialName("reply_sequence_previous") val replySequencePrevious:List<RemoteDeskSequenceMessage> = emptyList(),
     @Transient val archivedJson: JsonObject? = null
 )
 
@@ -87,6 +88,9 @@ data class RemoteDeskCurrentMessage(
     val delivered: Boolean = false,
     val content: String = ""
 )
+
+@Serializable
+data class RemoteDeskSequenceMessage(@SerialName("message_id") val messageId:String,val content:String)
 
 @Serializable
 data class RemoteDeskRecentContext(

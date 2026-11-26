@@ -91,7 +91,7 @@ internal class LocalDirectChatRepository(
                 if(content.isBlank())throw CoastApiException(CoastApiErrorKind.Model,"local_empty_reply","供应商未返回可显示正文。")
                 val receipt=LocalReplyRunStore.Usage(mid,finished.ordinaryToolCalls,finished.metadata?.usage?.totalTokens,finished.continueRequested)
                 val variant=RemoteVariant(mid,content,Instant.now().toString(),modelId=request.model,finishReason=finished.reason,generationSource="chat",
-                    furnitureRuns=runs,deskSlip=session?.receipt?:prepared.receipt,usage=finished.metadata?.usage,modelEcho=finished.metadata?.copy(usage=null))
+                    furnitureRuns=runs,deskSlip=(session?.receipt?:prepared.receipt).copy(replySequencePrevious=claim.previous.map{com.elementeracoast.app.core.remote.RemoteDeskSequenceMessage(it.id,it.content)},archivedJson=null),usage=finished.metadata?.usage,modelEcho=finished.metadata?.copy(usage=null))
                 val result=withContext(Dispatchers.IO){ledger.commit(cid,seq,variant,receipt)}
                     ?:throw CoastApiException(CoastApiErrorKind.Request,"reply_commit_unconfirmed","回复未确认写入；不会自动重放。")
                 val canonical=result.first

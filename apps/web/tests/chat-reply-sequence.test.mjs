@@ -195,3 +195,7 @@ assert.equal(await claimReplyRunSoil(routeDb,routeCv.id,'route-sequence',soilTai
 assert.equal(await finishReplyRunSoil(routeDb,routeCv.id,'route-sequence','done'),true);
 assert.equal((await organizeConversationSoil(routeEnv,routeCv.id,{trigger:'reply',reply_sequence_id:'route-sequence'})).reason,'reply_sequence_already_claimed_or_unsettled');
 assert.equal((await organizeConversationSoil(routeEnv,routeCv.id,{trigger:'reply'})).reason,'reply_sequence_not_current');
+
+const deskGroup=(await readConversationState(routeDb,routeCv.id)).turns[0].assistant.variantsByUserVariant['0'];
+assert.equal(deskGroup[0].desk_slip.reply_sequence_previous,undefined);
+assert.deepEqual(deskGroup[1].desk_slip.reply_sequence_previous,[{message_id:deskGroup[0].id,content:deskGroup[0].content}]);

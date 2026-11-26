@@ -14,7 +14,7 @@ internal object TurnDeskMapper {
     fun toUi(value: RemoteDeskSlip): TurnDeskReceipt = TurnDeskReceipt(
         summary = value.summary.ifBlank { "本轮递给模型" },
         comfort = value.comfort,
-        sections = listOf(
+        sections = listOfNotNull(
             section(
                 title = value.currentMessage.label.ifBlank { "当前消息" },
                 status = value.currentMessage.status,
@@ -28,6 +28,12 @@ internal object TurnDeskMapper {
                 details = value.recentContext.messages.map { message ->
                     TurnDeskDetail(if (message.role == "assistant") "模型伙伴回复" else "用户消息", message.content)
                 }
+            ),
+            if(value.replySequencePrevious.isEmpty())null else section(
+                title = "本组前序回复",
+                status = "已递给 · ${value.replySequencePrevious.size} 条",
+                description = "当前独立回复实际读取的本组前序正式消息。",
+                details = value.replySequencePrevious.map{TurnDeskDetail("消息 "+it.messageId,it.content)}
             ),
             section(
                 title = value.customInstructions.label.ifBlank { "核心自定义" },

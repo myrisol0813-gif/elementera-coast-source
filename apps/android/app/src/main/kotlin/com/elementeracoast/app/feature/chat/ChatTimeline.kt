@@ -76,7 +76,8 @@ internal fun ChatTimeline(
     onFootprint: (ChatMessage) -> Unit,
     onOpenActionLog: (Set<String>) -> Unit,
     onOpenThoughtSoil: (ThoughtSoilSnapshot) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenHistoryDesk:(ChatMessage)->Unit={}
 ) {
     val listState = rememberLazyListState()
     val streamingIndex = messages.indexOfFirst { it.id == streamingMessageId }
@@ -190,6 +191,11 @@ internal fun ChatTimeline(
                         onAction = onAction,
                         onFootprint = onFootprint
                     )
+                    if(message.role==MessageRole.Assistant&&!streamingTail&&message.deskReceipt!=null){
+                        androidx.compose.material3.TextButton(onClick={onOpenHistoryDesk(message)},modifier=Modifier.align(Alignment.End)){
+                            Text("历史桌面",style=MaterialTheme.typography.labelSmall)
+                        }
+                    }
                     if (metadataMessageId != null) {
                         ModelUsageFooter(
                             conversationId = conversationId,
