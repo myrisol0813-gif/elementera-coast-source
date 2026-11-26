@@ -443,6 +443,31 @@ try {
 assert.equal(providerStreamError.type, 'provider_unavailable');
 assert.doesNotMatch(providerStreamError.message, /secret upstream diagnostic/i, 'provider raw stream diagnostics must not leak');
 
+// Trusted, request-local control: never execute it as a side-effecting tool.
+const sequencePayloads=[];
+let ordinaryCalls=0;
+const sequenceUsage={prompt_tokens:10,completion_tokens:2,total_tokens:12};
+globalThis.fetch=async(_url,options={})=>{
+  const payload=JSON.parse(options.body);sequencePayloads.push(payload);
+  const first=sequencePayloads.length===1;
+  return new Response(JSON.stringify({model:'openai/gpt-4.1-nano',usage:sequenceUsage,choices:[first
+    ? {finish_reason:'tool_calls',message:{content:null,tool_calls:[{id:'continue-1',type:'function',function:{name:'continue_reply',arguments:'{}'}}]}}
+    : {finish_reason:'stop',message:{content:'完成第一条'}}]}),{status:200,headers:{'Content-Type':'application/json'}});
+};
+const seqResult=await performFormalChatWithTools(modelEnv,{model:'openai/gpt-4.1-nano',messages:[{role:'user',content:'hello'}],tools:testTools},{
+  replySequence:{mayContinue:true,toolBudget:0,tokenBudget:1000},executeTool:async()=>{ordinaryCalls++;return {ok:true};}
+});
+assert.deepEqual(seqResult.reply_sequence_receipt,{continue_requested:true,tool_calls:0,total_tokens:24,provider_requests:2});
+assert.equal(seqResult.message.content,'完成第一条');
+assert.equal(ordinaryCalls,0);
+assert.deepEqual(sequencePayloads[0].tools.map(t=>t.function.name),['continue_reply']);
+assert.equal(sequencePayloads[1].tools,undefined);
+assert.equal(sequencePayloads[1].messages.at(-1).role,'tool');
+assert.equal(sequencePayloads[1].messages.filter(m=>m.role==='user').length,1);
+globalThis.fetch=async()=>new Response(JSON.stringify({model:'openai/gpt-4.1-nano',choices:[{finish_reason:'stop',message:{content:'无回执'}}]}),{status:200});
+const missing=await performFormalChatWithTools(modelEnv,{model:'openai/gpt-4.1-nano',messages:[{role:'user',content:'hello'}]},{replySequence:{mayContinue:true,toolBudget:0,tokenBudget:1000}});
+assert.equal(missing.reply_sequence_receipt.total_tokens,null);
+assert.equal(missing.reply_sequence_receipt.continue_requested,false);
 globalThis.fetch = originalFetch;
 
 console.log('backend: ok');

@@ -48,7 +48,8 @@ data class ChatMessage(
     val createdAtLabel: String? = null,
     val attachments: List<ChatAttachment> = emptyList(),
     val furnitureRuns: List<FurnitureRun> = emptyList(),
-    val deskReceipt: TurnDeskReceipt? = null
+    val deskReceipt: TurnDeskReceipt? = null,
+    val replyGroupTail: Boolean = true
 ) {
     fun normalizedVariants(): List<String> = variants.ifEmpty { listOf(text) }
 }

@@ -148,6 +148,9 @@ data class RemoteImageGeneration(
 )
 
 @Serializable
+data class RemoteStickerDelivery(@SerialName("message_id") val messageId:String,@SerialName("sticker_id") val stickerId:String)
+
+@Serializable
 data class RemoteAttachment(
     val id: String,
     val type: String = "file",
@@ -156,7 +159,10 @@ data class RemoteAttachment(
     val size: Long = 0L,
     @SerialName("storage_key") val storageKey: String = "",
     @SerialName("created_at") val createdAt: String = "",
-    @SerialName("image_generation") val imageGeneration: RemoteImageGeneration? = null
+    @SerialName("image_generation") val imageGeneration: RemoteImageGeneration? = null,
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("sticker_delivery") val stickerDelivery: RemoteStickerDelivery? = null
 )
 
 @Serializable
@@ -164,6 +170,9 @@ data class RemoteAttachmentResponse(
     val ok: Boolean = false,
     val attachment: RemoteAttachment
 )
+
+@Serializable
+data class RemoteReplySequence(val id:String,val index:Int)
 
 @Serializable
 data class RemoteVariant(
@@ -187,7 +196,10 @@ data class RemoteVariant(
     @SerialName("input_type") val inputType: String? = null,
     @SerialName("source_model_label") val sourceModelLabel: String? = null,
     @SerialName("dogtalk_snapshot_id") val dogtalkSnapshotId: String? = null,
-    @SerialName("archive_retained_desk_slip") val archiveRetainedDeskSlip: Boolean = false
+    @SerialName("archive_retained_desk_slip") val archiveRetainedDeskSlip: Boolean = false,
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("reply_sequence") val replySequence: RemoteReplySequence? = null
 )
 
 @Serializable

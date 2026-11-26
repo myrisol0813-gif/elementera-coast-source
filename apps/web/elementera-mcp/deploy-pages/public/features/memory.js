@@ -173,7 +173,7 @@ export function createMemory({ chat, router, toast, storage }) {
     fetchVectorStatus,
   });
 
-  async function organizeAfterReply(conversationId, trigger, modelId) {
+  async function organizeAfterReply(conversationId, trigger, modelId, sequenceId) {
     const landing = trigger === 'landing';
     try {
       const data = await organizeSoilRequest({
@@ -181,6 +181,7 @@ export function createMemory({ chat, router, toast, storage }) {
         model: modelId,
         force: true,
         trigger,
+        ...(sequenceId?{reply_sequence_id:sequenceId}:{}),
         settings: settings(),
       });
       if (data.soil) runtime.soils.set(conversationId, data.soil);
@@ -211,9 +212,9 @@ export function createMemory({ chat, router, toast, storage }) {
     }
   }
 
-  function onReplyCompleted(conversationId, { trigger = 'reply', modelId = '' } = {}) {
+  function onReplyCompleted(conversationId, { trigger = 'reply', modelId = '', sequenceId = '' } = {}) {
     const previous = runtime.soilChains.get(conversationId) || Promise.resolve();
-    const next = previous.catch(() => undefined).then(() => organizeAfterReply(conversationId, trigger, modelId));
+    const next = previous.catch(() => undefined).then(() => organizeAfterReply(conversationId, trigger, modelId, sequenceId));
     runtime.soilChains.set(conversationId, next);
     const cleanup = () => {
       if (runtime.soilChains.get(conversationId) === next) runtime.soilChains.delete(conversationId);

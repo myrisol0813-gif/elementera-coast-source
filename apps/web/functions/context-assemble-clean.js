@@ -1,4 +1,4 @@
-import { trimContextToComfortRange } from './context-comfort-range.js';
+import { cleanMessages, trimContextToComfortRange } from './context-comfort-range.js';
 import { contextBudgetForModel } from './context-budget.js';
 import {
   crossWindowDeskSection,
@@ -66,8 +66,7 @@ function effectiveRecentTurns(request, access) {
     : request.recentTurns;
 }
 function cleanHistory(messages, recentTurns) {
-  const cleaned = (Array.isArray(messages) ? messages : []).filter((message) => ['user', 'assistant'].includes(message?.role) && typeof message.content === 'string' && message.content.trim()).map((message) => ({ role: message.role, content: message.content }));
-  const current = cleaned.at(-1)?.role === 'user' ? cleaned.pop() : null; const recent = cleaned.slice(-recentTurns * 2); return current ? [...recent, current] : recent;
+  return cleanMessages(messages,recentTurns);
 }
 function ensureCurrentUser(messages, lastUser) { const content = String(lastUser?.content ?? lastUser ?? '').trim(); if (!content) return messages; const last = messages.at(-1); return last?.role === 'user' && last.content === content ? messages : [...messages, { role: 'user', content }]; }
 function mailboxHistory(records) { return (Array.isArray(records) ? records : []).map((message) => ({ role: message.role === 'visitor' ? 'user' : 'assistant', content: String(message.content || '') })).filter((message) => message.content.trim()); }
@@ -163,7 +162,7 @@ function mergeModelReads(previous, next) {
 
 export async function assembleCleanContext(env, {
   surface, conversationId, roomId, visitorId, sourceTurnId = null, messages = [], lastUser, settings = {}, localDate = new Date().toISOString().slice(0, 10),
-  localDateTime = '', realityContext = null, realityAllowedFields = null, recentEntryIds = [], authScope = null, model = '', permission: requestedPermission, preview = false, baseSystemPrompt = '', exposeTools = true, initialFurniture = [], crossWindow = null,
+  localDateTime = '', realityContext = null, realityAllowedFields = null, recentEntryIds = [], authScope = null, model = '', permission: requestedPermission, preview = false, baseSystemPrompt = '', exposeTools = true, initialFurniture = [], crossWindow = null, groupDogtalk = undefined,
 } = {}) {
   const permission = requestedPermission || (surface === 'mailbox_visitor' ? 'visitor' : 'owner');
   const access = roomAccess(surface, { permission, visitorId }); const request = requestSettings(settings);
@@ -201,7 +200,7 @@ export async function assembleCleanContext(env, {
   const budgetPolicy = await contextBudgetForModel(env, settings, model, modelVisibleTools);
   const [worldbook, directDogtalk, manualCrossWindow, reality] = await Promise.all([
     request.worldbookEnabled && request.worldbookLimit ? matchWorldbook(env.COAST_CHAT_DB, { input: query, messages: recent.slice(0, -1), surface, allowedScopes: access.worldbook, limit: request.worldbookLimit }) : Promise.resolve([]),
-    OWNER_CUSTOM_INSTRUCTION_SURFACES.has(surface) ? dogtalkContext(env.COAST_CHAT_DB, { room_scope: 'conversation', conversation_id: conversationId }, query, { consume_direct: !preview }) : Promise.resolve(null),
+    OWNER_CUSTOM_INSTRUCTION_SURFACES.has(surface) ? (groupDogtalk!==undefined?Promise.resolve(groupDogtalk):dogtalkContext(env.COAST_CHAT_DB, { room_scope: 'conversation', conversation_id: conversationId }, query, { consume_direct: !preview })) : Promise.resolve(null),
     crossWindowRequest.mode === 'manual'
       ? readCrossWindow(env.COAST_CHAT_DB, { ...crossWindowRequest, current_conversation_id: conversationId })
       : Promise.resolve(null),

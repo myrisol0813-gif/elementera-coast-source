@@ -36,6 +36,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import com.elementeracoast.app.feature.wolf.ModelSeries
+import com.elementeracoast.app.feature.wolf.ModelKind
+import com.elementeracoast.app.feature.wolf.ModelKindTabs
+import com.elementeracoast.app.feature.wolf.ImageGroup
+import com.elementeracoast.app.feature.wolf.CurrentImageCard
+import com.elementeracoast.app.feature.wolf.imageModelItems
+import com.elementeracoast.app.feature.wolf.OnlineVoiceInfo
+import com.elementeracoast.app.feature.wolf.LocalVoicePanel
+import androidx.compose.material3.OutlinedTextField
 import com.elementeracoast.app.feature.wolf.LocalModelChannel
 import com.elementeracoast.app.feature.wolf.classifyModelSeries
 import com.elementeracoast.app.feature.wolf.localRawModelId
@@ -69,9 +77,19 @@ fun ModelQuickPicker(
     onChatGptConnect: () -> Unit,
     onChatGptRefresh: () -> Unit,
     localMode: Boolean = false,
-    onOpenModelBox: () -> Unit
+    onOpenModelBox: () -> Unit,
+    imageModels: List<String> = emptyList(),
+    currentImage: String = "",
+    onPickImage: (String) -> Unit = {},
+    headerTitle: String = "ChatGPT",
+    onHeaderTitle: (String) -> Unit = {}
 ) {
     var query by remember { mutableStateOf("") }
+    var kind by remember { mutableStateOf(ModelKind.Chat) }
+    var editingHeader by remember { mutableStateOf(false) }
+    var headerDraft by remember(headerTitle) { mutableStateOf(headerTitle) }
+    var imageQuery by remember { mutableStateOf("") }
+    var imageOpen by remember { mutableStateOf<Set<ImageGroup>>(emptySet()) }
     var channel by remember { mutableStateOf(if (currentModel.startsWith("chatgpt-plan:") || (currentModel.isBlank() && chatGpt.connected)) LocalModelChannel.Codex else LocalModelChannel.Provider) }
     var openGroups by remember { mutableStateOf<Set<ModelSeries>>(emptySet()) }
     val localContext = LocalContext.current
@@ -115,6 +133,38 @@ fun ModelQuickPicker(
                 TextButton(onClick = onOpenModelBox) { Text("打开模型箱") }
             }
             Spacer(Modifier.height(4.dp))
+            Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.45f),RoundedCornerShape(16.dp)).padding(10.dp)){
+                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+                    Column(Modifier.weight(1f)){
+                        Text("主页显示名",style=MaterialTheme.typography.labelSmall)
+                        Text(headerTitle,style=MaterialTheme.typography.titleSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
+                    }
+                    TextButton(onClick={headerDraft=headerTitle;editingHeader=!editingHeader}){Text(if(editingHeader)"收起" else "编辑")}
+                }
+                if(editingHeader){
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){
+                        TextButton(onClick={onHeaderTitle("ChatGPT");editingHeader=false}){Text("ChatGPT")}
+                        TextButton(onClick={onHeaderTitle("Tideloom");editingHeader=false}){Text("Tideloom")}
+                    }
+                    OutlinedTextField(headerDraft,{headerDraft=it.take(40)},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("自定义名称")})
+                    TextButton(onClick={onHeaderTitle(headerDraft);editingHeader=false}){Text("保存")}
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            ModelKindTabs(kind){kind=it}
+            Spacer(Modifier.height(8.dp))
+            if(kind==ModelKind.Image){
+                CurrentImageCard(currentImage)
+                OutlinedTextField(imageQuery,{imageQuery=it},modifier=Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("搜索生图模型")})
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max=420.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
+                    imageModelItems(imageModels,currentImage,imageQuery,imageOpen,{g->imageOpen=if(g in imageOpen)imageOpen-g else imageOpen+g},onPickImage)
+                }
+            } else if(kind==ModelKind.Voice){
+                if(localMode) {
+                    Text("本机独立语音 · ElevenLabs",style=MaterialTheme.typography.titleSmall)
+                    TextButton(onClick=onOpenModelBox){Text("打开模型箱配置声音")}
+                } else OnlineVoiceInfo()
+            } else {
             Text(
                 if (localMode) "本机供应商和已授权的 ChatGPT 套餐均可选用；在模型箱管理 Key 与 URL。" else "海岸 / OpenRouter 与官端 ChatGPT 套餐均可设为当前聊天模型。官端套餐参数按官方能力生效。",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -291,6 +341,7 @@ fun ModelQuickPicker(
                         }
                     }
                 }
+            }
             }
             Spacer(Modifier.height(24.dp))
         }

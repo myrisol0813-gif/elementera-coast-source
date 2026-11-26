@@ -1,15 +1,11 @@
 import { createManualImageSender, prepareAutonomousImageTurn, imageToolSucceeded } from './chat-manual-image.js';
 import { API, requestJson } from '../../core/api.js';
-import {
-  activeBranch,
-  appendAssistantVariant,
-  appendTurn,
-  updateAssistantVariant,
-} from '../chat-state.js';
+import { activeBranch, appendAssistantVariant, appendTurn, updateAssistantVariant } from '../chat-state.js';
 import { DEFAULT_MODEL, isImageModel } from './chat-profile.js';
 import { contextMessages as buildContextMessages } from './chat-context.js';
 import { chatRequestContext as buildChatRequestContext } from './chat-request-context.js';
 import { runChatStreamFlow } from './chat-stream-flow.js';
+import { createReplySequenceGenerator } from './chat-reply-sequence-generation.js';
 import { localDateKey, localDateTimeKey } from './chat-local-time.js';
 import { createChatTitleLanding } from './chat-title-landing.js';
 
@@ -89,11 +85,15 @@ export function createChatGeneration({
     if (render) renderMessages(conversationId);
     return latest;
   }
+  const generateSequence=createReplySequenceGenerator({runtime,toast,dogtalk,setHistory,composerState,renderMessages,patchAssistantStreamingText,saveHistory,voice,chatRequestContext,patchGeneratedVariant,autoTitle});
+
   async function generate(conversationId, turnId, { dogtalkSubmission = null, crossWindowSubmission = null } = {}) {
     if (runtime.generation || runtime.finalizing || runtime.deletedIds.has(conversationId)) return;
     const targetConversation = runtime.conversations.find((item) => item.id === conversationId);
     if (targetConversation?.room_type === 'lighthouse') return;
     const original = runtime.histories.get(conversationId);
+    if(original?.context_settings?.reply_sequence_enabled===true&&['main','radio'].includes(targetConversation?.room_type)&&targetConversation?.source!=='rikkahub')
+      return generateSequence(conversationId,turnId,original,{dogtalkSubmission,crossWindowSubmission});
     const appended = appendAssistantVariant(original, turnId, { content: CONNECTING_TEXT });
     if (!appended.turn || !appended.variant) return;
     setHistory(conversationId, appended.state);
@@ -103,7 +103,7 @@ export function createChatGeneration({
     composerState();
     const requestContext = chatRequestContext(conversationId);
     const streamingEnabled = requestContext.settings.streamingEnabled === true;
-    if (!streamingEnabled && !runtime.profile.current_image_model) saveHistory(conversationId, appended.state).catch(() => undefined);
+    if (!streamingEnabled && !runtime.profile.current_image_model && !appended.state.context_settings?.sticker_send_enabled && !appended.state.context_settings?.sticker_add_enabled) saveHistory(conversationId, appended.state).catch(() => undefined);
     const modelId = runtime.profile.current_chat_model || DEFAULT_MODEL;
     const payload = {
       conversation_id: conversationId,

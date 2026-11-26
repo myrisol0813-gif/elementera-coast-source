@@ -21,8 +21,16 @@ internal class LocalSoilOrganizer(
     private val plan: ChatGptPlanRepository?,
     private val client: LocalProviderClient = LocalProviderClient()
 ) {
-    suspend fun organize(conversationId: String, modelId: String) {
-        val prepared = try { withContext(Dispatchers.IO) { LocalSoilRun.prepare(store, conversationId, modelId) } } catch(e:CancellationException){throw e} catch(_:Exception){throw LocalSoilFailure("准备整理资料失败")} ?: return
+    suspend fun organize(conversationId:String,modelId:String){organizeInternal(conversationId,modelId,null)}
+    suspend fun organizeSequence(conversationId:String,modelId:String,sequenceId:String){
+        val ledger=LocalReplyRunStore(store)
+        if(!withContext(Dispatchers.IO){ledger.claimSoil(conversationId,sequenceId)})return
+        var status="failed"
+        try{status=if(organizeInternal(conversationId,modelId,sequenceId))"done" else "skipped"}
+        finally{withContext(kotlinx.coroutines.NonCancellable+Dispatchers.IO){ledger.finishSoil(conversationId,sequenceId,status)}}
+    }
+    private suspend fun organizeInternal(conversationId: String, modelId: String, sequenceId:String?):Boolean {
+        val prepared = try { withContext(Dispatchers.IO) { LocalSoilRun.prepare(store, conversationId, modelId,sequenceId) } } catch(e:CancellationException){throw e} catch(_:Exception){throw LocalSoilFailure("准备整理资料失败")} ?: return false
         val result = try { if (modelId.startsWith("chatgpt-plan:")) {
             val account = requireNotNull(plan) { "请先连接 ChatGPT 套餐。" }
             val model = modelId.removePrefix("chatgpt-plan:")
@@ -32,12 +40,13 @@ internal class LocalSoilOrganizer(
         } else {
             val (provider, model) = requireNotNull(providers.resolve(modelId)) { "整理模型未配置。" }
             val policy=client.soilPolicy(provider,model)
-            collectLocalSoilReply(prepared.prompt,policy.firstBudget,policy.retryBudget,{ LocalSoilRun.validate(prepared,it) }) { prompt,budget ->
+            collectLocalSoilReply(prepared.prompt,policy.firstBudget,policy.retryBudget,{ LocalSoilRun.validate(prepared,it) },allowRetry=sequenceId==null) { prompt,budget ->
                 client.organize(provider,model,prompt,budget,policy)
             }
         }
         } catch(e:CancellationException){throw e} catch(e:LocalSoilFailure){throw e} catch(e:CoastApiException){throw LocalSoilFailure(if(e.status>0)"供应商请求失败（HTTP ${e.status}）"else "供应商整理请求或流式响应失败")} catch(_:Exception){throw LocalSoilFailure("供应商整理请求未完成")}
         withContext(Dispatchers.IO) { LocalSoilRun.commit(store, prepared, result) }
+        return true
     }
 }
 
@@ -55,6 +64,7 @@ internal suspend fun collectLocalSoilReply(
     firstBudget:Int=LOCAL_SOIL_FIRST_OUTPUT_TOKENS,
     retryBudget:Int=LOCAL_SOIL_RETRY_OUTPUT_TOKENS,
     validate:(String)->Unit={},
+    allowRetry:Boolean=true,
     stream:(String,Int)->kotlinx.coroutines.flow.Flow<LocalProviderEvent>
 ):String {
     suspend fun attempt(text:String,budget:Int):String {
@@ -81,9 +91,10 @@ internal suspend fun collectLocalSoilReply(
     val retryPrompt=try {
         return attempt(prompt,firstBudget)
     }catch(_:LocalSoilOutputLimit){
+        if(!allowRetry)throw LocalSoilFailure("供应商达到整理输出上限，未重试")
         prompt+"\n上一次输出达到供应商上限。请减少重复与非必要候选，尽快返回完整闭合的 JSON。保留真正需要承接的内容。"
     }catch(e:LocalSoilFailure){
-        if(e.detail!="整理回包格式不符合约定")throw e
+        if(!allowRetry||e.detail!="整理回包格式不符合约定")throw e
         prompt+"\n上一次输出不是合法整理 JSON。请只返回一个完整 JSON 对象，不要解释。"
     }
     return try{attempt(retryPrompt,retryBudget)}
@@ -96,7 +107,7 @@ internal object LocalSoilRun {
     private const val MAX_PORTRAIT = 12000
     private val modules = listOf("user_portrait", "self_portrait")
     private val textFields = setOf("current_text", "afterthoughts", "memory_candidates", "seed_candidates", "user_portrait", "self_portrait")
-    data class Turn(val id: String, val user: RemoteVariant, val assistant: RemoteVariant)
+    data class Turn(val id: String, val user: RemoteVariant, val assistant: RemoteVariant,val messages:List<RemoteVariant> = emptyList())
     data class Prepared(
         val cid: String, val model: String, val row: JsonObject, val history: List<RemoteTurn>,
         val turns: List<Turn>, val portraitRoots: Map<String, JsonObject?>, val prompt: String
@@ -118,17 +129,20 @@ internal object LocalSoilRun {
     private fun active(history: List<RemoteTurn>): List<Turn> = history.mapNotNull { t ->
         val key = t.user.active.toString()
         val u = t.user.variants.getOrNull(t.user.active) ?: return@mapNotNull null
-        val a = t.assistant.variantsByUserVariant[key].orEmpty().getOrNull(t.assistant.activeByUserVariant[key] ?: 0)
-            ?: return@mapNotNull null
+        val list=t.assistant.variantsByUserVariant[key].orEmpty()
+        val selected=t.assistant.activeByUserVariant[key]?:0
+        val group=com.elementeracoast.app.feature.chat.ReplySequence.selectedGroup(list,selected)
+        val a=group.lastOrNull()?:return@mapNotNull null
         if (u.hidden || u.inputType == "landing_letter" || a.hidden || a.content.isBlank() ||
-            a.finishReason in setOf("cancelled", "error") || !a.errorDetail.isNullOrBlank()) null else Turn(t.id,u,a)
+            a.finishReason in setOf("cancelled", "error") || !a.errorDetail.isNullOrBlank()) null else Turn(t.id,u,a,group.takeIf{a.replySequence!=null}.orEmpty())
     }
-    fun prepare(store: LocalPersistence, cid: String, model: String): Prepared? = store.readConsistent { s ->
+    fun prepare(store: LocalPersistence, cid: String, model: String,sequenceId:String?=null): Prepared? = store.readConsistent { s ->
         val row = LocalSoilStore(s).current(cid) ?: return@readConsistent null
         if (!row.enabled("auto_refresh_enabled") || row.enabled("manual_locked")) return@readConsistent null
         val history = RemoteCacheStore(s, strictReads = true).history(cid)?.turns ?: return@readConsistent null
         val all = active(history)
         val latest = all.lastOrNull() ?: return@readConsistent null
+        if(latest.assistant.replySequence?.id!=sequenceId)return@readConsistent null
         require(latest.assistant.modelId == model) { "整理模型与本轮实际模型不一致。" }
         if (row.str("source_assistant_id") == latest.assistant.id) return@readConsistent null
         val cursor = all.indexOfFirst { it.id == row.str("organized_through_turn_id") }
@@ -139,7 +153,11 @@ internal object LocalSoilRun {
         fun digest(t:Turn,limit:Int)=buildJsonObject {
             put("turn_id",t.id)
             put("user",buildJsonObject { put("message_id",t.user.id);put("content",clip(t.user.content,limit)) })
-            put("assistant",buildJsonObject { put("message_id",t.assistant.id);put("content",clip(t.assistant.content,limit)) })
+            put("assistant",buildJsonObject { put("message_id",t.assistant.id);put("content",clip(t.assistant.content,if(t.messages.isEmpty())limit else limit/2)) })
+            if(t.messages.isNotEmpty())put("assistant_messages",JsonArray(t.messages.mapIndexed{index,message->buildJsonObject{
+                val text=clip(message.content,(limit/(2*t.messages.size)).coerceAtLeast(1))
+                put("message_id",message.id);put("index",index);put("content",text);put("truncated",text.length<message.content.length)
+            }}))
         }
         var includedMissed=missed
         var previousLimit=1000
@@ -165,7 +183,8 @@ internal object LocalSoilRun {
                 })
             }
         }))
-        val prompt = LocalSoilPrompt.text + input.toString()
+        val template=if(inputTurns.any{it.messages.isNotEmpty()})LocalSoilPrompt.text.replace("整理输入结构：\n","若有 assistant_messages，按 index 阅读所有独立回复；assistant 仅为末条索引及摘录。truncated=true 表示摘录已裁短，不要推测省略内容。\n\n整理输入结构：\n")else LocalSoilPrompt.text
+        val prompt = template + input.toString()
         Prepared(cid, model, row, history, inputTurns, portraits, prompt)
     }
     private data class Proposal(val update: Boolean, val body: String, val reason: String, val excerpt: String)

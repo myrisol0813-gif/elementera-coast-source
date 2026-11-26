@@ -8,7 +8,7 @@ export async function saveArchiveV2(options){
   active=true;
   try{return await writeArchive(options);}finally{active=false;}
 }
-async function writeArchive({applicationId,filename,onProgress}){
+async function writeArchive({applicationId,filename,onProgress,deviceBasic}){
   let handle,root,tempName,writable,finished=false;
   try{
     if(typeof globalThis.showSaveFilePicker==='function'){
@@ -20,7 +20,7 @@ async function writeArchive({applicationId,filename,onProgress}){
       handle=await root.getFileHandle(tempName,{create:true});
     }
     writable=await handle.createWritable();
-    const manifest=await collectArchiveV2({applicationId,onProgress,sink:{
+    const manifest=await collectArchiveV2({applicationId,onProgress,deviceBasic,sink:{
       write:b=>writable.write(b),
       close:async()=>{await writable.close();finished=true;},
       abort:async()=>{if(!finished)await writable.abort();}

@@ -130,6 +130,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 return ok(r, "conversation" to element(RemoteConversation.serializer(), next))
             }
             if (method == "DELETE") {
+                if(LocalReplyRunStore(store).active(cid))return failure(r,409,"reply_run_active","当前窗口正在连续回复。")
                 store.atomic{staged->
                     LocalSideRecords(staged).removeConversation(cid)
                     LocalDogtalkStore(staged).deleteConversation(cid)
@@ -147,8 +148,9 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val cid = r.url.queryParameter("conversation_id").orEmpty()
             if (!conversationExists(cid)) return missing(r)
             if (method == "GET") {
+                LocalReplyRunStore(store).recover(cid)
                 val h=store.readConsistent{s->val c=RemoteCacheStore(s,strictReads=true);val old=c.history(cid)?:RemoteHistory(conversationId=cid)
-                    LocalImageRecovery.recover(old).also{if(it!=old)c.putHistory(cid,it)}}
+                    if(LocalReplyRunStore(s).active(cid))old else LocalImageRecovery.recover(old).also{if(it!=old)c.putHistory(cid,it)}}
                 return ok(r,"source" to JsonPrimitive("local"),"history" to element(RemoteHistory.serializer(),h))
             }
             if (method == "PUT") {
@@ -156,6 +158,8 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 val h=store.readConsistent{s->
                     val c=RemoteCacheStore(s,strictReads=true)
                     val old=c.history(cid)?:RemoteHistory(conversationId=cid)
+                    require(!LocalReplyRunStore(s).active(cid)){"当前窗口正在连续回复。"}
+                    LocalReplyRunStore.protect(old,input,r.header("X-Coast-Delete-Revision"))
                     val next=LocalImageRecovery.protect(old,input,r.header("X-Coast-Delete-Revision")).copy(conversationId=cid,updatedAt=now())
                     val originals=LocalAttachmentStore(s)
                     if(originals.needsHistoryLink(cid,next))s.atomic{staged->LocalAttachmentStore(staged).linkHistory(cid,next);RemoteCacheStore(staged).putHistory(cid,next)}
@@ -193,6 +197,33 @@ class LocalCoastTransport(private val store: LocalPersistence,
             return rows("clips",side.clips(cid))
         }
         if(parts.size==5&&parts.take(3)==listOf("api","voice","clips")&&parts.last()=="audio"&&method=="GET")return binary(side.audio(parts[3])?:return missing(r),"audio/mpeg")
+        if(path=="/api/coast-vault/stickers/upload"&&method=="POST"){
+            val b=requireNotNull(r.body);require(b.contentLength() in 1L..(8L*1024*1024))
+            val buffer=Buffer();b.writeTo(buffer);require(buffer.size in 1L..(8L*1024*1024))
+            fun header(key:String)=java.net.URLDecoder.decode(r.header(key).orEmpty(),"UTF-8")
+            val item=LocalStickerLibrary(store).upload(header("X-Sticker-Name"),r.header("Content-Type")?:b.contentType()?.toString().orEmpty(),header("X-Sticker-Description"),buffer.readByteArray())
+            return response(r,201,buildJsonObject{put("ok",true);putJsonObject("item"){put("id",item.id);put("description",item.description);put("enabled",item.enabled)}})
+        }
+        if(path=="/api/coast-vault/stickers"){
+            val lib=LocalStickerLibrary(store)
+            if(method=="GET")return response(r,200,lib.ownerPage(r.url.queryParameter("q").orEmpty(),r.url.queryParameter("cursor")?.toIntOrNull()?:0))
+            if(method=="POST"){
+                val input=body(r)
+                require(input.keys==setOf("conversation_id","attachment_id","description"))
+                val e=lib.register(input.str("conversation_id").orEmpty(),input.str("attachment_id").orEmpty(),input.str("description").orEmpty(),"owner")
+                return ok(r,"item" to buildJsonObject{put("id",e.id);put("description",e.description);put("enabled",e.enabled)})
+            }
+        }
+        if(parts.size==4&&parts.take(3)==listOf("api","coast-vault","stickers")){
+            val lib=LocalStickerLibrary(store);val sid=parts.last()
+            if(method=="PATCH"){
+                val input=body(r);require(input.isNotEmpty()&&input.keys.all{it in setOf("description","enabled")})
+                val desc=input["description"]?.jsonPrimitive?.let{require(it.isString);it.content}
+                val enabled=input["enabled"]?.jsonPrimitive?.let{require(!it.isString);it.boolean}
+                lib.update(sid,"owner",desc,enabled);return ok(r)
+            }
+            if(method=="DELETE"){lib.remove(sid,"owner");return ok(r)}
+        }
         if(path=="/api/coast-vault/media"&&method=="GET")return response(r,200,JsonObject(side.media(r.url.queryParameter("kind")?:"all",r.url.queryParameter("q").orEmpty(),r.url.queryParameter("cursor")?.toIntOrNull()?:0)+("ok" to JsonPrimitive(true))))
         if(path=="/api/coast-vault/treasures"){
             if(method=="GET")return response(r,200,JsonObject(side.treasureRows(r.url.queryParameter("kind")?:"all",r.url.queryParameter("q").orEmpty(),r.url.queryParameter("conversation_id").orEmpty(),r.url.queryParameter("turn_id").orEmpty(),r.url.queryParameter("cursor")?.toIntOrNull()?:0)+("ok" to JsonPrimitive(true))))
@@ -260,7 +291,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val target=source?.assistant?.variantsByUserVariant?.get(source.user.active.toString())?.singleOrNull{it.id==request.messageId}
             val image=if(request.imageToolEnabled&&request.imageModelId==selected&&selected.isNotBlank()&&uid!=null&&target?.finishReason=="image_tool_ready"&&h?.contextSettings?.localModelWriteEnabled==true&&room in setOf("main","radio")&&imageConfig(selected)!=null)
                 LocalImageTool(store,imageConfig,request.conversationId,request.sourceTurnId,uid,request.messageId,selected,true)else null
-            val session=knowledge.toolSession(request.conversationId,request.sourceTurnId,request.crossWindow,prepared.receipt,request.model.let{if(it.startsWith("chatgpt-plan:"))it else "chatgpt-plan:"+it},image=image)
+            val session=knowledge.toolSession(request.conversationId,request.sourceTurnId,request.crossWindow,prepared.receipt,request.model.let{if(it.startsWith("chatgpt-plan:"))it else "chatgpt-plan:"+it},image=image,messageId=request.messageId)
             val key=request.conversationId+":"+request.messageId
             toolSessions.remove(key)
             if(session!=null){require(request.messageId.isNotBlank());while(toolSessions.size>=8)toolSessions.remove(toolSessions.keys.first());toolSessions[key]=session}
@@ -268,7 +299,8 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 ok = true,
                 tools = session?.tools?:JsonArray(emptyList()),
                 modelMessages = localMultimodalMessages(prepared.messages,prepared.imageParts),
-                deskSlip = session?.receipt?:prepared.receipt
+                deskSlip = session?.receipt?:prepared.receipt,
+                limitations = RemoteNativeToolLimits(session?.maxCalls?:com.elementeracoast.app.core.network.TurnToolPolicy.stored(store))
             )).jsonObject)
         }
         if (path == "/api/chat/message-metadata" && method == "GET") {
@@ -464,7 +496,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
     private fun search(r: Request): Response {
         val q = r.url.queryParameter("q").orEmpty().trim()
         val results = mutableListOf<JsonObject>()
-        if (q.isNotBlank()) for (c in cache.conversations()) {
+        if (q.isNotBlank()) for (c in cache.conversations().filter{it.source!="sticker_library"}) {
             fun hit(kind: String, snippet: String, turn: String = "", msg: String = "", role: String = "") =
                 buildJsonObject {
                     put("kind", kind); put("conversation_id", c.id); put("conversation_title", c.title)

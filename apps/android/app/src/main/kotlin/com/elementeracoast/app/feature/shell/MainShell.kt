@@ -24,6 +24,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import com.elementeracoast.app.core.model.ChatMessage
 import com.elementeracoast.app.core.model.ConversationContextSettings
 import com.elementeracoast.app.core.tour.SourceVisitGate
@@ -103,6 +104,15 @@ fun MainShell(
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val snackbar = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val headerContext = LocalContext.current.applicationContext
+    val headerPrefs = remember(headerContext) { headerContext.getSharedPreferences("coast_header_appearance", android.content.Context.MODE_PRIVATE) }
+    val headerKey = if (state.localMode) "local_header_title" else "online_header_title"
+    var headerTitle by remember(headerPrefs, headerKey) { mutableStateOf(headerPrefs.getString(headerKey, "ChatGPT").orEmpty().ifBlank { "ChatGPT" }) }
+    fun saveHeaderTitle(raw:String){
+        val value=raw.trim().take(40).ifBlank{"ChatGPT"}
+        headerPrefs.edit().putString(headerKey,value).apply()
+        headerTitle=value
+    }
     var openPendingMemoryOnLanding by remember { mutableStateOf(false) }
     var openModelBoxOnLanding by rememberSaveable { mutableStateOf(false) }
     var showThemeWardrobe by remember { mutableStateOf(false) }
@@ -195,6 +205,7 @@ fun MainShell(
                         if (!ownsPageChrome) {
                             CoastTopBar(
                                 state = state,
+                                headerTitle = headerTitle,
                                 onOpenDrawer = { coroutineScope.launch { drawerState.open() } },
                                 onBack = onBackToChat,
                                 onOpenModels = onOpenModels,
@@ -302,6 +313,11 @@ fun MainShell(
                 models = state.models,
                 modelReasoningChoices = state.modelReasoningChoices,
                 currentModel = state.currentModel,
+                imageModels = state.imageModels,
+                currentImage = state.currentImageModel,
+                headerTitle = headerTitle,
+                onHeaderTitle = ::saveHeaderTitle,
+                onPickImage = onSelectImageModel,
                 onPick = onSelectModel,
                 onDismiss = onDismissModels,
                 chatGpt = chatGpt,

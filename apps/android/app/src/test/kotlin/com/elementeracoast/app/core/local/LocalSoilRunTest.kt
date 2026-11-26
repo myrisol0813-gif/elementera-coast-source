@@ -159,4 +159,25 @@ class LocalSoilRunTest {
             else assertEquals("旧地层",history.getValue("assistant1").getValue("current_text").jsonPrimitive.content)
         }
     }
+    @Test fun groupedSoilReadsEachRealMessageAndDoesNotUseLegacyTrigger(){
+        val s=fixture();val cache=RemoteCacheStore(s);val h=cache.history(cid)!!
+        val t=h.turns.single()
+        val group=listOf(RemoteVariant("g1","first",modelId=model,finishReason="stop",replySequence=RemoteReplySequence("seq",0)),
+            RemoteVariant("g2","second",modelId=model,finishReason="stop",replySequence=RemoteReplySequence("seq",1)))
+        cache.putHistory(cid,h.copy(turns=listOf(t.copy(assistant=RemoteAssistantBranches(mapOf("0" to 1),mapOf("0" to group))))))
+        assertNull(LocalSoilRun.prepare(s,cid,model))
+        val prepared=LocalSoilRun.prepare(s,cid,model,"seq")!!
+        val input=Json.parseToJsonElement(prepared.prompt.substringAfter("整理输入结构：\n")).jsonObject
+        val latest=input.getValue("latest_turn").jsonObject
+        assertEquals(listOf("first","second"),latest.getValue("assistant_messages").jsonArray.map{it.jsonObject.getValue("content").jsonPrimitive.content})
+        assertEquals("g2",latest.getValue("assistant").jsonObject.getValue("message_id").jsonPrimitive.content)
+        LocalSoilRun.commit(s,prepared,"""{"current_text":"group","afterthoughts":[]}""")
+        assertEquals("g2",LocalSoilStore(s).read().history.single().getValue("assistant_message_id").jsonPrimitive.content)
+    }
+    @Test fun groupOrganizerDoesNotRetryTruncatedResult()=kotlinx.coroutines.runBlocking{
+        var calls=0
+        assertTrue(runCatching{collectLocalSoilReply("test",allowRetry=false){_,_->calls++;kotlinx.coroutines.flow.flowOf(LocalProviderEvent.Done("length"))}}.isFailure)
+        assertEquals(1,calls)
+    }
+
 }

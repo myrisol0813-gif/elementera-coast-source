@@ -1,5 +1,6 @@
 import {
   activeBranch,
+  selectedAssistantMessage,
   deleteActiveAssistantVariant,
   deleteActiveUserVariant,
   editUserVariant,
@@ -118,19 +119,27 @@ export function createChatActions({
       return;
     }
     const inPreview = runtime.searchPreview?.has(runtime.currentId);
-    if (inPreview && !['favorite', 'copy'].includes(name)) {
+    if (inPreview && !['favorite', 'copy','history-desk'].includes(name)) {
       toast('旧版本正在只读预览。请先结束预览，再修改或生成聊天。');
       return;
     }
     const turnId = turnIdFrom(target);
+    const messageId=target.closest('[data-message-id]')?.dataset.messageId || '';
+    if(name==='history-desk'){
+      const history=runtime.searchPreview?.get(runtime.currentId)||currentHistory();
+      const turn=history.turns.find(t=>t.id===turnId);
+      const variant=turn?selectedAssistantMessage(turn,messageId):null;
+      if(variant?.desk_slip)return runtime.desk?.openMessageDesk(runtime.currentId,variant);
+      return toast('此条回复没有保存历史桌面。');
+    }
     if (name === 'generation-detail') {
       const turn = currentHistory().turns.find((item) => item.id === turnId);
-      const variant = turn ? activeBranch(turn).assistant : null;
+      const variant = turn ? selectedAssistantMessage(turn,messageId) : null;
       if (variant?.model_id) return toast(generationDetail(variant), 5200);
       return;
     }
     if ((runtime.generation || runtime.finalizing || runtime.pendingComposerSend)
-      && ['switch-variant', 'edit-user', 'delete-user', 'delete-assistant', 'regenerate'].includes(name)) {
+      && ['switch-variant', 'edit-user', 'delete-user', 'delete-assistant', 'regenerate', 'like'].includes(name)) {
       return toast('请先停止或等待当前回复完成。');
     }
     if (name === 'switch-variant') {
@@ -174,13 +183,17 @@ export function createChatActions({
     if (name === 'copy') {
       const visible = runtime.searchPreview?.get(runtime.currentId) || currentHistory();
       const turn = visible.turns.find((item) => item.id === turnId);
-      const text = turn ? activeBranch(turn).assistant?.content || '' : '';
-      await navigator.clipboard.writeText(text);
+      const assistant=turn ? selectedAssistantMessage(turn,messageId) : null;
+      if (!assistant) return toast('原消息版本已经改变，请重新打开。');
+      await navigator.clipboard.writeText(assistant.content || '');
       return toast('已复制');
     }
     if (name === 'favorite') return treasures?.open(target);
     if (name === 'like') {
-      const state = toggleAssistantReaction(currentHistory(), turnId, 'liked');
+      const current=currentHistory();
+      const turn=current.turns.find(item=>item.id===turnId);
+      if (!turn || !selectedAssistantMessage(turn,messageId)) return toast('原消息版本已经改变，请重新打开。');
+      const state = toggleAssistantReaction(current, turnId, 'liked', messageId);
       setHistory(runtime.currentId, state);
       renderMessages();
       return saveHistory(runtime.currentId, state).catch(() => undefined);

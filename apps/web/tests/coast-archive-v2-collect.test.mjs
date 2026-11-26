@@ -77,3 +77,22 @@ test('browser reopens the streamed archive and verifies all object chunks before
  const broken=await openArchiveV2(new Blob([bytes]),validateArchiveManifest);
  await assert.rejects(async()=>{for await(const b of broken.objectChunks(f.descriptor)){}},/digest|CRC/);
 });
+
+test('portable browser settings are explicit, verified and do not include credentials',async()=>{
+ const {parseDeviceBasic,decodeDeviceBasic,restoreDeviceBasic}=await import('../elementera-mcp/deploy-pages/public/core/archive-v2-device-settings.js');
+ const f=await fixture(),m=await collectArchiveV2({...f,applicationId:'com.elementeracoast.source',deviceBasic:{replySequenceToolBudget:0,replySequenceTokenBudget:95000,toolCallLimit:41,contextBudget:0,apiKey:'secret'}});
+ const opened=await openArchiveV2(new Blob(f.parts),validateArchiveManifest);
+ const row=m.records.find(r=>r.module==='appearance');
+ const d=m.objects.find(d=>d.object_sha256===row.record_object);const parts=[];for await(const b of opened.objectChunks(d))parts.push(b);
+ const envelope=JSON.parse(await new Blob(parts).text());
+ assert.equal(envelope.data.basic_settings.replySequenceToolBudget,'0');assert.equal(envelope.data.basic_settings.apiKey,undefined);
+ const parsed=decodeDeviceBasic(row,envelope);
+ assert.equal(parsed.contextBudget,0);assert.equal(parsed.replySequenceTokenBudget,95000);
+ const state={runControl:{},preferences:{theme:'old'},secret:'target'};
+ const storage={read:()=>state,update:fn=>fn(state)};
+ restoreDeviceBasic(storage,parsed);
+ assert.equal(state.runControl.toolCallLimit,41);assert.equal(state.runControl.replySequenceToolBudget,0);assert.equal(state.preferences.theme,'old');assert.equal(state.secret,'target');
+ assert.throws(()=>parseDeviceBasic({...envelope.data.basic_settings,replySequenceToolBudget:'999'}));
+ assert.throws(()=>restoreDeviceBasic(storage,{...parsed,replySequenceToolBudget:999}));
+ assert.equal(state.runControl.replySequenceToolBudget,0);
+});

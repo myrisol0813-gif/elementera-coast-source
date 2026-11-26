@@ -44,7 +44,7 @@ object ArchiveV2NativeCollector {
             require(seen.add(next)){"归档分页重复。"};cursor=next
         }while(true)
     }
-    suspend fun collectCloud(api:CoastApiClient,output:File,applicationId:String,onProgress:(Int,Long)->Unit={_,_->}):ArchiveV2Manifest=withContext(Dispatchers.IO) {
+    suspend fun collectCloud(api:CoastApiClient,output:File,applicationId:String,onProgress:(Int,Long)->Unit={_,_->},deviceBasic:JsonObject?=null):ArchiveV2Manifest=withContext(Dispatchers.IO) {
         require(!output.exists()&&output.parentFile?.isDirectory==true)
         try {
             val caps=api.archiveV2Capabilities()
@@ -103,6 +103,7 @@ object ArchiveV2NativeCollector {
                     val m=v.jsonPrimitive.content;available.add(m)
                     pages({api.archiveV2DetailPage(kind,it)}){row->
                         val deps=chatLinks(row).toMutableList()
+                        if(kind=="vault_stickers")deps.add("attachments/"+row.string("attachment_id"))
                         if(kind.startsWith("library_")&&kind!="library_books")deps.add("library/"+detailId("library_books",buildJsonObject { put("id",row.getValue("book_id")) }))
                         if(kind=="daily_comments"||kind=="daily_likes")deps.add("daily/"+detailId("daily_moments",buildJsonObject { put("id",row.getValue("moment_id")) }))
                         val id=detailId(kind,row)
@@ -110,6 +111,7 @@ object ArchiveV2NativeCollector {
                         else record(m,id,kind,row,deps)
                     }
                 }
+                if(deviceBasic!=null)record("appearance",ArchiveV2Appearance.DEVICE_ID,"device_basic_settings",buildJsonObject{put("basic_settings",deviceBasic)})
                 val counts=records.groupingBy { it.module }.eachCount()
                 val manifest=ArchiveV2Manifest("elementera-coast-archive",2,"backend",applicationId,Instant.now().toString(),
                     ArchiveV2Manifests.modules.map { ArchiveV2Coverage(it,if(it in available)"partial" else "unavailable",counts[it]?:0) },records,objects.values.toList())

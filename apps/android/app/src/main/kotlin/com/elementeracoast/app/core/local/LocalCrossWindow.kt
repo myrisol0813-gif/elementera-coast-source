@@ -13,15 +13,16 @@ internal class LocalCrossWindow(store: LocalPersistence) {
             val user = turn.user.variants.getOrNull(turn.user.active) ?: return@forEachIndexed
             if (user.hidden) return@forEachIndexed
             if (user.content.isNotBlank()) add(Item(turn.id, index + 1, "user", user))
-            val assistant = turn.assistant.variantsByUserVariant[key].orEmpty().getOrNull(turn.assistant.activeByUserVariant[key] ?: 0)
-            if (assistant != null && !assistant.hidden && assistant.content.isNotBlank())
+            val list=turn.assistant.variantsByUserVariant[key].orEmpty()
+            val group=com.elementeracoast.app.feature.chat.ReplySequence.selectedGroup(list,turn.assistant.activeByUserVariant[key]?:0)
+            for(assistant in group.filter{!it.hidden&&it.content.isNotBlank()})
                 add(Item(turn.id, index + 1, "assistant", assistant))
         }
     }
     fun sources(currentId: String): RemoteCrossWindowSourcesResponse {
         require(cache.conversations().any { it.id == currentId }) { "当前本机窗口不存在。" }
         return RemoteCrossWindowSourcesResponse(ok = true, description = "手动选择的旧消息仅用于本轮。",
-            sources = cache.conversations().filter { it.id != currentId && it.deletedAt == null }.map { c ->
+            sources = cache.conversations().filter { it.id != currentId && it.deletedAt == null && it.source != "sticker_library" }.map { c ->
                 val messages = items(c.id)
                 val turns = messages.groupBy { it.turn }.values.map { group ->
                     RemoteCrossWindowTurn(group.first().turn, group.first().number, group.map { item ->
@@ -37,7 +38,7 @@ internal class LocalCrossWindow(store: LocalPersistence) {
     fun keyword(currentId:String, query:String):List<Pair<RemoteCrossWindowMessageSelection,kotlinx.serialization.json.JsonObject>> {
         require(query.trim().length in 1..160)
         val q=query.trim()
-        return cache.conversations().asSequence().filter{it.id!=currentId&&it.deletedAt==null}
+        return cache.conversations().asSequence().filter{it.id!=currentId&&it.deletedAt==null&&it.source!="sticker_library"}
             .sortedByDescending{it.updatedAt}.flatMap{c->items(c.id).asSequence().mapNotNull{item->
                 val at=item.variant.content.indexOf(q,ignoreCase=true)
                 if(at<0)return@mapNotNull null
@@ -51,7 +52,7 @@ internal class LocalCrossWindow(store: LocalPersistence) {
     }
     fun recent(currentId:String, sourceId:String, turns:Int):List<RemoteCrossWindowMessageSelection>{
         require(sourceId!=currentId&&turns in 1..9999)
-        require(cache.conversations().any{it.id==sourceId&&it.deletedAt==null}){"所选窗口不存在。"}
+        require(cache.conversations().any{it.id==sourceId&&it.deletedAt==null&&it.source!="sticker_library"}){"所选窗口不存在。"}
         val selected=items(sourceId).groupBy{it.turn}.values.toList().takeLast(turns).flatten()
         if(selected.sumOf{it.variant.content.length.toLong()}>12000L)
             throw LocalToolFailure("budget_exceeded","所选近期消息太长，请减少轮数；未截断原文。")
@@ -65,7 +66,7 @@ internal class LocalCrossWindow(store: LocalPersistence) {
         val selected = request?.messages.orEmpty().distinct()
         if (selected.isEmpty()) return Selection("", RemoteDeskCrossWindow(mode = "manual", status = "未选消息"))
         require(selected.none { it.conversationId == currentId }) { "请从其他窗口选取消息。" }
-        val conversations = cache.conversations().filter{it.deletedAt==null}.associateBy { it.id }
+        val conversations = cache.conversations().filter{it.deletedAt==null&&it.source!="sticker_library"}.associateBy { it.id }
         val sources = mutableListOf<RemoteDeskCrossWindowSource>()
         val groups = mutableListOf<RemoteDeskCrossWindowMessages>()
         var turns = 0

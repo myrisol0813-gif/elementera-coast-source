@@ -252,6 +252,28 @@ class ChatSyncMapperTest {
         assertEquals(null, ChatSyncMapper.toUi(cleared).single().errorDetail)
     }
 
+    @Test fun historicalReplySequenceIsReadAsOneRoundWithoutRetryLeak(){
+        val first=RemoteVariant("first","first reply",replySequence=com.elementeracoast.app.core.remote.RemoteReplySequence("group",0))
+        val second=first.copy(id="second",content="second reply",replySequence=first.replySequence!!.copy(index=1))
+        val old=RemoteVariant("old","old alternative")
+        val grouped=RemoteTurn(id="group-turn",user=RemoteUserBranch(variants=listOf(RemoteVariant("u","question"))),
+            assistant=RemoteAssistantBranches(activeByUserVariant=mapOf("0" to 2),variantsByUserVariant=mapOf("0" to listOf(old,first,second))))
+        val older=ChatSyncMapper.appendUser(RemoteHistory(),"older question")
+        val history=ChatSyncMapper.appendUser(older.history.copy(turns=older.history.turns+grouped),"next question")
+        val failed=ChatSyncMapper.appendAssistant(history.history,history.turnId,"failed retry","model","error")
+        assertEquals(listOf("question","first reply","second reply","next question"),
+            ChatSyncMapper.contextMessages(failed,history.turnId,2).map{it.content})
+        assertEquals(listOf("next question"),ChatSyncMapper.contextMessages(failed,history.turnId,1).map{it.content})
+        // Before the target there is no selected multi-message group; preserve legacy
+        // context selection, including an older unanswered user message.
+        assertEquals(listOf("older question","question"),ChatSyncMapper.contextMessages(failed,"group-turn",1).map{it.content})
+        assertEquals(listOf("question"),ChatSyncMapper.contextMessages(RemoteHistory(turns=listOf(grouped)),"group-turn",1).map{it.content})
+        val alternative=grouped.copy(assistant=grouped.assistant.copy(activeByUserVariant=mapOf("0" to 0)))
+        val alternativeHistory=failed.copy(turns=listOf(alternative,failed.turns.last()))
+        assertEquals(listOf("question","old alternative","next question"),
+            ChatSyncMapper.contextMessages(alternativeHistory,history.turnId,2).map{it.content})
+    }
+
     @Test fun assistantImageOnlyVariantMapsToAssistantBubble(){
         val image=com.elementeracoast.app.core.remote.RemoteAttachment("picture1","image","picture.png","image/png",8)
         val h=RemoteHistory(turns=listOf(RemoteTurn(id="turn1",user=RemoteUserBranch(variants=listOf(RemoteVariant("u","draw"))),assistant=RemoteAssistantBranches(variantsByUserVariant=mapOf("0" to listOf(RemoteVariant("a","",attachments=listOf(image))))))))

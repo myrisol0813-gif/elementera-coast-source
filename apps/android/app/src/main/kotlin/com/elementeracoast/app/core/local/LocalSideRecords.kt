@@ -286,7 +286,7 @@ internal object ArchiveV2SideRecords{
     fun read(m:ArchiveV2Manifest,stage:ArchiveV2Stage,selection:Set<String>,app:String):List<Item>{
         require("vault" !in selection||m.applicationId==app){"拾潮原始身份暂需同应用恢复。"}
         val objects=m.objects.associateBy{it.objectSha256}
-        return m.records.filter{it.module in selection.intersect(LocalSideRecords.modules)}.map{r->
+        return m.records.filter{it.module in selection.intersect(LocalSideRecords.modules)&&!(it.module=="vault"&&it.id.startsWith("vault_stickers:"))}.map{r->
             val raw=Json.parseToJsonElement(stage.verify(objects.getValue(r.recordObject),1800000).readBytes().decodeToString(throwOnInvalidSequence=true)).jsonObject
             require(raw.keys==setOf("kind","data"))
             val kind=raw.getValue("kind").jsonPrimitive.content;val data=raw.getValue("data").jsonObject

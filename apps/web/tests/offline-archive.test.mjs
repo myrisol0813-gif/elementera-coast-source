@@ -29,7 +29,7 @@ test('verified V2 reading copy keeps library anchors, original media and signatu
     ['library','n','library_notes',{book_id:'b',chapter_index:0,paragraph_index:1,kind:'annotation',author:'assistant',quote:'two',body:'note'}],
     ['library','cover','library_covers',{book_id:'b',mime:'image/png'},['image']],
     ['voice','v','voice',{id:'v',mime:'audio/mpeg'},['audio']],
-    ['chat','chat','chat',{conversation:{id:'chat',title:'chat'},history_json:JSON.stringify({turns:[{user:{variants:[{content:'署名测试'}]},assistant:{variantsByUserVariant:{}}}]})}]
+    ['chat','chat','chat',{conversation:{id:'chat',title:'chat'},history_json:JSON.stringify({turns:[{user:{variants:[{content:'署名测试'}]},assistant:{variantsByUserVariant:{0:[{id:'old',content:'old version'},{id:'a0',content:'first',reply_sequence:{id:'seq',index:0},desk_slip:{summary:'desk first'}},{id:'a1',content:'second',reply_sequence:{id:'seq',index:1},desk_slip:{reply_sequence_previous:[{message_id:'a0',content:'first'}]}}]}}}]})}]
   ];
   const enc=new TextEncoder(),values=new Map([['image',new Uint8Array([1,2,3])],['audio',new Uint8Array([4,5])]]);
   const records=rows.map(([module,id,kind,data,media_objects=[]],i)=>{const record_object='r'+i;values.set(record_object,enc.encode(JSON.stringify({kind,data})));return {module,id,record_object,media_objects,dependencies:[]};});
@@ -39,5 +39,7 @@ test('verified V2 reading copy keeps library anchors, original media and signatu
   const text=new TextDecoder().decode(await new Blob(parts).arrayBuffer());
   assert.equal(result.mediaCount,2);assert.deepEqual(result.warnings,[]);
   assert.match(text,/2\.html#p-1/);assert.match(text,/id="p-1"/);assert.match(text,/&lt;script&gt;/);
+  assert.match(text,/版本 2 · 连续回复 1 · 组 seq/);assert.match(text,/版本 2 · 连续回复 2 · 组 seq/);assert.match(text,/reply_sequence_previous/);
   assert.match(text,/归档署名/);assert.match(text,/media\/1\.png/);assert.match(text,/media\/2\.mp3/);
 });
+

@@ -55,7 +55,7 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence,private va
     }
     fun surfaceFor(conversationId:String):String=cache.conversations().firstOrNull{it.id==conversationId}?.roomType?.let{if(it=="main")"main_chat" else it}?:error("本机窗口不存在。")
     data class Context(val messages:List<RemoteChatMessage>,val receipt:RemoteDeskSlip,val imageParts:List<JsonObject> = emptyList())
-    fun context(input:List<RemoteChatMessage>,budget:Int,surface:String,conversationId:String="",attachmentIds:List<String> = emptyList(),turnId:String="",crossWindow:RemoteCrossWindowRequest?=null,reality:RemoteRealityContext=RemoteRealityContext(),inputPolicy:LocalInputBudget?=null):Context {
+    fun context(input:List<RemoteChatMessage>,budget:Int,surface:String,conversationId:String="",attachmentIds:List<String> = emptyList(),turnId:String="",crossWindow:RemoteCrossWindowRequest?=null,reality:RemoteRealityContext=RemoteRealityContext(),inputPolicy:LocalInputBudget?=null,groupDogtalk:String?=null):Context {
         val attachmentContext=attachments.attachmentContext(conversationId,attachmentIds,input)
         require(inputPolicy?.vision!=false||attachmentContext.imageParts.isEmpty()){"供应商目录报告当前模型不支持图片输入；附件未发送，请更换模型。"}
         val messages=attachmentContext.messages
@@ -71,7 +71,9 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence,private va
         val soilEnabled=soilRow?.get("auto_refresh_enabled")?.jsonPrimitive?.int==1
         val soilText=soilRow?.takeIf{soilEnabled}?.get("current_text")?.jsonPrimitive?.contentOrNull.orEmpty()
         val after=soilRow?.takeIf{soilEnabled}?.get("afterthoughts_json")?.jsonPrimitive?.contentOrNull?.let{Json.parseToJsonElement(it).jsonArray.map{v->v.jsonPrimitive.content}}.orEmpty()
-        val dogtalk=LocalDogtalkStore(store).pending(conversationId,surface,turnId)
+        // null retains ordinary one-time read; a non-null group value (even
+        // empty) disables live-drawer access for every subsequent request.
+        val dogtalk=if(groupDogtalk==null)LocalDogtalkStore(store).pending(conversationId,surface,turnId)else null
         val cross = if(crossWindow?.mode=="model_decides"){
             require(cache.history(conversationId)?.contextSettings?.crossWindowAuto==true){"跨窗口自主检索未授权。"}
             LocalCrossWindow.Selection("",RemoteDeskCrossWindow(mode="model_decides",status="已开放 · 未调用"))
@@ -80,7 +82,7 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence,private va
         val real=localReality(store,settings,reality)
         val responseMode=localResponseMode(settings)
         val comfort=LocalContextPolicy.assemble(instructions,userPortrait,selfPortrait,LocalContextPolicy.formatSoil(soilText,after),memoryText,
-            matches.map{it.entry.title+"："+it.entry.content},dogtalk?.text.orEmpty(),cross.text,
+            matches.map{it.entry.title+"："+it.entry.content},groupDogtalk?:dogtalk?.text.orEmpty(),cross.text,
             real.context.takeIf{real.delivered}.orEmpty(),responseMode.context.takeIf{responseMode.delivered}.orEmpty(),
             messages,budget,attachmentContext.imageParts.size)
         require(inputPolicy?.materialLimit?.let{comfort.estimated<=it}!=false){"完整当前消息、附件或画像超出模型目录估算的输入容量；未截断、未发送。请减少附件或调整输出上限。"}
@@ -113,13 +115,13 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence,private va
                 sourcesPreserved=(if(recent.isEmpty())emptyList()else listOf("recent_context"))+(if(currentMessage==null)emptyList()else listOf("current_message"))+(if(real.delivered)listOf("reality_context")else emptyList())+(if(responseMode.delivered)listOf("response_mode")else emptyList())+(if(soilContext.isNotEmpty())listOf("thinking_soil")else emptyList())+(if(cross.receipt.delivered)listOf("cross_window")else emptyList())+(if(comfort.dogtalk.isNotEmpty())listOf("dogtalk")else emptyList())+(if(instructions.isEmpty())emptyList()else listOf("custom_instructions"))+(if(deliveredWorld.isEmpty())emptyList()else listOf("worldbook"))+(if(deliveredMemory.isEmpty())emptyList()else listOf("related_memory"))+(if(userPortrait.isEmpty())emptyList()else listOf("user_portrait"))+(if(selfPortrait.isEmpty())emptyList()else listOf("global_excerpt")),userPortrait=portraitStatus(userPortrait,comfort.over),globalExcerpt=portraitStatus(selfPortrait,comfort.over))
         ),attachmentContext.imageParts)
     }
-    fun imageTool(cid:String,tid:String,uid:String,mid:String,providers:LocalProviderStore,vision:Boolean?):LocalImageTool?{
+    fun imageTool(cid:String,tid:String,uid:String,mid:String,providers:LocalProviderStore,vision:Boolean?,sequenceId:String?=null):LocalImageTool?{
         if(surfaceFor(cid) !in setOf("main_chat","radio")||cache.history(cid)?.contextSettings?.localModelWriteEnabled!=true)return null
         val selected=cache.profile()?.currentImageModel.orEmpty()
         if(selected.isBlank()||providers.resolveImageProvider(selected)==null)return null
-        return LocalImageTool(store,providers::resolveImageProvider,cid,tid,uid,mid,selected,vision)
+        return LocalImageTool(store,providers::resolveImageProvider,cid,tid,uid,mid,selected,vision,sequenceId)
     }
-    fun toolSession(cid:String,turn:String,request:RemoteCrossWindowRequest?,receipt:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null,image:LocalImageTool?=null)=LocalToolSession.open(store,cid,turn,request,receipt,modelId,wireLimit,web,voice,image)
+    fun toolSession(cid:String,turn:String,request:RemoteCrossWindowRequest?,receipt:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null,image:LocalImageTool?=null,messageId:String?=null,sequenceId:String?=null)=LocalToolSession.open(store,cid,turn,request,receipt,modelId,wireLimit,web,voice,image,messageId,sequenceId)
     private fun portraitStatus(body:String,over:Boolean)=if(body.isEmpty())"empty"else if(over)"over_budget"else "complete"
     private fun portraitReceipt(label:String,body:String,over:Boolean)=RemoteDeskGlobalExcerpt(label=label,status=if(body.isEmpty())"未设置" else "已递给",delivered=body.isNotEmpty(),injection=if(body.isEmpty())"none" else if(over)"over_budget"else "full",estimatedTokens=LocalContextPolicy.estimate(body),length=body.length,content=body)
     companion object {

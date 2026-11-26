@@ -23,6 +23,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -92,7 +94,7 @@ fun TidalLibraryScreen(
     var focusOffset by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var readError by remember { mutableStateOf<String?>(null) }
-    var noteFilter by remember { mutableStateOf("all") }
+    var openNoteGroups by remember(bookId) { mutableStateOf<Set<String>>(emptySet()) }
     var showDirectory by remember { mutableStateOf(false) }
     var importing by remember { mutableStateOf<String?>(null) }
     var pendingCoverBook by remember { mutableStateOf<String?>(null) }
@@ -184,7 +186,7 @@ fun TidalLibraryScreen(
     }
     fun openBook(entry: JsonObject) {
         if (bookId != entry.s("id")) { book = null; chapter = null; notes = emptyList() }
-        noteFilter = "all"; showDirectory = false
+        openNoteGroups = emptySet(); showDirectory = false
         loadedNotesKey = ""
         bookId = entry.s("id")
         index = entry["reader_chapter_index"]?.jsonPrimitive?.intOrNull ?: 0
@@ -279,44 +281,78 @@ fun TidalLibraryScreen(
             LibraryPage.Notes -> {
                 TextButton(onClick = { page = LibraryPage.Shelf }) { Text("‹ 返回书架") }
                 book?.takeIf { it.s("id")==bookId }?.let { currentBook ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.spacedBy(14.dp)) {
-                        TidalCoverSlot(bookId, currentBook.hasLibraryCover(), revision, repository,
-                            title=currentBook.s("title"), onClick={pendingCoverBook=bookId;coverPicker.launch("image/*")})
-                        Column(Modifier.weight(1f), verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                            Text(currentBook.s("title"),style=MaterialTheme.typography.titleLarge)
-                            Text("${currentBook.s("format").uppercase()} · ${currentBook.rows("chapters").size} 个正文分段",style=MaterialTheme.typography.labelSmall)
-                            TextButton(onClick={page=LibraryPage.Chapter}) { Text("继续阅读") }
-                            TextButton(onClick={showDirectory=!showDirectory}) { Text(if(showDirectory)"收起目录" else "查看目录") }
-                            TextButton(onClick={pendingCoverBook=bookId;coverPicker.launch("image/*")}) { Text("更换封面") }
+                    LibraryDossierCard {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.spacedBy(14.dp)) {
+                            TidalCoverSlot(bookId, currentBook.hasLibraryCover(), revision, repository,
+                                title=currentBook.s("title"), onClick={pendingCoverBook=bookId;coverPicker.launch("image/*")})
+                            Column(Modifier.weight(1f), verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                                Text(currentBook.s("title"),style=MaterialTheme.typography.titleLarge)
+                                Text("${currentBook.s("format").uppercase()} · ${currentBook.rows("chapters").size} 个正文分段",style=MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                            LibraryDossierAction("继续阅读",Modifier.weight(1f)){page=LibraryPage.Chapter}
+                            LibraryDossierAction(if(showDirectory)"收起目录" else "查看目录",Modifier.weight(1f)){showDirectory=!showDirectory}
+                            LibraryDossierAction("更换封面",Modifier.weight(1f)){pendingCoverBook=bookId;coverPicker.launch("image/*")}
+                        }
+                        if(showDirectory) LibraryDossierCard {
+                            currentBook.rows("chapters").forEach { item ->
+                                TextButton(onClick={openChapter(item.n("chapter_index"))}) {
+                                    Text(item.s("title").ifBlank { item.s("chapter_title") }.ifBlank { "第 ${item.n("chapter_index")+1} 分段" })
+                                }
+                            }
                         }
                     }
-                    if(showDirectory) currentBook.rows("chapters").forEach { item ->
-                        TextButton(onClick={openChapter(item.n("chapter_index"))}) {
-                            Text(item.s("title").ifBlank { item.s("chapter_title") }.ifBlank { "第 ${item.n("chapter_index")+1} 分段" })
+                    LibraryDossierCard {
+                        Text("我们的阅读情况",fontWeight=FontWeight.SemiBold)
+                        val last=currentBook["reader_chapter_index"]?.jsonPrimitive?.intOrNull
+                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                            listOf("owner","assistant").forEach { author ->
+                                Surface(Modifier.weight(1f),shape=RoundedCornerShape(14.dp),color=libraryAuthorColor(author)){
+                                    Column(Modifier.padding(11.dp),verticalArrangement=Arrangement.spacedBy(4.dp)){
+                                        Text(if(author=="owner")"屋主" else "模型伙伴",fontWeight=FontWeight.SemiBold,style=MaterialTheme.typography.labelLarge)
+                                        Text(if(author=="owner") {if(last==null)"尚无阅读位置" else "上次读到第 ${last+1} 分段"} else "暂无独立阅读进度统计",style=MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
                         }
                     }
-                    Text("我们的阅读情况",fontWeight=FontWeight.SemiBold)
-                    val last=currentBook["reader_chapter_index"]?.jsonPrimitive?.intOrNull
-                    Text(if(last==null)"屋主 · 尚无阅读位置" else "屋主 · 上次读到第 ${last+1} 分段",style=MaterialTheme.typography.bodySmall)
-                    Text("模型伙伴 · 暂无独立阅读进度统计",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("书页间的笔迹",style=MaterialTheme.typography.titleLarge)
-                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
-                        listOf("all" to "全部","highlight" to "划线","annotation" to "批注","reflection" to "读后感").forEach { (key,label) ->
-                            TextButton(onClick={noteFilter=key}) { Text(label,fontWeight=if(noteFilter==key)FontWeight.Bold else FontWeight.Normal) }
-                        }
-                    }
-                    TextButton(onClick = { edit(null) }) { Text("＋ 写一篇读后感") }
-                    for (author in listOf("owner","assistant")) {
-                        Text(if (author=="owner") "屋主的笔记" else "模型伙伴的笔记",fontWeight=FontWeight.Bold)
-                        val visibleNotes=notes.filter { it.s("author")==author && (noteFilter=="all" || it.s("kind")==noteFilter) }
-                            .sortedByDescending { it.s("created_at").toLongOrNull() ?: 0L }
-                        if(visibleNotes.isEmpty() && !loading && readError==null) Text("暂无笔迹",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                        visibleNotes.forEach { note ->
-                            NoteBlock(note, onJump={
-                                val ch=note["chapter_index"]?.jsonPrimitive?.intOrNull
-                                val para=note["paragraph_index"]?.jsonPrimitive?.intOrNull
-                                if(ch!=null && para!=null) openChapter(ch,para,note.n("start_offset"))
-                            },onEdit={edit(note)},onDelete={pendingNoteDelete=note})
+                    LibraryDossierCard {
+                        Text("书页间的笔迹",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                        for (author in listOf("owner","assistant")) {
+                            Surface(shape=RoundedCornerShape(16.dp),color=libraryAuthorColor(author)){
+                                Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+                                    val authorNotes=notes.filter{it.s("author")==author}
+                                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+                                        Text(if (author=="owner") "屋主的笔迹" else "模型伙伴的笔迹",Modifier.weight(1f),fontWeight=FontWeight.Bold)
+                                        Text("${authorNotes.size} 条",style=MaterialTheme.typography.labelSmall)
+                                    }
+                                    listOf("annotation" to "笔记","highlight" to "划线","reflection" to "读后感").forEach{(kind,label)->
+                                        val groupKey="$author:$kind"
+                                        val visibleNotes=authorNotes.filter{it.s("kind")==kind}.sortedByDescending{it.s("created_at").toLongOrNull()?:0L}
+                                        val expanded=groupKey in openNoteGroups
+                                        Surface(shape=RoundedCornerShape(14.dp),color=MaterialTheme.colorScheme.surface.copy(alpha=.88f)){
+                                            Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
+                                                Row(Modifier.fillMaxWidth().clickable{openNoteGroups=if(expanded)openNoteGroups-groupKey else openNoteGroups+groupKey},verticalAlignment=Alignment.CenterVertically){
+                                                    Text(label,Modifier.weight(1f),style=MaterialTheme.typography.titleSmall)
+                                                    Text("${visibleNotes.size}  "+if(expanded)"⌃" else "⌄",style=MaterialTheme.typography.labelMedium)
+                                                }
+                                                if(expanded){
+                                                    if(visibleNotes.isEmpty()&&!loading&&readError==null) Text("暂无$label",style=MaterialTheme.typography.bodySmall)
+                                                    visibleNotes.forEach{note->
+                                                        NoteBlock(note,onJump={
+                                                            val ch=note["chapter_index"]?.jsonPrimitive?.intOrNull
+                                                            val para=note["paragraph_index"]?.jsonPrimitive?.intOrNull
+                                                            if(ch!=null&&para!=null)openChapter(ch,para,note.n("start_offset"))
+                                                        },onEdit={edit(note)},onDelete={pendingNoteDelete=note})
+                                                    }
+                                                    if(author=="owner"&&kind=="reflection") LibraryDossierAction("＋ 写一篇读后感",Modifier.fillMaxWidth()){edit(null)}
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                     TextButton(onClick = { pendingBookDelete = true }) { Text("删除整本书及全部笔记") }
@@ -381,6 +417,25 @@ fun TidalLibraryScreen(
 private fun libraryNoteTime(value: String): String = value.toLongOrNull()?.takeIf { it>0 }?.let {
     java.text.SimpleDateFormat("yyyy.MM.dd HH:mm",java.util.Locale.getDefault()).format(java.util.Date(it))
 } ?: value.takeIf { it.isNotBlank() && it!="null" }.orEmpty()
+
+@Composable
+private fun libraryAuthorColor(author:String)=if(author=="owner")MaterialTheme.colorScheme.tertiaryContainer.copy(alpha=.68f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha=.68f)
+
+@Composable
+private fun LibraryDossierCard(content:@Composable ()->Unit){
+    SnowLetterSurface(modifier=Modifier.fillMaxWidth(),role=SnowLetterSurfaceRole.StatusCard,fallbackColor=MaterialTheme.colorScheme.surface,fallbackShape=RoundedCornerShape(18.dp)){
+        Column(Modifier.fillMaxWidth().padding(13.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){content()}
+    }
+}
+
+@Composable
+private fun LibraryDossierAction(label:String,modifier:Modifier=Modifier,onClick:()->Unit){
+    Surface(modifier=modifier.clickable(onClick=onClick),shape=RoundedCornerShape(12.dp),color=MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.7f)){
+        androidx.compose.foundation.layout.Box(Modifier.heightIn(min=40.dp).padding(horizontal=4.dp,vertical=8.dp),contentAlignment=Alignment.Center){
+            Text(label,style=MaterialTheme.typography.labelMedium,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+        }
+    }
+}
 
 @Composable
 private fun NoteBlock(note: JsonObject, onJump:()->Unit, onEdit:()->Unit, onDelete:()->Unit) {

@@ -37,6 +37,16 @@ export function createCoastVault({ router, chat, toast }) {
     return { ...current, ...extra, cursor: extra.cursor || '' };
   }
 
+  function stickerCard(item,index){
+    const image=item.available?mediaPreview({...item,kind:'image',source_id:item.attachment_id}):'<p>原件不可访问</p>';
+    return '<article class="coast-vault-card" data-vault-index="'+index+'">'+image
+      +'<textarea class="coast-sticker-description" rows="3" maxlength="500" aria-label="素材说明">'+escapeHtml(item.description)+'</textarea>'
+      +'<small>'+escapeHtml(item.author==='assistant'?'模型添加':'屋主添加')+' · '+(item.enabled?'已启用':'已停用')+'</small>'
+      +'<div class="coast-vault-actions"><button type="button" data-action="vault:sticker-save" data-index="'+index+'">保存说明</button>'
+      +'<button type="button" data-action="vault:sticker-toggle" data-index="'+index+'">'+(item.enabled?'停用':'启用')+'</button>'
+      +'<button type="button" data-action="vault:sticker-remove" data-index="'+index+'">移除</button></div></article>';
+  }
+
   function itemCard(item, index) {
     const saved = current.mode === 'treasures';
     const audio = item.kind === 'audio';
@@ -92,6 +102,7 @@ export function createCoastVault({ router, chat, toast }) {
         + '<div class="coast-vault-image-menu-items">'
         + '<button type="button" data-action="vault:rename-open" data-index="' + index
         + '">修改名称</button>' + saveAction + removeAction
+        + '<button type="button" data-action="vault:sticker-add" data-index="' + index + '">加入表情包</button>'
         + '<a download href="' + escapeAttribute(itemSource(item)) + '">下载原图</a>'
         + '<button type="button" data-action="vault:source" data-index="' + index
         + '">回到来源</button></div></details></div>'
@@ -165,13 +176,13 @@ export function createCoastVault({ router, chat, toast }) {
   }
 
   async function view(raw = {}) {
-    const mode = raw.mode === 'treasures' ? 'treasures' : 'basic';
+    const mode = ['treasures','stickers'].includes(raw.mode) ? raw.mode : 'basic';
     const choices = mode === 'treasures' ? SAVED_TYPES : MEDIA_TYPES;
     const kind = choices.some(pair => pair[0] === raw.kind) ? raw.kind : 'all';
     const qText = String(raw.q || '').slice(0, 100);
     const cursor = String(raw.cursor || '');
     current = { mode, kind, q: qText, cursor };
-    const api = mode === 'treasures' ? API.vaultTreasures : API.vaultMedia;
+    const api = mode === 'stickers' ? '/api/coast-vault/stickers' : mode === 'treasures' ? API.vaultTreasures : API.vaultMedia;
     const remoteKind = kind === 'writing' || kind === 'other' ? 'all' : kind;
     const query = '?kind=' + encodeURIComponent(remoteKind) + '&q=' +
       encodeURIComponent(qText) + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '');
@@ -190,22 +201,24 @@ export function createCoastVault({ router, chat, toast }) {
       + '<button type="button" data-action="vault:mode" data-mode="basic"'
       + (mode === 'basic' ? ' aria-current="page"' : '') + '>基本文件库</button>'
       + '<button type="button" data-action="vault:mode" data-mode="treasures"'
-      + (mode === 'treasures' ? ' aria-current="page"' : '') + '>收藏</button></nav>';
+      + (mode === 'treasures' ? ' aria-current="page"' : '') + '>收藏</button>'
+      + '<button type="button" data-action="vault:mode" data-mode="stickers"'+(mode==='stickers'?' aria-current="page"':'')+'>表情包</button></nav>';
     const searchForm = '<form data-submit="vault:search" class="coast-vault-search">'
       + '<span class="coast-vault-search-title">检索</span>'
       + '<div class="coast-vault-query-row"><input type="search" name="q" maxlength="100" value="'
       + escapeAttribute(qText) + '" placeholder="搜索文件、语音或备注">'
       + '<button type="submit">搜索</button></div>'
       + '<div class="coast-vault-kinds" aria-label="筛选类别">'
-      + choices.map(([value, title]) => '<button type="button" data-action="vault:kind"'
+      + (mode==='stickers'?[]:choices).map(([value, title]) => '<button type="button" data-action="vault:kind"'
         + ' data-kind="' + escapeAttribute(value) + '"'
         + (kind === value ? ' aria-current="true"' : '')
         + '>' + escapeHtml(title) + '</button>').join('')
       + '</div></form>';
-    const itemsHtml = items.length ? groupedCards(mode === 'treasures')
+    const itemsHtml = items.length ? (mode==='stickers'?'<section class="coast-vault-grid coast-vault-images">'+items.map(stickerCard).join('')+'</section>':groupedCards(mode === 'treasures'))
       : '<p class="coast-vault-empty">'
         + escapeHtml(message || (mode === 'basic' ? '还没有能够读取的已保存媒体。'
           : '还没有符合条件的收藏记录。')) + '</p>';
+    const upload=mode==='stickers'?'<form class="feature-card coast-sticker-upload" data-submit="vault:sticker-upload"><label>添加图片<input type="file" name="file" accept="image/png,image/jpeg,image/webp" required></label><label>素材说明<textarea name="description" rows="2" maxlength="500" required></textarea></label><button type="submit">加入表情包</button></form>':'';
     const migration = mode === 'treasures'
       ? '<p class="coast-vault-hint"><button type="button" class="coast-vault-next"'
         + ' data-action="vault:legacy">检查旧红心 · 确认后迁入收藏</button>'
@@ -213,9 +226,9 @@ export function createCoastVault({ router, chat, toast }) {
       : '';
     return {
       title: '文件库',
-      subtitle: mode === 'basic' ? '自动归集真实媒体 · 不收录聊天文字' : '收藏 · 只收录你主动珍藏的东西',
+      subtitle: mode==='stickers'?'从文件库图片菜单添加素材，独立管理说明与发送权限':mode === 'basic' ? '自动归集真实媒体 · 不收录聊天文字' : '收藏 · 只收录你主动珍藏的东西',
       className: 'daily-panel coast-vault-panel',
-      body: modeBar + searchForm + migration + itemsHtml + (next
+      body: modeBar + searchForm + upload + migration + itemsHtml + (next
         ? '<button type="button" class="coast-vault-next" data-action="vault:more" data-cursor="' +
           escapeAttribute(next) + '">下一页</button>' : '') +
         '<p class="coast-vault-hint">媒体库收录当前可访问的海岸附件和已生成语音；原来不存在或已经失效的文件无法凭索引恢复。</p>',
@@ -291,6 +304,23 @@ export function createCoastVault({ router, chat, toast }) {
     const index = Number(target.dataset.index);
     const item = items[index];
     if (!item) return;
+    if(name==='sticker-add'){
+      const description=window.prompt('写一句供模型选择时参考的表情包说明。','');
+      if(!description?.trim())return;
+      await requestJson('/api/coast-vault/stickers',{method:'POST',body:JSON.stringify({conversation_id:item.conversation_id,attachment_id:item.source_id||item.id,description})});
+      toast('已登记表情包，原图不变。');return;
+    }
+    if(['sticker-save','sticker-toggle','sticker-remove'].includes(name)){
+      const url='/api/coast-vault/stickers/'+encodeURIComponent(item.id);
+      if(name==='sticker-remove'){
+        if(!confirm('移除该表情包索引？原图片与已发送的聊天记录均保留。'))return;
+        await requestJson(url,{method:'DELETE'});
+      }else{
+        const patch=name==='sticker-save'?{description:card(index)?.querySelector('.coast-sticker-description')?.value||''}:{enabled:!item.enabled};
+        await requestJson(url,{method:'PATCH',body:JSON.stringify(patch)});
+      }
+      return router.refresh({preserveScroll:true});
+    }
     if (name === 'image-open' || name === 'image-close') {
       const dialog = card(index)?.querySelector('.coast-vault-image-dialog');
       if (!dialog) return;
@@ -412,7 +442,19 @@ export function createCoastVault({ router, chat, toast }) {
       if (context.namespace !== 'vault') return false;
       return { preventDefault: context.eventType === 'click' || context.eventType === 'submit' };
     },
-    handleEvent(_event, context) {
+    async handleEvent(_event, context) {
+      if(context.eventType==='submit'&&context.name==='sticker-upload'){
+        const form=context.target,file=form.elements.namedItem('file')?.files?.[0],description=form.elements.namedItem('description')?.value?.trim();
+        if(form.dataset.busy==='1')return;
+        if(!file||!description)return toast('请选择图片并填写素材说明。');
+        if(file.size>8*1024*1024||!['image/png','image/jpeg','image/webp'].includes(file.type))return toast('请选择8 MiB以内的 PNG、JPEG 或 WebP。');
+        form.dataset.busy='1';const button=form.querySelector('button[type=submit]');if(button)button.disabled=true;
+        try{await requestJson('/api/coast-vault/stickers/upload',{method:'POST',body:file,headers:{'Content-Type':file.type,'X-Sticker-Name':encodeURIComponent(file.name),'X-Sticker-Description':encodeURIComponent(description)}});
+          toast('表情包已保存。');return router.refresh({preserveScroll:true});
+        }catch(error){toast('上传未确认完成：'+(error.message||'请刷新目录核对。'));}
+        finally{delete form.dataset.busy;if(button)button.disabled=false;}
+        return;
+      }
       if (context.eventType === 'submit' && context.name === 'search') {
         const form = context.target;
         return router.open('vault-home', params({

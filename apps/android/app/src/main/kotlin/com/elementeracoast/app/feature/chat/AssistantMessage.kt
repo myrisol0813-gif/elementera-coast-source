@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -88,7 +89,7 @@ internal fun AssistantMessage(
         }
         Spacer(Modifier.height(8.dp))
         Column(modifier = Modifier.fillMaxWidth()) {
-            SnowLetterSurface(
+            if (message.text.isNotBlank() || isStreamingTail || !message.errorDetail.isNullOrBlank()) SnowLetterSurface(
                 modifier = Modifier.fillMaxWidth(),
                 role = SnowLetterSurfaceRole.AssistantBubble,
                 fallbackColor = MaterialTheme.colorScheme.surface.copy(alpha = .34f),
@@ -96,11 +97,11 @@ internal fun AssistantMessage(
             ) {
                 Column(modifier = Modifier.padding(snowLetterInnerPadding(SnowLetterSurfaceRole.AssistantBubble))) {
                     Text(
-                        text = when {
+                        text = remember(message.text,isStreamingTail) { renderChatMarkdown(when {
                             message.text.isEmpty() && isStreamingTail -> "•••"
                             isStreamingTail -> message.text + " ▍"
                             else -> message.text
-                        },
+                        }) },
                         color = MaterialTheme.colorScheme.onSurface,
                         style = coastReadingMessageStyle(CoastChatTokens.ChatBodyLineHeight)
                     )
@@ -111,19 +112,19 @@ internal fun AssistantMessage(
                 }
             }
             if(message.attachments.isNotEmpty()){
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(if (message.text.isNotBlank() || isStreamingTail || !message.errorDetail.isNullOrBlank()) 6.dp else 0.dp))
                 MessageAttachmentList(conversationId=conversationId,attachments=message.attachments,previewSource=attachmentPreviewSource)
             }
             Spacer(Modifier.height(CoastChatTokens.MessageActionTopGap))
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                 val compactTraceLabel = maxWidth < 410.dp
                 MessageActionRow(modifier = Modifier.fillMaxWidth()) {
-                    MessageActionButton(Icons.Default.ContentCopy, "复制", onClick = onCopy)
-                    MessageActionButton(Icons.Default.Mic, "生成语音", enabled = !isStreamingTail && !message.remoteVariantId.isNullOrBlank(), onClick = onVoice)
+                    MessageActionButton(Icons.Default.ContentCopy, "复制", enabled = message.text.isNotBlank(), onClick = onCopy)
+                    MessageActionButton(Icons.Default.Mic, "生成语音", enabled = !isStreamingTail && message.text.isNotBlank() && !message.remoteVariantId.isNullOrBlank(), onClick = onVoice)
                     MessageActionButton(Icons.Default.ThumbUp, "点赞", active = message.liked, onClick = { onAction(MessageAction.ToggleLike(message.id)) })
-                    MessageActionButton(Icons.Default.Refresh, "重新生成", enabled = !isStreamingTail, onClick = { onAction(MessageAction.Regenerate(message.id)) })
+                    if (message.replyGroupTail) MessageActionButton(Icons.Default.Refresh, "重新生成", enabled = !isStreamingTail, onClick = { onAction(MessageAction.Regenerate(message.id)) })
                     MessageActionButton(Icons.Default.FavoriteBorder, "收藏", active = message.favorite, onClick = { onAction(MessageAction.ToggleFavorite(message.id)) })
-                    MessageActionButton(Icons.Default.DeleteOutline, "删除", enabled = !isStreamingTail, onClick = { onAction(MessageAction.Delete(message.id)) })
+                    if (message.replyGroupTail) MessageActionButton(Icons.Default.DeleteOutline, "删除", enabled = !isStreamingTail, onClick = { onAction(MessageAction.Delete(message.id)) })
                     if (metadataTraceState != null) {
                         Spacer(Modifier.weight(1f))
                         ModelMetadataTraceChip(state = metadataTraceState, compact = compactTraceLabel)
@@ -139,7 +140,7 @@ internal fun AssistantMessage(
                     Text("▶ 语音留存", style = MaterialTheme.typography.labelSmall)
                 }
             }
-            if (message.variantCount > 1) {
+            if (message.replyGroupTail && message.variantCount > 1) {
                 Spacer(Modifier.height(4.dp))
                 Row(modifier = Modifier.align(Alignment.End)) {
                     VariantControl(

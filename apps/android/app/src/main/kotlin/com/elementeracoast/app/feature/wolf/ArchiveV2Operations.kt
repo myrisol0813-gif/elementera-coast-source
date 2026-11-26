@@ -23,7 +23,10 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
             val manifest=if(local) {
                 require(NativeWorkspace.isLocal)
                 ArchiveV2Local.export(NativeWorkspace.persistence(context),BuildConfig.APPLICATION_ID,file,context.filesDir)
-            }else ArchiveV2NativeCollector.collectCloud(api,file,BuildConfig.APPLICATION_ID,progress)
+            }else {
+                require(!NativeWorkspace.isLocal)
+                ArchiveV2NativeCollector.collectCloud(api,file,BuildConfig.APPLICATION_ID,progress,ArchiveV2Appearance.basic(SharedPreferencesLocalPersistence(context)))
+            }
             file to manifest
         }catch(e:Throwable){dir.deleteRecursively();throw e}
     }
@@ -66,6 +69,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
         val m=input.manifest;val objects=m.objects.associateBy { it.objectSha256 }
         buildList {
             for(r in m.records){
+                if(r.module=="appearance")continue
                 if(m.workspace=="local"&&((r.module !in ArchiveV2Local.localModules||r.module in setOf("attachments","appearance"))||r.module in setOf("custom_instructions","memory_entries","memory_pockets","user_portrait","self_portrait","thinking_soil","thinking_soil_history","tools","vault","dogtalk_records","dogtalk_snapshots")&&m.applicationId!=BuildConfig.APPLICATION_ID))continue
                 if(m.workspace=="backend"&&!(r.module=="chat"&&m.applicationId==BuildConfig.APPLICATION_ID)&&!(r.module=="library"&&r.id.startsWith("library_books:"))&&r.module !in setOf("calendar","worldbook","model_profile")&&!(m.applicationId==BuildConfig.APPLICATION_ID&&r.module in setOf("memory_entries","memory_pockets","user_portrait","self_portrait","daily","vault","custom_instructions","thinking_soil","thinking_soil_history","tools","dogtalk_records")))continue
                 val d=objects.getValue(r.recordObject)
@@ -98,7 +102,14 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
                     add(Choice("vault",r.id,title))
                 }
             }
+            if(ArchiveV2Appearance.readDeviceBasic(m,input.stage)!=null)add(Choice("appearance",ArchiveV2Appearance.DEVICE_ID,"仅当前设备基本设置（不上传）"))
         }
+    }
+    suspend fun restoreDeviceBasic(input:Imported,confirm:Boolean):JsonObject=withContext(Dispatchers.IO){
+        require(!local&&!NativeWorkspace.isLocal)
+        val values=requireNotNull(ArchiveV2Appearance.readDeviceBasic(input.manifest,input.stage))
+        val report=ArchiveV2Appearance.applyBasic(values,SharedPreferencesLocalPersistence(context),confirm)
+        buildJsonObject{put("scope","device_basic_settings");put("ready",report.ready);put("existing",report.existing);put("conflicts",report.conflicts);put("committed",confirm)}
     }
     fun cloudManifest(input:Imported,choice:Choice):ArchiveV2Manifest=ArchiveV2Manifests.forRestore(input.manifest,choice.kind,choice.id)
     suspend fun createSession():String {

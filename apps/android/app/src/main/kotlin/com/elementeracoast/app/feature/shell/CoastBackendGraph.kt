@@ -66,22 +66,24 @@ data class CoastBackendGraph(
             val metadataRemote = ModelMetadataRemoteDataSource(config, http)
             val titleRemote = ConversationTitleRemoteDataSource(config, http)
             val reasoning = ReasoningEffortStore.production(context)
-            val chatRepository = DefaultChatRepository(api, cache, metadataRemote, reasoningStore = reasoning)
+            val toolLimit = { com.elementeracoast.app.core.network.TurnToolPolicy.stored(persistence) }
+            val chatRepository = DefaultChatRepository(api, cache, metadataRemote, reasoningStore = reasoning,toolLimit=toolLimit)
+            val localSoil=if(config.localTransport!=null)LocalSoilOrganizer(persistence,LocalProviderStore(context),chatGptPlan)else null
             return CoastBackendGraph(
                 auth = DefaultAuthRepository(authStore, api),
                 conversations = DefaultConversationRepository(api, cache, titleRemote),
                 profile = DefaultProfileRepository(api, cache),
-                chat = if (config.localTransport != null) LocalDirectChatRepository(chatRepository, LocalProviderStore(context), LocalKnowledgeStore(persistence,com.elementeracoast.app.core.local.LocalIndependentWeb(context.applicationContext),com.elementeracoast.app.core.local.LocalVoiceProvider(context.applicationContext))) else chatRepository,
+                chat = if (config.localTransport != null) LocalDirectChatRepository(chatRepository, LocalProviderStore(context), LocalKnowledgeStore(persistence,com.elementeracoast.app.core.local.LocalIndependentWeb(context.applicationContext),com.elementeracoast.app.core.local.LocalVoiceProvider(context.applicationContext)),sequenceStore=persistence) else chatRepository,
                 reality = AndroidRealityContextSource(context.applicationContext, persistence,config.localTransport!=null),
                 thoughtSoil = DefaultThoughtSoilRepository(api, chatGptPlan,
-                    if (config.localTransport != null) LocalSoilOrganizer(persistence, LocalProviderStore(context), chatGptPlan)::organize else null),
+                    localSoil?.let{it::organize},localSoil?.let{it::organizeSequence}),
                 daily = DefaultDailyRepository(api, cache,
                     if (config.localTransport != null) LocalDailyComment(persistence, LocalProviderStore(context), chatGptPlan)::request else null),
                 memory = DefaultMemoryRepository(memoryRemote, cache),
                 dogtalk = DefaultDogtalkRepository(config, http),
                 crossWindow = DefaultCrossWindowRepository(config, http),
                 archive = DefaultGlobalArchiveRepository(api),
-                officialChat = chatGptPlan?.let { NativeChatGptTurnRepository(api, chatRepository, it, reasoning) }
+                officialChat = chatGptPlan?.let { NativeChatGptTurnRepository(api, chatRepository, it, reasoning,toolLimit=toolLimit) }
             )
         }
     }

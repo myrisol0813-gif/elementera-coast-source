@@ -97,7 +97,9 @@ class WolfStore(private val persistence: LocalPersistence) {
     }
 
     private fun update(transform: (WolfState) -> WolfState) {
-        val next = transform(_state.value)
+        // An explicit archive restore can change persisted settings while
+        // this store is still mounted. Never overwrite them with stale UI state.
+        val next = transform(load())
         _state.value = next
         persist(next)
     }
@@ -142,7 +144,11 @@ class WolfStore(private val persistence: LocalPersistence) {
                 seedCooldownTurns = int(KEY_SEED_COOLDOWN, 2),
                 worldbookEnabled = bool(KEY_WORLDBOOK_ENABLED, true),
                 worldbookLimit = int(KEY_WORLDBOOK_LIMIT, 3),
-                memoryLimit = int(KEY_MEMORY_LIMIT, 8)
+                memoryLimit = int(KEY_MEMORY_LIMIT, 8),
+                toolCallLimit = com.elementeracoast.app.core.network.TurnToolPolicy.stored(persistence),
+                replySequenceMaxMessages = int(KEY_REPLY_MESSAGES, 3),
+                replySequenceToolBudget = int(KEY_REPLY_TOOLS, 24),
+                replySequenceTokenBudget = int(KEY_REPLY_TOKENS, 48000)
             ).normalized()
         )
     }
@@ -175,6 +181,10 @@ class WolfStore(private val persistence: LocalPersistence) {
         persistence.put(KEY_WORLDBOOK_ENABLED, basic.worldbookEnabled.toString())
         persistence.put(KEY_WORLDBOOK_LIMIT, basic.worldbookLimit.toString())
         persistence.put(KEY_MEMORY_LIMIT, basic.memoryLimit.toString())
+        persistence.put(KEY_REPLY_MESSAGES, basic.replySequenceMaxMessages.toString())
+        persistence.put(KEY_REPLY_TOOLS, basic.replySequenceToolBudget.toString())
+        persistence.put(KEY_REPLY_TOKENS, basic.replySequenceTokenBudget.toString())
+        persistence.put(com.elementeracoast.app.core.network.TurnToolPolicy.STORE_KEY,basic.toolCallLimit.toString())
     }
 
     private fun BasicSettings.normalized() = copy(
@@ -186,7 +196,11 @@ class WolfStore(private val persistence: LocalPersistence) {
         soilBudget = soilBudget.coerceIn(300, 4000),
         seedCooldownTurns = seedCooldownTurns.coerceIn(0, 8),
         worldbookLimit = worldbookLimit.coerceIn(0, 6),
-        memoryLimit = memoryLimit.coerceIn(0, 12)
+        memoryLimit = memoryLimit.coerceIn(0, 12),
+        toolCallLimit = com.elementeracoast.app.core.network.TurnToolPolicy.normalize(toolCallLimit),
+        replySequenceMaxMessages = replySequenceMaxMessages.coerceIn(1,20),
+        replySequenceToolBudget = replySequenceToolBudget.coerceIn(0,128),
+        replySequenceTokenBudget = replySequenceTokenBudget.coerceIn(1,1000000)
     )
 
     private fun sanitizeHex(value: String): String {
@@ -223,5 +237,8 @@ class WolfStore(private val persistence: LocalPersistence) {
         private const val KEY_WORLDBOOK_ENABLED = ROOT + "worldbookEnabled"
         private const val KEY_WORLDBOOK_LIMIT = ROOT + "worldbookLimit"
         private const val KEY_MEMORY_LIMIT = ROOT + "memoryLimit"
+        private const val KEY_REPLY_MESSAGES = ROOT + "replySequenceMaxMessages"
+        private const val KEY_REPLY_TOOLS = ROOT + "replySequenceToolBudget"
+        private const val KEY_REPLY_TOKENS = ROOT + "replySequenceTokenBudget"
     }
 }

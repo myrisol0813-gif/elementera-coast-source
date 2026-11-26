@@ -29,7 +29,16 @@ function messageTokens(message) {
   return estimateContextTokens(message?.content) + 4;
 }
 
-function cleanMessages(messages, recentTurns) {
+// Keep every assistant message belonging to the same human turn together.
+export function completeMessageTurns(messages){
+  const groups=[];
+  for(const message of messages){
+    if(message.role==='user'||!groups.length)groups.push([]);
+    groups.at(-1).push(message);
+  }
+  return groups;
+}
+export function cleanMessages(messages, recentTurns) {
   const cleaned = (Array.isArray(messages) ? messages : [])
     .filter((message) => ['user', 'assistant'].includes(message?.role)
       && typeof message.content === 'string'
@@ -37,7 +46,7 @@ function cleanMessages(messages, recentTurns) {
     .map((message) => ({ role: message.role, content: message.content }));
   const current = cleaned.at(-1)?.role === 'user' ? cleaned.pop() : null;
   const turns = Math.max(1, Math.trunc(Number(recentTurns) || 8));
-  const recent = cleaned.slice(-(turns * 2));
+  const recent = completeMessageTurns(cleaned).slice(-turns).flat();
   return current ? [...recent, current] : recent;
 }
 
@@ -147,8 +156,12 @@ export function trimContextToComfortRange({
   if (total() > ceiling && value.soilText) { value.soilText = ''; trimmedCount += 1; }
   if (total() > ceiling && value.dogtalkText) { value.dogtalkText = ''; trimmedCount += 1; }
   while (total() > ceiling && keptMessages.length > 4) {
-    keptMessages.shift();
-    trimmedCount += 1;
+    const groups=completeMessageTurns(keptMessages);
+    const protectedCount=hasCurrentMessage(keptMessages)?2:1;
+    if(groups.length<=protectedCount)break;
+    const count=groups[0].length;
+    keptMessages.splice(0,count);
+    trimmedCount += count;
   }
 
   const systemText = assembleText(value, keptMessages);

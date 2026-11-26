@@ -23,7 +23,7 @@ export function createChatConversations({
     const data = await requestJson(API.conversations);
     const seen = new Set();
     runtime.conversations = (Array.isArray(data.conversations) ? data.conversations : [])
-      .filter((conversation) => conversation?.id && !seen.has(conversation.id) && seen.add(conversation.id))
+      .filter((conversation) => conversation?.id && conversation.source !== 'sticker_library' && !seen.has(conversation.id) && seen.add(conversation.id))
       .map((conversation) => ({
         ...conversation,
         source: conversation.source || 'coast',
@@ -153,7 +153,7 @@ export function createChatConversations({
       if (runtime.currentId === conversationId) setStatus('');
     }).catch(async (error) => {
       if (runtime.currentId === conversationId && !runtime.deletedIds.has(conversationId)) {
-        if(['image_pending','image_history_changed','history_changed'].includes(error.type))try{const fresh=await requestJson(`${API.history}?conversation_id=${encodeURIComponent(conversationId)}`);setHistory(conversationId,fresh.history);renderMessages(conversationId);}catch{}
+        if(['image_pending','image_history_changed','history_changed','reply_group_history_changed','reply_run_active'].includes(error.type))try{const fresh=await requestJson(`${API.history}?conversation_id=${encodeURIComponent(conversationId)}`);setHistory(conversationId,fresh.history);renderMessages(conversationId);}catch{}
         setStatus(`聊天记录写入失败：${error.message}`, 'error');
       }
       throw error;

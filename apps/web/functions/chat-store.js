@@ -1,4 +1,5 @@
 import { recoverImageTasks, protectImageHistory } from './image-task-recovery.js';
+import { protectReplyGroupHistory, recoverStaleReplyRuns, isReplyRunActive } from './chat-reply-run.js';
 import { ensureChatSchema as ensureSchema } from './chat-schema.js';
 import { sanitizeFurnitureRuns } from './tool-furniture-summary.js';
 
@@ -97,7 +98,10 @@ function normalizeAttachments(value, assistantId) {
     const createdAt = typeof item?.created_at === 'string' ? item.created_at : new Date().toISOString();
     if (!item?.id || !name || !storageKey) return null;
     const imageGeneration=type==='image'?normalizeImageGeneration(item.image_generation,assistantId):null;
-    return { id, type, name, mime, size, storage_key: storageKey, created_at: createdAt, ...(imageGeneration?{image_generation:imageGeneration}:{}) };
+    const sticker=item?.sticker_delivery;
+    const stickerDelivery=type==='image'&&assistantId&&sticker?.message_id===assistantId&&typeof sticker.sticker_id==='string'&&/^sticker_[A-Za-z0-9_.:-]{1,152}$/.test(sticker.sticker_id)
+      ?{message_id:assistantId,sticker_id:sticker.sticker_id}:null;
+    return { id, type, name, mime, size, storage_key: storageKey, created_at: createdAt, ...(imageGeneration?{image_generation:imageGeneration}:{}), ...(stickerDelivery?{sticker_delivery:stickerDelivery}:{}) };
   }).filter(Boolean);
 }
 
@@ -154,6 +158,12 @@ export function normalizeContextSettings(value = {}) {
     ...(raw.cross_window_auto === true ? { cross_window_auto: true } : {}),
     ...(raw.local_model_tools_enabled === true ? { local_model_tools_enabled: true } : {}),
     ...(raw.local_model_write_enabled === true ? { local_model_write_enabled: true } : {}),
+    ...(raw.sticker_send_enabled === true ? { sticker_send_enabled: true } : {}),
+    ...(raw.sticker_add_enabled === true ? { sticker_add_enabled: true } : {}),
+    ...(raw.reply_sequence_enabled === true ? { reply_sequence_enabled: true } : {}),
+    ...(Number.isSafeInteger(raw.reply_sequence_max_messages) && raw.reply_sequence_max_messages >= 1 && raw.reply_sequence_max_messages <= 20 ? { reply_sequence_max_messages: raw.reply_sequence_max_messages } : {}),
+    ...(Number.isSafeInteger(raw.reply_sequence_tool_budget) && raw.reply_sequence_tool_budget >= 0 && raw.reply_sequence_tool_budget <= 128 ? { reply_sequence_tool_budget: raw.reply_sequence_tool_budget } : {}),
+    ...(Number.isSafeInteger(raw.reply_sequence_token_budget) && raw.reply_sequence_token_budget >= 1 && raw.reply_sequence_token_budget <= 1000000 ? { reply_sequence_token_budget: raw.reply_sequence_token_budget } : {}),
     weather_city: weatherCity,
   };
 }
@@ -225,6 +235,8 @@ function normalizeVariant(value = {}, prefix = 'variant') {
   const furnitureRuns = sanitizeFurnitureRuns(value.furniture_runs);
   const attachments = normalizeAttachments(value.attachments, prefix.startsWith('assistant') ? value.id : null);
   const deskSlip = normalizeDeskSlip(value.desk_slip);
+  const seq=value.reply_sequence;
+  const sequence=prefix.startsWith('assistant')&&seq&&typeof seq.id==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(seq.id)&&Number.isInteger(seq.index)&&seq.index>=0&&seq.index<20?{id:seq.id,index:seq.index}:null;
   return {
     id: sanitizeId(value.id || crypto.randomUUID(), prefix),
     content: String(value.content),
@@ -237,6 +249,7 @@ function normalizeVariant(value = {}, prefix = 'variant') {
     ...(usage ? { usage } : {}),
     ...(modelEcho ? { model_echo: modelEcho } : {}),
     ...(finishReason ? { finish_reason: finishReason } : {}),
+    ...(sequence ? { reply_sequence: sequence } : {}),
     ...(generationSource ? { generation_source: generationSource } : {}),
     ...(dogtalkSnapshotId ? { dogtalk_snapshot_id: dogtalkSnapshotId } : {}),
     ...(messageSource ? { message_source: messageSource } : {}),
@@ -530,13 +543,16 @@ export async function readConversationState(db, id) {
   await ensureChatSchema(db);
   const conversationId = sanitizeId(id, 'conversation');
   await requireActiveConversation(db, conversationId);
+  await recoverStaleReplyRuns(db,Date.now(),conversationId);
   const row = await first(db, 'SELECT state_json, updated_at FROM conversation_states WHERE conversation_id = ?', [conversationId]);
   if (!row?.state_json) {
     throw new ChatStoreError('conversation_state_missing', '聊天记录不存在，未创建替代数据。', 500);
   }
   try {
     const state=normalizeState(JSON.parse(row.state_json));
-    if(recoverImageTasks(state)){
+    // The group ledger, rather than the legacy image timer, owns its
+    // active reservations. Otherwise a long active run could lose its slot.
+    if(!await isReplyRunActive(db,conversationId)&&recoverImageTasks(state)){
       const stamp=nowMs();state.updated_at=iso(stamp);
       const changed=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=?',[JSON.stringify(normalizeState(state)),stamp,conversationId,row.state_json]);
       if(changed.meta?.changes!==1)return readConversationState(db,conversationId);
@@ -555,12 +571,15 @@ export async function writeConversationState(db, id, value, {deleteRevision=null
   const previous = await first(db,'SELECT state_json FROM conversation_states WHERE conversation_id=?',[conversationId]);
   if(!previous?.state_json)throw new ChatStoreError('conversation_state_missing','聊天记录不存在，未创建替代数据。',409);
   const old=normalizeState(JSON.parse(previous.state_json));
-  const conflict=protectImageHistory(old,state,{allowDelete:deleteRevision!==null&&deleteRevision===old.updated_at});
+  const allowDelete=deleteRevision!==null&&deleteRevision===old.updated_at;
+  const groupConflict=protectReplyGroupHistory(old,state,{allowDelete});
+  if(groupConflict)throw new ChatStoreError(groupConflict,'连续回复历史已经变化；请刷新后按整组操作。',409);
+  const conflict=protectImageHistory(old,state,{allowDelete});
   if(conflict)throw new ChatStoreError(conflict,conflict==='image_pending'?'绘图仍在进行；请刷新原窗口，不覆盖任务。':'历史已包含新生成的图片，请刷新后再明确删除。',409);
   await carryArchiveDeskSlips(db, conversationId, state);
   const timestamp = nowMs();
   state.updated_at=iso(timestamp);
-  const changed=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS (SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL)',[JSON.stringify(normalizeState(state)),timestamp,conversationId,previous.state_json,conversationId]);
+  const changed=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS (SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL) AND NOT EXISTS (SELECT 1 FROM chat_reply_runs WHERE conversation_id=? AND status=\'running\')',[JSON.stringify(normalizeState(state)),timestamp,conversationId,previous.state_json,conversationId,conversationId]);
   if(changed.meta?.changes!==1)throw new ChatStoreError('history_changed','聊天在保存时发生变化，请刷新；未覆盖原记录。',409);
   await run(db, `UPDATE conversations SET updated_at = ?
     WHERE id = ? AND user_id = ? AND deleted_at IS NULL`, [timestamp, conversationId, USER_ID]);

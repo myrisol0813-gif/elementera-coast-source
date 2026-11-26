@@ -130,19 +130,22 @@ export function createTidalLibrary({router,toast}) {
     const b=memo.book,progress=b.progress?.[0],chapter=progress?.chapter_index??0,paragraph=progress?.paragraph_index??0;
     const shelf=(await requestJson(BASE+'/books')).books||[];
     const entry=shelf.find(x=>x.id===bookId);
-    const both=['owner','assistant'].map(author=>`<section class="tidal-library-notes-group"><h2>${authorLabel(author)}的笔记</h2>
-      ${memo.notes.filter(n=>n.author===author&&(filter==='all'||n.kind===filter)).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(noteCard).join('')||'<p class="feature-empty">暂无笔迹。</p>'}</section>`).join('');
+    const both=['owner','assistant'].map(author=>{
+      const notes=memo.notes.filter(n=>n.author===author);
+      return `<section class="tidal-library-notes-group" data-author="${author}"><h2>${authorLabel(author)}的笔迹 <small>${notes.length} 条</small></h2>
+        ${[['annotation','笔记'],['highlight','划线'],['reflection','读后感']].map(([key,label])=>{
+          const selected=notes.filter(n=>n.kind===key).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+          return `<details class="tidal-note-category" ${filter===key?'open':''}><summary>${label} <small>${selected.length}</small></summary>${selected.map(noteCard).join('')||'<p class="feature-empty">暂无记录。</p>'}${author==='owner'&&key==='reflection'?button('reflect','＋ 写一篇读后感',`class="tidal-library-primary" data-book="${escapeAttribute(bookId)}"`):''}</details>`;
+        }).join('')}</section>`;
+    }).join('');
     return {title:'阅读档案',subtitle:b.title,className:'tidal-library',
       body:`<section class="tidal-library-notes">
-        <div class="tidal-dossier-heading"><button class="tidal-book-volume" type="button" data-action="library:cover" data-book="${escapeAttribute(bookId)}" aria-label="更换封面">${coverFace({...b,has_cover:entry?.has_cover??b.has_cover})}</button><div><h2>${escapeHtml(b.title)}</h2><small>${escapeHtml(b.format.toUpperCase())} · ${b.chapters.length} 个正文分段</small>
-        ${button('continue','继续阅读',`class="tidal-library-primary" data-book="${escapeAttribute(bookId)}" data-index="${chapter}" data-paragraph="${paragraph}"`)}
-        ${button('cover','更换封面',`data-book="${escapeAttribute(bookId)}"`)}</div></div>
-        <details class="tidal-library-toc"><summary>查看目录</summary>${b.chapters.map(c=>button('chapter',escapeHtml(c.title),`data-book="${escapeAttribute(bookId)}" data-index="${c.chapter_index}"`)).join('')}</details>
-        <div class="tidal-library-reading-state"><h2>我们的阅读情况</h2><p class="tidal-library-progress">屋主 · ${progress?'上次读到第 '+(chapter+1)+' 分段':'尚无阅读位置'}</p><p class="tidal-library-progress">模型伙伴 · 暂无独立阅读进度统计</p></div>
-        <h2>书页间的笔迹</h2>
-        <div class="tidal-note-filters">${[['all','全部'],['highlight','划线'],['annotation','批注'],['reflection','读后感']].map(([key,label])=>button('filter',label,`data-book="${escapeAttribute(bookId)}" data-filter="${key}" aria-pressed="${filter===key}"`)).join('')}</div>
-        ${button('reflect','＋ 写一篇读后感',`class="tidal-library-primary" data-book="${escapeAttribute(bookId)}"`)}
-        ${both}
+        <section class="tidal-dossier-card"><div class="tidal-dossier-heading"><button class="tidal-book-volume" type="button" data-action="library:cover" data-book="${escapeAttribute(bookId)}" aria-label="更换封面">${coverFace({...b,has_cover:entry?.has_cover??b.has_cover})}</button><div><h2>${escapeHtml(b.title)}</h2><small>${escapeHtml(b.format.toUpperCase())} · ${b.chapters.length} 个正文分段</small></div></div>
+        <div class="tidal-dossier-actions">${button('continue','继续阅读',`class="tidal-library-primary" data-book="${escapeAttribute(bookId)}" data-index="${chapter}" data-paragraph="${paragraph}"`)}
+        <details class="tidal-library-toc"><summary>查看目录</summary><div class="tidal-dossier-directory">${b.chapters.map(c=>button('chapter',escapeHtml(c.title),`data-book="${escapeAttribute(bookId)}" data-index="${c.chapter_index}"`)).join('')}</div></details>
+        ${button('cover','更换封面',`data-book="${escapeAttribute(bookId)}"`)}</div></section>
+        <section class="tidal-dossier-card"><h2>我们的阅读情况</h2><div class="tidal-dossier-readers"><div data-author="owner"><strong>屋主</strong><p class="tidal-library-progress">${progress?'上次读到第 '+(chapter+1)+' 分段':'尚无阅读位置'}</p></div><div data-author="assistant"><strong>模型伙伴</strong><p class="tidal-library-progress">暂无独立阅读进度统计</p></div></div></section>
+        <section class="tidal-dossier-card"><h2>书页间的笔迹</h2>${both}</section>
         <details class="tidal-book-manage"><summary>书籍管理</summary>${button('delete-book','删除这本书与全部笔记',`class="tidal-library-danger" data-book="${escapeAttribute(bookId)}"`)}</details>
       </section>`};
   }

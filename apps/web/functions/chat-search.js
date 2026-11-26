@@ -101,7 +101,7 @@ export async function searchChatMessages(db, { q, cursor = '', limit = 40 } = {}
   const raw = await db.prepare(
     "SELECT c.id, c.title, c.room_type, s.state_json FROM conversations c " +
     "JOIN conversation_states s ON s.conversation_id = c.id " +
-    "WHERE c.user_id = 'owner' AND c.deleted_at IS NULL AND c.conversation_kind = 'chat' " +
+    "WHERE c.user_id = 'owner' AND c.deleted_at IS NULL AND c.conversation_kind = 'chat' AND c.source != 'sticker_library' " +
     "AND (c.title LIKE ? ESCAPE '!' OR s.state_json LIKE ? ESCAPE '!') " +
     "ORDER BY c.updated_at DESC, c.id DESC LIMIT ? OFFSET ?"
   ).bind(like, like, CHAT_SEARCH_LIMITS.candidate_batch + 1, offset).all();

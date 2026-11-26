@@ -6,6 +6,7 @@ import { ensureLibrarySchema } from './tidal-library.js';
 import { ensureDailySchema } from './daily-schema.js';
 import { ensureTreasureSchema } from './coast-vault-treasures.js';
 import { ensureMediaLabelSchema } from './coast-vault-media-labels.js';
+import { ensureStickerLibrarySchema } from './sticker-library.js';
 import { ensureChatAttachmentSchema } from './chat-attachments.js';
 import { ARCHIVE_CHUNK_BYTES,digestBytes,describeObject } from './coast-archive-v2-chunks.js';
 
@@ -41,6 +42,7 @@ const tables={
   library_reading_logs:spec('library',ensureLibrarySchema,'coast_library_reading_logs','book_id,author,day,chapter_index,paragraph_index,updated_at',"book_id IN (SELECT id FROM coast_library_books WHERE import_state='ready')"),
   library_covers:spec('library',ensureLibrarySchema,'coast_library_covers','book_id,mime,size,updated_at',"book_id IN (SELECT id FROM coast_library_books WHERE import_state='ready')"),
   vault_treasures:spec('vault',ensureTreasureSchema,'coast_vault_treasures','id,source_key,kind,conversation_id,turn_id,message_id,source_id,role,excerpt,selections_json,notes,created_at,updated_at',scope),
+  vault_stickers:spec('vault',ensureStickerLibrarySchema,'coast_sticker_library','id,conversation_id,attachment_id,description,author,enabled,created_at,updated_at',scope),
   vault_media_labels:spec('vault',async db=>{await ensureChatAttachmentSchema(db);await ensureMediaLabelSchema(db);},'coast_vault_media_labels','source_key,display_name,updated_at',"source_key IN (SELECT 'image:'||conversation_id||':'||id FROM chat_attachments WHERE kind='image' AND "+scope+")")
 };
 export const DETAIL_MODULES=Object.freeze(Object.fromEntries(Object.entries(tables).map(([name,s])=>[name,s.module])));

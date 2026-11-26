@@ -85,7 +85,7 @@ export function auditFullArchiveCompleteness(archive) {
 
 export function createSettings({ storage, shell, chat, router, toast, memory, daily, dogtalk }) {
   const preferences = () => storage.read().preferences;
-  const transfer = createTransferSettings({ router, toast, chat });
+  const transfer = createTransferSettings({ router, toast, chat, storage });
 
   router.register('wolf', () => {
     const currentModel = chat.getProfile().current_chat_model;
@@ -243,7 +243,7 @@ export function createSettings({ storage, shell, chat, router, toast, memory, da
     toast('正在采集已验证的 V2 资料…', 3000);
     const signature = preferences().ownerSignature || preferences().ownerName || '屋主';
     const prefs=preferences();
-    const safeRunKeys=['recentTurns','contextBudget','outputLength','maxOutputTokens','creativity','streamingEnabled','soilBudget','seedCooldownTurns','worldbookEnabled','worldbookLimit','memoryLimit'];
+    const safeRunKeys=['recentTurns','contextBudget','outputLength','maxOutputTokens','creativity','streamingEnabled','soilBudget','seedCooldownTurns','worldbookEnabled','worldbookLimit','memoryLimit','toolCallLimit','replySequenceMaxMessages','replySequenceToolBudget','replySequenceTokenBudget'];
     const run_control=Object.fromEntries(Object.entries(storage.read().runControl||{}).filter(([key,value])=>safeRunKeys.includes(key)&&['string','number','boolean'].includes(typeof value)));
     const device={exported_from:'pwa',current_app_version:currentAppVersion(),signature,theme:prefs.theme,userBubble:prefs.userBubble,accent:prefs.accent,run_control};
     const result=await saveOfflineV2({applicationId:'com.elementeracoast.source',filename:`elementera-coast-offline-${timestampLabel()}.zip`,ownerLabel:signature,device});
@@ -337,7 +337,7 @@ export function createSettings({ storage, shell, chat, router, toast, memory, da
     }
     if (name === 'export-v2') {
       try {
-        const manifest=await saveArchiveV2({applicationId:'com.elementeracoast.source',filename:`elementera-coast-v2-${timestampLabel()}.zip`});
+        const manifest=await saveArchiveV2({applicationId:'com.elementeracoast.source',filename:`elementera-coast-v2-${timestampLabel()}.zip`,deviceBasic:storage.read().runControl});
         toast('V2 已生成 · '+manifest.records.length+' 条记录；覆盖范围详见清单，尚非全量恢复包。',6500);
       } catch(error) { if(error.name!=='AbortError')toast('V2 导出失败：'+error.message,6500); }
       return;

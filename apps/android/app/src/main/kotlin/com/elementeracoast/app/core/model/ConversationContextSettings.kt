@@ -29,10 +29,25 @@ data class ConversationContextSettings(
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     @SerialName("local_model_tools_enabled") val localModelToolsEnabled: Boolean = false,
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
-    @SerialName("local_model_write_enabled") val localModelWriteEnabled: Boolean = false
+    @SerialName("local_model_write_enabled") val localModelWriteEnabled: Boolean = false,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("sticker_send_enabled") val stickerSendEnabled: Boolean = false,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("sticker_add_enabled") val stickerAddEnabled: Boolean = false,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("reply_sequence_enabled") val replySequenceEnabled: Boolean = false,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("reply_sequence_max_messages") val replySequenceMaxMessages: Int? = null,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("reply_sequence_tool_budget") val replySequenceToolBudget: Int? = null,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("reply_sequence_token_budget") val replySequenceTokenBudget: Int? = null
 ) {
     fun normalized(): ConversationContextSettings = copy(
         realityFields = realityFields.filter(RealityContextFields.all::contains).distinct(),
+        replySequenceMaxMessages = replySequenceMaxMessages?.takeIf { it in 1..20 },
+        replySequenceToolBudget = replySequenceToolBudget?.takeIf { it in 0..128 },
+        replySequenceTokenBudget = replySequenceTokenBudget?.takeIf { it in 1..1000000 },
         weatherCity = weatherCity.replace(Regex("[\\r\\n\\t]+"), " ").trim().take(80)
     )
 

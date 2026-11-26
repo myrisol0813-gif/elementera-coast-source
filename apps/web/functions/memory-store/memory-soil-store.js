@@ -56,10 +56,12 @@ export async function readSoil(db, id) {
   return soilFromRow(await first(db, 'SELECT * FROM conversation_soils WHERE conversation_id = ?', [conversationId]));
 }
 
-export async function writeSoil(db, id, value = {}, { automatic = false, provenance = {}, snapshotBranch = null } = {}) {
+export async function writeSoil(db, id, value = {}, { automatic = false, provenance = {}, snapshotBranch = null, expectedRevision = null, expectedHistoryUpdatedAt = null } = {}) {
   await ensureMemorySchema(db);
   const conversationId = sanitizeId(id, 'conversation');
   const current = await readSoil(db, conversationId);
+  if(expectedRevision!==null&&current.revision!==expectedRevision)
+    throw new MemoryStoreError('reply_sequence_soil_stale','整理期间纸条已变化，未覆盖原数据。',409);
   if (automatic && (current.manual_locked || !current.auto_refresh_enabled)) {
     throw new MemoryStoreError('soil_locked', '整理当前对话的纸条已由屋主手动锁定。', 409);
   }
@@ -91,7 +93,9 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
     actor = ?, surface = ?, model_label = ?, model_nickname = ?, symbol = ?, display_author = ?,
     source_conversation_id = ?, source_turn_id = ?, tool_call_id = ?,
     revision = revision + 1, updated_at = ?
-    WHERE conversation_id = ?`;
+    WHERE conversation_id = ?
+    AND (? IS NULL OR revision = ?)
+    AND (? IS NULL OR EXISTS(SELECT 1 FROM conversation_states WHERE conversation_id=? AND updated_at=?))`;
   const updateValues = [
     next.current_text,
     JSON.stringify(next.afterthoughts),
@@ -114,6 +118,8 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
     clip(provenance.tool_call_id, 240) || null,
     timestamp,
     conversationId,
+    expectedRevision,expectedRevision,
+    expectedHistoryUpdatedAt,conversationId,expectedHistoryUpdatedAt,
   ];
   const snapshot = snapshotBranch ? soilSnapshotStatement(db, conversationId, snapshotBranch, {
     current_text: next.current_text,
@@ -121,12 +127,16 @@ export async function writeSoil(db, id, value = {}, { automatic = false, provena
     revision: current.revision + 1,
     model_label: identity.model_label || '',
     display_author: identity.display_author || '',
-  }) : null;
+  }, expectedRevision!==null?{updatedAt:timestamp,revision:current.revision+1}:null) : null;
   if (snapshot) {
     // D1 batch commits both writes, or neither.
-    await db.batch([db.prepare(updateSql).bind(...updateValues), snapshot]);
+    const results=await db.batch([db.prepare(updateSql).bind(...updateValues), snapshot]);
+    if(expectedRevision!==null&&results[0]?.meta?.changes!==1)
+      throw new MemoryStoreError('reply_sequence_soil_stale','整理期间纸条或聊天记录已变化，未覆盖原数据。',409);
   } else {
-    await run(db, updateSql, updateValues);
+    const result=await run(db, updateSql, updateValues);
+    if(expectedRevision!==null&&result?.meta?.changes!==1)
+      throw new MemoryStoreError('reply_sequence_soil_stale','整理期间纸条或聊天记录已变化，未覆盖原数据。',409);
   }
   return readSoil(db, conversationId);
 }

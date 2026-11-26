@@ -111,15 +111,15 @@ function webSearchDeskDetails(section = {}) {
   ].join('');
 }
 
-function attachmentDeskDetails(section = {}) {
+function attachmentDeskDetails(section = {}, {previous=false}={}) {
   const delivered = Array.isArray(section.delivered) ? section.delivered : [];
   const notDelivered = Array.isArray(section.not_delivered) ? section.not_delivered : [];
   const rows = [
-    ...delivered.map((item) => `<section class="desk-record"><header><strong>${escapeHtml(item.name || item.id || '附件')}</strong><small>${item.type === 'image' ? '图片' : '文件'} · 已递给模型 · ${escapeHtml(item.mode === 'vision' ? '识图' : '文本读取')}</small></header></section>`),
+    ...delivered.map((item) => `<section class="desk-record"><header><strong>${escapeHtml(item.name || item.id || '附件')}</strong><small>${item.type === 'image' ? '图片' : '文件'} · 已递给模型 · ${escapeHtml(['vision','image'].includes(item.mode) ? '像素已递入，不代表已识别' : '文本读取')}</small></header></section>`),
     ...notDelivered.map((item) => `<section class="desk-record"><header><strong>${escapeHtml(item.name || item.id || '附件')}</strong><small>未递给模型</small></header>${paragraph('原因：', item.reason || 'unknown')}</section>`),
   ];
   return [
-    `<p><b>本轮上传：</b>${Math.max(0, Number(section.uploaded) || 0)} 个 · <b>递给模型：</b>${Math.max(0, Number(section.delivered_to_model) || 0)} 个</p>`,
+    `<p><b>${previous?'前序原件：':'本轮上传：'}</b>${Math.max(0, Number(section.uploaded) || 0)} 个 · <b>递给模型：</b>${Math.max(0, Number(section.delivered_to_model) || 0)} 个</p>`,
     `<p><b>识图：</b>${section.vision?.supported ? '当前模型支持' : '当前模型未确认支持'} · 已递图片 ${Math.max(0, Number(section.vision?.images_delivered) || 0)} 张</p>`,
     rows.length ? `<div class="desk-record-list">${rows.join('')}</div>` : emptyNote(),
   ].join('');
@@ -170,8 +170,9 @@ export function createDesk({ router, toast }) {
     root.innerHTML = `<button type="button" data-action="desk:open"><span>${escapeHtml(state.slip.summary || '本轮递给模型')}</span><small>${escapeHtml(state.slip.comfort || '')}</small><b>›</b></button>`;
     root.hidden = false;
   }
-  function deskView() {
-    const slip = state.slip || {};
+  async function deskView({historical=null}={}) {
+    const slip = historical?.slip || state.slip || {};
+    const echo=historical?await readModelMetadataStatus(historical.conversationId,historical.messageId).catch(()=>({...emptyModelEcho(),status_label:'读取失败'})):state.modelEcho;
     const current = slip.current_message || { label: '当前消息', status: '未递给', content: '' };
     const recent = slip.recent_context || { label: '最近上下文', status: '未递给', status_detail: '0 轮', messages: [] };
     const custom = slip.custom_instructions || { label: '核心自定义', status: '未递给', length: 0, content: '' };
@@ -230,10 +231,11 @@ export function createDesk({ router, toast }) {
       !workbench.prompt_delivered && !workbench.furniture?.length && !workbench.tool_results?.length ? emptyNote() : '',
     ].join('');
     return {
-      title: '本轮上下文预览', subtitle: slip.comfort || '只看这一轮实际递给模型的内容', className: 'desk-slip-panel',
+      title: historical?'历史桌面':'本轮上下文预览', subtitle: historical?`消息 ${historical.messageId} · 原始递送回执`:slip.comfort || '只看这一轮实际递给模型的内容', className: 'desk-slip-panel',
       body: `<section class="desk-slip-list">
         ${deskRow(current.label || '当前消息', current.status, [sourceNote(current.description), deskText(current.content), current.content ? '' : emptyNote()].join(''))}
         ${deskRow(recent.label || '最近上下文', recentStatus, [sourceNote(recent.description), recentDeskDetails(recent.messages)].join(''))}
+        ${Array.isArray(slip.reply_sequence_previous)&&slip.reply_sequence_previous.length?deskRow('本组前序回复','已递给 · '+slip.reply_sequence_previous.length+' 条',slip.reply_sequence_previous.map(v=>deskText(v.content,'消息 '+v.message_id)+(v.media_receipt?attachmentDeskDetails(v.media_receipt,{previous:true}):'')).join('')):''}
         ${deskRow(contextBudget.label || '上下文预算', budgetStatus, [
           paragraph('本轮估算 token：', contextBudget.estimated_tokens),
           paragraph('comfort ceiling：', contextBudget.comfort_ceiling),
@@ -264,7 +266,7 @@ export function createDesk({ router, toast }) {
           : webSearch.used ? `已搜索 · ${Number(webSearch.requests || 0)} 次 · ${Number(webSearch.results_count || 0)} 来源` : '可用 · 本轮未调用', webSearchDeskDetails(webSearch)) : ''}
         ${deskRow(workbench.label || '工作台 / 工具回执', workbench.status, workbenchDetail)}
         ${deskRow(external.label || '外部入口消息', external.status, [sourceNote(external.description), deskText(external.content || '本轮没有递入外部材料。')].join(''))}
-        ${modelEchoRow(state.modelEcho)}
+        ${modelEchoRow(echo)}
       </section>`,
     };
   }
@@ -381,6 +383,10 @@ export function createDesk({ router, toast }) {
     renderStatus();
     captureModelEcho(history, conversationId).catch(() => undefined);
   }
+  function openMessageDesk(conversationId,variant) {
+    if(!conversationId||!variant?.id||!variant.desk_slip)return;
+    return router.open('desk-slip',{historical:{conversationId,messageId:variant.id,slip:structuredClone(variant.desk_slip)}});
+  }
   function handlerFor(context) {
     const handlerName = HANDLER_NAMES[context.eventType];
     if (handlerName === 'handleAction') return handleAction;
@@ -397,5 +403,5 @@ export function createDesk({ router, toast }) {
   function refresh() { renderStatus(); }
   function destroy() { modelEchoRevision += 1; state.slip = null; state.modelEcho = emptyModelEcho(); renderStatus(); }
 
-  return Object.freeze({ id: 'desk', priority: 60, mountOrder: 50, ownsRoute, ownsEvent, handleEvent, mount, refresh, destroy, handleAction, handleSubmit, captureSlip, captureModelEcho, onConversationChanged, renderStatus, open: () => router.open('desk-slip') });
+  return Object.freeze({ id: 'desk', priority: 60, mountOrder: 50, ownsRoute, ownsEvent, handleEvent, mount, refresh, destroy, handleAction, handleSubmit, captureSlip, captureModelEcho, onConversationChanged, renderStatus, openMessageDesk, open: () => router.open('desk-slip') });
 }

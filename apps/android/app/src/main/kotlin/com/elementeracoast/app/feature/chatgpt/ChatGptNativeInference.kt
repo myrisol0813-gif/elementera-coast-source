@@ -8,6 +8,7 @@ import com.elementeracoast.app.core.remote.RemoteDeskSlip
 import com.elementeracoast.app.core.remote.RemoteFurnitureRun
 import com.elementeracoast.app.core.remote.RemoteNativeChatContext
 import com.elementeracoast.app.core.remote.RemoteNativeToolResult
+import com.elementeracoast.app.core.network.TurnToolPolicy
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
@@ -86,10 +87,10 @@ internal fun normalizeNativeInput(obj: JsonObject): JsonObject {
 
 /** Keep trusted image readback outside the function-call output. */
 internal fun nativeSavedImageContinuation(name:String,result:RemoteNativeToolResult):Pair<Boolean,List<JsonObject>> {
-    if(name!="image_generate"||!result.ok)return false to emptyList()
+    if(name !in setOf("image_generate","sticker_send")||!result.ok)return false to emptyList()
     val receipt=runCatching{Json.parseToJsonElement(result.output).jsonObject}.getOrNull()
     if(receipt?.get("ok")?.jsonPrimitive?.booleanOrNull!=true||receipt["status"]?.jsonPrimitive?.contentOrNull!="saved")return false to emptyList()
-    return true to result.privateContinuation.take(1).map(::normalizeNativeInput)
+    return true to if(name=="image_generate")result.privateContinuation.take(1).map(::normalizeNativeInput)else emptyList()
 }
 
 internal data class NativeCoastToolCall(val callId: String, val name: String)
@@ -309,7 +310,9 @@ internal class ChatGptNativeInference(
                 var usageTotal = NativeChatUsage()
                 var callsMade = 0
 
-                for (round in 0..12) {
+                val toolLimit = minOf(TurnToolPolicy.normalize(request.settings["toolCallLimit"]?.toIntOrNull()), (prepared.limitations?.maxToolsPerTurn ?: 12).coerceIn(1,TurnToolPolicy.MAX_CALLS))
+                for (round in 0..toolLimit) {
+                    val finalOnly = TurnToolPolicy.finalOnly(round, callsMade, toolLimit)
                     val body = buildJsonObject {
                         put("model", model)
                         put("input", JsonArray(history))
@@ -320,13 +323,13 @@ internal class ChatGptNativeInference(
                         })
                         // Preserve stateless reasoning across tool-call continuation on older Responses backends.
                         put("include", buildJsonArray { add("reasoning.encrypted_content") })
-                        if (instructions.isNotBlank()) put("instructions", instructions)
+                        if (instructions.isNotBlank() || finalOnly) put("instructions", instructions + if (finalOnly) "\n本轮工具额度已结束。仅根据已取得的结果正常完成正文，不再调用工具。" else "")
                         // A direct request to search must use search, not merely offer it as optional.
                         // Force only the provider-hosted tool; this never selects Coast write tools.
                         if (searchEnabled && round == 0) put("tool_choice", buildJsonObject {
                             put("type", "web_search")
                         })
-                        if (prepared.tools.isNotEmpty() || searchEnabled) put("tools", buildJsonArray {
+                        if (!finalOnly && (prepared.tools.isNotEmpty() || searchEnabled)) put("tools", buildJsonArray {
                             if (prepared.tools.isNotEmpty()) add(buildJsonObject {
                                 put("type", "namespace")
                                 put("name", "coast")
@@ -435,7 +438,11 @@ internal class ChatGptNativeInference(
                         trySend(NativeChatEvent.Delta(missingText))
                     }
                     val pending = output.toolCalls
-                    if (pending.isEmpty()) {
+                    if (pending.isEmpty() || finalOnly) {
+                        if (pending.isNotEmpty()) {
+                            text.append(TurnToolPolicy.LIMIT_NOTICE)
+                            trySend(NativeChatEvent.Delta(TurnToolPolicy.LIMIT_NOTICE))
+                        }
                         if (text.isBlank()&&!generatedImageSaved) {
                             val detail = when {
                                 output.hasReasoning -> "只有推理输出"
@@ -475,9 +482,6 @@ internal class ChatGptNativeInference(
                         ))
                         break
                     }
-                    if (round == 12 || callsMade + pending.size > 12) throw CoastApiException(
-                        CoastApiErrorKind.Model, "tool_limit", "这轮的工具调用超过 12 次。"
-                    )
                     history.addAll(output.items)
                     val privateImages=mutableListOf<JsonObject>()
                     for (tool in pending) {
@@ -492,6 +496,11 @@ internal class ChatGptNativeInference(
                                 put("name", name)
                                 put("arguments", tool["arguments"]?.jsonPrimitive?.contentOrNull ?: "{}")
                             })
+                        }
+                        if (!TurnToolPolicy.canExecute(callsMade, toolLimit)) {
+                            history.add(nativeCoastToolOutput(requestedTool, TurnToolPolicy.LIMIT_RECEIPT))
+                            trySend(NativeChatEvent.Tool(callId, name, false))
+                            continue
                         }
                         val result = coast.executeNativeChatGptTool(request, params, callsMade++)
                         runs.addAll(result.furnitureRuns)

@@ -51,6 +51,8 @@ export function createTools({ storage, router, toast, memory }) {
       body: `<p class="feature-note">最近聊天轮数与上下文 token budget 都保存在本机；前端提供推荐值，但不设置人为上限。</p>
         ${group('上下文舒服区间', numberRow('recentTurns', '最近聊天轮数', 1, null, 1, '默认 8；常用可试 8 / 12 / 20。没有应用层上限，实际可递入量取决于当前窗口历史、token budget 与模型上下文窗口。', 'recent-turns') + budgetRow())}
         ${group('输出偏好', choiceRow('outputLength', '回答长度', '“偏短”最多 700 tokens；“自然”和“长信”使用下方上限。') + numberRow('maxOutputTokens', '最大输出 token', 64, 65536, 64, '这是单次回复允许生成的最高值，不代表每次一定用满；自动标题固定为 40。') + choiceRow('creativity', '表达倾向'))}
+        ${group('模型运行与额度', numberRow('toolCallLimit','单轮普通工具调用上限',1,128,1,'默认24；手动1—128。达到上限后停止新调用并完成正文；上下文、供应商及付费媒体防重复保护另计。','tool-limit'))}
+        ${group('连续回复预算', numberRow('replySequenceMaxMessages','单组回复上限',1,20,1,'默认3条；实际还受剩余历史容量约束。','reply-budget') + numberRow('replySequenceToolBudget','累计工具调用预算',0,128,1,'默认24次；0表示不允许普通工具。','reply-budget') + numberRow('replySequenceTokenBudget','累计 token 预算',1,1000000,1,'默认48000；累计供应商回执，非精确费用上限。','reply-budget') + noteRow('功能状态','预算可先保存；真实连续执行接通前不会自动发送额外消息。'))}
         ${group('生成方式', choiceRow('streamingEnabled', '流式输出', '开启后普通聊天走真实流式输出；登岛信继续使用稳定 JSON 路径。'))}
         ${group('整理当前对话的纸条与记忆', numberRow('soilBudget', '当前对话纸条最多字数', 300, 4000, 100, '过长时只做普通截断。') + noteRow('当前对话纸条整理频率', '每个完成轮次自动整理一次。') + numberRow('seedCooldownTurns', '线索冷却轮数', 0, 8, 1, '同一条已召回记忆在冷却轮次内不重复递入。') + numberRow('memoryLimit', '本轮记忆召回上限', 0, 12, 1, '还会由舒服区间继续裁纸。'))}
         ${group('词典', choiceRow('worldbookEnabled', '世界书 / 词典') + numberRow('worldbookLimit', '每轮最多词条', 0, 6, 1, '没有命中时不会递空块。'))}
@@ -121,6 +123,20 @@ export function createTools({ storage, router, toast, memory }) {
   }
 
   function handleChange(name, target) {
+    if(name==='reply-budget'){
+      const ranges={replySequenceMaxMessages:[1,20],replySequenceToolBudget:[0,128],replySequenceTokenBudget:[1,1000000]};
+      const range=ranges[target.name];if(!range)return;
+      const raw=target.value.trim(),value=Number(raw);
+      if(!raw||!Number.isSafeInteger(value)||value<range[0]||value>range[1]){
+        target.value=String(storage.read().runControl[target.name]);toast(`请输入 ${range[0]}—${range[1]} 的整数，原设置保留。`);return;
+      }
+      storage.update(state=>{state.runControl[target.name]=value;});target.value=String(value);toast('连续回复默认预算已保存。');return;
+    }
+    if (name === 'tool-limit') {
+      const raw=target.value.trim();const value=raw===''?24:Number(raw);
+      if(!Number.isSafeInteger(value)||value<1||value>128){target.value=String(storage.read().runControl.toolCallLimit);toast('请输入1—128的整数，原设置保留。');return;}
+      storage.update(state=>{state.runControl.toolCallLimit=value;});target.value=String(value);toast('单轮工具次数已保存，下一轮生效。');return;
+    }
     if (name === 'recent-turns') {
       commitNumber(target, {
         field: 'recentTurns', fallback: RECENT_TURNS_DEFAULT, min: 1, label: '最近聊天轮数', unit: ' 轮',

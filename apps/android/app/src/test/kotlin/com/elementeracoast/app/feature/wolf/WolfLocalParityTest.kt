@@ -16,13 +16,14 @@ class WolfLocalParityTest {
         )
     }
 
-    @Test fun basicSettingsExposeExactlyElevenActiveFieldsAndNoOldRunControl() {
-        assertEquals(11, BasicSettings.activeFieldNames.size)
+    @Test fun basicSettingsExposeExactlyFifteenActiveFieldsAndNoOldRunControl() {
+        assertEquals(15, BasicSettings.activeFieldNames.size)
         assertEquals(
             listOf(
                 "recentTurns", "contextBudget", "outputLength", "maxOutputTokens", "creativity",
                 "streamingEnabled", "soilBudget", "seedCooldownTurns", "worldbookEnabled",
-                "worldbookLimit", "memoryLimit"
+                "worldbookLimit", "memoryLimit", "toolCallLimit",
+                "replySequenceMaxMessages", "replySequenceToolBudget", "replySequenceTokenBudget"
             ), BasicSettings.activeFieldNames
         )
         val names = BasicSettings.activeFieldNames.joinToString(" ")
@@ -38,12 +39,16 @@ class WolfLocalParityTest {
         store.setTheme(CoastThemePreset.BlushModelPartner)
         store.setUserBubble("#f5e8ee")
         store.setAccent("#ec4899")
-        store.updateBasic { it.copy(memoryLimit = 5, outputLength = "long") }
+        store.updateBasic { it.copy(memoryLimit = 5, outputLength = "long", toolCallLimit = 37, replySequenceMaxMessages=7,replySequenceToolBudget=0,replySequenceTokenBudget=12345) }
         val reloaded = WolfStore(persistence).state.value
         assertEquals("Human Owner", reloaded.profile.nickname)
         assertEquals(CoastThemePreset.BlushModelPartner, reloaded.appearance.theme)
         assertEquals("#f5e8ee", reloaded.appearance.userBubbleHex)
         assertEquals(5, reloaded.basic.memoryLimit)
+        assertEquals(37, reloaded.basic.toolCallLimit)
+        assertEquals(7,reloaded.basic.replySequenceMaxMessages)
+        assertEquals(0,reloaded.basic.replySequenceToolBudget)
+        assertEquals(12345,reloaded.basic.replySequenceTokenBudget)
         assertEquals("long", reloaded.basic.outputLength)
     }
 

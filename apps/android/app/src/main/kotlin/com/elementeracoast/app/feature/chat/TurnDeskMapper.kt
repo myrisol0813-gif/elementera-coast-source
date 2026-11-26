@@ -14,7 +14,7 @@ internal object TurnDeskMapper {
     fun toUi(value: RemoteDeskSlip): TurnDeskReceipt = TurnDeskReceipt(
         summary = value.summary.ifBlank { "本轮递给模型" },
         comfort = value.comfort,
-        sections = listOf(
+        sections = listOfNotNull(
             section(
                 title = value.currentMessage.label.ifBlank { "当前消息" },
                 status = value.currentMessage.status,
@@ -27,6 +27,18 @@ internal object TurnDeskMapper {
                 description = value.recentContext.description,
                 details = value.recentContext.messages.map { message ->
                     TurnDeskDetail(if (message.role == "assistant") "模型伙伴回复" else "用户消息", message.content)
+                }
+            ),
+            if(value.replySequencePrevious.isEmpty())null else section(
+                title = "本组前序回复",
+                status = "已递给 · ${value.replySequencePrevious.size} 条",
+                description = "当前独立回复实际读取的本组前序正式消息。",
+                details = value.replySequencePrevious.flatMap{message->
+                    listOf(TurnDeskDetail("消息 "+message.messageId,message.content.ifBlank{"（纯媒体回复）"})) +
+                        (message.mediaReceipt?.let{receipt->
+                            listOf(TurnDeskDetail("前序原件","已保存 ${receipt.uploaded} · 已递给 ${receipt.deliveredToModel}")) +
+                                attachmentDetails(receipt)
+                        }?:emptyList())
                 }
             ),
             section(
@@ -246,7 +258,11 @@ internal object TurnDeskMapper {
             title = "本轮附件",
             status = "上传 ${value.uploaded} · 递给 ${value.deliveredToModel}",
             description = "",
-            details = buildList {
+            details = attachmentDetails(value)
+        )
+    }
+
+    private fun attachmentDetails(value:RemoteDeskAttachments):List<TurnDeskDetail> = buildList {
                 add(TurnDeskDetail(
                     "识图",
                     if (value.vision.supported) "当前模型支持 · 已递 ${value.vision.imagesDelivered} 张"
@@ -268,8 +284,6 @@ internal object TurnDeskMapper {
                         "未递给模型 · ${item.reason.ifBlank { "unknown" }}"
                     ))
                 }
-            }
-        )
     }
 
     private fun webSearchSection(value: RemoteDeskWebSearch?): TurnDeskSection? {

@@ -92,6 +92,10 @@ object GlobalArchive {
                     put("soilBudget", state.basic.soilBudget); put("seedCooldownTurns", state.basic.seedCooldownTurns)
                     put("worldbookEnabled", state.basic.worldbookEnabled); put("worldbookLimit", state.basic.worldbookLimit)
                     put("memoryLimit", state.basic.memoryLimit)
+                    put("toolCallLimit", state.basic.toolCallLimit)
+                    put("replySequenceMaxMessages", state.basic.replySequenceMaxMessages)
+                    put("replySequenceToolBudget", state.basic.replySequenceToolBudget)
+                    put("replySequenceTokenBudget", state.basic.replySequenceTokenBudget)
                 })
             }
         }

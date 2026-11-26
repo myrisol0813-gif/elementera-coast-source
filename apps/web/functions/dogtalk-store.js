@@ -532,11 +532,36 @@ export async function dogtalkContext(db, value = {}, _query = '', _options = {})
   if (dogtalk.read_mode !== 'read_now') {
     return { context: '', dogtalk, selected: false, reason: 'not_readable_now' };
   }
-  await consumeReadNow(db, dogtalk);
+  if(_options.consume_direct!==false){
+    const stamp=Date.now();
+    const result=await run(db,`UPDATE coast_mystic_dogtalk SET read_mode='keep_private',last_read_at=?,updated_at=?
+      WHERE id=? AND owner=? AND read_mode='read_now' AND updated_at=? AND body=? AND true_core=? AND weather=? AND status IN ('draft','saved')`,
+      [stamp,stamp,dogtalk.id,OWNER,Date.parse(dogtalk.updated_at),dogtalk.body,dogtalk.true_core,dogtalk.weather]);
+    if(result?.meta?.changes!==1)throw new DogtalkStoreError('dogtalk_read_changed','私人草稿授权或内容已经改变；未递送。',409);
+  }
   return {
     context: formatMysticDogtalk(dogtalk),
     dogtalk,
     selected: true,
     reason: 'read_now',
   };
+}
+
+
+// Called only after the server claims the first independent reply. An
+// explicit submission is bound to the exact persisted human-message reference.
+// Subsequent replies use the actually delivered text, never this live drawer.
+export async function prepareReplyGroupDogtalk(db,{conversationId,turnId,user,submission}){
+  const scope={room_scope:'conversation',conversation_id:conversationId};
+  if(!submission)return dogtalkContext(db,scope,'',{consume_direct:true});
+  if(submission.room_scope!=='conversation'||submission.conversation_id!==conversationId||
+     submission.read_mode!=='read_now'||!submission.snapshot_id||user?.dogtalk_snapshot_id!==submission.snapshot_id)
+    throw new DogtalkStoreError('dogtalk_group_scope_mismatch','私人草稿不属于本组原用户消息。',409);
+  const existing=await listMysticDogtalkSnapshots(db,{...scope,source_ids:[turnId]});
+  if(existing.length)throw new DogtalkStoreError('dogtalk_group_already_submitted','该轮已有私人草稿历史；不会重新读取或消费，请新开一轮。',409);
+  const result=await saveMysticDogtalkWithSnapshot(db,{...submission,...scope},{source_type:'turn',source_id:turnId});
+  const snapshot=result.snapshot;
+  if(snapshot?.id!==submission.snapshot_id||snapshot.conversation_id!==conversationId||snapshot.source_id!==turnId||snapshot.read_mode!=='read_now')
+    throw new DogtalkStoreError('dogtalk_group_snapshot_mismatch','私人草稿历史身份未确认；未递送。',409);
+  return {context:formatMysticDogtalk(snapshot),selected:true,reason:'read_now',snapshot_id:snapshot.id};
 }

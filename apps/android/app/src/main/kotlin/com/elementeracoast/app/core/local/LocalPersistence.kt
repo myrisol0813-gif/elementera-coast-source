@@ -38,4 +38,11 @@ class SharedPreferencesLocalPersistence(context: Context) : LocalPersistence {
     override fun get(key: String, default: String): String = preferences.getString(key, default) ?: default
     override fun put(key: String, value: String) { preferences.edit().putString(key, value).apply() }
     override fun remove(key: String) { preferences.edit().remove(key).apply() }
+
+    // A single synchronous preferences editor commit, not a generic archive transaction.
+    internal fun putDeviceSettings(values:Map<String,String>){
+        val editor=preferences.edit()
+        values.forEach{(k,v)->editor.putString(k,v)}
+        require(editor.commit()){"设备基本设置写入未确认。"}
+    }
 }

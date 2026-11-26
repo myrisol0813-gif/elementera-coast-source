@@ -2,6 +2,7 @@
 // completeness across concurrent edits; unimplemented modules stay unavailable.
 import { archiveV2Transport } from './archive-v2-transport.js';
 import { ArchiveV2ZipWriter } from './archive-v2-zip.js';
+import {captureDeviceBasic,DEVICE_SETTINGS_ID} from './archive-v2-device-settings.js';
 const utf8=new TextEncoder(),CHUNK=1048576;
 const sha=async b=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',b))].map(x=>x.toString(16).padStart(2,'0')).join('');
 const check=(ok,msg)=>{if(!ok)throw Error(msg);};
@@ -21,7 +22,7 @@ const detailKeys={
 };
 const detailId=async(kind,row)=>kind+':'+await sha(utf8.encode(JSON.stringify((detailKeys[kind]||['id']).map(k=>{check(row[k]!=null,'missing detail identity: '+kind);return row[k];}))));
 const linkChat=r=>r.conversation_id?['chat/'+r.conversation_id]:[];
-export async function collectArchiveV2({sink,applicationId,transport=archiveV2Transport,onProgress=()=>{}}){
+export async function collectArchiveV2({sink,applicationId,transport=archiveV2Transport,onProgress=()=>{},deviceBasic=null}){
   const zip=new ArchiveV2ZipWriter(sink);
   try{
     const caps=await transport.capabilities();
@@ -67,6 +68,7 @@ export async function collectArchiveV2({sink,applicationId,transport=archiveV2Tr
       available(module);
       for await(const row of pages(c=>transport.detailPage(kind,c))){
         const deps=linkChat(row);
+        if(kind==='vault_stickers')deps.push('attachments/'+row.attachment_id);
         if(kind.startsWith('library_')&&kind!=='library_books')deps.push('library/'+await detailId('library_books',{id:row.book_id}));
         if(kind==='daily_comments'||kind==='daily_likes')deps.push('daily/'+await detailId('daily_moments',{id:row.moment_id}));
         const key=await detailId(kind,row);
@@ -74,6 +76,7 @@ export async function collectArchiveV2({sink,applicationId,transport=archiveV2Tr
         else await record(module,key,kind,row,deps);
       }
     }
+    if(deviceBasic!==null)await record('appearance',DEVICE_SETTINGS_ID,'device_basic_settings',{basic_settings:captureDeviceBasic(deviceBasic)});
     // Fail closed rather than silently dropping dependencies that were not collected.
     check(manifest.records.every(r=>r.dependencies.every(d=>records.has(d))),'archive contains an uncollected dependency');
     await transport.validateManifest(manifest);

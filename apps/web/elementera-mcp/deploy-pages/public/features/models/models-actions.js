@@ -6,6 +6,7 @@ export function createModelsActions({
   toast,
   getSearchDraft,
   setSearch,
+  setKind = () => {},
   fetchCatalog,
   quickPicker,
 }) {
@@ -48,6 +49,15 @@ export function createModelsActions({
       return router.open('models');
     }
     if (name === 'quick-select') return selectChat(target.dataset.id, { closePicker: true });
+    if (name === 'kind') {setKind(target.dataset.id);return router.refresh({preserveScroll:false});}
+    if (name === 'quick-tab') return quickPicker.selectTab(target.dataset.id);
+    if (name === 'title-preset') return quickPicker.setTitle(target.dataset.id);
+    if (name === 'quick-image') {
+      await chat.updateProfile({current_image_model:target.dataset.id});
+      quickPicker.renderQuickPicker();
+      toast('图片模型已切换',2000);
+      return;
+    }
     if (name === 'refresh') {
       try {
         await fetchCatalog(true);
@@ -71,7 +81,8 @@ export function createModelsActions({
     }
   }
 
-  async function handleSubmit(name) {
+  async function handleSubmit(name, target) {
+    if (name === 'title') return quickPicker.setTitle(target?.querySelector?.('[name=display_name]')?.value);
     if (name !== 'search') return;
     setSearch(getSearchDraft().trim());
     await router.refresh({ preserveScroll: false });

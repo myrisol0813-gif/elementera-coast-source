@@ -84,7 +84,8 @@ fun ChatWindow(
     var soilOpen by rememberSaveable { mutableStateOf(false) }
     var selectedSoil by remember(state.activeConversationId) { mutableStateOf<com.elementeracoast.app.core.model.ThoughtSoilSnapshot?>(null) }
     var soilTreasureTarget by remember(state.activeConversationId) { mutableStateOf<com.elementeracoast.app.core.model.ThoughtSoilSnapshot?>(null) }
-    var deskOpen by rememberSaveable { mutableStateOf(false) }
+    var deskOpen by rememberSaveable(state.activeConversationId) { mutableStateOf(false) }
+    var selectedHistoryDesk by remember(state.activeConversationId){mutableStateOf<ChatMessage?>(null)}
     var drawerOpen by rememberSaveable(state.activeConversationId) { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
@@ -229,6 +230,7 @@ fun ChatWindow(
                         treasureTarget = state.messages.firstOrNull { it.id == action.messageId }
                     } else onMessageAction(action)
                 },
+                onOpenHistoryDesk={message->selectedHistoryDesk=message;deskOpen=true},
                 onFootprint = { message ->
                     val model = message.modelId ?: "未知模型"
                     val source = message.generationSource ?: "unknown"
@@ -319,7 +321,9 @@ fun ChatWindow(
         )
     }
 
-    if (deskOpen && deskReceipt != null) TurnDeskBottomSheet(receipt = deskReceipt, onDismiss = { deskOpen = false })
+    val openedDesk=selectedHistoryDesk?.deskReceipt?:deskReceipt
+    if (deskOpen && openedDesk != null) TurnDeskBottomSheet(receipt = openedDesk, historical=selectedHistoryDesk!=null,
+        onDismiss = { deskOpen = false;selectedHistoryDesk=null })
 
     if (avatarDialogOpen) {
         AvatarPickerDialog(
@@ -337,7 +341,7 @@ fun ChatWindow(
             message = message,
             voiceClips = voiceClips.filter {
                 it.messageId == message.remoteVariantId ||
-                    (it.messageId.isBlank() && it.turnId == message.turnId &&
+                    (message.replyGroupTail && it.messageId.isBlank() && it.turnId == message.turnId &&
                         message.role == MessageRole.Assistant)
             },
             repository = sideRooms,

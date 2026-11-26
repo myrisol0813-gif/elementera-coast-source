@@ -17,7 +17,7 @@ assert.doesNotMatch(generation, /function contextMessages\(/);
 assert.doesNotMatch(generation, /function chatRequestContext\(/);
 assert.doesNotMatch(generation, /item\.event === 'delta'/);
 
-for (const name of ['chat-context.js', 'chat-request-context.js', 'chat-stream-flow.js', 'chat-local-time.js', 'chat-title-landing.js']) {
+for (const name of ['chat-context.js', 'chat-request-context.js', 'chat-stream-flow.js', 'chat-local-time.js', 'chat-title-landing.js', 'chat-reply-sequence-generation.js']) {
   const source = await read(`${base}${name}`);
   assert.ok(source.trim(), `${name} must exist`);
   assert.ok(worker.includes(`/public/features/chat/${name}`), `${name} must be precached`);
@@ -32,3 +32,9 @@ const stream = await read(`${base}chat-stream-flow.js`);
 for (const event of ['desk_slip', 'meta', 'delta', 'usage', 'done', 'error']) assert.ok(stream.includes(`'${event}'`));
 assert.match(stream, /stream_incomplete/);
 console.log(`chat-generation-split: ok (${lines} lines)`);
+
+const sequenceGeneration=await read(`${base}chat-reply-sequence-generation.js`);
+assert.match(sequenceGeneration,/export function createReplySequenceGenerator/);
+assert.match(sequenceGeneration,/reply_committed/);
+assert.match(sequenceGeneration,/sequenceId/);
+assert.ok(sequenceGeneration.trimEnd().split('\n').length<=160);

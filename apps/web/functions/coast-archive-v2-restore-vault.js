@@ -1,5 +1,6 @@
 import { ensureTreasureSchema,resolveTreasureSource,TREASURE_LIMITS } from './coast-vault-treasures.js';
 import { ensureMediaLabelSchema,MEDIA_LABEL_LIMIT } from './coast-vault-media-labels.js';
+import { ensureStickerLibrarySchema,verifyStickerArchiveOriginal } from './sticker-library.js';
 import { ensureChatAttachmentSchema } from './chat-attachments.js';
 import { ensureChatSchema } from './chat-store.js';
 import { digestBytes } from './coast-archive-v2-chunks.js';
@@ -31,6 +32,16 @@ export async function prepareArchiveVault(db,r,raw,manifest){
    await ensureTreasureSchema(db);
    const priorKey=await db.prepare('SELECT id FROM '+table+' WHERE source_key=?').bind(v.source_key).first();
    check(!priorKey||priorKey.id===v.id,'treasure source already collected under another id');
+ }else if(kind==='vault_stickers'){
+   fields='id,conversation_id,attachment_id,description,author,enabled,created_at,updated_at'.split(',');
+   table='coast_sticker_library';key='id';
+   check(exact(v,fields)&&id(v.id)&&v.id.startsWith('sticker_')&&id(v.conversation_id)&&id(v.attachment_id)&&r.id===await identity(kind,v.id),'invalid sticker identity');
+   check(text(v.description,500)&&v.description.trim()===v.description&&v.description.length>0&&!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(v.description)&&['owner','assistant'].includes(v.author)&&[0,1].includes(v.enabled)&&stamp(v.created_at)&&stamp(v.updated_at)&&v.updated_at>=v.created_at,'invalid sticker record');
+   check(r.dependencies.length===2&&r.dependencies.includes('chat/'+v.conversation_id)&&r.dependencies.includes('attachments/'+v.attachment_id),'missing sticker original dependency');
+   await ensureStickerLibrarySchema(db);
+   try{await verifyStickerArchiveOriginal(db,v.conversation_id,v.attachment_id);}catch{check(false,'restore verified sticker original first');}
+   const prior=await db.prepare('SELECT id FROM '+table+' WHERE conversation_id=? AND attachment_id=?').bind(v.conversation_id,v.attachment_id).first();
+   check(!prior||prior.id===v.id,'sticker source already registered under another id');
  }else if(kind==='vault_media_labels'){
    fields=['source_key','display_name','updated_at'];table='coast_vault_media_labels';key='source_key';
    check(exact(v,fields)&&typeof v.source_key==='string'&&v.source_key.length<=327&&v.source_key.startsWith('image:')&&r.id===await identity(kind,v.source_key)&&stamp(v.updated_at)&&text(v.display_name,MEDIA_LABEL_LIMIT)&&v.display_name.trim()===v.display_name&&v.display_name.length>0&&!/[\x00-\x1f\x7f]/.test(v.display_name),'invalid media label');

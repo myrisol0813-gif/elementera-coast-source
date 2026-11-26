@@ -16,6 +16,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -204,6 +205,30 @@ class SideRoomsRepository(private val config: CoastApiConfig, private val client
     // Shared Coast Vault API. No local duplicate database and no paid audio regeneration.
     suspend fun chatSearch(query: String, cursor: String = ""): JsonObject =
         request("/api/chat/search?q=" + encode(query) + "&cursor=" + encode(cursor))
+
+    suspend fun vaultUploadSticker(name:String,mime:String,description:String,bytes:ByteArray):JsonObject=withContext(Dispatchers.IO){
+        require(bytes.size in 1..8*1024*1024&&mime in setOf("image/png","image/jpeg","image/webp")&&description.trim().length in 1..500)
+        val request=Request.Builder().url(config.url("/api/coast-vault/stickers/upload"))
+            .header("X-Sticker-Name",encode(name)).header("X-Sticker-Description",encode(description.trim()))
+            .header("Content-Type",mime).post(bytes.toRequestBody(mime.toMediaType())).build()
+        client.newCall(request).execute().use{response->
+            val data=runCatching{json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject}.getOrNull()
+            if(!response.isSuccessful||data?.get("ok")?.toString()!="true")throw IllegalStateException("上传未确认完成，请刷新目录核对。")
+            requireNotNull(data)
+        }
+    }
+    suspend fun vaultStickers(query:String="",cursor:String=""):JsonObject =
+        request("/api/coast-vault/stickers?q="+encode(query)+"&cursor="+encode(cursor))
+    suspend fun vaultRegisterSticker(cid:String,aid:String,description:String):JsonObject =
+        request("/api/coast-vault/stickers","POST",kotlinx.serialization.json.buildJsonObject{
+            put("conversation_id",cid);put("attachment_id",aid);put("description",description)
+        })
+    suspend fun vaultUpdateSticker(id:String,description:String?=null,enabled:Boolean?=null):JsonObject =
+        request("/api/coast-vault/stickers/"+path(id),"PATCH",kotlinx.serialization.json.buildJsonObject{
+            if(description!=null)put("description",description)
+            if(enabled!=null)put("enabled",enabled)
+        })
+    suspend fun vaultRemoveSticker(id:String):JsonObject=request("/api/coast-vault/stickers/"+path(id),"DELETE")
 
     suspend fun vaultMedia(kind: String = "all", query: String = "", cursor: String = ""): JsonObject =
         request("/api/coast-vault/media?kind=" + encode(kind) + "&q=" + encode(query) + "&cursor=" + encode(cursor))

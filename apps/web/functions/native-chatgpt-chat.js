@@ -1,4 +1,5 @@
 import { attachImageTool } from './chat-image-tool.js';
+import { attachStickerTools } from './chat-sticker-tool.js';
 import { assembleCleanContext } from './context-assemble-clean.js';
 import { resolveChatAttachmentsForModel, applyChatAttachmentsToMessages, attachmentDeskReceipt } from './chat-attachments.js';
 import { ChatStoreError, getConversation, readConversationState, sanitizeId } from './chat-store.js';
@@ -6,7 +7,7 @@ import { json, methodNotAllowed, readJson, sameOrigin } from './http.js';
 import { saveModelEcho } from './model-metadata-api.js';
 
 const BODY_BYTES = 2 * 1024 * 1024;
-const MAX_TOOLS_PER_TURN = 12;
+import { normalizeToolCallLimit } from './turn-tool-policy.js';
 
 function assertRequest(request) {
   if (request.method !== 'POST') return methodNotAllowed('POST');
@@ -88,6 +89,7 @@ async function contextFromRequest(env, value, { preview = false } = {}) {
     chatModel:model,enabled:value.image_tool_enabled===true&&typeof value.image_model_id==='string'&&!!value.image_model_id,
     expectedImageModel:value.image_model_id??null,visionOverride:true
   });
+  assembled=await attachStickerTools(env,assembled,{conversationId,turnId,messageId:String(value.message_id||''),roomType:room.room_type});
   return { assembled, conversationId, turnId, model };
 }
 
@@ -112,7 +114,7 @@ export async function prepareNativeChatGpt(request, env) {
     tools,
     desk_slip: { ...assembled.deskSlip(), ...(resolved ? {attachments:attachmentDeskReceipt(resolved)} : {}) },
     // This is not a hidden clamp: unsupported OpenRouter-hosted tools are excluded.
-    limitations:{ hosted_openrouter_search:false, max_tools_per_turn:MAX_TOOLS_PER_TURN },
+    limitations:{ hosted_openrouter_search:false, max_tools_per_turn:normalizeToolCallLimit(value.settings?.toolCallLimit) },
     selected_memory_ids:assembled.selected_memory_ids,
   });
 }

@@ -124,3 +124,56 @@ test('native three-turn history restores old desk receipts without dropping or i
  const updated=JSON.parse((await readArchiveChat(dst,c.id)).history_json);
  assert.deepEqual(updated.turns.map(t=>t.assistant.variantsByUserVariant['0'][0].desk_slip),slips);
 });
+
+test('reply group with real sticker original and individual desk receipts round trips local to cloud to cloud without replay',async()=>{
+ const src=new D1Database(),dst=new D1Database(),returned=new D1Database();
+ const c=await createConversation(src,'Group migration','main');
+ const {uploadOwnerSticker,deliverSticker}=await import('../functions/sticker-library.js');
+ const {acquireReplyRun,reserveReplyStep,claimReplyStep,reserveReplyMedia,commitReplyStep,settleReplyRun,isReplyRunActive,claimReplyRunSoil}=await import('../functions/chat-reply-run.js');
+ const {readConversationState}=await import('../functions/chat-store.js');
+ const bytes=Uint8Array.from([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,6,0,0,0]);
+ const sticker=await uploadOwnerSticker(src,{name:'group.png',mime:'image/png',description:'group fixture',bytes},{actor:'owner'});
+ const identity={conversationId:c.id,turnId:'group-turn',userVariantId:'group-user',sequenceId:'group-run'};
+ await writeConversationState(src,c.id,{context_settings:{reply_sequence_enabled:true,reply_sequence_max_messages:2,reply_sequence_tool_budget:3,reply_sequence_token_budget:9000,sticker_send_enabled:true},turns:[{id:identity.turnId,user:{variants:[{id:identity.userVariantId,content:'hello'}]}}]});
+ assert.equal(await acquireReplyRun(src,identity,{maxMessages:2,toolBudget:3,tokenBudget:9000}),true);
+ assert.equal(await reserveReplyStep(src,identity,'group-first',0),true);
+ assert.ok(await claimReplyStep(src,identity,'group-first'));
+ assert.equal(await reserveReplyMedia(src,identity,'group-first','fixture/chat',{sticker:true}),true);
+ await assert.rejects(()=>readArchiveChat(src,c.id),e=>e.type==='archive_reply_run_active');
+ await deliverSticker(src,{conversation_id:c.id,turn_id:identity.turnId,user_variant_id:identity.userVariantId,message_id:'group-first',sticker_id:sticker.id},{allowSend:true,sequenceId:identity.sequenceId});
+ assert.ok(await commitReplyStep(src,identity,'group-first',{id:'group-first',content:'',finish_reason:'stop',model_id:'fixture/chat',desk_slip:{summary:'first desk'}},{tool_calls:1,total_tokens:100,continue_requested:true}));
+ assert.equal(await reserveReplyStep(src,identity,'group-second',1),true);
+ assert.ok(await claimReplyStep(src,identity,'group-second'));
+ assert.ok(await commitReplyStep(src,identity,'group-second',{id:'group-second',content:'next message',finish_reason:'stop',model_id:'fixture/chat',desk_slip:{summary:'second desk',reply_sequence_previous:[{message_id:'group-first',content:''}]}},{tool_calls:0,total_tokens:100,continue_requested:false}));
+ assert.equal(await settleReplyRun(src,identity,'completed'),true);
+ assert.ok(await readArchiveChat(src,c.id));
+ const original=(await readConversationState(src,c.id)).turns[0].assistant.variantsByUserVariant['0'];
+ const attachment=original[0].attachments[0];
+ const at='2026-11-26T00:00:00Z';
+ async function transfer(from,to,workspace){
+   const chat=await readArchiveChat(from,c.id),media=await readArchiveAttachment(from,c.id,attachment.id);
+   const iso=v=>v==null?null:new Date(v).toISOString();
+   const data=workspace==='local'?{conversation:{...chat.conversation,created_at:iso(chat.conversation.created_at),updated_at:iso(chat.conversation.updated_at),title_manual:!!chat.conversation.title_manual,title_generated_at:iso(chat.conversation.title_generated_at)},history:{...JSON.parse(chat.history_json),conversation_id:c.id,archive_storage_updated_at:chat.history_updated_at}}:chat;
+   const root=await encodeRecordObject({kind:workspace==='local'?'local_chat':'chat',data});
+   const leaf=await encodeRecordObject({kind:'attachment',data:media.metadata});
+   const objects=[root,leaf,media];
+   const records=[{module:'chat',id:c.id,record_object:root.descriptor.object_sha256,media_objects:[],dependencies:[]},{module:'attachments',id:attachment.id,record_object:leaf.descriptor.object_sha256,media_objects:[media.descriptor.object_sha256],dependencies:['chat/'+c.id]}];
+   const manifest={format:'elementera-coast-archive',version:2,workspace,application_id:'com.elementeracoast.source',exported_at:at,modules:MODULES.map(module=>({module,coverage:records.some(r=>r.module===module)?'partial':'unavailable',count:records.filter(r=>r.module===module).length})),records,objects:objects.map(o=>o.descriptor)};
+   const session=await createArchiveSession(to);
+   for(const o of objects){await registerArchiveObject(to,session.id,o.descriptor);for(let i=0;i<o.chunks.length;i++)await putArchiveChunk(to,session.id,o.descriptor.object_sha256,i,o.chunks[i]);}
+   assert.equal((await restoreArchiveChatGroup(to,session.id,manifest,c.id,false)).committed,false);
+   assert.equal((await restoreArchiveChatGroup(to,session.id,manifest,c.id,true)).committed,true);
+   const history=await readConversationState(to,c.id);
+   const group=history.turns[0].assistant.variantsByUserVariant['0'];
+   assert.deepEqual(group.map(v=>v.id),['group-first','group-second']);
+   assert.deepEqual(group.map(v=>v.reply_sequence),original.map(v=>v.reply_sequence));
+   assert.deepEqual(group.map(v=>v.desk_slip),original.map(v=>v.desk_slip));
+   assert.deepEqual(group[0].attachments,original[0].attachments);
+   assert.equal(group[0].content,'');assert.equal(history.context_settings.reply_sequence_tool_budget,3);
+   assert.equal(history.context_settings.reply_sequence_token_budget,9000);
+   assert.deepEqual(new Uint8Array((await getChatAttachmentRecord(to,c.id,attachment.id)).data),bytes);
+   assert.equal(await isReplyRunActive(to,c.id),false);
+   assert.equal(await claimReplyRunSoil(to,c.id,identity.sequenceId,'group-second'),false);
+ }
+ await transfer(src,dst,'local');await transfer(dst,returned,'backend');
+});

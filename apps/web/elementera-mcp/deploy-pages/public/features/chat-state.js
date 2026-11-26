@@ -1,4 +1,5 @@
 import { clamp, id, sanitizeId } from '../core/dom.js';
+import { selectedReplyGroup, replyAlternatives } from './chat/chat-reply-sequence.js';
 
 const MAX_ERROR_DETAIL = 12000;
 const MAX_TURNS = 400;
@@ -63,6 +64,12 @@ export function normalizeContextSettings(value = {}) {
     ...(raw.cross_window_auto === true ? { cross_window_auto: true } : {}),
     ...(raw.local_model_tools_enabled === true ? { local_model_tools_enabled: true } : {}),
     ...(raw.local_model_write_enabled === true ? { local_model_write_enabled: true } : {}),
+    ...(raw.sticker_send_enabled === true ? { sticker_send_enabled: true } : {}),
+    ...(raw.sticker_add_enabled === true ? { sticker_add_enabled: true } : {}),
+    ...(raw.reply_sequence_enabled === true ? { reply_sequence_enabled: true } : {}),
+    ...(Number.isSafeInteger(raw.reply_sequence_max_messages) && raw.reply_sequence_max_messages >= 1 && raw.reply_sequence_max_messages <= 20 ? { reply_sequence_max_messages: raw.reply_sequence_max_messages } : {}),
+    ...(Number.isSafeInteger(raw.reply_sequence_tool_budget) && raw.reply_sequence_tool_budget >= 0 && raw.reply_sequence_tool_budget <= 128 ? { reply_sequence_tool_budget: raw.reply_sequence_tool_budget } : {}),
+    ...(Number.isSafeInteger(raw.reply_sequence_token_budget) && raw.reply_sequence_token_budget >= 1 && raw.reply_sequence_token_budget <= 1000000 ? { reply_sequence_token_budget: raw.reply_sequence_token_budget } : {}),
     weather_city: String(raw.weather_city || '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80),
   };
 }
@@ -103,6 +110,8 @@ function normalizeAttachments(value, assistantId) {
     const createdAt = typeof item?.created_at === 'string' ? item.created_at : now();
     if (!item?.id || !name || !storageKey) return null;
     const imageGeneration=type==='image'?normalizeImageGeneration(item.image_generation,assistantId):null;
+    const sd=item.sticker_delivery;
+    const stickerDelivery=type==='image'&&assistantId&&sd?.message_id===assistantId&&typeof sd.sticker_id==='string'&&/^sticker_[A-Za-z0-9_.:-]{1,152}$/.test(sd.sticker_id)?{message_id:assistantId,sticker_id:sd.sticker_id}:null;
     return {
       id: idValue,
       type,
@@ -112,6 +121,7 @@ function normalizeAttachments(value, assistantId) {
       storage_key: storageKey,
       created_at: createdAt,
       ...(imageGeneration?{image_generation:imageGeneration}:{}),
+      ...(stickerDelivery?{sticker_delivery:stickerDelivery}:{}),
     };
   }).filter(Boolean);
 }
@@ -145,6 +155,8 @@ export function normalizeVariant(value = {}, prefix = 'variant') {
   const furnitureRuns = normalizeFurnitureRuns(value.furniture_runs);
   const attachments = normalizeAttachments(value.attachments, prefix.startsWith('assistant') ? value.id : null);
   const deskSlip = normalizeDeskSlip(value.desk_slip);
+  const seq=value.reply_sequence;
+  const sequence=prefix.startsWith('assistant')&&seq&&typeof seq.id==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(seq.id)&&Number.isInteger(seq.index)&&seq.index>=0&&seq.index<20?{id:seq.id,index:seq.index}:null;
   return {
     id: sanitizeId(value.id || id(prefix), prefix),
     content: value.content,
@@ -157,6 +169,7 @@ export function normalizeVariant(value = {}, prefix = 'variant') {
     ...(usage ? { usage } : {}),
     ...(modelEcho ? { model_echo: modelEcho } : {}),
     ...(finishReason ? { finish_reason: finishReason } : {}),
+    ...(sequence ? { reply_sequence: sequence } : {}),
     ...(generationSource ? { generation_source: generationSource } : {}),
     ...(dogtalkSnapshotId ? { dogtalk_snapshot_id: dogtalkSnapshotId } : {}),
     ...(messageSource ? { message_source: messageSource } : {}),
@@ -257,12 +270,21 @@ export function activeBranch(turn) {
   };
 }
 
+// Resolve only messages in the currently selected alternative.
+export function selectedAssistantMessage(turn, messageId) {
+  const branch=activeBranch(turn);
+  if (!messageId) return branch.assistant;
+  return selectedReplyGroup(branch.assistants,branch.assistantIndex).find(v=>v.id===messageId) || null;
+}
+
 export function activeMessages(value) {
   const result = [];
   for (const turn of normalizeState(value).turns) {
     const branch = activeBranch(turn);
     if (branch.user?.content) result.push({ role: 'user', ...branch.user });
-    if (branch.assistant?.content) result.push({ role: 'assistant', ...branch.assistant });
+    for (const assistant of selectedReplyGroup(branch.assistants, branch.assistantIndex)) {
+      if (assistant.content) result.push({ role: 'assistant', ...assistant });
+    }
   }
   return result;
 }
@@ -346,6 +368,11 @@ export function appendAssistantVariant(value, turnId, variantValue) {
   const branch = activeBranch(turn);
   const variant = normalizeVariant(variantValue, 'assistant');
   const list = turn.assistant.variantsByUserVariant[branch.key] || [];
+  // A grouped history cannot be truncated through its first message.
+  // Ordinary ungrouped histories retain the existing rolling limit.
+  if (list.length >= MAX_VARIANTS && (variant.reply_sequence || list.some(v=>v.reply_sequence))) {
+    return { state, turn: null, variant: null, assistantIndex: -1, userIndex: -1 };
+  }
   list.push(variant);
   turn.assistant.variantsByUserVariant[branch.key] = list.slice(-MAX_VARIANTS);
   const assistantIndex = turn.assistant.variantsByUserVariant[branch.key].length - 1;
@@ -407,8 +434,13 @@ export function deleteActiveAssistantVariant(value, turnId) {
   if (!turn) return state;
   const branch = activeBranch(turn);
   if (!branch.assistants.length) return state;
-  branch.assistants.splice(branch.assistantIndex, 1);
-  turn.assistant.activeByUserVariant[branch.key] = Math.min(branch.assistantIndex, Math.max(0, branch.assistants.length - 1));
+  const alternatives = replyAlternatives(branch.assistants);
+  const selected = alternatives.findIndex(a => a.messages.includes(branch.assistant));
+  const removed = new Set(alternatives[selected].messages.map(v=>v.id));
+  const remaining = branch.assistants.filter(v=>!removed.has(v.id));
+  const choices = replyAlternatives(remaining);
+  turn.assistant.variantsByUserVariant[branch.key] = remaining;
+  turn.assistant.activeByUserVariant[branch.key] = choices[Math.min(selected, choices.length-1)]?.activeIndex ?? 0;
   state.updated_at = now();
   return state;
 }
@@ -423,21 +455,24 @@ export function switchVariant(value, turnId, kind, direction) {
   }
   if (kind === 'assistant') {
     const branch = activeBranch(turn);
-    if (branch.assistants.length > 1) {
-      turn.assistant.activeByUserVariant[branch.key] = (branch.assistantIndex + delta + branch.assistants.length) % branch.assistants.length;
+    const alternatives = replyAlternatives(branch.assistants);
+    if (alternatives.length > 1) {
+      const current = alternatives.findIndex(a=>a.messages.includes(branch.assistant));
+      const next = (current + delta + alternatives.length) % alternatives.length;
+      turn.assistant.activeByUserVariant[branch.key] = alternatives[next].activeIndex;
     }
   }
   state.updated_at = now();
   return state;
 }
 
-export function toggleAssistantReaction(value, turnId, reaction) {
+export function toggleAssistantReaction(value, turnId, reaction, messageId) {
   const state = normalizeState(value);
   const turn = state.turns.find((item) => item.id === turnId);
   if (!turn || !['liked', 'favorite'].includes(reaction)) return state;
-  const branch = activeBranch(turn);
-  if (!branch.assistant) return state;
-  branch.assistant[reaction] = !branch.assistant[reaction];
+  const assistant=selectedAssistantMessage(turn,messageId);
+  if (!assistant) return state;
+  assistant[reaction] = !assistant[reaction];
   state.updated_at = now();
   return state;
 }

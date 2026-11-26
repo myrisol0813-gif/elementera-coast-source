@@ -68,6 +68,7 @@ internal object OfflineV2HtmlArchive {
                 "local_chat","chat"->item.data["conversation"].obj().s("title").ifBlank{item.row.id}
                 "library_books","library_chapters"->item.data.s("title").ifBlank{item.kind}
                 "library_notes"->when(item.data.s("kind")){"highlight"->"划线";"annotation"->"批注";else->"读后感"}
+                "vault_stickers"->"表情包 · "+item.data.s("description").take(45)
                 "vault_treasures"->item.data.s("display_name").ifBlank{item.data.s("kind")+" · "+item.data.s("source_id")}
                 else->item.data.s("name").ifBlank{item.data.s("title").ifBlank{item.kind+" · "+item.row.id}}
             }
@@ -98,7 +99,7 @@ internal object OfflineV2HtmlArchive {
                             val conv=data["conversation"].obj()
                             val history=(data["history"]?:data["history_json"]).let { if(it is JsonPrimitive)Json.parseToJsonElement(it.content).obj() else it.obj() }
                             fun variant(v:JsonObject,role:String,label:String)=buildString{
-                                append("<article class=\"$role\"><small>"+esc(label)+" · "+esc(time(v.s("created_at")))+"</small><p>"+esc(v.s("content"))+"</p>")
+                                append("<article class=\"$role\"><small>"+esc(label)+" · "+esc(v.s("id"))+" · "+esc(time(v.s("created_at")))+"</small><p>"+esc(v.s("content"))+"</p>")
                                 for(a in v["attachments"].arr()){
                                     val ref=a.obj();val m=attachments[conv.s("id")+":"+ref.s("id")]
                                     if(m!=null)append(media(m)) else {append("<p>原件未归档："+esc(ref.s("name"))+"</p>");warnings.add("聊天附件未匹配："+ref.s("id"))}
@@ -111,7 +112,15 @@ internal object OfflineV2HtmlArchive {
                                 history["turns"].arr().forEachIndexed{j,t->
                                     val turn=t.obj();append("<section><h2>第 "+(j+1)+" 轮</h2>")
                                     turn["user"].obj()["variants"].arr().forEachIndexed{k,v->append(variant(v.obj(),"user","用户变体 "+(k+1)))}
-                                    turn["assistant"].obj()["variantsByUserVariant"].obj().forEach{(k,vs)->vs.arr().forEachIndexed{l,v->append(variant(v.obj(),"assistant","分支 $k · 回复 "+(l+1)))}}
+                                    turn["assistant"].obj()["variantsByUserVariant"].obj().forEach{(k,vs)->
+                                        val groups=linkedMapOf<String,Int>()
+                                        vs.arr().forEachIndexed{l,v->
+                                            val obj=v.obj();val seq=obj["reply_sequence"].obj();val sid=seq.s("id")
+                                            val version=groups.getOrPut(if(sid.isBlank())"single:$l" else "group:$sid"){groups.size+1}
+                                            val label="分支 $k · 版本 $version"+if(sid.isNotBlank())" · 连续回复 "+((seq["index"]?.jsonPrimitive?.intOrNull?:0)+1)+" · 组 "+sid else ""
+                                            append(variant(obj,"assistant",label))
+                                        }
+                                    }
                                     append("</section>")
                                 }
                                 val linked=files.filter{it.kind=="voice"&&it.data.s("conversation_id")==conv.s("id")}
@@ -146,6 +155,12 @@ internal object OfflineV2HtmlArchive {
                             val id=data.s("book_id")
                             books.firstOrNull{it.data.s("id")==id}?.let{append("<a href=\""+it.index+".html\">返回阅读档案</a>")}
                             data.s("body").split(Regex("\\n\\s*\\n")).map{it.trim()}.filter{it.isNotEmpty()}.forEachIndexed{i,para->append("<p id=\"p-$i\">"+esc(para)+"</p>")}
+                        }
+                        item.kind=="vault_stickers"->buildString {
+                            val m=attachments[data.s("conversation_id")+":"+data.s("attachment_id")]
+                            append("<article><small>"+(if(data.s("author")=="assistant")"模型添加" else "屋主添加")+" · "+(if(data.s("enabled")=="1")"已启用" else "已停用")+" · "+esc(time(data.s("created_at")))+"</small><p>"+esc(data.s("description"))+"</p>")
+                            if(m!=null)append(media(m)) else {append("<p>原件未归档。</p>");warnings.add("表情包原件未匹配："+data.s("id"))}
+                            append("</article>")
                         }
                         item.kind=="vault_treasures"->buildString {
                             append("<article><small>"+esc(data.s("kind"))+" · "+esc(time(data.s("created_at")))+"</small><p>"+esc(data.s("excerpt"))+"</p><p>"+esc(data.s("notes"))+"</p>")

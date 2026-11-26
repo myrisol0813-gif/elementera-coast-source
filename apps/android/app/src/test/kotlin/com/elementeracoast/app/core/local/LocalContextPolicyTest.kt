@@ -29,4 +29,12 @@ class LocalContextPolicyTest {
         assertTrue(r.over);assertTrue(r.messages.first().content.contains(body))
         assertEquals("最新",r.visible.last().content)
     }
+    @Test fun comfortTrimsWholeHumanTurnsNotIndividualGroupReplies(){
+        val input=listOf(RemoteChatMessage("user","旧".repeat(1500)),RemoteChatMessage("assistant","答".repeat(1500)),
+            RemoteChatMessage("user","group question"),RemoteChatMessage("assistant","one"),RemoteChatMessage("assistant","two"),RemoteChatMessage("assistant","three"),RemoteChatMessage("user","current"))
+        val result=LocalContextPolicy.assemble("","","","",emptyList(),emptyList(),"","","","",input,1800)
+        assertEquals(listOf("group question","one","two","three","current"),result.visible.map{it.content})
+        assertEquals(2,result.trimmed)
+    }
+
 }

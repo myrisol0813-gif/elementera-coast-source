@@ -95,6 +95,7 @@ internal fun ChatRecordsScreen(
 @Composable
 internal fun BasicSettingsScreen(settings: BasicSettings, store: WolfStore, onSnackbar: (String) -> Unit) {
     var recentTurnsText by remember(settings.recentTurns) { mutableStateOf(settings.recentTurns.toString()) }
+    var toolLimitText by remember(settings.toolCallLimit) { mutableStateOf(settings.toolCallLimit.toString()) }
     var contextBudgetText by remember(settings.contextBudget) { mutableStateOf(if(settings.contextBudget==0)"" else settings.contextBudget.toString()) }
 
     fun commitRecentTurns() {
@@ -169,6 +170,27 @@ internal fun BasicSettingsScreen(settings: BasicSettings, store: WolfStore, onSn
                 listOf("stable" to "稳定", "balanced" to "自然", "expansive" to "发散").forEach { (value, label) ->
                     ChoiceRow(label, settings.creativity == value) { store.updateBasic { it.copy(creativity = value) } }
                 }
+            }
+        }
+        item {
+            SettingGroup("模型运行与额度") {
+                OutlinedTextField(toolLimitText,{toolLimitText=it.filter(Char::isDigit).take(3)},modifier=Modifier.fillMaxWidth(),singleLine=true,
+                    label={Text("单轮普通工具调用上限")},suffix={Text("次")},
+                    supportingText={Text("默认24；可手动输入1—128。达到上限后保留已完成操作，停止新调用并完成正文。上下文、供应商及付费媒体防重复保护另计。")},
+                    keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number,imeAction=ImeAction.Done))
+                androidx.compose.material3.TextButton(onClick={
+                    val parsed=toolLimitText.toIntOrNull()
+                    if(parsed==null||parsed !in 1..128) onSnackbar("请输入1—128的整数，原设置保留。")
+                    else {store.updateBasic{it.copy(toolCallLimit=parsed)};onSnackbar("本机设置已保存，下一轮生效。")}
+                }){Text("保存工具次数")}
+            }
+        }
+        item {
+            SettingGroup("连续回复预算") {
+                ReplyBudgetField("单组回复上限",settings.replySequenceMaxMessages,1..20,false){value->store.updateBasic{it.copy(replySequenceMaxMessages=requireNotNull(value))}}
+                ReplyBudgetField("累计工具调用预算",settings.replySequenceToolBudget,0..128,false){value->store.updateBasic{it.copy(replySequenceToolBudget=requireNotNull(value))}}
+                ReplyBudgetField("累计 token 预算",settings.replySequenceTokenBudget,1..1000000,false){value->store.updateBasic{it.copy(replySequenceTokenBudget=requireNotNull(value))}}
+                Text("预算可先保存；真实连续执行尚未开放。累计 token 不是精确费用上限。",style=MaterialTheme.typography.bodySmall)
             }
         }
         item {
@@ -262,4 +284,19 @@ internal fun DiagnosticsScreen(shell: CoastShellState, wolf: WolfState) {
             }
         }
     }
+}
+
+
+/** Explicit commit, so typing an intermediate number never changes a live quota. */
+@Composable
+internal fun ReplyBudgetField(title:String,value:Int?,range:IntRange,inherit:Boolean,enabled:Boolean=true,onSave:(Int?)->Unit){
+    var draft by remember(value){mutableStateOf(value?.toString().orEmpty())}
+    val parsed=draft.toIntOrNull()
+    val valid=if(draft.isBlank())inherit else parsed!=null&&parsed in range
+    OutlinedTextField(value=draft,onValueChange={draft=it.filter(Char::isDigit).take(7)},
+        modifier=Modifier.fillMaxWidth(),singleLine=true,enabled=enabled,isError=!valid,
+        label={Text(title)},placeholder={if(inherit)Text("继承基本设置")},
+        supportingText={Text("${range.first}—${range.last}"+if(inherit)"；留空继承" else "")},
+        keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number,imeAction=ImeAction.Done))
+    androidx.compose.material3.TextButton(enabled=enabled&&valid&&draft!=value?.toString().orEmpty(),onClick={onSave(parsed)}){Text("保存")}
 }

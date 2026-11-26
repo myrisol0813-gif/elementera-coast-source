@@ -19,7 +19,7 @@ export async function writeOfflineV2(source,sink,{ownerLabel='屋主',device=nul
   const key=x=>x.row.module+'/'+x.row.id;
   const load=async row=>{const d=objects.get(row.record_object);if(!d)throw Error('归档记录缺失');const raw=new Uint8Array(d.size);let at=0;for await(const b of objectChunks(d)){raw.set(b,at);at+=b.length;}if(at!==d.size)throw Error('归档记录不完整');return JSON.parse(decoder.decode(raw));};
   const text=async(path,value)=>{const raw=utf8.encode(value);await zip.entry(path,raw.length,chunks(raw));};
-  const title=x=>x.kind==='chat'||x.kind==='local_chat'?x.data.conversation?.title||x.row.id:x.kind==='library_notes'?({highlight:'划线',annotation:'批注',reflection:'读后感'})[x.data.kind]||'笔迹':x.data.title||x.data.name||(x.kind==='vault_treasures'?x.data.kind+' · '+x.data.source_id:x.kind+' · '+x.row.id);
+  const title=x=>x.kind==='chat'||x.kind==='local_chat'?x.data.conversation?.title||x.row.id:x.kind==='vault_stickers'?'表情包 · '+String(x.data.description||'').slice(0,45):x.kind==='library_notes'?({highlight:'划线',annotation:'批注',reflection:'读后感'})[x.data.kind]||'笔迹':x.data.title||x.data.name||(x.kind==='vault_treasures'?x.data.kind+' · '+x.data.source_id:x.kind+' · '+x.row.id);
   const link=(x,hash='')=>x.index+'.html'+hash;
   try{
     for(const [i,row] of manifest.records.entries()){
@@ -48,8 +48,8 @@ export async function writeOfflineV2(source,sink,{ownerLabel='屋主',device=nul
       const {data}=await load(x.row);let body='';
       if(x.row.module==='chat'){
         const conv=data.conversation||{},history=data.history||(typeof data.history_json==='string'?JSON.parse(data.history_json):data.history_json)||{};
-        const article=(v,role,label)=>'<article class="'+role+'"><small>'+esc(v.display_author||(role==='user'?ownerLabel:'模型伙伴'))+' · '+esc(label)+' · '+esc(time(v.created_at))+'</small><p>'+esc(v.content)+'</p>'+(v.attachments||[]).map(a=>{const m=attachments.get(conv.id+':'+a.id);if(m)return mediaHtml(m);warnings.push('聊天附件未匹配：'+a.id);return '<p>原件未归档：'+esc(a.name||a.id)+'</p>';}).join('')+(v.desk_slip?'<details><summary>历史桌面</summary><pre>'+esc(JSON.stringify(v.desk_slip))+'</pre></details>':'')+(v.usage||v.model_echo?'<details><summary>模型回波与用量</summary><pre>'+esc(JSON.stringify({usage:v.usage,model_echo:v.model_echo}))+'</pre></details>':'')+'</article>';
-        body=(history.turns||[]).map((t,j)=>'<section><h2>第 '+(j+1)+' 轮</h2>'+(t.user?.variants||[]).map((v,i)=>article(v,'user','用户变体 '+(i+1))).join('')+Object.entries(t.assistant?.variantsByUserVariant||{}).map(([k,vs])=>vs.map((v,i)=>article(v,'assistant','分支 '+k+' · 回复 '+(i+1))).join('')).join('')+'</section>').join('');
+        const article=(v,role,label)=>'<article class="'+role+'"><small>'+esc(v.display_author||(role==='user'?ownerLabel:'模型伙伴'))+' · '+esc(label)+' · '+esc(v.id||'')+' · '+esc(time(v.created_at))+'</small><p>'+esc(v.content)+'</p>'+(v.attachments||[]).map(a=>{const m=attachments.get(conv.id+':'+a.id);if(m)return mediaHtml(m);warnings.push('聊天附件未匹配：'+a.id);return '<p>原件未归档：'+esc(a.name||a.id)+'</p>';}).join('')+(v.desk_slip?'<details><summary>历史桌面</summary><pre>'+esc(JSON.stringify(v.desk_slip))+'</pre></details>':'')+(v.usage||v.model_echo?'<details><summary>模型回波与用量</summary><pre>'+esc(JSON.stringify({usage:v.usage,model_echo:v.model_echo}))+'</pre></details>':'')+'</article>';
+        body=(history.turns||[]).map((t,j)=>'<section><h2>第 '+(j+1)+' 轮</h2>'+(t.user?.variants||[]).map((v,i)=>article(v,'user','用户变体 '+(i+1))).join('')+Object.entries(t.assistant?.variantsByUserVariant||{}).map(([k,vs])=>(()=>{const groups=new Map();return vs.map((v,i)=>{const seq=v.reply_sequence;const key=seq?.id?'group:'+seq.id:'single:'+i;if(!groups.has(key))groups.set(key,groups.size+1);const label='分支 '+k+' · 版本 '+groups.get(key)+(seq?.id?' · 连续回复 '+(Number(seq.index)+1)+' · 组 '+seq.id:'');return article(v,'assistant',label);}).join('');})()).join('')+'</section>').join('');
         const voice=(voiceLinks.get(conv.id)||[]).flatMap(v=>byRecord.get(key(v))||[]);if(voice.length)body+='<section><h2>本窗口语音</h2>'+voice.map(m=>mediaHtml(m)).join('')+'</section>';
       }else if(x.kind==='library_books'){
         const cover=covers.get(data.id),m=cover&&byRecord.get(key(cover))?.[0],chs=chapters.get(data.id)||[],ns=notes.get(data.id)||[];
@@ -62,6 +62,10 @@ export async function writeOfflineV2(source,sink,{ownerLabel='屋主',device=nul
       }else if(x.kind==='library_chapters'){
         const book=books.get(data.book_id);
         body=(book?'<a href="'+link(book)+'">返回阅读档案</a>':'')+String(data.body||'').split(/\n\s*\n/).map(s=>s.trim()).filter(Boolean).map((s,i)=>'<p id="p-'+i+'">'+esc(s)+'</p>').join('');
+      }else if(x.kind==='vault_stickers'){
+        const m=attachments.get(data.conversation_id+':'+data.attachment_id);
+        if(!m)warnings.push('表情包原件未匹配：'+data.id);
+        body='<article><small>'+esc(data.author==='assistant'?'模型添加':'屋主添加')+' · '+(Number(data.enabled)===1?'已启用':'已停用')+' · '+esc(time(data.created_at))+'</small><p>'+esc(data.description)+'</p>'+(m?mediaHtml(m):'<p>原件未归档。</p>')+'</article>';
       }else if(x.kind==='vault_treasures'){
         const lookup=data.conversation_id+':'+data.source_id,m=data.kind==='audio'?voices.get(lookup):attachments.get(lookup),chat=chatLinks.get(data.conversation_id);
         body='<article><small>'+esc(data.kind)+' · '+esc(time(data.created_at))+'</small><p>'+esc(data.excerpt)+'</p><p>'+esc(data.notes)+'</p>'+(m?mediaHtml(m):'')+(chat?'<a href="'+link(chat)+'">回到来源窗口</a>':'')+'</article>';

@@ -70,6 +70,17 @@ async function createLatestSchema(db) {
     state_json TEXT NOT NULL,
     updated_at INTEGER NOT NULL
   )`);
+  await run(db, `CREATE TABLE IF NOT EXISTS chat_reply_runs (
+    sequence_id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, turn_id TEXT NOT NULL,
+    user_variant_id TEXT NOT NULL, status TEXT NOT NULL,
+    max_messages INTEGER NOT NULL, tool_budget INTEGER NOT NULL, token_budget INTEGER NOT NULL,
+    pending_id TEXT, pending_state TEXT, receipts_json TEXT NOT NULL DEFAULT '[]',
+    updated_at INTEGER NOT NULL
+  )`);
+  await ensureColumn(db,'chat_reply_runs','soil_state','TEXT DEFAULT NULL');
+  await ensureColumn(db,'chat_reply_runs','soil_updated_at','INTEGER DEFAULT NULL');
+  await run(db, `CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_reply_run_live
+    ON chat_reply_runs(conversation_id) WHERE status='running'`);
   await run(db, `CREATE TABLE IF NOT EXISTS chat_profiles (
     user_id TEXT PRIMARY KEY,
     assistant_avatar_dataurl TEXT,

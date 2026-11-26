@@ -132,3 +132,25 @@
 :root[data-theme="paper"] .tidal-library-note{position:relative;isolation:isolate;background:transparent;padding:18px;filter:drop-shadow(0 2px 3px var(--coast-letter-shadow));}
 :root[data-theme="paper"] .tidal-library-note::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;clip-path:var(--coast-letter-cut);background:var(--coast-letter-ink,var(--surface));}
 .tidal-book-manage{color:var(--muted);font-size:12px;margin-top:25px;}.tidal-book-manage summary{cursor:pointer;}
+
+/* The dossier is three independent functional groups; preserve the note anchors. */
+.tidal-dossier-card{display:grid;gap:12px;padding:14px;margin:12px 0;background:var(--surface);border-radius:18px;box-shadow:0 2px 5px color-mix(in srgb,var(--text) 7%,transparent)}
+.tidal-dossier-card h2{margin:0;font-size:15px}
+.tidal-dossier-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;align-items:start}
+.tidal-dossier-actions>button,.tidal-dossier-actions>details>summary{min-width:0;box-sizing:border-box;padding:10px 4px;min-height:40px;text-align:center;background:var(--surface-soft);color:var(--text);border:0;border-radius:12px;font:inherit;font-size:12px;cursor:pointer}
+.tidal-dossier-actions .tidal-library-toc{margin:0;min-width:0;position:relative;padding:0;background:none}
+.tidal-dossier-actions .tidal-library-toc>summary{margin:0;list-style:none}
+.tidal-dossier-actions:has(.tidal-library-toc[open]){padding-bottom:0}
+.tidal-dossier-actions .tidal-library-toc[open] .tidal-dossier-directory{position:relative;display:grid;gap:5px;max-height:280px;overflow:auto;padding:6px}
+.tidal-dossier-directory button{overflow-wrap:anywhere;white-space:normal}
+.tidal-dossier-readers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.tidal-dossier-readers>div,.tidal-library-notes-group{border-radius:14px;padding:10px;background:color-mix(in srgb,var(--accent) 15%,var(--surface-soft))}
+.tidal-dossier-readers>[data-author=owner],.tidal-library-notes-group[data-author=owner]{background:color-mix(in srgb,#b88d85 19%,var(--surface-soft))}
+.tidal-library-notes-group{margin:0;display:grid;gap:8px}
+.tidal-library-notes-group h2{display:flex;justify-content:space-between;align-items:center}
+.tidal-library-notes-group h2 small,.tidal-note-category summary small{font-size:11px;color:var(--muted);font-weight:400}
+.tidal-note-category{background:var(--surface);border-radius:12px;padding:10px;min-width:0}
+.tidal-note-category summary{cursor:pointer;font-size:13px;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.tidal-note-category summary::after{content:"⌄";color:var(--muted)}
+.tidal-note-category[open] summary::after{content:"⌃"}
+.tidal-note-category .tidal-library-note{margin:8px 0}

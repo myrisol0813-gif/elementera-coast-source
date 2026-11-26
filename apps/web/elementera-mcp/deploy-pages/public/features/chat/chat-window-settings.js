@@ -8,6 +8,16 @@ const WEB_REALITY_FIELDS = Object.freeze([
 ]);
 
 
+
+const REPLY_BUDGET_FIELDS=Object.freeze([
+  ['reply_sequence_max_messages','单组回复上限',1,20],
+  ['reply_sequence_tool_budget','累计工具调用预算',0,128],
+  ['reply_sequence_token_budget','累计 token 预算',1,1000000],
+]);
+function replyBudgetRow(settings,[key,title,min,max],locked){
+  return `<div class="window-context-copy" style="padding:8px 12px"><label><strong>${escapeHtml(title)}</strong><input type="number" inputmode="numeric" min="${min}" max="${max}" step="1" data-reply-budget="${key}" placeholder="继承基本设置" value="${escapeAttribute(settings[key]??'')}" ${locked?'disabled':''}></label><small>${min}—${max}；留空继承</small></div>`;
+}
+
 function switchRow({ field = '', title, note, checked = false, enabled = true, action, extra = '' }) {
   const attrs = [
     'type="button"',
@@ -52,6 +62,7 @@ export function createChatWindowSettings({
     const settings = normalizeContextSettings(state.context_settings);
     const locked = isUnavailableConversation();
     const fields = new Set(settings.reality_fields);
+    const mediaLocked=locked||!['main','radio'].includes(activeConversation()?.room_type);
 
     const rows = WEB_REALITY_FIELDS.map(([field, title, note]) => switchRow({
       field,
@@ -99,6 +110,15 @@ export function createChatWindowSettings({
             </button>
           </section>
 
+          <section class="window-context-card">
+            ${switchRow({title:'允许发送表情包',note:'模型可自主查找和发送已启用的素材，不调用生图 API。',checked:settings.sticker_send_enabled,enabled:!mediaLocked,action:!mediaLocked?'chat:window-sticker-send':''})}
+            ${switchRow({title:'允许添加表情包',note:'模型可登记自己在本窗口生成并保存的图片。',checked:settings.sticker_add_enabled,enabled:!mediaLocked,action:!mediaLocked?'chat:window-sticker-add':''})}
+          </section>
+          <section class="window-context-card">
+            ${switchRow({title:'真实连续回复',note:'执行链施工中，暂不开放自动追加回复；预算可先保存。',checked:false,enabled:false})}
+            ${REPLY_BUDGET_FIELDS.map(field=>replyBudgetRow(settings,field,mediaLocked)).join('')}
+            <button class="window-context-link" type="button" data-action="chat:window-reply-budget-save" ${mediaLocked?'disabled':''}><span><strong>保存本窗口预算</strong><small>留空的项目继承基本设置。</small></span><span>›</span></button>
+          </section>
           <section class="window-context-card window-context-note">
             <strong>PWA 与 Native 的边界</strong>
             <p>PWA 只递入日期、时间和未来 7 天日历，保持轻量，不在聊天前等待天气或设备信息。完整现实上下文仍由 Native 提供。</p>
@@ -122,6 +142,7 @@ export function createChatWindowSettings({
 
   async function writeSettings(nextSettings) {
     if (!runtime.currentId || isUnavailableConversation()) return;
+    const cid=runtime.currentId;
     const previous = currentHistory();
     const next = { ...previous, context_settings: normalizeContextSettings(nextSettings) };
     setHistory(runtime.currentId, next);
@@ -129,11 +150,11 @@ export function createChatWindowSettings({
     renderMessages(runtime.currentId);
     render();
     try {
-      await saveHistory(runtime.currentId, next);
+      await saveHistory(cid, next);
     } catch (error) {
-      setHistory(runtime.currentId, previous);
+      setHistory(cid, previous);
       renderConversationList();
-      renderMessages(runtime.currentId);
+      if(runtime.currentId===cid)renderMessages(cid);
       render();
       toast(`窗口设置保存失败：${error.message}`);
     }
@@ -154,9 +175,24 @@ export function createChatWindowSettings({
     const state = currentHistory();
     const settings = normalizeContextSettings(state.context_settings);
 
+    if(name==='window-reply-budget-save'){
+      if(isUnavailableConversation()||!['main','radio'].includes(activeConversation()?.room_type))return;
+      if(runtime.generation||runtime.finalizing||runtime.pendingComposerSend)return toast('请先结束当前回复，再修改预算。');
+      const next={...settings};
+      for(const [key,title,min,max] of REPLY_BUDGET_FIELDS){
+        const field=root?.querySelector(`[data-reply-budget="${key}"]`);
+        if(!field)return;
+        const raw=field.value.trim(),value=Number(raw);
+        if(field.validity?.badInput||raw&&(!Number.isSafeInteger(value)||value<min||value>max))return toast(`${title}请输入 ${min}—${max} 的整数，原设置保留。`);
+        if(!raw)delete next[key];else next[key]=value;
+      }
+      return writeSettings(next);
+    }
     if (name === 'window-reality-master') {
       return writeSettings({ ...settings, reality_enabled: !settings.reality_enabled });
     }
+    if(name==='window-sticker-send')return writeSettings({...settings,sticker_send_enabled:!settings.sticker_send_enabled});
+    if(name==='window-sticker-add')return writeSettings({...settings,sticker_add_enabled:!settings.sticker_add_enabled});
     if (name === 'window-short-mode') {
       return writeSettings({ ...settings, short_reply_mode: !settings.short_reply_mode });
     }

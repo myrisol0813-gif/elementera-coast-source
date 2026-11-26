@@ -45,7 +45,8 @@ internal fun CoastTopBar(
     onOpenModels: () -> Unit,
     onRefresh: () -> Unit,
     onNewConversation: () -> Unit,
-    onMore: () -> Unit
+    onMore: () -> Unit,
+    headerTitle: String = "ChatGPT"
 ) {
     Column(modifier = Modifier.background(MaterialTheme.colorScheme.background)) {
         Row(
@@ -96,11 +97,14 @@ internal fun CoastTopBar(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            "ChatGPT",
+                            headerTitle,
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontSize = CoastChatTokens.TopBarTitleSize
                             ),
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.widthIn(max=130.dp),
+                            maxLines=1,
+                            overflow=TextOverflow.Ellipsis
                         )
                         Spacer(Modifier.width(CoastChatTokens.TopBarModelGap))
                         Text(

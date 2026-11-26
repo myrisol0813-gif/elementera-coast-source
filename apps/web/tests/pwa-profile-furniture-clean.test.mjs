@@ -52,7 +52,7 @@ for (const retired of ['舒服区间上沿', '运行水闸', 'API 免费沙盒�
 
 const requestContextPath = resolve(pages, 'public/features/chat/chat-request-context.js');
 const { pickRunSettings, RUN_SETTING_KEYS } = await import(pathToFileURL(requestContextPath).href + '?clean27=' + Date.now());
-const activeKeys = ['recentTurns', 'contextBudget', 'outputLength', 'maxOutputTokens', 'creativity', 'streamingEnabled', 'soilBudget', 'seedCooldownTurns', 'worldbookEnabled', 'worldbookLimit', 'memoryLimit'];
+const activeKeys = ['recentTurns', 'toolCallLimit', 'contextBudget', 'outputLength', 'maxOutputTokens', 'creativity', 'streamingEnabled', 'soilBudget', 'seedCooldownTurns', 'worldbookEnabled', 'worldbookLimit', 'memoryLimit'];
 assert.deepEqual([...RUN_SETTING_KEYS], activeKeys);
 const picked = pickRunSettings(Object.fromEntries([...activeKeys.map((key) => [key, key]), ['maxHandSeeds', 99], ['systemDraft', 'bad']]));
 assert.deepEqual(Object.keys(picked), activeKeys);

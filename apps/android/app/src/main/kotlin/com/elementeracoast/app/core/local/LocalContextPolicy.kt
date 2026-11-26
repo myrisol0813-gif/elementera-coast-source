@@ -98,7 +98,14 @@ internal object LocalContextPolicy {
         if(total()>ceiling&&soil.length>700){soil=soil.take(700);trimmed++}
         if(total()>ceiling&&soil.isNotEmpty()){soil="";trimmed++}
         if(total()>ceiling&&dog.isNotEmpty()){dog="";trimmed++}
-        while(total()>ceiling&&recent.size>4){recent.removeAt(0);trimmed++}
+        while(total()>ceiling&&recent.size>4){
+            val starts=recent.indices.filter{recent[it].role=="user"||it==0}
+            val protectedCount=if(current())2 else 1
+            if(starts.size<=protectedCount)break
+            val count=starts[1]
+            repeat(count){recent.removeAt(0)}
+            trimmed+=count
+        }
         return Result(listOf(RemoteChatMessage("system",system()))+recent,recent.toList(),body(soil),body(dog),memory.size,world.size,total(),ceiling,trimmed)
     }
 }

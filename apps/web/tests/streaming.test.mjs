@@ -64,7 +64,7 @@ const storage = {
 
 const now = () => new Date().toISOString();
 let conversations = [{
-  id: 'conv-stream', title: '新聊天', created_at: now(), updated_at: now(), deleted_at: null,
+  id: 'conv-stream', title: '新聊天', room_type: 'main', source: 'coast', created_at: now(), updated_at: now(), deleted_at: null,
   title_manual: false, title_generated_at: null, title_model_id: null,
 }];
 let serverHistory = { version: 4, updated_at: now(), turns: [] };
@@ -73,6 +73,7 @@ const historyWrites = [];
 let titleCount = 0;
 let soilCount = 0;
 let chatRequestCount = 0;
+let sequenceRequestCount = 0;
 const chatBodies = [];
 const toastMessages = [];
 const encoder = new TextEncoder();
@@ -132,6 +133,23 @@ globalThis.fetch = async (input, options = {}) => {
       ...conversations[0], title: '流式标题', title_generated_at: now(), title_model_id: 'openai/gpt-4.1-nano',
     };
     return json({ ok: true, conversation: conversations[0] });
+  }
+  if (url.pathname === '/api/chat/reply-sequence') {
+    sequenceRequestCount++;
+    assert.equal(body.conversation_id,'conv-stream');
+    const turn=serverHistory.turns.find(t=>t.id===body.source_turn_id);
+    const key=String(turn.user.active);
+    const list=turn.assistant.variantsByUserVariant[key];
+    const events=[['reply_group_start',{sequence_id:body.sequence_id,max_messages:2}]];
+    for(let index=0;index<2;index++){
+      const id='dom-sequence-'+index;
+      events.push(['reply_begin',{message_id:id,index}],['reply_delta',{message_id:id,content:'delta '+index}]);
+      list.push({id,content:'canonical '+index,reply_sequence:{id:body.sequence_id,index},finish_reason:'stop'});
+      turn.assistant.activeByUserVariant[key]=list.length-1;
+      events.push(['reply_committed',{message_id:id,index,history:structuredClone(serverHistory)}]);
+    }
+    events.push(['reply_group_end',{status:'completed',saved:2}]);
+    return coastStream({before:events.map(([event,data])=>'event: '+event+'\ndata: '+JSON.stringify(data)+'\n\n')},options);
   }
   if (url.pathname === '/api/chat') {
     chatRequestCount += 1;
@@ -287,5 +305,20 @@ assert.ok(chatRequestCount >= 5);
 assert.equal(historyWrites.filter((history) => history.turns?.at(-1)?.assistant?.variantsByUserVariant?.['0']?.at(-1)?.finish_reason === 'cancelled').length, 1);
 assert.equal(historyWrites.filter((history) => history.turns?.at(-1)?.assistant?.variantsByUserVariant?.['0']?.at(-1)?.finish_reason === 'error').length, 1);
 
+// Reload an explicitly enabled experimental window from its canonical history.
+await waitFor(()=>!document.querySelector('#composerActionButton').disabled,'previous send finalized');
+serverHistory.context_settings={reply_sequence_enabled:true};
+assert.equal(await chat.openSearchResult({conversation_id:'conv-stream',kind:'conversation'}),true);
+assert.equal(chat.getCurrentConversation().room_type,'main');
+const beforeSequenceSoil=soilCount,beforeSequenceWrites=historyPutCount;
+send('real sequence');
+await waitFor(()=>sequenceRequestCount===1,'explicit sequence endpoint');
+try{await waitFor(()=>document.querySelector('[data-message-id="dom-sequence-1"]')?.textContent.includes('canonical 1'),'sequence second bubble');}
+catch(error){throw new Error(error.message+'; messages='+JSON.stringify(chat.getActiveMessages())+'; toast='+JSON.stringify(toastMessages.slice(-4)));}
+assert.equal(document.querySelector('[data-message-id="dom-sequence-0"] .assistant-text').textContent,'canonical 0');
+assert.equal(document.querySelector('[data-message-id="dom-sequence-1"] .assistant-text').textContent,'canonical 1');
+assert.equal(historyPutCount,beforeSequenceWrites+1,'only human history is written by client; server owns commits');
+await waitFor(()=>soilCount===beforeSequenceSoil+1,'one group soil organization');
+assert.equal(soilCount,beforeSequenceSoil+1,'one organizer after all committed messages');
 await chatSpine.unmount();
 console.log('streaming: ok');

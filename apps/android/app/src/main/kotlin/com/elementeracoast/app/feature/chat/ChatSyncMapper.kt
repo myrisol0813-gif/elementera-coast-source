@@ -139,8 +139,10 @@ object ChatSyncMapper {
     }
 
     fun contextMessages(history: RemoteHistory, targetTurnId: String, recentTurns: Int): List<RemoteChatMessage> {
-        val messages = buildList {
-            for (turn in history.turns) {
+        val rounds = mutableListOf<List<RemoteChatMessage>>()
+        var grouped = false
+        for (turn in history.turns) {
+            val messages = buildList {
                 val userIndex = turn.user.active.coerceIn(0, (turn.user.variants.size - 1).coerceAtLeast(0))
                 val user = turn.user.variants.getOrNull(userIndex)
                 if (user != null && !user.hidden && (user.content.isNotBlank() || user.attachments.isNotEmpty())) {
@@ -150,23 +152,29 @@ object ChatSyncMapper {
                         if (user.messageSource == "official_mcp") "[来源：官端 ChatGPT / official_mcp]\n$body" else body
                     ))
                 }
-                if (turn.id == targetTurnId) break
-
-                val key = userIndex.toString()
-                val assistants = turn.assistant.variantsByUserVariant[key].orEmpty()
-                val assistantIndex = (turn.assistant.activeByUserVariant[key] ?: 0)
-                    .coerceIn(0, (assistants.size - 1).coerceAtLeast(0))
-                val assistant = assistants.getOrNull(assistantIndex)
-                if (assistant != null && assistant.content.isNotBlank()) {
-                    add(RemoteChatMessage("assistant", assistant.content))
+                if (turn.id != targetTurnId) {
+                    val key = userIndex.toString()
+                    val assistants = turn.assistant.variantsByUserVariant[key].orEmpty()
+                    val assistantIndex = (turn.assistant.activeByUserVariant[key] ?: 0)
+                        .coerceIn(0, (assistants.size - 1).coerceAtLeast(0))
+                    val group = ReplySequence.selectedGroup(assistants, assistantIndex)
+                    if (group.size > 1) grouped = true
+                    for (assistant in group) {
+                        if (assistant.content.isNotBlank()) add(RemoteChatMessage("assistant", assistant.content))
+                    }
                 }
             }
+            rounds.add(messages)
+            if (turn.id == targetTurnId) break
         }
         val requestedMessages = recentTurns.coerceAtLeast(1).toLong() * 2L
-        val recent = if (requestedMessages >= messages.size.toLong()) {
-            messages.toMutableList()
+        val all = rounds.flatten()
+        val recent = if (grouped) {
+            rounds.takeLast(recentTurns.coerceAtLeast(1)).flatten().toMutableList()
+        } else if (requestedMessages >= all.size.toLong()) {
+            all.toMutableList()
         } else {
-            messages.takeLast(requestedMessages.toInt()).toMutableList()
+            all.takeLast(requestedMessages.toInt()).toMutableList()
         }
         while (recent.firstOrNull()?.role == "assistant") recent.removeAt(0)
         return recent
@@ -200,11 +208,15 @@ object ChatSyncMapper {
             val assistants = turn.assistant.variantsByUserVariant[key].orEmpty()
             val assistantIndex = (turn.assistant.activeByUserVariant[key] ?: 0)
                 .coerceIn(0, (assistants.size - 1).coerceAtLeast(0))
-            val assistant = assistants.getOrNull(assistantIndex)
-            if (assistant != null) {
+            val selected = assistants.getOrNull(assistantIndex)
+            val alternatives=ReplySequence.alternatives(assistants)
+            val alternativeIndex=alternatives.indexOfFirst{selected in it.messages}
+            val group=alternatives.getOrNull(alternativeIndex)?.messages.orEmpty()
+            group.forEachIndexed { index, assistant ->
+                val tail=index==group.lastIndex
                 add(
                     ChatMessage(
-                        id = stableLong("assistant:${turn.id}:$key"),
+                        id = if (assistant.replySequence != null) stableLong("assistant:${turn.id}:$key:${assistant.id}") else stableLong("assistant:${turn.id}:$key"),
                         role = MessageRole.Assistant,
                         text = assistant.content.ifBlank{when(assistant.finishReason){"image_pending"->"正在绘制图片 · 重新打开窗口查看结果";"image_tool_ready"->"等待回复 · 重新打开窗口查看结果";else->""}},
                         turnId = turn.id,
@@ -216,13 +228,14 @@ object ChatSyncMapper {
                         liked = assistant.liked,
                         favorite = assistant.favorite,
                         errorDetail = assistant.errorDetail,
-                        variantIndex = assistantIndex,
-                        variantCount = assistants.size.coerceAtLeast(1),
-                        variants = assistants.map { it.content },
+                        variantIndex = alternativeIndex,
+                        variantCount = alternatives.size.coerceAtLeast(1),
+                        variants = alternatives.map { choice -> choice.messages.joinToString("\n\n"){it.content} },
                         createdAtLabel = assistant.createdAt,
                         attachments = assistant.attachments.map(::toChatAttachment),
                         furnitureRuns = assistant.furnitureRuns.map(::toFurnitureRun),
-                        deskReceipt = assistant.deskSlip?.let(TurnDeskMapper::toUi)
+                        deskReceipt = assistant.deskSlip?.let(TurnDeskMapper::toUi),
+                        replyGroupTail = tail
                     )
                 )
             }
@@ -254,6 +267,22 @@ object ChatSyncMapper {
         storageKey = value.storageKey,
         createdAt = value.createdAt
     )
+
+    /** Ephemeral preview only, sharing the exact identity of the future saved
+     * bubble. This never changes canonical history or writes a placeholder. */
+    internal fun replyRunPreview(history:RemoteHistory,turnId:String,userId:String,sequenceId:String,messageId:String,index:Int,modelId:String,partial:String):List<ChatMessage>{
+        val turn=history.turns.single{it.id==turnId}
+        val key=turn.user.active.toString()
+        require(turn.user.variants[turn.user.active].id==userId)
+        val list=turn.assistant.variantsByUserVariant[key].orEmpty()
+        require(list.size<20&&list.none{it.id==messageId}&&list.count{it.replySequence?.id==sequenceId}==index)
+        val preview=RemoteVariant(id=messageId,content=partial,modelId=modelId,generationSource="chat",
+            replySequence=com.elementeracoast.app.core.remote.RemoteReplySequence(sequenceId,index))
+        val changed=turn.copy(assistant=turn.assistant.copy(
+            variantsByUserVariant=turn.assistant.variantsByUserVariant+(key to (list+preview)),
+            activeByUserVariant=turn.assistant.activeByUserVariant+(key to list.size)))
+        return toUi(history.copy(turns=history.turns.map{if(it.id==turnId)changed else it}))
+    }
 
     fun streamingAssistant(turnId: String, modelId: String, partialContent: String): ChatMessage = ChatMessage(
         id = streamingMessageId(turnId),

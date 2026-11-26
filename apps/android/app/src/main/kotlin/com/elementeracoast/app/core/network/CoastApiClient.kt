@@ -492,6 +492,13 @@ class CoastApiClient(
         return jsonRequest(Request.Builder().url(config.url("/api/memory/soil/organize")).post(jsonBody(payload)).build(), RemoteSoilOrganizeResponse.serializer())
     }
 
+    suspend fun organizeReplyRunSoil(conversationId:String,modelId:String,sequenceId:String):RemoteSoilOrganizeResponse{
+        val payload=buildJsonObject{
+            put("conversation_id",conversationId);put("model",modelId);put("trigger","reply");put("force",true);put("reply_sequence_id",sequenceId)
+        }.toString()
+        return jsonRequest(Request.Builder().url(config.url("/api/memory/soil/organize")).post(jsonBody(payload)).build(),RemoteSoilOrganizeResponse.serializer())
+    }
+
     suspend fun preparePlanSoil(conversationId: String, modelId: String): RemotePlanSoilPrepareResponse {
         val payload = buildJsonObject {
             put("conversation_id", conversationId)
@@ -554,6 +561,33 @@ class CoastApiClient(
             }
         }
         awaitClose { call.cancel(); readerJob.cancel() }
+    }
+
+    /** Dedicated stream; legacy single-reply events cannot complete a group. */
+    fun streamReplyRun(payload:RemoteReplyRunRequest):Flow<ReplyRunEvent> = callbackFlow {
+        val body=json.encodeToString(RemoteReplyRunRequest.serializer(),payload)
+        val request=Request.Builder().url(config.url("/api/chat/reply-sequence")).post(jsonBody(body)).header("Accept","text/event-stream").build()
+        val call=client.newCall(request)
+        val readerJob=launch(Dispatchers.IO){
+            try{
+                call.execute().use { response ->
+                    if(!response.isSuccessful)throw responseError(response)
+                    val source=response.body?.source()?:throw CoastApiException(CoastApiErrorKind.Stream,"empty_stream","后端没有返回可读取的回复流。")
+                    val parser=SseParser(json)
+                    val wire=ReplyRunWire(payload,json)
+                    while(!source.exhausted()){
+                        val event=parser.acceptLine(source.readUtf8Line())?:continue
+                        send(wire.accept(event))
+                    }
+                    parser.acceptLine(null)?.let{send(wire.accept(it))}
+                    wire.finish()
+                }
+                close()
+            }catch(error:Throwable){
+                if(call.isCanceled())close()else close(asApiException(error))
+            }
+        }
+        awaitClose{call.cancel();readerJob.cancel()}
     }
 
     private fun mapStreamEvent(event: CoastSseEvent): ApiStreamEvent {

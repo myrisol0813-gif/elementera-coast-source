@@ -1,7 +1,8 @@
 import { OPENROUTER_CHAT_URL, OPENROUTER_REFERER } from './model-constants.js';
+import { normalizeToolCallLimit, DEFAULT_TOOL_CALL_LIMIT } from '../turn-tool-policy.js';
 import { openRouterKey } from './model-catalog.js';
 import { prepareFormalChat } from './model-payload.js';
-import { assertWireInputBudget } from '../context-budget.js';
+import { assertWireInputBudget, estimateWireInputTokens } from '../context-budget.js';
 import { SseParseError, parseSseEventBlock } from '../stream-format.js';
 import {
   ModelRequestError,
@@ -40,11 +41,12 @@ function providerRequest(env, payload, title, signal) {
   });
 }
 
-export async function requestOpenRouter(env, payload, title) {
+export async function requestOpenRouter(env, payload, title, signal) {
   let response;
   try {
-    response = await providerRequest(env, payload, title);
-  } catch {
+    response = await providerRequest(env, payload, title, signal);
+  } catch (error) {
+    if(error?.name==='AbortError')throw error;
     throw new ModelRequestError('provider_unavailable', '上游模型暂时不可用。', 502, { model: payload.model });
   }
   if (!response.ok) {
@@ -237,13 +239,82 @@ function safeToolFailure(error) {
   };
 }
 
-async function executeToolCalls(calls, executeTool) {
+const TOOL_LIMIT_NOTICE = '本轮工具额度已用完，额外调用未执行。已完成的操作保留。';
+const toolLimitReceipt = () => ({ok:false,error:{type:'tool_limit',message:'本轮工具额度已用完，此项未执行。请根据已有结果完成回复。'}});
+function finalToolPayload(payload, finalOnly) {
+  if (!finalOnly) return payload;
+  const next = {...payload};
+  // Keep schemas for compatibility with prior tool messages, but disable new tools,
+  // including provider-hosted search on the final request.
+  if (next.tools?.length) next.tool_choice = 'none';
+  return next;
+}
+
+// Trusted in-process option only. Expresses intent, never authorization
+// for another independent reply. Ordinary side effects use a separate quota.
+function sequenceControl(config, input){
+  if(config==null)return null;
+  if(!Number.isSafeInteger(config.toolBudget)||config.toolBudget<0||config.toolBudget>128
+    ||!Number.isSafeInteger(config.tokenBudget)||config.tokenBudget<1||config.tokenBudget>1000000)
+    throw new ModelRequestError('invalid_reply_sequence_budget','连续回复预算无效。',400);
+  const toolLimit=Math.min(normalizeToolCallLimit(input.settings?.toolCallLimit),config.toolBudget);
+  const tool={type:'function',function:{name:'continue_reply',description:'仅在你自主希望当前正文完成后再发送一条独立回复时调用；无需用满次数。未调用即结束本组。',parameters:{type:'object',properties:{},required:[],additionalProperties:false}}};
+  let used=0,tokens=0,known=true,attempted=false,requested=false,providerCalls=0;
+  const allowed=config.mayContinue===true;
+  function observe(usage){
+    providerCalls++;
+    if(!usage||!Number.isSafeInteger(usage.total_tokens)||usage.total_tokens<0)known=false;
+    else tokens+=usage.total_tokens;
+  }
+  function beforeRequest(){
+    if(providerCalls&&(!known||tokens>=config.tokenBudget))
+      throw new ModelRequestError('reply_sequence_budget_exhausted','连续回复预算不足或供应商用量未确认；不会再发起模型请求。',409);
+  }
+  return {
+    // Hosted tools are excluded until their accounting can be enforced.
+    input:{...input,tools:[...(input.tools||[]).filter(t=>t.type==='function'&&t.function?.name!=='continue_reply'&&toolLimit>0),...(allowed?[tool]:[])]},
+    rounds:toolLimit+(allowed?1:0),
+    payload(base){
+      const next={...base};
+      const tools=(base.tools||[]).filter(t=>t.function?.name==='continue_reply'
+        ? allowed&&!attempted : used<toolLimit);
+      if(tools.length){next.tools=tools;next.tool_choice='auto';}
+      else{delete next.tools;delete next.tool_choice;}
+      return next;
+    },
+    beforeRequest,observe,
+    boundPayload(payload){
+      const estimate=estimateWireInputTokens(payload);
+      const available=config.tokenBudget-tokens-estimate;
+      if(available<1)throw new ModelRequestError('reply_sequence_budget_exhausted','预计完整输入已耗尽连续回复预算；未发送给模型。',409);
+      const limit=Math.min(available,Number(payload.max_completion_tokens??payload.max_tokens??8000));
+      return {...payload,max_completion_tokens:limit,...('max_tokens' in payload?{max_tokens:limit}:{})};
+    },
+    async execute(call,executor){
+      if(call.function.name==='continue_reply'){
+        if(!allowed||attempted)return {ok:false,error:{type:'continuation_unavailable'}};
+        attempted=true;
+        let args;try{args=JSON.parse(call.function.arguments||'{}');}catch{return {ok:false,error:{type:'invalid_arguments'}};}
+        if(!args||typeof args!=='object'||Array.isArray(args)||Object.keys(args).length)return {ok:false,error:{type:'invalid_arguments'}};
+        requested=true;return {ok:true,status:'next_message_requested'};
+      }
+      if(used>=toolLimit||!known||tokens>=config.tokenBudget)return toolLimitReceipt();
+      used++;
+      if(typeof executor!=='function')return {ok:false,error:{type:'tool_executor_missing'}};
+      return executor(call);
+    },
+    receipt(finishReason){return {continue_requested:requested&&finishReason==='stop'&&known&&tokens<config.tokenBudget,
+      tool_calls:used,total_tokens:known?tokens:null,provider_requests:providerCalls};},
+  };
+}
+
+async function executeToolCalls(calls, executeTool, remaining = DEFAULT_TOOL_CALL_LIMIT, sequence = null) {
   const results = [];
   const messages = [];
   for (const call of calls) {
     let value;
     try {
-      value = await executeTool(call);
+      value = sequence ? await sequence.execute(call,executeTool) : remaining-- > 0 ? await executeTool(call) : toolLimitReceipt();
     } catch (error) {
       value = safeToolFailure(error);
     }
@@ -309,36 +380,49 @@ export async function performFormalChatWithTools(env, input = {}, {
   captureMetadata = false,
   takePrivateContinuation = () => [],
   hasGeneratedImage = () => false,
+  replySequence = null,
+  signal,
 } = {}) {
-  const prepared = await prepareFormalChat(env, input, allowSystem);
+  const sequence=sequenceControl(replySequence,input);
+  const prepared = await prepareFormalChat(env, sequence?.input || input, allowSystem);
   const webSearch = createWebSearchTracker(input, prepared);
   const providerCalls = [];
   const allToolResults = [];
   let usage = null;
   let messages = [...prepared.payload.messages];
 
+  const toolLimit=normalizeToolCallLimit(input.settings?.toolCallLimit);
+  let rounds = 0;
   while (true) {
-    const payload = { ...prepared.payload, messages };
+    const finalOnly = sequence ? rounds++ >= sequence.rounds : rounds++ >= toolLimit || allToolResults.length >= toolLimit;
+    sequence?.beforeRequest();
+    const base={...prepared.payload,messages};
+    const candidate = finalToolPayload(sequence?sequence.payload(base):base, finalOnly);
+    const payload=sequence?sequence.boundPayload(candidate):candidate;
     assertWireInputBudget(payload, undefined, providerCalls.length > 0);
-    const upstream = await requestOpenRouter(env, payload, 'Elementera Coast Formal Chat');
+    const upstream = await requestOpenRouter(env, payload, 'Elementera Coast Formal Chat',signal);
     providerCalls.push(upstream);
     webSearch.observe(upstream);
     usage = addUsage(usage, upstream?.usage);
+    sequence?.observe(normalizeUsage(upstream?.usage));
     const choice = upstream?.choices?.[0] || {};
     const message = choice?.message || {};
     const calls = normalizeToolCalls(message.tool_calls);
 
-    if (!calls.length) {
+    if (!calls.length || finalOnly) {
       const model = upstream?.model || prepared.modelId;
-      const content = completedReply(message, model, choice?.finish_reason, allToolResults.length, hasGeneratedImage());
+      const content = finalOnly && calls.length
+        ? [message.content, TOOL_LIMIT_NOTICE].filter(Boolean).join('\n\n')
+        : completedReply(message, model, choice?.finish_reason, allToolResults.length, hasGeneratedImage());
       const result = {
         ok: true,
         model,
         message: { role: 'assistant', content },
         usage: normalizeUsage(usage),
-        finish_reason: choice?.finish_reason || null,
+        finish_reason: finalOnly && calls.length ? 'stop' : choice?.finish_reason || null,
         tool_results: allToolResults,
         server_tools: webSearch.snapshot(),
+        ...(sequence?{reply_sequence_receipt:sequence.receipt(finalOnly&&calls.length?'limit':choice?.finish_reason)}:{}),
       };
       if (captureMetadata) {
         result.model_metadata = await metadataFromProviderCalls({
@@ -355,10 +439,10 @@ export async function performFormalChatWithTools(env, input = {}, {
       throw new ModelRequestError('invalid_provider_response', '模型返回了工具调用，但 finish_reason 不是 tool_calls。', 502);
     }
 
-    if (typeof executeTool !== 'function') {
+    if (!sequence && typeof executeTool !== 'function') {
       throw new ModelRequestError('tool_executor_missing', '模型请求了本地工具，但当前调用没有工具执行器。', 500);
     }
-    const executed = await executeToolCalls(calls, executeTool);
+    const executed = await executeToolCalls(calls, executeTool, Math.max(0, toolLimit - allToolResults.length),sequence);
     allToolResults.push(...executed.results);
     messages = [
       ...messages,
@@ -395,8 +479,10 @@ export async function* performFormalChatStream(env, input = {}, {
   onMetadata,
   takePrivateContinuation = () => [],
   hasGeneratedImage = () => false,
+  replySequence = null,
 } = {}) {
-  const prepared = await prepareFormalChat(env, input, allowSystem);
+  const sequence=sequenceControl(replySequence,input);
+  const prepared = await prepareFormalChat(env, sequence?.input || input, allowSystem);
   const webSearch = createWebSearchTracker(input, prepared);
   let messages = [...prepared.payload.messages];
   let metaSent = false;
@@ -404,6 +490,8 @@ export async function* performFormalChatStream(env, input = {}, {
   let generationId = crypto.randomUUID();
   let totalUsage = null;
   let completedToolCalls = 0;
+  const toolLimit=normalizeToolCallLimit(input.settings?.toolCallLimit);
+  let rounds = 0;
   const metadataCollector = typeof onMetadata === 'function'
     ? createModelMetadataCollector({
       requestedModel: prepared.modelId,
@@ -414,17 +502,17 @@ export async function* performFormalChatStream(env, input = {}, {
 
   try {
     while (true) {
-      const payload = {
-        ...prepared.payload,
-        messages,
-        stream: true,
-        stream_options: { include_usage: true },
-      };
+      const finalOnly = sequence ? rounds++ >= sequence.rounds : rounds++ >= toolLimit || completedToolCalls >= toolLimit;
+      sequence?.beforeRequest();
+      const base={...prepared.payload,messages,stream:true,stream_options:{include_usage:true}};
+      const candidate=finalToolPayload(sequence?sequence.payload(base):base,finalOnly);
+      const payload=sequence?sequence.boundPayload(candidate):candidate;
       assertWireInputBudget(payload, undefined, completedToolCalls > 0);
       const response = await requestOpenRouterStream(env, payload, 'Elementera Coast Formal Chat', signal);
       let finishReason = null;
       let providerDone = false;
       let roundContent = '';
+      let roundUsage=null;
       const toolChunks = new Map();
 
       for await (const block of readProviderSse(response)) {
@@ -460,6 +548,7 @@ export async function* performFormalChatStream(env, input = {}, {
         }
         appendStreamToolCalls(toolChunks, delta.tool_calls);
         totalUsage = addUsage(totalUsage, value?.usage);
+        if(normalizeUsage(value?.usage))roundUsage=normalizeUsage(value.usage);
         if (value?.choices?.[0]?.finish_reason != null) finishReason = String(value.choices[0].finish_reason);
       }
 
@@ -467,18 +556,24 @@ export async function* performFormalChatStream(env, input = {}, {
         throw new ModelRequestError('stream_incomplete', '上游流式响应提前中断。', 502, { model: prepared.modelId });
       }
 
+      sequence?.observe(roundUsage);
       const calls = normalizeToolCalls([...toolChunks.entries()]
         .sort(([left], [right]) => left - right)
         .map(([, call]) => call));
 
-      if (calls.length) {
+      if (calls.length && finalOnly) {
+        roundContent += '\n\n' + TOOL_LIMIT_NOTICE;
+        yield {event:'delta',data:{content:'\n\n' + TOOL_LIMIT_NOTICE}};
+        finishReason = 'stop';
+      }
+      if (calls.length && !finalOnly) {
         if (finishReason !== 'tool_calls') {
           throw new ModelRequestError('invalid_provider_response', '模型返回了工具调用，但 finish_reason 不是 tool_calls。', 502);
         }
-        if (typeof executeTool !== 'function') {
+        if (!sequence && typeof executeTool !== 'function') {
           throw new ModelRequestError('tool_executor_missing', '模型请求了本地工具，但当前调用没有工具执行器。', 500);
         }
-        const executed = await executeToolCalls(calls, executeTool);
+        const executed = await executeToolCalls(calls, executeTool, Math.max(0, toolLimit - completedToolCalls),sequence);
         completedToolCalls += executed.results.length;
         metadataCollector?.addToolResults(executed.results);
         for (const result of executed.results) {
@@ -519,7 +614,8 @@ export async function* performFormalChatStream(env, input = {}, {
       if (!metaSent) yield { event: 'meta', data: { model: actualModel, generation_id: generationId } };
       yield { event: 'server_tools', data: webSearch.snapshot() };
       if (totalUsage) yield { event: 'usage', data: totalUsage };
-      yield { event: 'done', data: { finish_reason: finishReason } };
+      yield { event: 'done', data: { finish_reason: finishReason,
+        ...(sequence?{reply_sequence_receipt:sequence.receipt(finalOnly&&calls.length?'limit':finishReason)}:{}) } };
       return;
     }
   } catch (error) {

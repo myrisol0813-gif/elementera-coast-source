@@ -170,6 +170,7 @@ export async function runChatStreamFlow({
             errorDetail: '',
           }, { render: false });
           patchAssistantStreamingText?.(conversationId, turnId, streamState.partialContent, {
+            messageId: appended.variant.id,
             errorDetail: '',
             loading: true,
           });

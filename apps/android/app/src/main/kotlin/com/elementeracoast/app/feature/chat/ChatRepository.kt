@@ -4,6 +4,8 @@ import com.elementeracoast.app.core.model.CrossWindowMode
 import com.elementeracoast.app.core.model.CrossWindowRequest
 import com.elementeracoast.app.core.model.TurnDeskReceipt
 import com.elementeracoast.app.core.network.ApiStreamEvent
+import com.elementeracoast.app.core.network.RemoteReplyRunRequest
+import com.elementeracoast.app.core.network.ReplyRunEvent
 import com.elementeracoast.app.core.network.CoastApiClient
 import com.elementeracoast.app.core.network.CoastApiErrorKind
 import com.elementeracoast.app.core.network.CoastApiException
@@ -41,6 +43,7 @@ sealed interface ChatProgress {
 }
 
 interface ChatRepository {
+    fun streamReplyRun(request:RemoteReplyRunRequest):Flow<ReplyRunEvent> = flow { throw CoastApiException(CoastApiErrorKind.Model,"reply_sequence_unavailable","当前模式尚未接通连续回复。") }
     fun cachedHistory(conversationId: String): RemoteHistory?
     suspend fun generateImage(conversationId:String,turnId:String,userId:String,messageId:String,prompt:String):RemoteHistory = error("Image generation unavailable")
     suspend fun loadHistory(conversationId: String): RemoteHistory
@@ -82,8 +85,16 @@ class DefaultChatRepository(
     private val cache: RemoteCacheStore,
     private val metadataRemote: ModelMetadataRemoteDataSource? = null,
     private val json: Json = Json { ignoreUnknownKeys = true; explicitNulls = false },
-    private val reasoningStore: ReasoningEffortStore? = null
+    private val reasoningStore: ReasoningEffortStore? = null,
+    private val toolLimit: () -> Int = { com.elementeracoast.app.core.network.TurnToolPolicy.DEFAULT_CALLS }
 ) : ChatRepository {
+    override fun streamReplyRun(request:RemoteReplyRunRequest):Flow<ReplyRunEvent> = flow {
+        api.streamReplyRun(request).collect { event ->
+            if(event is ReplyRunEvent.Committed)cache.putHistory(request.conversationId,event.history)
+            if(event is ReplyRunEvent.End)event.history?.let{cache.putHistory(request.conversationId,it)}
+            emit(event)
+        }
+    }
     override fun cachedHistory(conversationId: String): RemoteHistory? = cache.history(conversationId)
 
     override suspend fun generateImage(conversationId:String,turnId:String,userId:String,messageId:String,prompt:String):RemoteHistory =
@@ -135,7 +146,9 @@ class DefaultChatRepository(
         val userId=sourceTurn?.user?.variants?.getOrNull(sourceTurn.user.active)?.id.orEmpty()
         val imageEnabled=cache.profile()?.currentImageModel?.isNotBlank()==true&&userId.isNotBlank()&&
             cache.conversations().any{it.id==conversationId&&it.roomType in setOf("main","radio")&&it.deletedAt==null}
-        if(imageEnabled)persistHistory(conversationId,ChatSyncMapper.appendAssistant(historyWithUser,turnId,"",modelId,"image_tool_ready",assistantVariantId=assistantVariantId))
+        val cfg=historyWithUser.contextSettings
+        val mediaReserved=imageEnabled||userId.isNotBlank()&&(cfg.stickerSendEnabled||cfg.stickerAddEnabled)&&cache.conversations().any{it.id==conversationId&&it.roomType in setOf("main","radio")&&it.deletedAt==null}
+        if(mediaReserved)persistHistory(conversationId,ChatSyncMapper.appendAssistant(historyWithUser,turnId,"",modelId,if(imageEnabled)"image_tool_ready"else "sticker_tool_ready",assistantVariantId=assistantVariantId))
         val offered = cache.modelCatalog()?.groups?.let { it.openAiChat + it.freeTest }
             ?.firstOrNull { it.id == modelId }?.reasoningEfforts.orEmpty()
         val effort = reasoningStore?.get(modelId, offered)
@@ -153,7 +166,8 @@ class DefaultChatRepository(
                 "recentTurns" to normalizedRecentTurns.toString(),
                 "contextBudget" to (if(contextBudget==0)0 else contextBudget.coerceAtLeast(1800)).toString(),
                 "outputLength" to outputLength,
-                "maxOutputTokens" to maxOutputTokens.coerceIn(64, 65536).toString()
+                "maxOutputTokens" to maxOutputTokens.coerceIn(64, 65536).toString(),
+                "toolCallLimit" to com.elementeracoast.app.core.network.TurnToolPolicy.normalize(toolLimit()).toString()
             ) + (effort?.let { mapOf("reasoningEffort" to it) } ?: emptyMap()),
             crossWindow = crossWindow.toRemote(),
             stream = true,
@@ -209,7 +223,7 @@ class DefaultChatRepository(
             "stream_incomplete",
             "回复流提前中断。"
         )
-        val completed = if(imageEnabled) ChatSyncMapper.completeReservedAssistant(loadHistory(conversationId),turnId,userId,assistantVariantId,content,actualModel,finishReason,mergeFurnitureRuns(furnitureRuns,deskSlip),deskSlip)
+        val completed = if(mediaReserved) ChatSyncMapper.completeReservedAssistant(loadHistory(conversationId),turnId,userId,assistantVariantId,content,actualModel,finishReason,mergeFurnitureRuns(furnitureRuns,deskSlip),deskSlip)
         else ChatSyncMapper.appendAssistant(
             history = ChatSyncMapper.clearUserFailure(historyWithUser, turnId),
             turnId = turnId,

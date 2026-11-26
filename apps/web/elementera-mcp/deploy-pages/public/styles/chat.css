@@ -1397,3 +1397,7 @@
   background: var(--surface-raised);
   cursor: pointer;
 }
+
+/* A completed attachment-only reply has no decorative empty text bubble.
+   Keep the node in DOM so streaming patches can still populate it. */
+.message.assistant .assistant-text:empty { display: none; }

@@ -181,4 +181,61 @@ class CoastApiClientTest {
     )
 
     private fun jsonResponse(body: String): MockResponse = MockResponse().setResponseCode(200).setHeader("Content-Type", "application/json").setBody(body)
+    @Test
+    fun replyRunUsesSeparateEndpointAndValidatesCanonicalMessages() = runBlocking {
+        val request=RemoteReplyRunRequest("c1","t1","u1","seq","openai/gpt-4.1-nano",RemoteReplyRunBudget(2,0,48000),"2026-11-26","2026-11-26 12:00",kotlinx.serialization.json.JsonObject(emptyMap()))
+        fun message(id:String,index:Int,text:String)="""{"id":"$id","content":"$text","reply_sequence":{"id":"seq","index":$index},"finish_reason":"stop"}"""
+        fun history(index:Int):String{
+            val items=(0..index).joinToString(","){message("a$it",it,"text $it")}
+            return """{"conversation_id":"c1","turns":[{"id":"t1","user":{"variants":[{"id":"u1","content":"hello"}]},"assistant":{"activeByUserVariant":{"0":$index},"variantsByUserVariant":{"0":[$items]}}}]}"""
+        }
+        fun event(name:String,body:String)="event: $name\ndata: $body\n\n"
+        val stream=buildString{
+            append(event("reply_group_start","""{"sequence_id":"seq","max_messages":2}"""))
+            for(i in 0..1){
+                append(event("reply_begin","""{"message_id":"a$i","index":$i}"""))
+                append(event("reply_delta","""{"message_id":"a$i","content":"text $i"}"""))
+                append(event("reply_committed","""{"message_id":"a$i","index":$i,"history":${history(i)}}"""))
+            }
+            append(event("reply_group_end","""{"status":"completed","saved":2}"""))
+        }
+        server.enqueue(MockResponse().setResponseCode(200).setHeader("Content-Type","text/event-stream").setBody(stream))
+        val events=api.streamReplyRun(request).toList()
+        assertEquals(listOf("a0","a1"),events.filterIsInstance<ReplyRunEvent.Committed>().map{it.variant.id})
+        assertEquals(ReplyRunEvent.End("completed",2,null),events.last())
+        val sent=server.takeRequest()
+        assertEquals("/api/chat/reply-sequence",sent.path)
+        assertEquals(config.origin,sent.getHeader("Origin"))
+        assertTrue(sent.body.readUtf8().contains("\"toolBudget\":0"))
+        server.enqueue(MockResponse().setResponseCode(200).setBody(event("reply_group_start","""{"sequence_id":"seq","max_messages":2}""")+event("reply_begin","""{"message_id":"a0","index":0}""")+event("reply_delta","""{"message_id":"wrong","content":"not ours"}""")))
+        val failure=runCatching{api.streamReplyRun(request).toList()}.exceptionOrNull()
+        assertEquals("invalid_reply_sequence_event",(failure as? CoastApiException)?.type)
+        server.enqueue(MockResponse().setResponseCode(200).setBody(event("reply_group_start","""{"sequence_id":"seq","max_messages":2}""")))
+        assertEquals("reply_group_incomplete",(runCatching{api.streamReplyRun(request).toList()}.exceptionOrNull() as? CoastApiException)?.type)
+    }
+
+    @Test fun replyRunPreservesMediaOnlyAndInterruptedOriginals()=runBlocking{
+        val request=RemoteReplyRunRequest("c1","t1","u1","seq","openai/gpt-4.1-nano",RemoteReplyRunBudget(2,2,48000),"2026-11-26","2026-11-26 12:00",kotlinx.serialization.json.JsonObject(emptyMap()),imageToolEnabled=true,imageModelId="fixture/image")
+        fun media(id:String,index:Int,reason:String,original:Boolean=true):String{
+            val attachment=if(original)""","attachments":[{"id":"att-$id","type":"image","sticker_delivery":{"message_id":"$id","sticker_id":"s1"}}]"""else ""
+            return """{"id":"$id","content":"","reply_sequence":{"id":"seq","index":$index},"finish_reason":"$reason"$attachment}"""
+        }
+        fun history(items:String,index:Int)="""{"conversation_id":"c1","turns":[{"id":"t1","user":{"variants":[{"id":"u1","content":"hello"}]},"assistant":{"activeByUserVariant":{"0":$index},"variantsByUserVariant":{"0":[$items]}}}]}"""
+        fun event(name:String,body:String)="event: $name\ndata: $body\n\n"
+        val prefix=event("reply_group_start","""{"sequence_id":"seq","max_messages":2}""")+event("reply_begin","""{"message_id":"a0","index":0}""")
+        val first=media("a0",0,"stop")
+        val second=media("a1",1,"sticker_saved_interrupted")
+        val stream=prefix+event("reply_committed","""{"message_id":"a0","index":0,"history":${history(first,0)}}""")+
+            event("reply_begin","""{"message_id":"a1","index":1}""")+event("reply_group_end","""{"status":"cancelled","saved":1,"history":${history("$first,$second",1)}}""")
+        server.enqueue(MockResponse().setResponseCode(200).setHeader("Content-Type","text/event-stream").setBody(stream))
+        val events=api.streamReplyRun(request).toList()
+        assertEquals("att-a0",events.filterIsInstance<ReplyRunEvent.Committed>().single().variant.attachments.single().id)
+        val end=events.last() as ReplyRunEvent.End
+        assertEquals(1,end.saved)
+        assertEquals("att-a1",end.history!!.turns.single().assistant.variantsByUserVariant.getValue("0").last().attachments.single().id)
+        assertTrue(server.takeRequest().body.readUtf8().contains("\"image_model_id\":\"fixture/image\""))
+        server.enqueue(MockResponse().setResponseCode(200).setBody(prefix+event("reply_committed","""{"message_id":"a0","index":0,"history":${history(media("a0",0,"stop",false),0)}}""")))
+        assertEquals("invalid_reply_sequence_event",(runCatching{api.streamReplyRun(request).toList()}.exceptionOrNull() as? CoastApiException)?.type)
+    }
+
 }

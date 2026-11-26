@@ -2,6 +2,7 @@ import { escapeAttribute, escapeHtml } from '../../core/dom.js';
 import { SERIES } from './models-constants.js';
 import {
   modelById,
+  imageGroupKey,
   modelKind,
   priceText,
   seriesKey,
@@ -9,7 +10,7 @@ import {
   tagText,
 } from './models-format.js';
 
-export function createModelsView({ chat, getCatalog, getSearch, getSearchDraft }) {
+export function createModelsView({ chat, getCatalog, getSearch, getSearchDraft, getKind = () => 'chat' }) {
   function row(modelId, groupName, mode = 'box') {
     const catalog = getCatalog();
     const model = modelById(catalog, modelId) || {
@@ -63,25 +64,28 @@ export function createModelsView({ chat, getCatalog, getSearch, getSearchDraft }
     const profile = chat.getProfile();
     const box = profile.model_box || { chat: [], free: [], image: [] };
     const groups = catalog?.groups || { openai_chat: [], openai_image: [], free_test: [] };
+    const kind=getKind();
+    const tabs=['chat','image','voice'].map((id,i)=>`<button type="button" data-action="models:kind" data-id="${id}" class="${kind===id?'is-current':''}" aria-pressed="${kind===id}">${['聊天模型','生图模型','语音模型'][i]}</button>`).join('');
+    const toolbar=`<form class="model-toolbar" data-submit="models:search"><input type="search" data-input="models:search-draft" placeholder="搜索${kind==='image'?'生图':'聊天'}模型" value="${escapeAttribute(getSearchDraft())}" autocomplete="off" enterkeyhint="search"><button type="submit">搜索</button><button type="button" data-action="models:refresh">刷新</button></form>`;
+    const chatBody=()=>`${group('当前聊天模型', profile.current_chat_model ? row(profile.current_chat_model, 'chat', 'current') : '')}
+        ${group('我的 Chat 模型', (box.chat || []).map((id) => row(id, 'chat')).join(''))}
+        ${catalogGroups(groups.openai_chat || [])}
+        ${group('Free Test', (box.free || []).map((id) => row(id, 'free')).join(''))}
+        ${group('Free Test 目录', filtered(groups.free_test || []).map((model) => row(model.id, 'free', 'catalog')).join(''))}`;
+    const imageBody=()=>{
+      const all=[...new Set([...(box.image||[]),...(groups.openai_image||[]).map(m=>m.id)])];
+      const entries=filtered(all.map(id=>modelById(catalog,id)||{id,name:id}));
+      const sections=['GPT','其他模型','Free'].map(label=>{
+        const models=entries.filter(m=>imageGroupKey(m.id)===label);
+        return models.length?`<details class="feature-card model-list" ${getSearch()?'open':''}><summary>${label} · ${models.length}</summary>${models.map(m=>row(m.id,'image',(box.image||[]).includes(m.id)?'box':'catalog')).join('')}</details>`:'';
+      }).join('');
+      return `${group('当前生图模型',profile.current_image_model?row(profile.current_image_model,'image','current'):'')}${group('图片模型目录',sections||'<p class="feature-empty">暂无匹配图片模型。</p>')}${catalog?.image_catalog_status==='unavailable'?'<div class="feature-card">目录暂不可用；已选模型保留，生成时重新核验。</div>':''}`;
+    };
     return {
       title: '模型箱',
       subtitle: '选择、搜索与管理模型',
       className: 'model-box',
-      body: `<form class="model-toolbar" data-submit="models:search">
-          <input type="search" data-input="models:search-draft" placeholder="搜索聊天或图片模型" value="${escapeAttribute(getSearchDraft())}" autocomplete="off" enterkeyhint="search">
-          <button type="submit">搜索</button>
-          <button type="button" data-action="models:refresh">刷新</button>
-        </form>
-        <p class="feature-meta">目录更新：${escapeHtml(catalog?.updated_at || '未刷新')} · 当前模型：${escapeHtml(profile.current_chat_model || '未选择')}</p>
-        ${group('当前聊天模型', profile.current_chat_model ? row(profile.current_chat_model, 'chat', 'current') : '')}
-        ${group('我的 Chat 模型', (box.chat || []).map((id) => row(id, 'chat')).join(''))}
-        ${catalogGroups(groups.openai_chat || [])}
-        ${group('Free Test', (box.free || []).map((id) => row(id, 'free')).join(''))}
-        ${group('Free Test 目录', filtered(groups.free_test || []).map((model) => row(model.id, 'free', 'catalog')).join(''))}
-        ${group('当前生图模型', profile.current_image_model ? row(profile.current_image_model, 'image', 'current') : '')}
-        ${catalog?.image_catalog_status === 'unavailable' ? '<p class="feature-meta">图片模型目录暂不可用；已选模型保留，生成时重新核验。</p>' : ''}
-        ${group('图片模型', (box.image || []).map((id) => row(id, 'image')).join(''))}
-        ${group('图片模型目录', filtered(groups.openai_image || []).map((model) => row(model.id, 'image', 'catalog')).join(''))}`,
+      body: `<div class="feature-card model-actions">${tabs}</div>${kind==='voice'?group('语音模型','<strong>ElevenLabs</strong><p>在线语音由部署者配置；本机语音密钥不会上传。</p>'):`${toolbar}<div class="feature-card feature-meta">目录更新：${escapeHtml(catalog?.updated_at||'未刷新')}</div>${kind==='image'?imageBody():chatBody()}`}`,
     };
   }
 
