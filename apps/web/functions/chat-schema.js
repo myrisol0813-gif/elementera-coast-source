@@ -79,6 +79,9 @@ async function createLatestSchema(db) {
   )`);
   await ensureColumn(db,'chat_reply_runs','soil_state','TEXT DEFAULT NULL');
   await ensureColumn(db,'chat_reply_runs','soil_updated_at','INTEGER DEFAULT NULL');
+  await ensureColumn(db,'chat_reply_runs','native_plan_model','TEXT DEFAULT NULL');
+  await ensureColumn(db,'chat_reply_runs','native_plan_calls_json',"TEXT NOT NULL DEFAULT '[]'");
+  await ensureColumn(db,'chat_reply_runs','native_plan_soil_revision','TEXT DEFAULT NULL');
   await run(db, `CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_reply_run_live
     ON chat_reply_runs(conversation_id) WHERE status='running'`);
   await run(db, `CREATE TABLE IF NOT EXISTS chat_profiles (

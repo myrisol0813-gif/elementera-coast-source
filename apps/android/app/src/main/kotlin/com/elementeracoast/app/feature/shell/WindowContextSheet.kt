@@ -69,6 +69,9 @@ internal fun WindowContextSheet(
     conversationId: String,
     settings: ConversationContextSettings,
     thoughtSoilEnabled: Boolean,
+    localMode:Boolean=false,
+    selectedModel:String="",
+    roomType:String="main",
     onSettingsChange: (ConversationContextSettings) -> Unit,
     onSetThoughtSoilEnabled: (Boolean) -> Unit,
     onOpenIslandLetter: () -> Unit,
@@ -77,6 +80,7 @@ internal fun WindowContextSheet(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val usable = conversationId.isNotBlank()
+    val sequenceSupported=roomType in setOf("main","radio")
 
     var usageAccess by remember { mutableStateOf(AndroidRealityContextSource.hasUsageAccess(context)) }
     var stepsAccess by remember { mutableStateOf(AndroidRealityContextSource.hasActivityRecognitionPermission(context)) }
@@ -179,12 +183,14 @@ internal fun WindowContextSheet(
             }
 
             SoftSettingsCard {
-                Text("真实连续回复",style=MaterialTheme.typography.titleSmall)
-                SettingSwitchRow(title="真实连续回复",note="执行链施工中，暂不自动追加回复；预算可先保存。",checked=false,enabled=false,onCheckedChange={})
+                SettingSwitchRow(title="真实连续回复（实验）",note=when{
+                    roomType !in setOf("main","radio")->"当前窗口不执行连续回复。"
+                    localMode->"模型可主动追加独立回复。套餐 token 为软预算，单次可能超额；未报告用量则停止追加。"
+                    selectedModel.startsWith("chatgpt-plan:")->"在线套餐需已更新服务端；token 为软预算，单次可能超额，缺失用量则停止。"
+                    else->"在线普通 API 需要已更新的服务端；模型可主动追加独立回复。"
+                },checked=settings.replySequenceEnabled,enabled=usable&&(sequenceSupported||settings.replySequenceEnabled),onCheckedChange={if(sequenceSupported||!it)onSettingsChange(settings.copy(replySequenceEnabled=it))})
                 androidx.compose.runtime.key(conversationId){
-                    com.elementeracoast.app.feature.wolf.ReplyBudgetField("单组回复上限",settings.replySequenceMaxMessages,1..20,true,usable){onSettingsChange(settings.copy(replySequenceMaxMessages=it))}
-                    com.elementeracoast.app.feature.wolf.ReplyBudgetField("累计工具调用预算",settings.replySequenceToolBudget,0..128,true,usable){onSettingsChange(settings.copy(replySequenceToolBudget=it))}
-                    com.elementeracoast.app.feature.wolf.ReplyBudgetField("累计 token 预算",settings.replySequenceTokenBudget,1..1000000,true,usable){onSettingsChange(settings.copy(replySequenceTokenBudget=it))}
+                    ReplySequenceBudgetBlock(settings,usable,onSettingsChange)
                 }
             }
             SoftSettingsCard {
@@ -342,5 +348,39 @@ private fun PermissionRow(
                 )
             ) { Text(it) }
         }
+    }
+}
+
+
+@Composable
+private fun ReplySequenceBudgetBlock(settings:ConversationContextSettings,enabled:Boolean,onSave:(ConversationContextSettings)->Unit){
+    var messages by remember(settings.replySequenceMaxMessages){mutableStateOf(settings.replySequenceMaxMessages?.toString().orEmpty())}
+    var tools by remember(settings.replySequenceToolBudget){mutableStateOf(settings.replySequenceToolBudget?.toString().orEmpty())}
+    var tokens by remember(settings.replySequenceTokenBudget){mutableStateOf(settings.replySequenceTokenBudget?.toString().orEmpty())}
+    fun valid(text:String,range:IntRange)=text.isBlank()||text.toIntOrNull()?.let{it in range}==true
+    val validAll=valid(messages,1..20)&&valid(tools,0..128)&&valid(tokens,1..1000000)
+    val dirty=messages!=settings.replySequenceMaxMessages?.toString().orEmpty()||
+        tools!=settings.replySequenceToolBudget?.toString().orEmpty()||tokens!=settings.replySequenceTokenBudget?.toString().orEmpty()
+    Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
+        Text("留空继承基本设置；工具预算可以设为 0。",style=MaterialTheme.typography.bodySmall)
+        ReplySequenceBudgetRow("单组回复上限","1—20",messages,1..20,enabled){messages=it}
+        ReplySequenceBudgetRow("累计工具预算","0—128",tools,0..128,enabled){tools=it}
+        ReplySequenceBudgetRow("累计 token 预算","1—1000000",tokens,1..1000000,enabled){tokens=it}
+        androidx.compose.material3.TextButton(enabled=enabled&&validAll&&dirty,onClick={
+            onSave(settings.copy(replySequenceMaxMessages=messages.toIntOrNull(),replySequenceToolBudget=tools.toIntOrNull(),replySequenceTokenBudget=tokens.toIntOrNull()))
+        }){Text("保存本窗口预算")}
+    }
+}
+@Composable
+private fun ReplySequenceBudgetRow(title:String,rangeLabel:String,value:String,range:IntRange,enabled:Boolean,onChange:(String)->Unit){
+    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){
+        Column(Modifier.weight(1f)){
+            Text(title,style=MaterialTheme.typography.bodyMedium)
+            Text(rangeLabel,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        OutlinedTextField(value=value,onValueChange={onChange(it.filter(Char::isDigit).take(7))},modifier=Modifier.weight(1f),
+            singleLine=true,enabled=enabled,isError=value.isNotBlank()&&value.toIntOrNull()?.let{it in range}!=true,
+            placeholder={Text("继承")},
+            keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Number))
     }
 }

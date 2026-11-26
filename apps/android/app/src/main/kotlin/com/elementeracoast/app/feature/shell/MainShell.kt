@@ -299,6 +299,9 @@ fun MainShell(
                 conversationId = state.activeConversationId,
                 settings = state.contextSettings,
                 thoughtSoilEnabled = state.thoughtSoil?.autoRefreshEnabled ?: true,
+                localMode = state.localMode,
+                selectedModel = state.currentModel,
+                roomType = state.activeRoomType.wireValue,
                 onSettingsChange = onSetContextSettings,
                 onSetThoughtSoilEnabled = onSetThoughtSoilEnabled,
                 onOpenIslandLetter = {

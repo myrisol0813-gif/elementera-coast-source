@@ -1289,8 +1289,8 @@ class CoastShellViewModel(
 
     private suspend fun generateReplyRun(cid:String,initial:RemoteHistory,tid:String,model:String,crossWindow:CrossWindowRequest){
         // Never silently switch a requested group into a paid single reply.
-        if(isChatGptPlanModel(model)){
-            showPlaceholder("ChatGPT 套餐通道尚不能执行本组累计 token 上限；请关闭连续回复后使用原套餐模型。未发起请求，也不会切换供应商。");return
+        if(isChatGptPlanModel(model)&&!localMode&&backend.officialChat==null){
+            showPlaceholder("当前安装包没有可用的套餐执行器。未发起请求，也不会切换供应商。");return
         }
         val window=initial.contextSettings
         val imageModel=_state.value.currentImageModel
@@ -1348,7 +1348,8 @@ class CoastShellViewModel(
                         else->"keyword"
                     },crossWindow.messages.map{com.elementeracoast.app.core.remote.RemoteCrossWindowMessageSelection(it.conversationId,it.messageId)}),
                 imageToolEnabled=imageModel.isNotBlank(),imageModelId=imageModel.takeIf{it.isNotBlank()})
-            backend.chat.streamReplyRun(request).collect{event->
+            val sequenceRepository=if(isChatGptPlanModel(model)&&!localMode)requireNotNull(backend.officialChat)else backend.chat
+            sequenceRepository.streamReplyRun(request).collect{event->
                 when(event){
                     is ReplyRunEvent.Start->Unit
                     is ReplyRunEvent.Begin->{mid=event.messageId;index=event.index;partial="";preview()}
@@ -1374,7 +1375,7 @@ class CoastShellViewModel(
                 catch(_:Exception){showPlaceholder("回复组已保存；思维壤整理未确认。")}
                 val group=canonical.turns.firstOrNull{it.id==tid}?.assistant?.variantsByUserVariant?.get(source.user.active.toString()).orEmpty()
                     .filter{it.replySequence?.id==sequenceId}
-                refreshGeneratedTitle(cid,user.content,group.joinToString("\n\n"){it.content})
+                if(!isChatGptPlanModel(model))refreshGeneratedTitle(cid,user.content,group.joinToString("\n\n"){it.content})
             }
         }catch(cancelled:CancellationException){
             withContext(NonCancellable){readBack()};showPlaceholder("已停止；保留确认写入的回复，不会自动重试。");throw cancelled

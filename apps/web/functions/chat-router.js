@@ -31,7 +31,7 @@ import {
 import { estimateContextTokens as estimateTokens } from './context-comfort-range.js';
 import { executeRegisteredTool } from './tool-registry.js';
 import { encodeSseEvent } from './stream-format.js';
-import { prepareNativeChatGpt, executeNativeChatGptTool, saveNativeChatGptEcho } from './native-chatgpt-chat.js';
+import { prepareNativeChatGpt, executeNativeChatGptTool, saveNativeChatGptEcho, routeNativeReplySequence } from './native-chatgpt-chat.js';
 import {
   ModelRequestError,
   modelErrorResponse,
@@ -476,7 +476,7 @@ function streamFormalChat(request, env, input, assembled, metadataContext, dogta
 async function replySequenceChat(request,env){
   if(request.method!=='POST')return methodNotAllowed('POST');
   requireSameOrigin(request);
-  if(env.COAST_REPLY_SEQUENCE_EXPERIMENTAL!=='true')throw new ChatStoreError('reply_sequence_unavailable','真实连续回复仍在施工。',409);
+  if(env.COAST_REPLY_SEQUENCE_EXPERIMENTAL==='false')throw new ChatStoreError('reply_sequence_unavailable','服务端已暂停连续回复，请关闭本窗口连续回复或联系部署者。',409);
   const value=await body(request),db=env.COAST_CHAT_DB;
   // The ChatGPT subscription adapter has no verified hard output cap for
   // this budget contract. Do not send subscription model IDs to OpenRouter.
@@ -863,6 +863,7 @@ export function isChatApiPath(pathname) {
     || pathname === LANDING_LETTER_PATH
     || pathname === MODEL_METADATA_PATH
     || pathname === '/api/chat/image-generate'
+    || pathname === '/api/chat/native-reply-sequence'
     || pathname === '/api/chat/native-context'
     || pathname === '/api/chat/native-tool'
     || pathname === '/api/chat/native-echo'
@@ -888,6 +889,7 @@ export async function routeChatApi(request, env) {
     if (pathname === ATTACHMENTS_PATH || pathname.startsWith(`${ATTACHMENTS_PATH}/`)) return await attachments(request, env, pathname);
     if (pathname === LANDING_LETTER_PATH) return await landingLetter(request, env);
     if (pathname === MODEL_METADATA_PATH) return await modelMetadataApi(request, env);
+    if (pathname === '/api/chat/native-reply-sequence') return await routeNativeReplySequence(request, env);
     if (pathname === '/api/chat/native-context') return await prepareNativeChatGpt(request, env);
     if (pathname === '/api/chat/native-tool') return await executeNativeChatGptTool(request, env);
     if (pathname === '/api/chat/native-echo') return await saveNativeChatGptEcho(request, env);

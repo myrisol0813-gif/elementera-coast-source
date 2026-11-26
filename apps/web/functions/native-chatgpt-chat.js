@@ -5,6 +5,8 @@ import { resolveChatAttachmentsForModel, applyChatAttachmentsToMessages, attachm
 import { ChatStoreError, getConversation, readConversationState, sanitizeId } from './chat-store.js';
 import { json, methodNotAllowed, readJson, sameOrigin } from './http.js';
 import { saveModelEcho } from './model-metadata-api.js';
+import { acquireReplyRun,reserveReplyStep,claimReplyStep,reserveReplyMedia,commitReplyStep,settleReplyRun,recoverStaleReplyRuns,canonicalReplyContext,isReplyRunActive,nativePlanRun,nativePlanClaim,reserveNativePlanTool,finishNativePlanTool,refreshReplyClaim } from './chat-reply-run.js';
+import { prepareReplyGroupDogtalk } from './dogtalk-store.js';
 
 const BODY_BYTES = 2 * 1024 * 1024;
 import { normalizeToolCallLimit } from './turn-tool-policy.js';
@@ -34,9 +36,9 @@ function chatSettings(value) {
   const settings = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   return {
     recentTurns: Math.max(1, Math.min(400, Number(settings.recentTurns) || 8)),
-    contextBudget: Math.max(1800, Math.min(65536, Number(settings.contextBudget) || 6000)),
+    contextBudget: settings.contextBudget===0||settings.contextBudget==='0'?0:Math.max(1800, Math.min(65536, Number(settings.contextBudget) || 6000)),
     soilBudget: Math.max(300, Math.min(4000, Number(settings.soilBudget) || 1800)),
-    worldbookEnabled: settings.worldbookEnabled !== false,
+    worldbookEnabled: settings.worldbookEnabled !== false && settings.worldbookEnabled !== 'false',
     worldbookLimit: Math.max(0, Math.min(6, Number(settings.worldbookLimit ?? 6))),
     memoryLimit: Math.max(0, Math.min(12, Number(settings.memoryLimit ?? 8))),
   };
@@ -58,21 +60,27 @@ function acceptedModel(value) {
   if (!/^[a-z0-9][a-z0-9._-]{1,127}$/i.test(model)) throw new ChatStoreError('invalid_model', 'ChatGPT 套餐模型名称格式无效。', 400);
   return model;
 }
-async function contextFromRequest(env, value, { preview = false } = {}) {
+async function contextFromRequest(env, value, { preview = false, group = null } = {}) {
   const conversationId = sanitizeId(value.conversation_id || '', 'conversation');
   const turnId = sanitizeId(value.source_turn_id || '', 'turn');
   const room = await getConversation(env.COAST_CHAT_DB, conversationId);
   if (room.room_type === 'lighthouse') throw new ChatStoreError('lighthouse_generation_disabled', '灯塔不触发聊天模型。', 409);
   const history = await readConversationState(env.COAST_CHAT_DB, conversationId);
   assertConversationTurn(history, turnId);
-  const messages = parsedMessages(value);
+  if(!group&&await isReplyRunActive(env.COAST_CHAT_DB,conversationId))throw new ChatStoreError('reply_run_active','当前窗口正在连续回复。',409);
+  const messages = group?canonicalReplyContext(history,group.identity,chatSettings(value.settings).recentTurns):parsedMessages(value);
   const suppliedText = messages.at(-1).content.trim();
   const userTurn = history.turns.find(t=>t.id===turnId);
   const actualText = userTurn.user.variants[userTurn.user.active || 0].content.trim();
-  if (actualText !== suppliedText && !(actualText === '' && suppliedText === '请查看本轮附件。')) {
+  if (!group && actualText !== suppliedText && !(actualText === '' && suppliedText === '请查看本轮附件。')) {
     throw new ChatStoreError('turn_stale', '聊天记录已更新，请重新发送本轮。', 409);
   }
   const model = acceptedModel(value);
+  let groupDogtalk;
+  if(group){
+    const previous=group.claim.previous[0]?.desk_slip?.dogtalk;
+    groupDogtalk=group.claim.index>0?(previous?.delivered&&previous.context?{context:previous.context,selected:true,reason:'same_group'}:null):preview?null:await prepareReplyGroupDogtalk(env.COAST_CHAT_DB,{conversationId,turnId,user:userTurn.user.variants[userTurn.user.active||0]});
+  }
   let assembled = await assembleCleanContext(env, {
     conversationId, sourceTurnId:turnId, messages,
     lastUser: messages.at(-1), settings: chatSettings(value.settings),
@@ -80,16 +88,16 @@ async function contextFromRequest(env, value, { preview = false } = {}) {
     realityContext: value.reality_context,
     surface:room.room_type==='radio'?'radio':'main_chat', model,
     permission:'owner', crossWindow:value.cross_window,
-    preview, exposeOpenRouterSearch:false,
+    preview, exposeOpenRouterSearch:false, ...(group?{groupDogtalk,exposeTools:group.claim.toolBudget>0}:{}),
   });
   // The direct Responses route already uses the native input_image contract
   // for owner attachments. No OpenRouter chat request is made on this path.
   assembled=await attachImageTool(env,assembled,{
     conversationId,turnId,messageId:String(value.message_id||''),roomType:room.room_type,
     chatModel:model,enabled:value.image_tool_enabled===true&&typeof value.image_model_id==='string'&&!!value.image_model_id,
-    expectedImageModel:value.image_model_id??null,visionOverride:true
+    expectedImageModel:value.image_model_id??null,visionOverride:true,sequenceId:group?.identity.sequenceId??null
   });
-  assembled=await attachStickerTools(env,assembled,{conversationId,turnId,messageId:String(value.message_id||''),roomType:room.room_type});
+  if(!group||group.claim.toolBudget>0)assembled=await attachStickerTools(env,assembled,{conversationId,turnId,messageId:String(value.message_id||''),roomType:room.room_type,sequenceId:group?.identity.sequenceId??null});
   return { assembled, conversationId, turnId, model };
 }
 
@@ -126,7 +134,8 @@ export async function executeNativeChatGptTool(request, env) {
   // Tool requests replay the same authenticated context envelope as preparation.
   // A smaller body cap breaks every tool in longer conversations before execution.
   const value=await readJson(request, BODY_BYTES);
-  const {assembled}=await contextFromRequest(env, value, {preview:true});
+  const group=value.reply_sequence_id?await nativeGroupClaim(env,value):null;
+  const {assembled}=await contextFromRequest(env, value, {preview:true,group});
   const call=value.tool_call;
   const name=String(call?.function?.name||'').trim();
   if(!name||String(call?.function?.arguments||'').length>32000) {
@@ -135,6 +144,7 @@ export async function executeNativeChatGptTool(request, env) {
   if(!namedTools(assembled.tools).some(t=>t.function.name===name)) {
     throw new ChatStoreError('tool_unavailable','模型请求的工具不在本轮允许清单中。',403);
   }
+  if(group&&!await reserveNativePlanTool(env.COAST_CHAT_DB,group.identity,group.model,value.message_id,String(call?.id||''),name,value.tool_index))throw new ChatStoreError('native_plan_tool_claim_lost','工具额度不足、重复调用或预约已变化；没有再次执行。',409);
   try {
     const result=await assembled.executeTool({
       id:String(call?.id||'').slice(0,128),
@@ -156,6 +166,8 @@ export async function executeNativeChatGptTool(request, env) {
       }}),
       furniture_runs:assembled.furnitureRuns(),desk_slip:assembled.deskSlip(),
     });
+  } finally {
+    if(group&&!await finishNativePlanTool(env.COAST_CHAT_DB,group.identity,group.model,value.message_id,String(call?.id||'')))throw new ChatStoreError('native_plan_tool_unconfirmed','工具完成回执未确认；不会自动重试。',409);
   }
 }
 
@@ -189,4 +201,95 @@ export async function saveNativeChatGptEcho(request, env) {
     raw_metadata_sanitized:null,
   };
   return json(await saveModelEcho(env,conversationId,messageId,safeSnapshot));
+}
+
+
+function planIdentity(value){
+  return {conversationId:value.conversation_id,turnId:value.source_turn_id,userVariantId:value.user_variant_id,sequenceId:value.sequence_id??value.reply_sequence_id};
+}
+function fullPlanModel(value){
+  const raw=String(value.model||'');
+  const slug=acceptedModel({model:raw.replace(/^chatgpt-plan:/,'')});
+  return 'chatgpt-plan:'+slug;
+}
+async function nativeGroupClaim(env,value){
+  const identity=planIdentity(value),model=fullPlanModel(value);
+  const claim=await nativePlanClaim(env.COAST_CHAT_DB,identity,model,value.message_id);
+  return {identity,model,claim};
+}
+
+/** Device executes Responses; server owns reservations, actual original media,
+ * and canonical history. Usage/text are device-reported, not server-attested. */
+export async function routeNativeReplySequence(request,env){
+  const invalid=assertRequest(request);if(invalid)return invalid;
+  const value=await readJson(request,BODY_BYTES),db=env.COAST_CHAT_DB;
+  const identity=planIdentity(value),model=fullPlanModel(value),slug=model.slice('chatgpt-plan:'.length);
+  const action=value.action;
+  if(action==='start'){
+    if(env.COAST_REPLY_SEQUENCE_EXPERIMENTAL==='false')throw new ChatStoreError('reply_sequence_unavailable','服务端已暂停连续回复。',409);
+    await recoverStaleReplyRuns(db,Date.now(),identity.conversationId);
+    if(!await acquireReplyRun(db,identity,value.budget||{},{nativePlanModel:model}))throw new ChatStoreError('reply_run_not_acquired','当前窗口未授权、预算不足或已有运行任务。',409);
+    const row=await nativePlanRun(db,identity,model);
+    return json({ok:true,max_messages:row.max_messages});
+  }
+  const row=await nativePlanRun(db,identity,model);
+  if(action==='settle'){
+    const status=String(value.status||'');
+    if(!await settleReplyRun(db,identity,status))throw new ChatStoreError('reply_settle_unconfirmed','任务结束未确认；请刷新，不会重试。',409);
+    return json({ok:true,history:await readConversationState(db,identity.conversationId)});
+  }
+  if(action==='heartbeat'){
+    await nativePlanClaim(db,identity,model,value.message_id);
+    return json({ok:await refreshReplyClaim(db,identity,value.message_id)});
+  }
+  if(action==='next'){
+    const mid=value.message_id,index=value.index;
+    if(!await reserveReplyStep(db,identity,mid,index)||!await claimReplyStep(db,identity,mid))throw new ChatStoreError('native_plan_claim_lost','下一条预约未确认；未发起模型调用。',409);
+    let claim=await nativePlanClaim(db,identity,model,mid);
+    const turn=claim.state.turns.find(t=>t.id===identity.turnId),active=turn.user.variants[turn.user.active];
+    const cfg=claim.state.context_settings;
+    const image=claim.toolBudget>0&&value.image_tool_enabled===true;
+    const sticker=claim.toolBudget>0&&(cfg.sticker_send_enabled||cfg.sticker_add_enabled);
+    if(image||sticker){
+      if(!await reserveReplyMedia(db,identity,mid,model,{image,sticker}))throw new ChatStoreError('reply_media_reservation_lost','媒体预约未确认。',409);
+      claim=await nativePlanClaim(db,identity,model,mid);
+    }
+    const group={identity,model,claim};
+    const envelope={...value,model:slug,message_id:mid,image_tool_enabled:image};
+    const {assembled}=await contextFromRequest(env,envelope,{preview:index>0,group});
+    const attachmentIds=(active.attachments||[]).map(a=>a.id);
+    const resolved=attachmentIds.length?await resolveChatAttachmentsForModel(env,db,{conversationId:identity.conversationId,turnId:identity.turnId,attachmentIds,modelId:slug,visionSupportedOverride:true}):null;
+    const modelMessages=[...(resolved?applyChatAttachmentsToMessages(assembled.modelMessages,resolved):assembled.modelMessages)];
+    const previous=[];
+    for(const v of claim.previous){
+      if(v.content.trim())modelMessages.push({role:'assistant',content:v.content});
+      const ids=(v.attachments||[]).filter(a=>a.image_generation?.message_id===v.id||a.sticker_delivery?.message_id===v.id).map(a=>a.id);
+      let mediaReceipt=null;
+      if(ids.length){
+        const media=await resolveChatAttachmentsForModel(env,db,{conversationId:identity.conversationId,attachmentIds:ids,modelId:slug,visionSupportedOverride:true});
+        mediaReceipt=attachmentDeskReceipt(media);
+        const note='【本组前序媒体 · 系统转交，非人类新发言】原助手消息 '+v.id+'；已保存图像 '+ids.join('、')+'。'+(media.image_parts.length?'附实际像素。':'本次未递入像素，不要声称看见。');
+        modelMessages.push(media.image_parts.length?{role:'user',content:[{type:'text',text:note},...media.image_parts]}:{role:'system',content:note});
+      }
+      previous.push({message_id:v.id,content:v.content,...(mediaReceipt?{media_receipt:mediaReceipt}:{})});
+    }
+    const desk={...assembled.deskSlip(),...(resolved?{attachments:attachmentDeskReceipt(resolved)}:{}),reply_sequence_previous:previous};
+    const tools=claim.toolBudget>0?asNativeTools(assembled.tools):[];
+    return json({ok:true,max_messages:row.max_messages,tool_budget:claim.toolBudget,token_budget:claim.tokenBudget,
+      may_continue:index+1<row.max_messages,context:{ok:true,model_messages:modelMessages,tools,desk_slip:desk,
+        limitations:{max_tools_per_turn:normalizeToolCallLimit(value.settings?.toolCallLimit)}}});
+  }
+  if(action==='commit'){
+    const claim=await nativePlanClaim(db,identity,model,value.message_id),variant=value.variant||{};
+    const receipt=value.receipt||{};
+    if(claim.calls.some(c=>!c.done)||receipt.tool_calls!==claim.calls.length||variant.id!==value.message_id||variant.model_id!==model||
+        typeof variant.content!=='string'||variant.finish_reason!=='stop')throw new ChatStoreError('native_plan_commit_invalid','设备回复或工具回执不匹配。',409);
+    const safe={id:variant.id,content:variant.content,model_id:model,finish_reason:'stop',generation_source:'chat',
+      ...(variant.usage?{usage:variant.usage}:{}),...(variant.model_echo?{model_echo:variant.model_echo}:{}),
+      furniture_runs:variant.furniture_runs||[],desk_slip:variant.desk_slip||{}};
+    const committed=await commitReplyStep(db,identity,value.message_id,safe,receipt);
+    if(!committed)throw new ChatStoreError('reply_commit_unconfirmed','回复未确认写入；不会重放。',409);
+    return json({ok:true,continue_requested:committed.receipt.continue_requested,history:await readConversationState(db,identity.conversationId)});
+  }
+  throw new ChatStoreError('native_plan_action_invalid','无效的套餐连续回复操作。',400);
 }

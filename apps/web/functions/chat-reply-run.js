@@ -39,7 +39,7 @@ function remaining(row){
   }
   return {tools,tokens};
 }
-export async function acquireReplyRun(db,identity,budget){
+export async function acquireReplyRun(db,identity,budget,{nativePlanModel=null}={}){
   await ensureChatSchema(db);
   ids(identity.conversationId,identity.turnId,identity.userVariantId,identity.sequenceId);
   const {raw,state}=await source(db,identity.conversationId);
@@ -55,9 +55,9 @@ export async function acquireReplyRun(db,identity,budget){
   const tools=Math.min(budget.toolBudget,cfg.reply_sequence_tool_budget??budget.toolBudget);
   const tokens=Math.min(budget.tokenBudget,cfg.reply_sequence_token_budget??budget.tokenBudget);
   if(max<1||list.some(v=>v.reply_sequence?.id===identity.sequenceId||['image_pending','image_tool_ready','sticker_tool_ready','image_saved','sticker_saved'].includes(v.finish_reason)))return false;
-  return changes(await stmt(db,`INSERT OR IGNORE INTO chat_reply_runs(sequence_id,conversation_id,turn_id,user_variant_id,status,max_messages,tool_budget,token_budget,updated_at)
-    SELECT ?,?,?,?,'running',?,?,?,? WHERE EXISTS(SELECT 1 FROM conversation_states s JOIN conversations c ON c.id=s.conversation_id WHERE s.conversation_id=? AND s.state_json=? AND c.deleted_at IS NULL)`,
-    identity.sequenceId,identity.conversationId,identity.turnId,identity.userVariantId,max,tools,tokens,Date.now(),identity.conversationId,raw).run());
+  return changes(await stmt(db,`INSERT OR IGNORE INTO chat_reply_runs(sequence_id,conversation_id,turn_id,user_variant_id,status,max_messages,tool_budget,token_budget,updated_at,native_plan_model)
+    SELECT ?,?,?,?,'running',?,?,?,?,? WHERE EXISTS(SELECT 1 FROM conversation_states s JOIN conversations c ON c.id=s.conversation_id WHERE s.conversation_id=? AND s.state_json=? AND c.deleted_at IS NULL)`,
+    identity.sequenceId,identity.conversationId,identity.turnId,identity.userVariantId,max,tools,tokens,Date.now(),nativePlanModel,identity.conversationId,raw).run());
 }
 export async function reserveReplyStep(db,identity,messageId,index){
   ids(messageId);
@@ -72,7 +72,7 @@ export async function reserveReplyStep(db,identity,messageId,index){
   if(list.length>=20||prior.some(r=>r.message_id===messageId)||state.turns.some(t=>Object.values(t.assistant.variantsByUserVariant).flat().some(v=>v.id===messageId)))return false;
   const group=list.filter(v=>v.reply_sequence?.id===identity.sequenceId);
   if(group.length!==index||group.some((v,i)=>v.id!==prior[i]?.message_id||v.reply_sequence.index!==i))return false;
-  return changes(await stmt(db,`UPDATE chat_reply_runs SET pending_id=?,pending_state='reserved',updated_at=? WHERE sequence_id=? AND status='running' AND pending_id IS NULL AND receipts_json=? AND EXISTS(SELECT 1 FROM conversation_states WHERE conversation_id=? AND state_json=?)`,
+  return changes(await stmt(db,`UPDATE chat_reply_runs SET pending_id=?,pending_state='reserved',native_plan_calls_json='[]',updated_at=? WHERE sequence_id=? AND status='running' AND pending_id IS NULL AND receipts_json=? AND EXISTS(SELECT 1 FROM conversation_states WHERE conversation_id=? AND state_json=?)`,
     messageId,Date.now(),identity.sequenceId,row.receipts_json,identity.conversationId,raw).run());
 }
 export async function claimReplyStep(db,identity,messageId){
@@ -141,6 +141,7 @@ export async function commitReplyStep(db,identity,messageId,variant,receipt){
   const originals=(slot?.attachments||[]).filter(a=>a.image_generation?.message_id===messageId||a.sticker_delivery?.message_id===messageId);
   if((slot?list.length>20:list.length>=20)||!budget||typeof variant?.content!=='string'||(!variant.content.trim()&&!originals.length)||variant.id!==messageId)return null;
   const calls=receipt?.tool_calls,tokens=receipt?.total_tokens;
+  if(row.native_plan_model){const executed=JSON.parse(row.native_plan_calls_json||'[]');if(executed.some(c=>!c.done)||calls!==executed.length||variant.model_id!==row.native_plan_model)return null;}
   const known=Number.isSafeInteger(calls)&&calls>=0&&calls<=budget.tools&&Number.isSafeInteger(tokens)&&tokens>=0;
   const record={message_id:messageId,tool_calls:known?calls:null,total_tokens:known?tokens:null,
     continue_requested:known&&tokens<budget.tokens&&receipt?.continue_requested===true&&variant.finish_reason==='stop'};
@@ -153,10 +154,10 @@ export async function commitReplyStep(db,identity,messageId,variant,receipt){
   // Both writes run in one D1 transaction. The ledger advance requires the
   // exact new canonical history, while the history requires the claimed step.
   const result=await db.batch([
-    stmt(db,`UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS(SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL) AND EXISTS(SELECT 1 FROM chat_reply_runs WHERE sequence_id=? AND status='running' AND pending_id=? AND pending_state='claimed' AND receipts_json=?)`,
-      newRaw,stamp,identity.conversationId,raw,identity.conversationId,identity.sequenceId,messageId,row.receipts_json),
-    stmt(db,`UPDATE chat_reply_runs SET pending_id=NULL,pending_state=NULL,receipts_json=?,updated_at=? WHERE sequence_id=? AND status='running' AND pending_id=? AND pending_state='claimed' AND receipts_json=? AND EXISTS(SELECT 1 FROM conversation_states WHERE conversation_id=? AND state_json=?)`,
-      newReceipts,stamp,identity.sequenceId,messageId,row.receipts_json,identity.conversationId,newRaw),
+    stmt(db,`UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS(SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL) AND EXISTS(SELECT 1 FROM chat_reply_runs WHERE sequence_id=? AND status='running' AND pending_id=? AND pending_state='claimed' AND receipts_json=? AND native_plan_calls_json=?)`,
+      newRaw,stamp,identity.conversationId,raw,identity.conversationId,identity.sequenceId,messageId,row.receipts_json,row.native_plan_calls_json),
+    stmt(db,`UPDATE chat_reply_runs SET pending_id=NULL,pending_state=NULL,receipts_json=?,updated_at=? WHERE sequence_id=? AND status='running' AND pending_id=? AND pending_state='claimed' AND receipts_json=? AND native_plan_calls_json=? AND EXISTS(SELECT 1 FROM conversation_states WHERE conversation_id=? AND state_json=?)`,
+      newReceipts,stamp,identity.sequenceId,messageId,row.receipts_json,row.native_plan_calls_json,identity.conversationId,newRaw),
     stmt(db,`UPDATE conversations SET updated_at=? WHERE id=? AND deleted_at IS NULL AND EXISTS(SELECT 1 FROM chat_reply_runs WHERE sequence_id=? AND receipts_json=?)`,
       stamp,identity.conversationId,identity.sequenceId,newReceipts),
   ]);
@@ -312,20 +313,76 @@ export async function executeDurableReplyRun(db,identity,budget,{invoke,emit=()=
 
 // One automatic organizer claim per settled group. A lost receipt is not
 // retried automatically, just as a lost provider response is not replayed.
-export async function claimReplyRunSoil(db,conversationId,sequenceId,tailId){
+export async function claimReplyRunSoil(db,conversationId,sequenceId,tailId,{nativePlanRevision=null,nativePlanModel=null}={}){
   await ensureChatSchema(db);ids(conversationId,sequenceId,tailId);
   const row=await stmt(db,'SELECT * FROM chat_reply_runs WHERE conversation_id=? AND sequence_id=?',conversationId,sequenceId).first();
-  if(!row||row.status==='running'||row.soil_state||receipts(row).at(-1)?.message_id!==tailId)return false;
+  if(!row||row.status==='running'||row.soil_state||receipts(row).at(-1)?.message_id!==tailId||(row.native_plan_model||null)!==nativePlanModel)return false;
   const {raw,state}=await source(db,conversationId);
   const {turn,key,list}=branch(state,row.turn_id,row.user_variant_id);
   const group=list.filter(v=>v.reply_sequence?.id===sequenceId);
   const records=receipts(row);
   if(group.length!==records.length||group.some((v,i)=>v.id!==records[i].message_id||v.reply_sequence.index!==i)
     ||list[turn.assistant.activeByUserVariant[key]]?.id!==tailId)return false;
-  return changes(await stmt(db,`UPDATE chat_reply_runs SET soil_state='claimed',soil_updated_at=? WHERE sequence_id=? AND status!='running' AND soil_state IS NULL AND receipts_json=? AND EXISTS(SELECT 1 FROM conversation_states WHERE conversation_id=? AND state_json=?) AND NOT EXISTS(SELECT 1 FROM chat_reply_runs WHERE conversation_id=? AND status='running')`,
-    Date.now(),sequenceId,row.receipts_json,conversationId,raw,conversationId).run());
+  return changes(await stmt(db,`UPDATE chat_reply_runs SET soil_state='claimed',soil_updated_at=?,native_plan_soil_revision=? WHERE sequence_id=? AND status!='running' AND soil_state IS NULL AND receipts_json=? AND EXISTS(SELECT 1 FROM conversation_states WHERE conversation_id=? AND state_json=?) AND NOT EXISTS(SELECT 1 FROM chat_reply_runs WHERE conversation_id=? AND status='running')`,
+    Date.now(),nativePlanRevision,sequenceId,row.receipts_json,conversationId,raw,conversationId).run());
 }
 export async function finishReplyRunSoil(db,conversationId,sequenceId,status){
   if(!['done','skipped','failed'].includes(status))fail('reply_soil_status_invalid','整理状态无效。');
-  return changes(await stmt(db,"UPDATE chat_reply_runs SET soil_state=?,soil_updated_at=? WHERE conversation_id=? AND sequence_id=? AND soil_state='claimed'",status,Date.now(),conversationId,sequenceId).run());
+  return changes(await stmt(db,"UPDATE chat_reply_runs SET soil_state=?,soil_updated_at=? WHERE conversation_id=? AND sequence_id=? AND soil_state IN ('claimed','committing')",status,Date.now(),conversationId,sequenceId).run());
+}
+
+
+// Native plan inference remains on the authenticated owner's device. The
+// ledger binds that client-reported execution to one exact model/step;
+// it cannot independently attest the upstream token receipt.
+export async function nativePlanRun(db,identity,model){
+  await ensureChatSchema(db);
+  const row=await rowFor(db,identity);
+  if(!row||row.native_plan_model!==model)fail('native_plan_group_missing','套餐回复组身份或模型不匹配。');
+  return row;
+}
+export async function nativePlanClaim(db,identity,model,messageId){
+  const row=await nativePlanRun(db,identity,model);
+  if(row.status!=='running'||row.pending_state!=='claimed'||row.pending_id!==messageId)fail('native_plan_claim_lost','套餐回复预约已失效。');
+  const {state}=await source(db,identity.conversationId);
+  if(!state.context_settings.reply_sequence_enabled)fail('native_plan_claim_lost','窗口连续回复授权已撤销。');
+  const {list}=branch(state,identity.turnId,identity.userVariantId);
+  const budget=remaining(row);
+  if(!budget||budget.tokens<=0)fail('native_plan_budget','套餐回复组预算已用尽。');
+  return {row,state,index:receipts(row).length,toolBudget:budget.tools,tokenBudget:budget.tokens,
+    previous:list.filter(v=>v.reply_sequence?.id===identity.sequenceId),calls:JSON.parse(row.native_plan_calls_json||'[]')};
+}
+export async function reserveNativePlanTool(db,identity,model,messageId,callId,name,index){
+  ids(callId);
+  const claim=await nativePlanClaim(db,identity,model,messageId),{row,calls}=claim;
+  if(!Number.isSafeInteger(index)||index!==calls.length||index>=claim.toolBudget||calls.some(c=>c.id===callId||!c.done)||
+      (['image_generate','voice_create'].includes(name)&&calls.some(c=>c.name===name)))return false;
+  // Reserve before a write or paid tool. Lost responses are not replayed.
+  return changes(await stmt(db,`UPDATE chat_reply_runs SET native_plan_calls_json=?,updated_at=?
+    WHERE sequence_id=? AND status='running' AND pending_state='claimed' AND pending_id=? AND native_plan_model=? AND native_plan_calls_json=?`,
+    JSON.stringify([...calls,{id:callId,name,done:false}]),Date.now(),identity.sequenceId,messageId,model,row.native_plan_calls_json).run());
+}
+export async function claimNativePlanSoilCommit(db,conversationId,sequenceId,model,tailId,revision){
+  await ensureChatSchema(db);
+  ids(conversationId,sequenceId,tailId);
+  const row=await stmt(db,'SELECT * FROM chat_reply_runs WHERE conversation_id=? AND sequence_id=?',conversationId,sequenceId).first();
+  if(!row||row.native_plan_model!==model||row.soil_state!=='claimed'||row.native_plan_soil_revision!==revision||
+    receipts(row).at(-1)?.message_id!==tailId)return false;
+  const {raw,state}=await source(db,conversationId);
+  if(state.updated_at!==revision)return false;
+  const {turn,key,list}=branch(state,row.turn_id,row.user_variant_id);
+  if(list[turn.assistant.activeByUserVariant[key]]?.id!==tailId)return false;
+  return changes(await stmt(db,`UPDATE chat_reply_runs SET soil_state='committing',soil_updated_at=?
+    WHERE sequence_id=? AND soil_state='claimed' AND native_plan_soil_revision=? AND EXISTS(SELECT 1 FROM conversation_states WHERE conversation_id=? AND state_json=?)
+    AND NOT EXISTS(SELECT 1 FROM chat_reply_runs WHERE conversation_id=? AND status='running')`,
+    Date.now(),sequenceId,revision,conversationId,raw,conversationId).run());
+}
+
+export async function finishNativePlanTool(db,identity,model,messageId,callId){
+  const {row,calls}=await nativePlanClaim(db,identity,model,messageId);
+  if(calls.at(-1)?.id!==callId||calls.at(-1)?.done)return false;
+  const next=calls.map(c=>c.id===callId?{...c,done:true}:c);
+  return changes(await stmt(db,`UPDATE chat_reply_runs SET native_plan_calls_json=?,updated_at=?
+    WHERE sequence_id=? AND native_plan_model=? AND status='running' AND pending_id=? AND pending_state='claimed' AND native_plan_calls_json=?`,
+    JSON.stringify(next),Date.now(),identity.sequenceId,model,messageId,row.native_plan_calls_json).run());
 }

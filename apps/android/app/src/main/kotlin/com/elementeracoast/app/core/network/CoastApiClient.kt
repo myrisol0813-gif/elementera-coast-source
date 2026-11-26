@@ -499,11 +499,12 @@ class CoastApiClient(
         return jsonRequest(Request.Builder().url(config.url("/api/memory/soil/organize")).post(jsonBody(payload)).build(),RemoteSoilOrganizeResponse.serializer())
     }
 
-    suspend fun preparePlanSoil(conversationId: String, modelId: String): RemotePlanSoilPrepareResponse {
+    suspend fun preparePlanSoil(conversationId: String, modelId: String, sequenceId:String?=null): RemotePlanSoilPrepareResponse {
         val payload = buildJsonObject {
             put("conversation_id", conversationId)
             put("model", modelId)
             put("action", "prepare")
+            sequenceId?.let{put("reply_sequence_id",it)}
         }.toString()
         return jsonRequest(
             Request.Builder().url(config.url("/api/memory/soil/plan"))
@@ -515,7 +516,7 @@ class CoastApiClient(
     suspend fun commitPlanSoil(
         conversationId: String, modelId: String,
         prepared: RemotePlanSoilPrepareResponse, text: String,
-        inputTokens: Long?, cachedTokens: Long?, outputTokens: Long?
+        inputTokens: Long?, cachedTokens: Long?, outputTokens: Long?, sequenceId:String?=null
     ): RemoteSoilOrganizeResponse {
         val payload = buildJsonObject {
             put("conversation_id", conversationId)
@@ -524,6 +525,7 @@ class CoastApiClient(
             put("expected_turn_id", prepared.expectedTurnId)
             put("expected_assistant_id", prepared.expectedAssistantId)
             put("expected_soil_revision", prepared.expectedSoilRevision)
+            sequenceId?.let{put("reply_sequence_id",it);put("expected_history_revision",prepared.expectedHistoryRevision)}
             put("result_text", text)
             put("usage", buildJsonObject {
                 inputTokens?.let { put("input_tokens", it) }
@@ -561,6 +563,16 @@ class CoastApiClient(
             }
         }
         awaitClose { call.cancel(); readerJob.cancel() }
+    }
+
+    internal suspend fun nativePlanReplyRun(request:RemoteReplyRunRequest,action:String,extra:JsonObject=buildJsonObject{}):NativePlanRunResponse {
+        require(config.localTransport==null) { "本机连续回复不访问云端预约。" }
+        val payload=buildJsonObject{
+            json.encodeToJsonElement(RemoteReplyRunRequest.serializer(),request).jsonObject.forEach{(key,value)->put(key,value)}
+            put("action",action)
+            extra.forEach{(key,value)->put(key,value)}
+        }
+        return jsonRequest(Request.Builder().url(config.url("/api/chat/native-reply-sequence")).post(jsonBody(payload.toString())).build(),NativePlanRunResponse.serializer())
     }
 
     /** Dedicated stream; legacy single-reply events cannot complete a group. */

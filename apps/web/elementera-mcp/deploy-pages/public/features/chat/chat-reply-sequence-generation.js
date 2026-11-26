@@ -91,7 +91,7 @@ export function createReplySequenceGenerator({runtime,toast,dogtalk,setHistory,c
       composerState();
     }
     if(runtime.deletedIds.has(conversationId))return false;
-    if(ended?.message&&ended.status==='failed')toast(ended.message+'；已保存的消息保留。');
+    if(ended&&!['completed','limit_reached'].includes(ended.status))toast((ended.message||'连续回复已停止。')+'；已保存的消息保留。');
     if(committed){void voice?.load(conversationId,{force:true});}
     if(ended&&committed){
       try{
