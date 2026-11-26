@@ -19,7 +19,7 @@ export async function writeOfflineV2(source,sink,{ownerLabel='屋主',device=nul
   const key=x=>x.row.module+'/'+x.row.id;
   const load=async row=>{const d=objects.get(row.record_object);if(!d)throw Error('归档记录缺失');const raw=new Uint8Array(d.size);let at=0;for await(const b of objectChunks(d)){raw.set(b,at);at+=b.length;}if(at!==d.size)throw Error('归档记录不完整');return JSON.parse(decoder.decode(raw));};
   const text=async(path,value)=>{const raw=utf8.encode(value);await zip.entry(path,raw.length,chunks(raw));};
-  const title=x=>x.kind==='chat'||x.kind==='local_chat'?x.data.conversation?.title||x.row.id:x.kind==='library_notes'?({highlight:'划线',annotation:'批注',reflection:'读后感'})[x.data.kind]||'笔迹':x.data.title||x.data.name||(x.kind==='vault_treasures'?x.data.kind+' · '+x.data.source_id:x.kind+' · '+x.row.id);
+  const title=x=>x.kind==='chat'||x.kind==='local_chat'?x.data.conversation?.title||x.row.id:x.kind==='vault_stickers'?'表情包 · '+String(x.data.description||'').slice(0,45):x.kind==='library_notes'?({highlight:'划线',annotation:'批注',reflection:'读后感'})[x.data.kind]||'笔迹':x.data.title||x.data.name||(x.kind==='vault_treasures'?x.data.kind+' · '+x.data.source_id:x.kind+' · '+x.row.id);
   const link=(x,hash='')=>x.index+'.html'+hash;
   try{
     for(const [i,row] of manifest.records.entries()){
@@ -62,6 +62,10 @@ export async function writeOfflineV2(source,sink,{ownerLabel='屋主',device=nul
       }else if(x.kind==='library_chapters'){
         const book=books.get(data.book_id);
         body=(book?'<a href="'+link(book)+'">返回阅读档案</a>':'')+String(data.body||'').split(/\n\s*\n/).map(s=>s.trim()).filter(Boolean).map((s,i)=>'<p id="p-'+i+'">'+esc(s)+'</p>').join('');
+      }else if(x.kind==='vault_stickers'){
+        const m=attachments.get(data.conversation_id+':'+data.attachment_id);
+        if(!m)warnings.push('表情包原件未匹配：'+data.id);
+        body='<article><small>'+esc(data.author==='assistant'?'模型添加':'屋主添加')+' · '+(Number(data.enabled)===1?'已启用':'已停用')+' · '+esc(time(data.created_at))+'</small><p>'+esc(data.description)+'</p>'+(m?mediaHtml(m):'<p>原件未归档。</p>')+'</article>';
       }else if(x.kind==='vault_treasures'){
         const lookup=data.conversation_id+':'+data.source_id,m=data.kind==='audio'?voices.get(lookup):attachments.get(lookup),chat=chatLinks.get(data.conversation_id);
         body='<article><small>'+esc(data.kind)+' · '+esc(time(data.created_at))+'</small><p>'+esc(data.excerpt)+'</p><p>'+esc(data.notes)+'</p>'+(m?mediaHtml(m):'')+(chat?'<a href="'+link(chat)+'">回到来源窗口</a>':'')+'</article>';

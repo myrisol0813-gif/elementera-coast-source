@@ -68,6 +68,7 @@ internal object OfflineV2HtmlArchive {
                 "local_chat","chat"->item.data["conversation"].obj().s("title").ifBlank{item.row.id}
                 "library_books","library_chapters"->item.data.s("title").ifBlank{item.kind}
                 "library_notes"->when(item.data.s("kind")){"highlight"->"划线";"annotation"->"批注";else->"读后感"}
+                "vault_stickers"->"表情包 · "+item.data.s("description").take(45)
                 "vault_treasures"->item.data.s("display_name").ifBlank{item.data.s("kind")+" · "+item.data.s("source_id")}
                 else->item.data.s("name").ifBlank{item.data.s("title").ifBlank{item.kind+" · "+item.row.id}}
             }
@@ -146,6 +147,12 @@ internal object OfflineV2HtmlArchive {
                             val id=data.s("book_id")
                             books.firstOrNull{it.data.s("id")==id}?.let{append("<a href=\""+it.index+".html\">返回阅读档案</a>")}
                             data.s("body").split(Regex("\\n\\s*\\n")).map{it.trim()}.filter{it.isNotEmpty()}.forEachIndexed{i,para->append("<p id=\"p-$i\">"+esc(para)+"</p>")}
+                        }
+                        item.kind=="vault_stickers"->buildString {
+                            val m=attachments[data.s("conversation_id")+":"+data.s("attachment_id")]
+                            append("<article><small>"+(if(data.s("author")=="assistant")"模型添加" else "屋主添加")+" · "+(if(data.s("enabled")=="1")"已启用" else "已停用")+" · "+esc(time(data.s("created_at")))+"</small><p>"+esc(data.s("description"))+"</p>")
+                            if(m!=null)append(media(m)) else {append("<p>原件未归档。</p>");warnings.add("表情包原件未匹配："+data.s("id"))}
+                            append("</article>")
                         }
                         item.kind=="vault_treasures"->buildString {
                             append("<article><small>"+esc(data.s("kind"))+" · "+esc(time(data.s("created_at")))+"</small><p>"+esc(data.s("excerpt"))+"</p><p>"+esc(data.s("notes"))+"</p>")

@@ -45,7 +45,7 @@ internal class LocalStickerLibrary(private val store:LocalPersistence){
         val desc=description(raw)
         require(mime in MIMES&&bytes.size in 1..8*1024*1024){"请选择8 MiB以内的 PNG、JPEG 或 WebP。"}
         prepareGeneratedImageReadback("upload",bytes,mime,false)
-        val safeName=name.map{if(it in listOf('\\\\','/','\\r','\\n','\\t'))' ' else it}.joinToString("").trim().take(180).ifBlank{"表情包"}
+        val safeName=name.map{if(it in listOf('\\','/','\r','\n','\t'))' ' else it}.joinToString("").trim().take(180).ifBlank{"表情包"}
         val cache=RemoteCacheStore(s,strictReads=true);val all=cache.conversations()
         val now=Instant.now().toString()
         val source=all.filter{it.source=="sticker_library"&&it.deletedAt==null}.sortedWith(compareBy<RemoteConversation>{it.createdAt.orEmpty()}.thenBy{it.id}).firstOrNull()

@@ -107,4 +107,20 @@ class LocalStickerLibraryTest {
         return RemoteAttachment(id="image-original",type="image",name="wolf.png",mime="image/png",size=png.size.toLong())
     }
 
+    @Test fun directUploadUsesOneArchiveSourceWithoutMessages(){
+        val store=MemoryLocalPersistence();val lib=LocalStickerLibrary(store)
+        val png=byteArrayOf(137.toByte(),80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,6,0,0,0)
+        assertTrue(runCatching{lib.upload("bad.png","image/png","坏图片",byteArrayOf(1,2,3))}.isFailure)
+        assertTrue(RemoteCacheStore(store).conversations().isEmpty())
+        val first=lib.upload("wolf.png","image/png","摇尾巴",png)
+        val second=lib.upload("wolf2.png","image/png","第二张",png)
+        assertEquals(first.conversationId,second.conversationId)
+        val source=RemoteCacheStore(store).conversations().single()
+        assertEquals("sticker_library",source.source)
+        assertTrue(RemoteCacheStore(store).history(source.id)!!.turns.isEmpty())
+        assertEquals(2,lib.archiveRows().size)
+        val raw=LocalAttachmentStore(store)
+        assertTrue(raw.entries().all{raw.bytes(it).contentEquals(png)})
+    }
+
 }
