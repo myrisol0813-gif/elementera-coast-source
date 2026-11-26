@@ -243,7 +243,7 @@ export function createSettings({ storage, shell, chat, router, toast, memory, da
     toast('正在采集已验证的 V2 资料…', 3000);
     const signature = preferences().ownerSignature || preferences().ownerName || '屋主';
     const prefs=preferences();
-    const safeRunKeys=['recentTurns','contextBudget','outputLength','maxOutputTokens','creativity','streamingEnabled','soilBudget','seedCooldownTurns','worldbookEnabled','worldbookLimit','memoryLimit','toolCallLimit'];
+    const safeRunKeys=['recentTurns','contextBudget','outputLength','maxOutputTokens','creativity','streamingEnabled','soilBudget','seedCooldownTurns','worldbookEnabled','worldbookLimit','memoryLimit','toolCallLimit','replySequenceMaxMessages','replySequenceToolBudget','replySequenceTokenBudget'];
     const run_control=Object.fromEntries(Object.entries(storage.read().runControl||{}).filter(([key,value])=>safeRunKeys.includes(key)&&['string','number','boolean'].includes(typeof value)));
     const device={exported_from:'pwa',current_app_version:currentAppVersion(),signature,theme:prefs.theme,userBubble:prefs.userBubble,accent:prefs.accent,run_control};
     const result=await saveOfflineV2({applicationId:'com.elementeracoast.source',filename:`elementera-coast-offline-${timestampLabel()}.zip`,ownerLabel:signature,device});

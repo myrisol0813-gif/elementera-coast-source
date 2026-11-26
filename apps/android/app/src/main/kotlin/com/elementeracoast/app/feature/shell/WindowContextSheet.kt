@@ -179,6 +179,15 @@ internal fun WindowContextSheet(
             }
 
             SoftSettingsCard {
+                Text("真实连续回复",style=MaterialTheme.typography.titleSmall)
+                SettingSwitchRow(title="真实连续回复",note="执行链施工中，暂不自动追加回复；预算可先保存。",checked=false,enabled=false,onCheckedChange={})
+                androidx.compose.runtime.key(conversationId){
+                    com.elementeracoast.app.feature.wolf.ReplyBudgetField("单组回复上限",settings.replySequenceMaxMessages,1..20,true,usable){onSettingsChange(settings.copy(replySequenceMaxMessages=it))}
+                    com.elementeracoast.app.feature.wolf.ReplyBudgetField("累计工具调用预算",settings.replySequenceToolBudget,0..128,true,usable){onSettingsChange(settings.copy(replySequenceToolBudget=it))}
+                    com.elementeracoast.app.feature.wolf.ReplyBudgetField("累计 token 预算",settings.replySequenceTokenBudget,1..1000000,true,usable){onSettingsChange(settings.copy(replySequenceTokenBudget=it))}
+                }
+            }
+            SoftSettingsCard {
                 Text("表情包",style=MaterialTheme.typography.titleSmall)
                 SettingSwitchRow(title="允许发送表情包",note="自主查找并发送已登记素材；本机还需开启模型工具与写入权限。",checked=settings.stickerSendEnabled,enabled=usable,onCheckedChange={onSettingsChange(settings.copy(stickerSendEnabled=it))})
                 SettingSwitchRow(title="允许添加表情包",note="登记自己在当前窗口生成的图片；本机还需写入权限。",checked=settings.stickerAddEnabled,enabled=usable,onCheckedChange={onSettingsChange(settings.copy(stickerAddEnabled=it))})
