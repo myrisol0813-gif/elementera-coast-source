@@ -2,6 +2,7 @@ import { replyTokenBudget } from './chat-profile.js';
 
 export const RUN_SETTING_KEYS = Object.freeze([
   'recentTurns',
+  'toolCallLimit',
   'contextBudget',
   'outputLength',
   'maxOutputTokens',

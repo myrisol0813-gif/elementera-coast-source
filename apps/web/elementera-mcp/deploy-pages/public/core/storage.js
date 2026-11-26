@@ -45,6 +45,7 @@ function defaultRoom(kind) {
 
 const ACTIVE_RUN_CONTROL_DEFAULTS = Object.freeze({
   recentTurns: 8,
+  toolCallLimit: 24,
   contextBudget: 6000,
   outputLength: 'auto',
   maxOutputTokens: 8000,

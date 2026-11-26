@@ -6,7 +6,7 @@ import { json, methodNotAllowed, readJson, sameOrigin } from './http.js';
 import { saveModelEcho } from './model-metadata-api.js';
 
 const BODY_BYTES = 2 * 1024 * 1024;
-const MAX_TOOLS_PER_TURN = 24;
+import { normalizeToolCallLimit } from './turn-tool-policy.js';
 
 function assertRequest(request) {
   if (request.method !== 'POST') return methodNotAllowed('POST');
@@ -112,7 +112,7 @@ export async function prepareNativeChatGpt(request, env) {
     tools,
     desk_slip: { ...assembled.deskSlip(), ...(resolved ? {attachments:attachmentDeskReceipt(resolved)} : {}) },
     // This is not a hidden clamp: unsupported OpenRouter-hosted tools are excluded.
-    limitations:{ hosted_openrouter_search:false, max_tools_per_turn:MAX_TOOLS_PER_TURN },
+    limitations:{ hosted_openrouter_search:false, max_tools_per_turn:normalizeToolCallLimit(value.settings?.toolCallLimit) },
     selected_memory_ids:assembled.selected_memory_ids,
   });
 }

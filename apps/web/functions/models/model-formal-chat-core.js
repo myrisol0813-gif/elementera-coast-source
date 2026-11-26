@@ -1,4 +1,5 @@
 import { OPENROUTER_CHAT_URL, OPENROUTER_REFERER } from './model-constants.js';
+import { normalizeToolCallLimit, DEFAULT_TOOL_CALL_LIMIT } from '../turn-tool-policy.js';
 import { openRouterKey } from './model-catalog.js';
 import { prepareFormalChat } from './model-payload.js';
 import { assertWireInputBudget } from '../context-budget.js';
@@ -237,8 +238,6 @@ function safeToolFailure(error) {
   };
 }
 
-const MAX_TURN_TOOLS = 24;
-const MAX_TOOL_ROUNDS = 24;
 const TOOL_LIMIT_NOTICE = '本轮工具额度已用完，额外调用未执行。已完成的操作保留。';
 const toolLimitReceipt = () => ({ok:false,error:{type:'tool_limit',message:'本轮工具额度已用完，此项未执行。请根据已有结果完成回复。'}});
 function finalToolPayload(payload, finalOnly) {
@@ -250,7 +249,7 @@ function finalToolPayload(payload, finalOnly) {
   return next;
 }
 
-async function executeToolCalls(calls, executeTool, remaining = MAX_TURN_TOOLS) {
+async function executeToolCalls(calls, executeTool, remaining = DEFAULT_TOOL_CALL_LIMIT) {
   const results = [];
   const messages = [];
   for (const call of calls) {
@@ -330,9 +329,10 @@ export async function performFormalChatWithTools(env, input = {}, {
   let usage = null;
   let messages = [...prepared.payload.messages];
 
+  const toolLimit=normalizeToolCallLimit(input.settings?.toolCallLimit);
   let rounds = 0;
   while (true) {
-    const finalOnly = rounds++ >= MAX_TOOL_ROUNDS || allToolResults.length >= MAX_TURN_TOOLS;
+    const finalOnly = rounds++ >= toolLimit || allToolResults.length >= toolLimit;
     const payload = finalToolPayload({ ...prepared.payload, messages }, finalOnly);
     assertWireInputBudget(payload, undefined, providerCalls.length > 0);
     const upstream = await requestOpenRouter(env, payload, 'Elementera Coast Formal Chat');
@@ -375,7 +375,7 @@ export async function performFormalChatWithTools(env, input = {}, {
     if (typeof executeTool !== 'function') {
       throw new ModelRequestError('tool_executor_missing', '模型请求了本地工具，但当前调用没有工具执行器。', 500);
     }
-    const executed = await executeToolCalls(calls, executeTool, Math.max(0, MAX_TURN_TOOLS - allToolResults.length));
+    const executed = await executeToolCalls(calls, executeTool, Math.max(0, toolLimit - allToolResults.length));
     allToolResults.push(...executed.results);
     messages = [
       ...messages,
@@ -421,6 +421,7 @@ export async function* performFormalChatStream(env, input = {}, {
   let generationId = crypto.randomUUID();
   let totalUsage = null;
   let completedToolCalls = 0;
+  const toolLimit=normalizeToolCallLimit(input.settings?.toolCallLimit);
   let rounds = 0;
   const metadataCollector = typeof onMetadata === 'function'
     ? createModelMetadataCollector({
@@ -432,7 +433,7 @@ export async function* performFormalChatStream(env, input = {}, {
 
   try {
     while (true) {
-      const finalOnly = rounds++ >= MAX_TOOL_ROUNDS || completedToolCalls >= MAX_TURN_TOOLS;
+      const finalOnly = rounds++ >= toolLimit || completedToolCalls >= toolLimit;
       const payload = finalToolPayload({
         ...prepared.payload,
         messages,
@@ -502,7 +503,7 @@ export async function* performFormalChatStream(env, input = {}, {
         if (typeof executeTool !== 'function') {
           throw new ModelRequestError('tool_executor_missing', '模型请求了本地工具，但当前调用没有工具执行器。', 500);
         }
-        const executed = await executeToolCalls(calls, executeTool, Math.max(0, MAX_TURN_TOOLS - completedToolCalls));
+        const executed = await executeToolCalls(calls, executeTool, Math.max(0, toolLimit - completedToolCalls));
         completedToolCalls += executed.results.length;
         metadataCollector?.addToolResults(executed.results);
         for (const result of executed.results) {
