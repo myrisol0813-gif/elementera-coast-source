@@ -96,7 +96,7 @@ assert.equal(resolveReplySequenceBudget(globalBudget,{reply_sequence_enabled:tru
 // Durable server-side reservation and canonical commit use real SQLite via D1.
 const {D1Database}=await import('./d1-helper.mjs');
 const {createConversation,writeConversationState,readConversationState}=await import('../functions/chat-store.js');
-const {acquireReplyRun,reserveReplyStep,claimReplyStep,commitReplyStep,settleReplyRun,recoverStaleReplyRuns}=await import('../functions/chat-reply-run.js');
+const {acquireReplyRun,reserveReplyStep,claimReplyStep,commitReplyStep,settleReplyRun,recoverStaleReplyRuns,refreshReplyClaim}=await import('../functions/chat-reply-run.js');
 const db=new D1Database(),cv=await createConversation(db,'sequence','main');
 const ident={conversationId:cv.id,turnId:'durable-turn',userVariantId:'durable-user',sequenceId:'durable-seq'};
 const base={context_settings:{reply_sequence_enabled:true,reply_sequence_tool_budget:0},turns:[{id:ident.turnId,user:{variants:[{id:ident.userVariantId,content:'hello'}]}}]};
@@ -125,7 +125,12 @@ const interrupted={...ident,sequenceId:'interrupted-seq'};
 assert.equal(await acquireReplyRun(db,interrupted,quota),true);
 assert.equal(await reserveReplyStep(db,interrupted,'uncertain',0),true);
 assert.ok(await claimReplyStep(db,interrupted,'uncertain'));
-assert.equal(await recoverStaleReplyRuns(db,Date.now()+31*60*1000),1);
+const clock=Date.now();
+assert.equal(await refreshReplyClaim(db,interrupted,'not-owned',clock+29*60*1000),false);
+assert.equal(await refreshReplyClaim(db,interrupted,'uncertain',clock+29*60*1000),true);
+assert.equal(await recoverStaleReplyRuns(db,clock+31*60*1000),0);
+assert.equal(await recoverStaleReplyRuns(db,clock+60*60*1000),1);
+assert.equal(await refreshReplyClaim(db,interrupted,'uncertain',clock+61*60*1000),false);
 assert.equal(await claimReplyStep(db,interrupted,'uncertain'),null);
 assert.equal(await acquireReplyRun(db,interrupted,quota),false);
 assert.equal(await commitReplyStep(db,interrupted,'uncertain',{id:'uncertain',content:'late',finish_reason:'stop'},{tool_calls:0,total_tokens:1}),null);
@@ -163,6 +168,10 @@ await saveMysticDogtalk(routeDb,{...draftScope,body:'original authorized draft',
 const routeBody={...routeIdentity,cross_window:{mode:'manual',messages:[{conversation_id:crossCv.id,message_id:'cross-user'}]},model:'openai/gpt-4.1-nano',settings:{streamingEnabled:false,contextBudget:6000},budget:{maxMessages:2,toolBudget:0,tokenBudget:48000}};
 const makeRequest=()=>new Request('https://coast.test/api/chat/reply-sequence',{method:'POST',headers:{Origin:'https://coast.test','Content-Type':'application/json'},body:JSON.stringify(routeBody)});
 assert.equal((await routeChatApi(makeRequest(),{...routeEnv,COAST_REPLY_SEQUENCE_EXPERIMENTAL:'false'})).status,409);
+const planRequest=new Request('https://coast.test/api/chat/reply-sequence',{method:'POST',headers:{Origin:'https://coast.test','Content-Type':'application/json'},body:JSON.stringify({...routeBody,model:'chatgpt-plan:gpt-5.6-sol'})});
+const planResponse=await routeChatApi(planRequest,routeEnv);
+assert.equal(planResponse.status,409);
+assert.match(await planResponse.text(),/reply_sequence_plan_unavailable/);
 const routeFetch=globalThis.fetch,payloads=[];
 try{
   globalThis.fetch=async(url,options={})=>{

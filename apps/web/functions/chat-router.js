@@ -478,6 +478,10 @@ async function replySequenceChat(request,env){
   requireSameOrigin(request);
   if(env.COAST_REPLY_SEQUENCE_EXPERIMENTAL!=='true')throw new ChatStoreError('reply_sequence_unavailable','真实连续回复仍在施工。',409);
   const value=await body(request),db=env.COAST_CHAT_DB;
+  // The ChatGPT subscription adapter has no verified hard output cap for
+  // this budget contract. Do not send subscription model IDs to OpenRouter.
+  if(typeof value.model==='string'&&value.model.startsWith('chatgpt-plan:'))
+    throw new ChatStoreError('reply_sequence_plan_unavailable','ChatGPT 套餐通道暂不支持连续回复累计预算；未发起请求，不会切换供应商。',409);
   const identity={conversationId:value.conversation_id,turnId:value.source_turn_id,userVariantId:value.user_variant_id,sequenceId:value.sequence_id};
   const conversation=await getConversation(db,identity.conversationId);
   const initial=await readConversationState(db,identity.conversationId);

@@ -4,6 +4,7 @@ import {ensureChatSchema,normalizeState,readConversationState,ChatStoreError} fr
 // An uncertain claimed request is never replayed, even after recovery.
 const ID=/^[A-Za-z0-9_.:-]{1,160}$/;
 const STALE_MS=30*60*1000;
+const HEARTBEAT_MS=60*1000;
 const stmt=(db,sql,...args)=>db.prepare(sql).bind(...args);
 const changes=r=>r?.meta?.changes===1;
 const fail=(type,message)=>{throw new ChatStoreError(type,message,409)};
@@ -89,6 +90,24 @@ export async function claimReplyStep(db,identity,messageId){
   if(!changes(changed))return null;
   return {index,mayContinue:index+1<row.max_messages&&list.length+1<20,toolBudget:budget.tools,tokenBudget:budget.tokens,
     previous:list.filter(v=>v.reply_sequence?.id===identity.sequenceId).map(v=>({id:v.id,content:v.content,...(v.attachments?.length?{attachments:v.attachments}: {})}))};
+}
+// Refresh only the still-owned, claimed step. A stale recovery and this
+// heartbeat race through the same updated_at/status predicates.
+export async function refreshReplyClaim(db,identity,messageId,now=Date.now()){
+  ids(identity.conversationId,identity.turnId,identity.userVariantId,identity.sequenceId,messageId);
+  return changes(await stmt(db,`UPDATE chat_reply_runs SET updated_at=MAX(updated_at,?) WHERE sequence_id=? AND conversation_id=? AND turn_id=? AND user_variant_id=? AND status='running' AND pending_id=? AND pending_state='claimed'`,
+    now,identity.sequenceId,identity.conversationId,identity.turnId,identity.userVariantId,messageId).run());
+}
+async function withClaimHeartbeat(db,identity,messageId,invoke){
+  let pending=null;
+  const timer=setInterval(()=>{
+    if(pending)return;
+    // A temporarily unavailable database must not cause a second provider
+    // call. The final canonical commit still requires the actual claim.
+    pending=refreshReplyClaim(db,identity,messageId).catch(()=>false).finally(()=>{pending=null;});
+  },HEARTBEAT_MS);
+  try{return await invoke();}
+  finally{clearInterval(timer);if(pending)await pending;}
 }
 // Materialize a media reservation only for the currently claimed step.
 // It is not a committed group member until commitReplyStep promotes it.
@@ -276,7 +295,7 @@ export async function executeDurableReplyRun(db,identity,budget,{invoke,emit=()=
       if(signal?.aborted){status='cancelled';break;}
       emit('reply_begin',{message_id:messageId,index});
       const state=await readConversationState(db,identity.conversationId);
-      const result=await invoke({identity,messageId,...claim,state,signal},chunk=>emit('reply_delta',{message_id:messageId,content:chunk}));
+      const result=await withClaimHeartbeat(db,identity,messageId,()=>invoke({identity,messageId,...claim,state,signal},chunk=>emit('reply_delta',{message_id:messageId,content:chunk})));
       const committed=await commitReplyStep(db,identity,messageId,result.variant,result.receipt);
       if(!committed)fail('reply_commit_unconfirmed','回复未确认写入；不会重放。');
       saved++;

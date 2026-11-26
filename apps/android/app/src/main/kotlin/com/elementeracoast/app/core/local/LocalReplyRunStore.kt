@@ -17,6 +17,9 @@ internal class LocalReplyRunStore(private val store:LocalPersistence){
         val pendingId:String?=null,val pendingState:String?=null,val receipts:List<Usage> = emptyList(),
         val soilState:String?=null)
     data class Claim(val index:Int,val mayContinue:Boolean,val tools:Int,val tokens:Int,val history:RemoteHistory,val previous:List<RemoteVariant>)
+    // This registry describes only work currently owned by this process.
+    // No periodic full-file rewrite, and process death clears it; durable
+    // stale recovery then uses the persisted timestamp as before.
     private val json=Json{ignoreUnknownKeys=true;encodeDefaults=true}
     private val id=Regex("[A-Za-z0-9_.:-]{1,160}")
     private fun checkIds(vararg ids:String)=require(ids.all(id::matches)){"连续回复身份无效。"}
@@ -50,7 +53,7 @@ internal class LocalReplyRunStore(private val store:LocalPersistence){
     }
     fun recover(cid:String,now:Long=System.currentTimeMillis()):Boolean=store.atomic{s->
         val seq=s.get(activeKey(cid));val row=seq.takeIf{it.isNotBlank()}?.let{get(s,cid,it)}
-        if(row==null||row.status!="running"||row.updatedAt>=now-30*60*1000L)return@atomic false
+        if(row==null||row.status!="running"||isLive(cid,seq)||row.updatedAt>=now-30*60*1000L)return@atomic false
         settleIn(s,cid,row,"interrupted",now)
     }
     fun acquire(request:RemoteReplyRunRequest):Boolean=store.readConsistent{s->
@@ -189,6 +192,10 @@ internal class LocalReplyRunStore(private val store:LocalPersistence){
         put(s,cid,r.copy(soilState=status));true
     }
     companion object{
+        private val live=java.util.concurrent.ConcurrentHashMap.newKeySet<Pair<String,String>>()
+        fun markLive(cid:String,seq:String):Boolean=live.add(cid to seq)
+        fun unmarkLive(cid:String,seq:String){live.remove(cid to seq)}
+        private fun isLive(cid:String,seq:String):Boolean=live.contains(cid to seq)
         fun protect(old:RemoteHistory,next:RemoteHistory,deleteRevision:String?){
             for(t in old.turns){
                 val incoming=next.turns.firstOrNull{it.id==t.id}

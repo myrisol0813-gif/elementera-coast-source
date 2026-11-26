@@ -42,6 +42,8 @@ internal class LocalDirectChatRepository(
         val context=number("contextBudget",6000)
         val output=number("maxOutputTokens",8000).coerceIn(64,65536)
         val temperature=when(request.settings["creativity"]?.jsonPrimitive?.contentOrNull){"stable"->0.3;"expansive"->1.0;else->0.7}
+        if(!LocalReplyRunStore.markLive(cid,seq))throw CoastApiException(CoastApiErrorKind.Request,"reply_run_not_acquired","同一任务已在本机运行。")
+        try{
         try{withContext(Dispatchers.IO){
             ledger.recover(cid)
             val cache=com.elementeracoast.app.core.remote.RemoteCacheStore(store,strictReads=true)
@@ -146,6 +148,7 @@ internal class LocalDirectChatRepository(
         val settled=withContext(NonCancellable+Dispatchers.IO){ledger.settle(cid,seq,status)}
         if(!settled)throw CoastApiException(CoastApiErrorKind.Request,"reply_settle_unconfirmed","任务状态未确认；请重新打开窗口。")
         emit(ReplyRunEvent.End(status,saved,detail,if(status in setOf("completed","limit_reached"))null else withContext(Dispatchers.IO){com.elementeracoast.app.core.remote.RemoteCacheStore(store,strictReads=true).history(cid)}))
+        }finally{LocalReplyRunStore.unmarkLive(cid,seq)}
     }
 
     override fun streamReply(

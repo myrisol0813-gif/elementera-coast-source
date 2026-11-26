@@ -27,6 +27,12 @@ class LocalReplyRunStoreTest {
         assertTrue(ledger.reserve("cid","seq","a1",1))
         val second=ledger.claim("cid","seq","a1")!!
         assertEquals(listOf("first"),second.previous.map{it.content});assertEquals(900,second.tokens);assertFalse(second.mayContinue)
+        assertTrue(LocalReplyRunStore.markLive("cid","seq"))
+        try{
+            assertFalse(LocalReplyRunStore.markLive("cid","seq"))
+            assertFalse(ledger.recover("cid",System.currentTimeMillis()+31*60*1000))
+            assertTrue(ledger.active("cid"))
+        }finally{LocalReplyRunStore.unmarkLive("cid","seq")}
         assertTrue(ledger.recover("cid",System.currentTimeMillis()+31*60*1000))
         assertNull(ledger.claim("cid","seq","a1"))
         assertNull(ledger.commit("cid","seq",RemoteVariant("a1","late",finishReason="stop"),LocalReplyRunStore.Usage("a1",0,1,false)))
