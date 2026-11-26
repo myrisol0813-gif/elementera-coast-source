@@ -155,4 +155,25 @@ class LocalAttachmentArchiveTest {
         assertEquals(1,calls)
     }
 
+
+    @Test fun expiredImageTaskRecoveryPreservesSavedOriginalAndRejectsStaleDeletion(){
+        val start=java.time.Instant.parse("2026-11-26T00:00:00Z")
+        val png=byteArrayOf(137.toByte(),80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,6,0,0,0)
+        val original=RemoteAttachment(id="att1",type="image",name="picture.png",mime="image/png",size=png.size.toLong(),imageGeneration=RemoteImageGeneration("saved","openrouter","fixture/paid","wolf"))
+        val variants=listOf(RemoteVariant("pending",createdAt=start.toString(),finishReason="image_pending"),RemoteVariant("saved",createdAt=start.toString(),finishReason="image_saved",attachments=listOf(original)))
+        val history=RemoteHistory(updatedAt=start.toString(),turns=listOf(RemoteTurn("turn1",user=RemoteUserBranch(0,listOf(RemoteVariant("user1","draw"))),assistant=RemoteAssistantBranches(mapOf("0" to 1),mapOf("0" to variants)))))
+        assertEquals(history,LocalImageRecovery.recover(history,start.plusMillis(LocalImageRecovery.GRACE_MS-1)))
+        assertTrue(runCatching{LocalImageRecovery.protect(history,history.copy(turns=emptyList()),history.updatedAt)}.isFailure)
+        val recovered=LocalImageRecovery.recover(history,start.plusMillis(LocalImageRecovery.GRACE_MS))
+        val reply=recovered.turns.single().assistant.variantsByUserVariant.getValue("0")
+        assertEquals(listOf("image_failed","image_saved_interrupted"),reply.map{it.finishReason})
+        assertEquals(original,reply.last().attachments.single())
+        assertEquals(recovered,LocalImageRecovery.recover(recovered,start.plusMillis(2*LocalImageRecovery.GRACE_MS)))
+        assertTrue(runCatching{LocalImageRecovery.protect(recovered,recovered.copy(turns=emptyList()),history.updatedAt)}.isFailure)
+        assertEquals(emptyList<RemoteTurn>(),LocalImageRecovery.protect(recovered,recovered.copy(turns=emptyList()),recovered.updatedAt).turns)
+        val stale=recovered.copy(turns=listOf(recovered.turns.single().copy(assistant=RemoteAssistantBranches(mapOf("0" to 1),mapOf("0" to listOf(reply.first(),reply.last().copy(attachments=emptyList(),finishReason="image_tool_ready")))))))
+        val merged=LocalImageRecovery.protect(recovered,stale,null).turns.single().assistant.variantsByUserVariant.getValue("0").last()
+        assertEquals(original,merged.attachments.single());assertEquals("image_saved_interrupted",merged.finishReason)
+    }
+
 }

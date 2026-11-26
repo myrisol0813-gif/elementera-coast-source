@@ -45,6 +45,7 @@ interface ChatRepository {
     suspend fun generateImage(conversationId:String,turnId:String,userId:String,messageId:String,prompt:String):RemoteHistory = error("Image generation unavailable")
     suspend fun loadHistory(conversationId: String): RemoteHistory
     suspend fun persistHistory(conversationId: String, history: RemoteHistory): RemoteHistory
+    suspend fun deleteFromHistory(conversationId:String,history:RemoteHistory,revision:String):RemoteHistory=persistHistory(conversationId,history)
     suspend fun uploadAttachment(conversationId: String, name: String, mime: String, bytes: ByteArray): RemoteAttachment
     suspend fun deleteAttachment(conversationId: String, attachmentId: String)
     suspend fun modelMetadata(
@@ -93,6 +94,8 @@ class DefaultChatRepository(
 
     override suspend fun persistHistory(conversationId: String, history: RemoteHistory): RemoteHistory =
         api.putHistory(conversationId, history).also { cache.putHistory(conversationId, it) }
+
+    override suspend fun deleteFromHistory(conversationId:String,history:RemoteHistory,revision:String):RemoteHistory=api.putHistory(conversationId,history,revision).also{cache.putHistory(conversationId,it)}
 
     override suspend fun uploadAttachment(conversationId: String, name: String, mime: String, bytes: ByteArray): RemoteAttachment =
         api.uploadChatAttachment(conversationId, name, mime, bytes)
@@ -154,7 +157,8 @@ class DefaultChatRepository(
             ) + (effort?.let { mapOf("reasoningEffort" to it) } ?: emptyMap()),
             crossWindow = crossWindow.toRemote(),
             stream = true,
-            imageToolEnabled = imageEnabled
+            imageToolEnabled = imageEnabled,
+            imageModelId = cache.profile()?.currentImageModel?.takeIf{imageEnabled}
         )
         api.streamChat(request).collect { event ->
             when (event) {

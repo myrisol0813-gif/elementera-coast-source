@@ -392,9 +392,9 @@ class CoastApiClient(
         )
     }
 
-    suspend fun putHistory(conversationId: String, history: RemoteHistory): RemoteHistory {
+    suspend fun putHistory(conversationId: String, history: RemoteHistory, deleteRevision:String?=null): RemoteHistory {
         val payload = historyJson.encodeToString(RemoteHistory.serializer(), history.copy(conversationId = null))
-        return jsonRequest(Request.Builder().url(config.url("/api/chat/history?conversation_id=${encodeQuery(conversationId)}")).put(jsonBody(payload)).build(), RemoteHistoryResponse.serializer()).history
+        return jsonRequest(Request.Builder().url(config.url("/api/chat/history?conversation_id=${encodeQuery(conversationId)}")).put(jsonBody(payload)).apply{deleteRevision?.let{header("X-Coast-Delete-Revision",it)}}.build(), RemoteHistoryResponse.serializer()).history
     }
 
     /** Authenticated context assembly; ChatGPT bearer tokens stay on this device. */

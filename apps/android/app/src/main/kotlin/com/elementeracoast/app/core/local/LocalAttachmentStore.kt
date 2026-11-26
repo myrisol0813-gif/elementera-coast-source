@@ -223,7 +223,8 @@ internal fun runLocalManualImageGeneration(store:LocalPersistence,config:LocalPr
         val cache=RemoteCacheStore(s,strictReads=true)
         if(cache.profile()?.currentImageModel!=selected)fail("image_model_changed","生成模型选择已变化，请重新发起。",409)
         if(cache.conversations().none{it.id==cid&&it.deletedAt==null&&it.roomType in setOf("main","radio")})fail("generated_surface_invalid","该窗口不允许生成图像。",403)
-        val h=cache.history(cid)?:fail("generated_source_invalid","找不到原消息。",409)
+        val original=cache.history(cid)?:fail("generated_source_invalid","找不到原消息。",409)
+        val h=LocalImageRecovery.recover(original)
         val t=h.turns.firstOrNull{it.id==tid}?:fail("generated_source_invalid","找不到原轮次。",409)
         val i=t.user.variants.indexOfFirst{it.id==uid}
         if(i<0||i!=t.user.active||t.user.variants[i].hidden)fail("generated_source_invalid","原消息版本已变化。",409)
@@ -235,7 +236,7 @@ internal fun runLocalManualImageGeneration(store:LocalPersistence,config:LocalPr
         if(!modelTool&&branch.size>=20)fail("image_branch_full","当前回复版本已满。",409)
         val now=java.time.Instant.now().toString()
         val pending=RemoteVariant(id=mid,content="",createdAt=now,modelId=model,finishReason="image_pending",generationSource="chat")
-        val variants=if(modelTool)branch.map{if(it.id==mid)it.copy(finishReason="image_pending")else it}else branch+pending
+        val variants=if(modelTool)branch.map{if(it.id==mid)it.copy(finishReason="image_pending",createdAt=now)else it}else branch+pending
         val next=t.copy(assistant=t.assistant.copy(variantsByUserVariant=t.assistant.variantsByUserVariant+(k to variants),activeByUserVariant=if(modelTool)t.assistant.activeByUserVariant else t.assistant.activeByUserVariant+(k to branch.size)))
         cache.putHistory(cid,h.copy(updatedAt=now,turns=h.turns.map{if(it.id==tid)next else it}))
     }

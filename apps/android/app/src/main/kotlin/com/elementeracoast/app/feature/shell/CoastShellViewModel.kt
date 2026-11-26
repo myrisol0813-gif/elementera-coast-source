@@ -1352,7 +1352,7 @@ class CoastShellViewModel(
 
     private fun deleteMessage(message: ChatMessage) {
         val turnId = message.turnId ?: return
-        mutateMessageHistory("删除消息失败", "消息已删除") { history ->
+        mutateMessageHistory("删除消息失败", "消息已删除", explicitDeletion=true) { history ->
             when (message.role) {
                 MessageRole.User -> ChatHistoryMutations.deleteActiveUser(history, turnId)
                 MessageRole.Assistant -> ChatHistoryMutations.deleteActiveAssistant(history, turnId)
@@ -1444,6 +1444,7 @@ class CoastShellViewModel(
     private fun mutateMessageHistory(
         failureLabel: String,
         successMessage: String,
+        explicitDeletion:Boolean=false,
         transform: (RemoteHistory) -> RemoteHistory
     ) {
         if (_state.value.isStreaming || generationJob?.isActive == true) {
@@ -1464,12 +1465,13 @@ class CoastShellViewModel(
         showHistory(conversationId, next)
         viewModelScope.launch(workDispatcher) {
             try {
-                val persisted = backend.chat.persistHistory(conversationId, next)
+                val persisted = if(explicitDeletion)backend.chat.deleteFromHistory(conversationId,next,previous.updatedAt)else backend.chat.persistHistory(conversationId,next)
                 showHistory(conversationId, persisted)
                 _state.update { it.copy(backendOffline = false, snackbarMessage = successMessage) }
             } catch (error: CoastApiException) {
-                backend.chat.cacheHistory(conversationId, previous)
-                showHistory(conversationId, previous)
+                val restored=runCatching{backend.chat.loadHistory(conversationId)}.getOrElse{previous}
+                backend.chat.cacheHistory(conversationId, restored)
+                showHistory(conversationId, restored)
                 handleBackendError(error, failureLabel, keepAuthenticatedOnNetworkError = true)
             }
         }

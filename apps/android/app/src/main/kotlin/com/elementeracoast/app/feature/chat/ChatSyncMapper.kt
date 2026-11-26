@@ -206,7 +206,7 @@ object ChatSyncMapper {
                     ChatMessage(
                         id = stableLong("assistant:${turn.id}:$key"),
                         role = MessageRole.Assistant,
-                        text = assistant.content,
+                        text = assistant.content.ifBlank{when(assistant.finishReason){"image_pending"->"正在绘制图片 · 重新打开窗口查看结果";"image_tool_ready"->"等待回复 · 重新打开窗口查看结果";else->""}},
                         turnId = turn.id,
                         remoteVariantId = assistant.id,
                         modelId = assistant.modelId,
