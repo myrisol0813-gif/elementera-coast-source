@@ -122,3 +122,25 @@ assert.equal((await readUserPortrait(portraitDb)).body,'Synthetic confirmed prof
 await setUserPortraitWriteEnabled(portraitDb,false);
 await assert.rejects(() => executeModelTool(portraitDb,portraitCall,portraitContext));
 console.log('user portrait candidate lifecycle: ok');
+
+// The model discovers a real book ID before reading or writing anchored notes.
+const libraryDb = new D1Database();
+const { createLibraryBook } = await import('../functions/tidal-library.js');
+const fixtureBook = await createLibraryBook(libraryDb,{title:'Synthetic reader fixture',format:'txt',chapters:[{title:'Chapter 1',body:'First paragraph.'}]});
+const libraryContext = {permission:'owner',surface:'main_chat'};
+const libraryCall = (name,args) => executeModelTool(libraryDb,{id:'test-'+name,function:{name,arguments:JSON.stringify(args)}},libraryContext);
+const shelf = await libraryCall('library_books',{book_id:null});
+const actualBookId = shelf.books.find(b=>b.title==='Synthetic reader fixture').id;
+assert.equal(actualBookId,fixtureBook.id);
+const toc = await libraryCall('library_books',{book_id:actualBookId});
+const chapterIndex = toc.book.chapters[0].chapter_index;
+const page = await libraryCall('library_read',{book_id:actualBookId,chapter_index:chapterIndex,start_paragraph:null,limit:null});
+assert.equal(page.paragraphs[0].text,'First paragraph.');
+await assert.rejects(()=>libraryCall('library_read',{book_id:actualBookId,chapter_index:null}));
+await libraryCall('library_write',{action:'create',kind:'highlight',book_id:actualBookId,chapter_index:chapterIndex,paragraph_index:0,start_offset:0,end_offset:5});
+await libraryCall('library_write',{action:'create',kind:'annotation',book_id:actualBookId,chapter_index:chapterIndex,paragraph_index:0,body:'A note'});
+await libraryCall('library_write',{action:'create',kind:'reflection',book_id:actualBookId,body:'A reflection'});
+const notes = await libraryCall('library_notes',{book_id:actualBookId,chapter_index:null});
+assert.deepEqual(notes.notes.map(n=>n.kind).sort(),['annotation','highlight','reflection']);
+assert.equal(notes.notes.find(n=>n.kind==='highlight').quote,'First');
+console.log('model library discovery, reading and note roundtrip: ok');
