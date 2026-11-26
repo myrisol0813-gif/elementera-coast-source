@@ -172,7 +172,9 @@ export function createChat({ storage, toast, dogtalk }) {
     ui.input.style.height = '22px';
     ui.input.style.height = `${Math.min(Math.max(ui.input.scrollHeight, 22), 112)}px`;
     ui.input.style.overflowY = ui.input.scrollHeight > 112 ? 'auto' : 'hidden';
-    const generating = Boolean(runtime.generation);
+    const generating = runtime.generation?.conversationId === runtime.currentId;
+    const background = Boolean(runtime.generation && !generating);
+    const finalizing = Boolean(background || runtime.finalizing || (runtime.pendingComposerSend && !generating));
     const hasText = Boolean(ui.input.value.trim());
     const hasAttachments = Boolean(
       Array.isArray(runtime.pendingAttachments)
@@ -183,16 +185,16 @@ export function createChat({ storage, toast, dogtalk }) {
     const canSend = hasText || hasAttachments;
     const name = generating ? 'stop' : canSend ? 'send' : 'call';
     ui.primary.innerHTML = icon(name);
-    ui.primary.disabled = generating ? false : (!runtime.composerReady || uploading || Boolean(runtime.pendingComposerSend));
-    ui.primary.setAttribute('aria-label', !runtime.composerReady && !generating
+    ui.primary.disabled = finalizing || (!generating && (!runtime.composerReady || uploading));
+    ui.primary.setAttribute('aria-label', background ? '另一个窗口正在生成；可以先写草稿' : !runtime.composerReady && !generating
       ? '聊天正在载入'
       : uploading ? '附件正在上传'
         : generating ? '停止生成' : canSend ? '发送' : '通话');
     if (ui.mic) {
-      ui.mic.hidden = generating || canSend || uploading;
-      ui.mic.disabled = !runtime.composerReady || uploading;
+      ui.mic.hidden = generating || finalizing || canSend || uploading;
+      ui.mic.disabled = !runtime.composerReady || finalizing || uploading;
     }
-    if (ui.attachmentButton) ui.attachmentButton.disabled = !runtime.composerReady || generating || uploading;
+    if (ui.attachmentButton) ui.attachmentButton.disabled = !runtime.composerReady || generating || finalizing || uploading;
   }
 
   const chatAttachments = createChatAttachments({ runtime, ui, toast, composerState });
