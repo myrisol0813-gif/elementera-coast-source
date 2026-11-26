@@ -47,7 +47,7 @@ internal class LocalDirectChatRepository(
             val cache=com.elementeracoast.app.core.remote.RemoteCacheStore(store,strictReads=true)
             val h=cache.history(cid)?:error("原窗口不存在")
             val cfg=h.contextSettings
-            require(!cfg.stickerAddEnabled&&!cfg.stickerSendEnabled&&!cfg.crossWindowAuto&&cache.profile()?.currentImageModel.isNullOrBlank()){"本机连续回复媒体与跨窗工具尚未接通。"}
+            require(!cfg.stickerAddEnabled&&!cfg.stickerSendEnabled&&cache.profile()?.currentImageModel.isNullOrBlank()){"本机连续回复媒体工具尚未接通。"}
             require(LocalDogtalkStore(store).pending(cid,knowledge.surfaceFor(cid),tid)==null){"本机连续回复私人草稿递送尚未接通。"}
             h
         }}catch(e:CancellationException){throw e}catch(e:Exception){
@@ -68,13 +68,13 @@ internal class LocalDirectChatRepository(
                 val source=claim.history.turns.single{it.id==tid}
                 val cfg=claim.history.contextSettings
                 val attachmentIds=ChatSyncMapper.activeAttachmentIds(claim.history,tid)
-                val policy=client.inputBudget(provider,model,context,output,claim.mayContinue||claim.tools>0&&(cfg.localModelToolsEnabled||cfg.localModelWriteEnabled))
+                val policy=client.inputBudget(provider,model,context,output,claim.mayContinue||claim.tools>0&&(cfg.localModelToolsEnabled||cfg.localModelWriteEnabled||cfg.crossWindowAuto))
                 val prepared=withContext(Dispatchers.IO){
                     require(LocalDogtalkStore(store).pending(cid,knowledge.surfaceFor(cid),tid)==null){"本机连续回复私人草稿递送尚未接通。"}
-                    knowledge.context(ChatSyncMapper.contextMessages(claim.history,tid,recent),policy.comfort,knowledge.surfaceFor(cid),cid,attachmentIds,tid,null,request.realityContext?:RemoteRealityContext(),policy)
+                    knowledge.context(ChatSyncMapper.contextMessages(claim.history,tid,recent),policy.comfort,knowledge.surfaceFor(cid),cid,attachmentIds,tid,request.crossWindow,request.realityContext?:RemoteRealityContext(),policy)
                 }
                 val messages=prepared.messages+claim.previous.map{RemoteChatMessage("assistant",it.content)}
-                val session=if(claim.tools>0)withContext(Dispatchers.IO){knowledge.toolSession(cid,tid,null,prepared.receipt,request.model,policy.wireLimit,messageId=null)}else null
+                val session=if(claim.tools>0)withContext(Dispatchers.IO){knowledge.toolSession(cid,tid,request.crossWindow,prepared.receipt,request.model,policy.wireLimit,messageId=null)}else null
                 var content="";var done:LocalProviderEvent.Done?=null
                 val runs=mutableListOf<RemoteFurnitureRun>()
                 currentCoroutineContext().ensureActive()

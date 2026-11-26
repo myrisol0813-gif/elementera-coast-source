@@ -13,8 +13,9 @@ internal class LocalCrossWindow(store: LocalPersistence) {
             val user = turn.user.variants.getOrNull(turn.user.active) ?: return@forEachIndexed
             if (user.hidden) return@forEachIndexed
             if (user.content.isNotBlank()) add(Item(turn.id, index + 1, "user", user))
-            val assistant = turn.assistant.variantsByUserVariant[key].orEmpty().getOrNull(turn.assistant.activeByUserVariant[key] ?: 0)
-            if (assistant != null && !assistant.hidden && assistant.content.isNotBlank())
+            val list=turn.assistant.variantsByUserVariant[key].orEmpty()
+            val group=com.elementeracoast.app.feature.chat.ReplySequence.selectedGroup(list,turn.assistant.activeByUserVariant[key]?:0)
+            for(assistant in group.filter{!it.hidden&&it.content.isNotBlank()})
                 add(Item(turn.id, index + 1, "assistant", assistant))
         }
     }

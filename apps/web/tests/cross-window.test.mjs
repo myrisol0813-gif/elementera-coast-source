@@ -321,3 +321,11 @@ assert.match(generationSource, /failedDeskSlip \? \{ desk_slip: failedDeskSlip \
 assert.match(generationSource, /partialContent \|\| \(cancelled \? '已停止生成。' : visibleFailure \|\| '消息生成失败，请稍后重试。'\)/, 'a first-byte provider failure must become visible text instead of an empty assistant message');
 
 console.log('cross-window unlock tests passed');
+// Selected sequence is one turn, with all actual message identities.
+const groupTurn=turn('group-read','question','unused',{assistants:[variant('group-old','old alternative'),variant('group-first','first original',{reply_sequence:{id:'cross-seq',index:0}}),variant('group-second','second original',{reply_sequence:{id:'cross-seq',index:1}})],assistantActive:2});
+states.get('work-main').turns.push(groupTurn);
+const groupRead=await readCrossWindow(db,{mode:'manual',current_conversation_id:'current-main',sources:[{conversation_id:'work-main',turns:1}]});
+assert.equal(groupRead.total_loaded_turns,1);
+assert.deepEqual(groupRead.items[0].messages.map(m=>m.message_id),['group-read-u0','group-first','group-second']);
+const exactGroup=await readCrossWindow(db,{mode:'manual',current_conversation_id:'current-main',messages:[{conversation_id:'work-main',message_id:'group-first'}]});
+assert.deepEqual(exactGroup.items[0].messages.map(m=>m.content),['first original']);

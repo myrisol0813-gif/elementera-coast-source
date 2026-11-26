@@ -482,8 +482,8 @@ async function replySequenceChat(request,env){
   const initial=await readConversationState(db,identity.conversationId);
   if(initial.context_settings.sticker_send_enabled||initial.context_settings.sticker_add_enabled||value.image_tool_enabled===true)
     throw new ChatStoreError('reply_sequence_media_unavailable','连续回复的媒体工具预约尚未接通，请勿在此测试路径启用。',409);
-  if(value.dogtalk||value.cross_window?.mode&&value.cross_window.mode!=='off')
-    throw new ChatStoreError('reply_sequence_context_unavailable','连续回复的私人草稿与跨窗口手递上下文尚未接通。',409);
+  if(value.dogtalk)
+    throw new ChatStoreError('reply_sequence_context_unavailable','连续回复的私人草稿递送尚未接通。',409);
   const settings=formalChatRequestSettings(value.settings||{});
   const budget=value.budget||{};
   const controller=new AbortController();
@@ -510,7 +510,7 @@ async function replySequenceChat(request,env){
               settings,localDate:localDate(value.local_date),localDateTime:value.local_datetime,
               realityContext:value.reality_context,realityAllowedFields:PWA_REALITY_FIELDS,
               surface:conversationSurface(conversation.room_type),model:value.model,
-              permission:'owner',recentEntryIds:value.recent_entry_ids,preview:step.index>0,
+              permission:'owner',recentEntryIds:value.recent_entry_ids,preview:step.index>0,crossWindow:value.cross_window,
             });
             const resolved=attachmentIds.length?await resolveChatAttachmentsForModel(env,db,{
               conversationId:identity.conversationId,turnId:identity.turnId,attachmentIds,modelId:value.model

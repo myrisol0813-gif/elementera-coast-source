@@ -155,7 +155,9 @@ const routeDb=new D1Database(),routeCv=await createConversation(routeDb,'route',
 const routeIdentity={conversation_id:routeCv.id,source_turn_id:'route-turn',user_variant_id:'route-user',sequence_id:'route-sequence'};
 await writeConversationState(routeDb,routeCv.id,{context_settings:{reply_sequence_enabled:true,reply_sequence_tool_budget:0},turns:[{id:'route-turn',user:{variants:[{id:'route-user',content:'original human'}]}}]});
 const routeEnv={COAST_CHAT_DB:routeDb,OPENROUTER_API_KEY:'synthetic-key',COAST_REPLY_SEQUENCE_EXPERIMENTAL:'true'};
-const routeBody={...routeIdentity,model:'openai/gpt-4.1-nano',settings:{streamingEnabled:false,contextBudget:6000},budget:{maxMessages:2,toolBudget:0,tokenBudget:48000}};
+const crossCv=await createConversation(routeDb,'cross fixture','main');
+await writeConversationState(routeDb,crossCv.id,{turns:[{id:'cross-turn',user:{variants:[{id:'cross-user',content:'selected cross-window text'}]}}]});
+const routeBody={...routeIdentity,cross_window:{mode:'manual',messages:[{conversation_id:crossCv.id,message_id:'cross-user'}]},model:'openai/gpt-4.1-nano',settings:{streamingEnabled:false,contextBudget:6000},budget:{maxMessages:2,toolBudget:0,tokenBudget:48000}};
 const makeRequest=()=>new Request('https://coast.test/api/chat/reply-sequence',{method:'POST',headers:{Origin:'https://coast.test','Content-Type':'application/json'},body:JSON.stringify(routeBody)});
 assert.equal((await routeChatApi(makeRequest(),{...routeEnv,COAST_REPLY_SEQUENCE_EXPERIMENTAL:'false'})).status,409);
 const routeFetch=globalThis.fetch,payloads=[];
@@ -164,6 +166,7 @@ try{
     if(String(url).includes('/models?'))return new Response(JSON.stringify({data:[{id:'openai/gpt-4.1-nano',name:'fixture',architecture:{output_modalities:['text']},pricing:{prompt:'0.1',completion:'0.2'},supported_parameters:['tools','tool_choice']}]}),{headers:{'Content-Type':'application/json'}});
     const payload=JSON.parse(options.body);payloads.push(payload);
     const n=payloads.length;
+    assert.ok(payload.messages.some(m=>typeof m.content==='string'&&m.content.includes('selected cross-window text')));
     if(n===3){
       const persisted=await readConversationState(routeDb,routeCv.id);
       assert.equal(persisted.turns[0].assistant.variantsByUserVariant['0'][0].content,'first actual reply');
@@ -199,3 +202,5 @@ assert.equal((await organizeConversationSoil(routeEnv,routeCv.id,{trigger:'reply
 const deskGroup=(await readConversationState(routeDb,routeCv.id)).turns[0].assistant.variantsByUserVariant['0'];
 assert.equal(deskGroup[0].desk_slip.reply_sequence_previous,undefined);
 assert.deepEqual(deskGroup[1].desk_slip.reply_sequence_previous,[{message_id:deskGroup[0].id,content:deskGroup[0].content}]);
+
+assert.ok(deskGroup.every(v=>v.desk_slip.cross_window.messages.some(g=>g.messages.some(m=>m.message_id==='cross-user'))));

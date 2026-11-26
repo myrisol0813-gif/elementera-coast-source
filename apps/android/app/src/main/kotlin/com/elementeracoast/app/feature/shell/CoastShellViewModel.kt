@@ -1293,8 +1293,8 @@ class CoastShellViewModel(
             showPlaceholder("当前模型通道尚未接通连续回复；未发起模型请求。");return
         }
         val window=initial.contextSettings
-        if(window.stickerSendEnabled||window.stickerAddEnabled||_state.value.currentImageModel.isNotBlank()||crossWindow.mode!=com.elementeracoast.app.core.model.CrossWindowMode.Off){
-            showPlaceholder("连续回复的媒体与跨窗工具尚未接通；未发起模型请求。");return
+        if(window.stickerSendEnabled||window.stickerAddEnabled||_state.value.currentImageModel.isNotBlank() ){
+            showPlaceholder("连续回复的媒体工具尚未接通；未发起模型请求。");return
         }
         val source=initial.turns.firstOrNull{it.id==tid}?:return
         val user=source.user.variants.getOrNull(source.user.active)?:return
@@ -1341,7 +1341,13 @@ class CoastShellViewModel(
                     put("soilBudget",global.soilBudget);put("worldbookEnabled",global.worldbookEnabled)
                     put("worldbookLimit",global.worldbookLimit);put("memoryLimit",global.memoryLimit)
                     put("creativity",global.creativity)
-                },reality)
+                },reality,com.elementeracoast.app.core.remote.RemoteCrossWindowRequest(
+                    when(crossWindow.mode){
+                        com.elementeracoast.app.core.model.CrossWindowMode.Off->"off"
+                        com.elementeracoast.app.core.model.CrossWindowMode.Manual->"manual"
+                        com.elementeracoast.app.core.model.CrossWindowMode.ModelDecides->"model_decides"
+                        else->"keyword"
+                    },crossWindow.messages.map{com.elementeracoast.app.core.remote.RemoteCrossWindowMessageSelection(it.conversationId,it.messageId)}))
             backend.chat.streamReplyRun(request).collect{event->
                 when(event){
                     is ReplyRunEvent.Start->Unit

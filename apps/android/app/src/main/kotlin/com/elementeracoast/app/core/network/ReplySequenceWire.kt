@@ -23,7 +23,8 @@ data class RemoteReplyRunRequest(
     @SerialName("local_date") val localDate:String,
     @SerialName("local_datetime") val localDateTime:String,
     val settings:JsonObject,
-    @SerialName("reality_context") val realityContext:RemoteRealityContext?=null
+    @SerialName("reality_context") val realityContext:RemoteRealityContext?=null,
+    @SerialName("cross_window") val crossWindow:com.elementeracoast.app.core.remote.RemoteCrossWindowRequest?=null
 )
 
 sealed interface ReplyRunEvent {

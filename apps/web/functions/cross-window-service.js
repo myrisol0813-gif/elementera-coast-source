@@ -52,7 +52,9 @@ function activeTurns(state) {
       ...(user.model_id ? { model_id: String(user.model_id).slice(0, 180) } : {}),
       ...(user.display_author ? { display_author: String(user.display_author).slice(0, 180) } : {}),
     }];
-    if (assistant) messages.push({
+    const group=assistant?.reply_sequence?assistants.filter(v=>v.reply_sequence?.id===assistant.reply_sequence.id).sort((a,b)=>a.reply_sequence.index-b.reply_sequence.index):assistant?[assistant]:[];
+    if(group.some((v,i)=>v.reply_sequence&&v.reply_sequence.index!==i))throw crossWindowRequestError('reply_group_history_changed','连续回复组不完整。',409);
+    for(const assistant of group.filter(v=>!v.hidden&&typeof v.content==='string'&&v.content.trim())) messages.push({
       role: 'assistant',
       message_id: assistant.id || `${turn.id || 'turn'}:assistant`,
       content: assistant.content,

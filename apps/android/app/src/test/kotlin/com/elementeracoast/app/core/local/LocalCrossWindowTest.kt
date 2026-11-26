@@ -29,4 +29,17 @@ class LocalCrossWindowTest {
         assertTrue(runCatching { knowledge.context(input,1800,"main_chat","current", crossWindow =
             RemoteCrossWindowRequest("keyword")) }.isFailure)
     }
+    @Test fun selectedGroupRetainsAllActualMessageIds(){
+        val store=MemoryLocalPersistence();val cache=RemoteCacheStore(store)
+        cache.putConversations(listOf(RemoteConversation("current","Current"),RemoteConversation("old","Old")))
+        val list=listOf(RemoteVariant("old-alt","old version"),RemoteVariant("a0","first original",replySequence=RemoteReplySequence("seq",0)),
+            RemoteVariant("a1","second original",replySequence=RemoteReplySequence("seq",1)))
+        cache.putHistory("old",RemoteHistory(conversationId="old",turns=listOf(RemoteTurn("t",user=RemoteUserBranch(variants=listOf(RemoteVariant("u","question"))),
+            assistant=RemoteAssistantBranches(mapOf("0" to 2),mapOf("0" to list))))))
+        val cross=LocalCrossWindow(store)
+        assertEquals(listOf("u","a0","a1"),cross.recent("current","old",1).map{it.messageId})
+        val read=cross.select("current",RemoteCrossWindowRequest("manual",listOf(RemoteCrossWindowMessageSelection("old","a0"))))
+        assertTrue(read.text.contains("first original"));assertFalse(read.text.contains("second original"));assertFalse(read.text.contains("old version"))
+    }
+
 }
