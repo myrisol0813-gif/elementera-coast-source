@@ -144,3 +144,14 @@ const notes = await libraryCall('library_notes',{book_id:actualBookId,chapter_in
 assert.deepEqual(notes.notes.map(n=>n.kind).sort(),['annotation','highlight','reflection']);
 assert.equal(notes.notes.find(n=>n.kind==='highlight').quote,'First');
 console.log('model library discovery, reading and note roundtrip: ok');
+
+// Per-turn furniture summaries must distinguish a pending portrait from a formal edit and a highlight from a reflection.
+const { buildFurnitureSummary } = await import('../functions/tool-furniture-summary.js');
+const portraitReceipt = buildFurnitureSummary({id:'receipt-p',toolKey:'memory.user_portrait_propose',output:{id:'pending-p'}});
+assert.equal(portraitReceipt.status,'success');
+assert.equal(portraitReceipt.items[0].kind,'用户画像');
+assert.match(portraitReceipt.label,/待确认/);
+const highlightReceipt = buildFurnitureSummary({id:'receipt-h',toolKey:'library.write',output:{note:{id:'note-h',book_id:'book-h',kind:'highlight',chapter_index:0,paragraph_index:0}}});
+assert.match(highlightReceipt.label,/划线/);
+assert.equal(highlightReceipt.target.note_id,'note-h');
+assert.doesNotMatch(summarizeToolValue('memory.user_portrait_propose',{proposed_body:'fixture-private-body'}),/fixture-private-body/);
