@@ -202,6 +202,7 @@ object ChatSyncMapper {
                         variantCount = assistants.size.coerceAtLeast(1),
                         variants = assistants.map { it.content },
                         createdAtLabel = assistant.createdAt,
+                        attachments = assistant.attachments.map(::toChatAttachment),
                         furnitureRuns = assistant.furnitureRuns.map(::toFurnitureRun),
                         deskReceipt = assistant.deskSlip?.let(TurnDeskMapper::toUi)
                     )
