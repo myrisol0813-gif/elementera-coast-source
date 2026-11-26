@@ -51,14 +51,14 @@ private fun JsonObject.rows(name: String): List<JsonObject> = (this[name] as? Js
 // Normalize transport aliases at the display boundary; never rewrite stored notes.
 internal fun JsonObject.libraryDisplayNote(): JsonObject {
     val author = when (s("author")) {
-        "owner", "xiaohan" -> "owner"
-        "assistant", "model_partner", "myri" -> "assistant"
+        "owner" -> "owner"
+        "assistant", "model_partner" -> "assistant"
         else -> return this
     }
     return JsonObject(this + ("author" to kotlinx.serialization.json.JsonPrimitive(author)))
 }
 internal fun JsonObject.libraryDisplayCount(model: Boolean): Int {
-    val keys = if (model) listOf("assistant_notes", "model_partner_notes", "myri_notes") else listOf("owner_notes", "xiaohan_notes")
+    val keys = if (model) listOf("assistant_notes", "model_partner_notes") else listOf("owner_notes")
     return keys.firstNotNullOfOrNull { this[it]?.jsonPrimitive?.intOrNull } ?: 0
 }
 
