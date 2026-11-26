@@ -133,4 +133,47 @@ class LocalToolSessionTest {
         assertFalse(session.execute("web3","independent_web_search","""{"query":"not authorized"}""").ok)
         assertEquals(1,calls)
     }
+
+    @Test fun modelVoiceUsesAuthorizedProviderAndStoresOriginalOnlyOnce(){
+        val s=fixture(auto=false,tools=true)
+        val cache=RemoteCacheStore(s)
+        val before=cache.history("current")!!
+        cache.putHistory("current",before.copy(contextSettings=before.contextSettings.copy(localModelWriteEnabled=true)))
+        val bytes=byteArrayOf(73,68,51,4,0,0,0,0,0,0,1,2)
+        var calls=0
+        val http=OkHttpClient.Builder().addInterceptor{chain->
+            calls++
+            val r=chain.request()
+            val buf=Buffer();r.body!!.writeTo(buf)
+            val body=Json.parseToJsonElement(buf.readUtf8()).jsonObject
+            assertEquals("spoken fixture",body["text"]!!.jsonPrimitive.content)
+            assertEquals(setOf("text","model_id"),body.keys)
+            Response.Builder().request(r).protocol(Protocol.HTTP_1_1).code(200).message("ok").body(bytes.toResponseBody()).build()
+        }.build()
+        var enabled=true
+        val provider=LocalVoiceProvider({if(enabled)LocalProviderConfig("elevenlabs","ElevenLabs","https://api.elevenlabs.io","secret-fixture",listOf("fixtureVoice"))else null},http)
+        val k=LocalKnowledgeStore(s,voice=provider)
+        val req=RemoteCrossWindowRequest("off")
+        val ctx=k.context(listOf(RemoteChatMessage("user","private user text")),12000,"main_chat","current",crossWindow=req)
+        val session=k.toolSession("current","turn-now",req,ctx.receipt,"local:fixture/model")!!
+        assertTrue(session.tools.toString().contains("voice_create"))
+        val result=session.execute("voice-call","voice_create","""{"text":"spoken fixture"}""")
+        assertTrue(result.output,result.ok)
+        val side=LocalSideRecords(s)
+        val row=side.clips("current").single()
+        assertEquals("turn-now",row["turn_id"]!!.jsonPrimitive.content)
+        assertEquals("coast_chat",row["source"]!!.jsonPrimitive.content)
+        assertArrayEquals(bytes,side.bytes(side.audio(row["id"]!!.jsonPrimitive.content)!!))
+        assertTrue(result.deskSlip.workbench.toolResults.any{it.name=="voice_create"&&it.content.contains(row["id"]!!.jsonPrimitive.content)})
+        assertFalse(session.execute("repeat","voice_create","""{"text":"repeat"}""").ok)
+        assertFalse(LocalToolAudit(s).read().toString().contains("spoken fixture"))
+        assertFalse(LocalToolAudit(s).read().toString().contains("secret-fixture"))
+        assertEquals(1,calls)
+        enabled=false
+        assertFalse(k.toolSession("current","turn-now",req,ctx.receipt,"local:fixture/model")!!.tools.toString().contains("voice_create"))
+        enabled=true
+        cache.putHistory("current",before)
+        assertFalse(k.toolSession("current","turn-now",req,ctx.receipt,"local:fixture/model")!!.tools.toString().contains("voice_create"))
+        assertEquals(1,calls)
+    }
 }
