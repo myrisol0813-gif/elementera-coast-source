@@ -64,6 +64,7 @@ function successLabel(toolKey, displayName) {
     'library.write': '在书房留下笔记',
     'memory.write_candidate': '放入待确认区',
     'memory.global_excerpt_propose': '全局摘录：新增 1 条待确认修改',
+    'memory.user_portrait_propose': '用户画像：新增 1 条待确认修改',
   };
   return labels[toolKey] || clean(displayName || toolKey, 120) || '使用了一件工具';
 }
@@ -89,10 +90,11 @@ export function buildFurnitureSummary({ id, toolKey, displayName, status = 'succ
   if (key === 'memory.search') detail = memorySummary(output);
   else if (key === 'memory.write_candidate') detail = candidateSummary(output);
   else if (key === 'memory.global_excerpt_propose') detail = { count: 1, items: [{ title: '待确认的全局摘录修改', kind: '全局摘录' }], extra_count: 0 };
+  else if (key === 'memory.user_portrait_propose') detail = { count: 1, items: [{ title: '待确认的用户画像修改', kind: '用户画像' }], extra_count: 0 };
   else if (key === 'library.write') detail = {
     count: 1, items: [], extra_count: 0,
     target: libraryTarget(output),
-    label: output?.deleted ? '助手删去了一条笔记' : output?.note?.kind === 'annotation' ? '助手写了一条批注' : '助手写了一篇读后感',
+    label: output?.deleted ? '助手删去了一条笔记' : output?.note?.kind === 'highlight' ? '助手留下了一处划线' : output?.note?.kind === 'annotation' ? '助手写了一条批注' : '助手写了一篇读后感',
   };
 
   return {
