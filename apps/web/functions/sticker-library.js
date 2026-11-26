@@ -118,8 +118,9 @@ export async function deliverSticker(db,input,{allowSend=false}={}){
   const state=normalizeState(JSON.parse(snap.state_json)),turn=state.turns.find(t=>t.id===tid);
   const index=turn?.user?.variants?.findIndex(v=>v.id===uid)??-1;
   const target=index<0?null:turn.assistant.variantsByUserVariant[String(index)]?.find(v=>v.id===mid);
+  if(state.context_settings?.sticker_send_enabled!==true)fail('sticker_send_denied','当前窗口未允许发送表情包。',403);
   if(!target||target.hidden||turn.user.active!==index||
-    !['sticker_tool_ready','sticker_saved'].includes(target.finish_reason))
+    !['sticker_tool_ready','sticker_saved','image_tool_ready','image_saved'].includes(target.finish_reason))
     fail('sticker_reservation_lost','原回复版本不再等待表情包。',409);
   const attachments=target.attachments||[];
   const existing=attachments.find(a=>a.sticker_delivery?.sticker_id===sid&&a.sticker_delivery?.message_id===mid);

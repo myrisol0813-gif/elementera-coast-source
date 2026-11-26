@@ -157,6 +157,8 @@ export function normalizeContextSettings(value = {}) {
     ...(raw.cross_window_auto === true ? { cross_window_auto: true } : {}),
     ...(raw.local_model_tools_enabled === true ? { local_model_tools_enabled: true } : {}),
     ...(raw.local_model_write_enabled === true ? { local_model_write_enabled: true } : {}),
+    ...(raw.sticker_send_enabled === true ? { sticker_send_enabled: true } : {}),
+    ...(raw.sticker_add_enabled === true ? { sticker_add_enabled: true } : {}),
     weather_city: weatherCity,
   };
 }

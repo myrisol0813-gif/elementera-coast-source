@@ -103,7 +103,7 @@ export function createChatGeneration({
     composerState();
     const requestContext = chatRequestContext(conversationId);
     const streamingEnabled = requestContext.settings.streamingEnabled === true;
-    if (!streamingEnabled && !runtime.profile.current_image_model) saveHistory(conversationId, appended.state).catch(() => undefined);
+    if (!streamingEnabled && !runtime.profile.current_image_model && !appended.state.context_settings?.sticker_send_enabled && !appended.state.context_settings?.sticker_add_enabled) saveHistory(conversationId, appended.state).catch(() => undefined);
     const modelId = runtime.profile.current_chat_model || DEFAULT_MODEL;
     const payload = {
       conversation_id: conversationId,

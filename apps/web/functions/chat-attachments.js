@@ -488,8 +488,8 @@ export async function saveGeneratedImageOriginal(db,{conversationId,turnId,messa
     const t=next.turns.find(x=>x.id===turnId);
     const idx=t?.user.variants.findIndex(v=>v.id===reservedUserId)??-1;
     const v=idx<0?null:t.assistant.variantsByUserVariant[String(idx)]?.find(x=>x.id===messageId);
-    if(!v||v.finish_reason!=='image_pending'||v.attachments?.length)throw new ChatAttachmentError('image_reservation_lost','原回复版本已不再等待生成图像。',409);
-    v.attachments=[attachment];v.content='';v.finish_reason=modelTool?'image_saved':'stop';delete v.errorDetail;
+    if(!v||v.finish_reason!=='image_pending'||v.attachments?.some(a=>!a.sticker_delivery)||v.attachments?.length>=12)throw new ChatAttachmentError('image_reservation_lost','原回复版本已不再等待生成图像。',409);
+    v.attachments=[...(v.attachments||[]),attachment];v.content='';v.finish_reason=modelTool?'image_saved':'stop';delete v.errorDetail;
     next.updated_at=iso(stamp);
     const expected=snap.state_json,encoded=JSON.stringify(normalizeState(next));
     // All writes share the same CAS guard, and the batch rolls back on any SQL error.
@@ -534,7 +534,7 @@ export async function runManualImageGeneration(env,input,{generate=generateIndep
   const existing=state.turns.flatMap(t=>[...t.user.variants,...Object.values(t.assistant.variantsByUserVariant).flat()]);
   const branch=turn.assistant.variantsByUserVariant[String(index)]||[];
   const target=branch.find(v=>v.id===mid);
-  if(existing.some(v=>v.finish_reason==='image_pending')|| (modelTool ? (!target||target.hidden||target.finish_reason!=='image_tool_ready'||target.attachments?.length||existing.filter(v=>v.id===mid).length!==1) : existing.some(v=>v.id===mid)))fail('image_already_reserved','已有生成任务或此请求已使用；不会再次生成。',409);
+  if(existing.some(v=>v.finish_reason==='image_pending')|| (modelTool ? (!target||target.hidden||!['image_tool_ready','sticker_saved'].includes(target.finish_reason)||target.attachments?.some(a=>!a.sticker_delivery)||target.attachments?.length>=12||existing.filter(v=>v.id===mid).length!==1) : existing.some(v=>v.id===mid)))fail('image_already_reserved','已有生成任务或此请求已使用；不会再次生成。',409);
   if(!modelTool&&branch.length>=20)fail('image_branch_full','当前回复版本已满。',409);
   let catalog;
   try{catalog=await discover(fetch,key);}catch{fail('image_catalog_unavailable','无法核验生图模型目录，未发起生成。',502);}

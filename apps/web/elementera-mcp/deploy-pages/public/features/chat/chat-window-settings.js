@@ -99,6 +99,10 @@ export function createChatWindowSettings({
             </button>
           </section>
 
+          <section class="window-context-card">
+            ${switchRow({title:'允许发送表情包',note:'模型可自主查找和发送已启用的素材，不调用生图 API。',checked:settings.sticker_send_enabled,enabled:!locked,action:!locked?'chat:window-sticker-send':''})}
+            ${switchRow({title:'允许添加表情包',note:'模型可登记自己在本窗口生成并保存的图片。',checked:settings.sticker_add_enabled,enabled:!locked,action:!locked?'chat:window-sticker-add':''})}
+          </section>
           <section class="window-context-card window-context-note">
             <strong>PWA 与 Native 的边界</strong>
             <p>PWA 只递入日期、时间和未来 7 天日历，保持轻量，不在聊天前等待天气或设备信息。完整现实上下文仍由 Native 提供。</p>
@@ -157,6 +161,8 @@ export function createChatWindowSettings({
     if (name === 'window-reality-master') {
       return writeSettings({ ...settings, reality_enabled: !settings.reality_enabled });
     }
+    if(name==='window-sticker-send')return writeSettings({...settings,sticker_send_enabled:!settings.sticker_send_enabled});
+    if(name==='window-sticker-add')return writeSettings({...settings,sticker_add_enabled:!settings.sticker_add_enabled});
     if (name === 'window-short-mode') {
       return writeSettings({ ...settings, short_reply_mode: !settings.short_reply_mode });
     }

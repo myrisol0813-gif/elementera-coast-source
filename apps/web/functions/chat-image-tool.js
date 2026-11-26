@@ -16,7 +16,7 @@ export async function attachImageTool(env,assembled,{conversationId,turnId,messa
   const state=await readConversationState(db,conversationId);
   const turn=state.turns.find(t=>t.id===turnId),uid=turn?.user?.variants?.[turn.user.active]?.id;
   const target=turn?.assistant?.variantsByUserVariant?.[String(turn.user.active)]?.find(v=>v.id===messageId);
-  if(!uid||!target||target.hidden||target.finish_reason!=='image_tool_ready')return assembled;
+  if(!uid||!target||target.hidden||!['image_tool_ready','sticker_saved'].includes(target.finish_reason)||target.attachments?.some(a=>a.image_generation?.message_id===messageId))return assembled;
   let vision=visionOverride;
   if(visionOverride===null)try{const catalog=await (deps.catalog||fetchModelCatalog)(env);const entry=Object.values(catalog.groups||{}).flat().find(m=>m.id===chatModel);
     const modalities=entry?.architecture?.input_modalities;

@@ -1,4 +1,5 @@
 import { attachImageTool } from './chat-image-tool.js';
+import { attachStickerTools } from './chat-sticker-tool.js';
 import {
   apiError,
   json,
@@ -519,6 +520,7 @@ async function formalChat(request, env) {
     crossWindow: value.cross_window,
   });
   assembled=await attachImageTool(env,assembled,{conversationId,turnId:sourceTurnId,messageId,roomType:conversation.room_type,chatModel:value.model,enabled:value.image_tool_enabled===true,expectedImageModel:value.image_model_id??null,signal:request.signal});
+  assembled=await attachStickerTools(env,assembled,{conversationId,turnId:sourceTurnId,messageId,roomType:conversation.room_type,signal:request.signal});
   const attachmentIds = (Array.isArray(value.attachment_ids) ? value.attachment_ids : [])
     .map((item) => String(item || '').trim())
     .filter(Boolean)

@@ -30,7 +30,7 @@ await setStickerEnabled(db,entry.id,true,{actor:'owner'});
 
 const target=await createConversation(db,'发送素材','main');
 const turn={id:'turn-sticker',user:{variants:[{id:'user-sticker',content:'你好'}]},assistant:{variantsByUserVariant:{0:[{id:'assistant-sticker',content:'',finish_reason:'sticker_tool_ready'}]}}};
-await writeConversationState(db,target.id,{turns:[turn]});
+await writeConversationState(db,target.id,{turns:[turn],context_settings:{sticker_send_enabled:true}});
 const delivery={conversation_id:target.id,turn_id:turn.id,user_variant_id:'user-sticker',message_id:'assistant-sticker',sticker_id:entry.id};
 await assert.rejects(()=>deliverSticker(db,delivery),e=>e.type==='sticker_send_denied');
 await assert.rejects(()=>deliverSticker(db,{...delivery,message_id:'wrong'},{allowSend:true}),e=>e.type==='sticker_reservation_lost');
@@ -42,7 +42,7 @@ assert.equal(repeated.reused,true);
 assert.equal(repeated.attachment.id,sent.attachment.id);
 const saved=(await readConversationState(db,target.id)).turns[0].assistant.variantsByUserVariant['0'][0];
 assert.deepEqual(saved.attachments,[sent.attachment]);
-await writeConversationState(db,target.id,{turns:[turn]});
+await writeConversationState(db,target.id,{turns:[turn],context_settings:{sticker_send_enabled:true}});
 assert.deepEqual((await readConversationState(db,target.id)).turns[0].assistant.variantsByUserVariant['0'][0].attachments,[sent.attachment]);
 await assert.rejects(()=>writeConversationState(db,target.id,{turns:[]}),e=>e.type==='image_history_changed');
 const gt='generated-turn',gm='generated-model';

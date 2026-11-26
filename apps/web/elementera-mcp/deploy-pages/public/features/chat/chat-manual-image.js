@@ -44,12 +44,13 @@ export function createManualImageSender({runtime,toast,currentHistory,setHistory
 
 /** Reserve the exact normal-chat variant before exposing the model image tool. */
 export async function prepareAutonomousImageTurn(runtime,conversationId,appended,payload,saveHistory){
-  if(!runtime.profile.current_image_model)return;
-  appended.variant.finish_reason='image_tool_ready';
+  const image=runtime.profile.current_image_model;
+  const settings=appended.state.context_settings||{};
+  if(!image&&!settings.sticker_send_enabled&&!settings.sticker_add_enabled)return;
+  appended.variant.finish_reason=image?'image_tool_ready':'sticker_tool_ready';
   await saveHistory(conversationId,appended.state);
-  payload.image_tool_enabled=true;
-  payload.image_model_id=runtime.profile.current_image_model;
+  if(image){payload.image_tool_enabled=true;payload.image_model_id=image;}
 }
 export function imageToolSucceeded(data){
-  return data?.name==='image_generate'&&data?.result?.ok===true&&data.result.status==='saved'&&typeof data.result.attachment?.id==='string';
+  return ['image_generate','sticker_send'].includes(data?.name)&&data?.result?.ok===true&&data.result.status==='saved'&&typeof data.result.attachment?.id==='string';
 }
