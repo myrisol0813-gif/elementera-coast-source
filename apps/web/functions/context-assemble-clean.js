@@ -245,7 +245,7 @@ export async function assembleCleanContext(env, {
     userPortrait: comfort.keptUserPortraitText, userPortraitStatus: comfort.userPortraitStatus, userPortraitTokens: comfort.userPortraitTokens,
     globalExcerpt: comfort.keptGlobalExcerptText, globalExcerptStatus: comfort.globalExcerptStatus, globalExcerptTokens: comfort.globalExcerptTokens,
     estimatedTokens: comfort.estimatedTokens, comfortCeiling: comfort.comfortCeiling, exceedsComfortCeiling: comfort.exceedsComfortCeiling, budgetNote: budgetPolicy.note,
-    soil: comfort.kept.soil, soilEnabled, soilContext: soilDesk.context,
+    soil: comfort.kept.soil, soilEnabled, soilContextAvailable: Boolean(soilText.trim()), soilContext: soilDesk.context,
     soilCurrentText: soilDesk.current_text, soilAfterthoughts: soilDesk.afterthoughts,
     soilMemoryCandidatesCount: soilDesk.memory_candidates_count, soilSeedCandidatesCount: soilDesk.seed_candidates_count, memoryItems: deliveredMemoryRecords,
     memoryDeliveredTexts: comfort.keptMemoryItems, worldbookItems: worldbook, worldbookDeliveredCount: comfort.kept.worldbook, worldbookDeliveredTexts: comfort.keptWorldbookItems,
