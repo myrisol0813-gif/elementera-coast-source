@@ -341,27 +341,30 @@ const REGISTRY = Object.freeze([
     handler: async (db, input) => ({ entries: await listCalendarEntries(db, input) }),
   }),
   entry({
-    tool_key: 'calendar.create', display_name: '写入公历日程', description: '新增日程或随记。',
+    tool_key: 'calendar.create', display_name: '写入公历日程', description: '新增日程、随记或纪念日。',
     model_exposed: true, model_group: 'calendar', auth_scopes: ['write:soil'],
-    model_tool: modelTool('calendar_create', '新增一条海岸公历记录。', {
+    model_tool: modelTool('calendar_create', '新增日程、随记或纪念日。随记使用 kind=note；纪念日使用 anniversary 对象（day 为起始日期，kind 为 event）。', {
       properties: {
         day: { type: 'string', description: 'YYYY-MM-DD' }, title: { type: 'string', maxLength: 120 },
         body: { type: 'string', maxLength: 4000 }, kind: { type: 'string', enum: ['event', 'note'] },
         recurrence: { type: 'string', enum: ['none', 'yearly'] },
+        anniversary: objectSchema({ startDay: { type: 'string', format: 'date' }, mode: { type: 'string', enum: ['elapsed', 'milestone', 'yearly'] }, targetDays: { type: 'integer', minimum: 1, maximum: 109938 }, pinned: { type: 'boolean' } }, ['startDay', 'mode', 'pinned']),
       },
       required: ['day', 'title'],
     }),
     official_mcp: officialMcpTool({
-      order: 170, name: 'create_calendar_entry', title: '写入海岸日程', description: '新增一条公历日程或随记。',
+      order: 170, name: 'create_calendar_entry', title: '写入海岸日程', description: '新增公历日程、随记或纪念日；纪念日提供 anniversary 对象。',
       inputSchema: objectSchema({
         day: { type: 'string', format: 'date' }, title: { type: 'string', minLength: 1, maxLength: 120 },
         body: { type: 'string', maxLength: 4000 }, kind: { type: 'string', enum: ['event', 'note'] },
-        recurrence: { type: 'string', enum: ['none', 'yearly'] }, ...MCP_MODEL_IDENTITY_PROPERTIES,
+        recurrence: { type: 'string', enum: ['none', 'yearly'] },
+        anniversary: objectSchema({ startDay: { type: 'string', format: 'date' }, mode: { type: 'string', enum: ['elapsed', 'milestone', 'yearly'] }, targetDays: { type: 'integer', minimum: 1, maximum: 109938 }, pinned: { type: 'boolean' } }, ['startDay', 'mode', 'pinned']), ...MCP_MODEL_IDENTITY_PROPERTIES,
       }, ['day', 'title', 'model_label']),
       invoking: '正在写下日程…', invoked: '日程已经记下',
     }),
     handler: (db, input, context) => createCalendarEntry(db, {
       day: input.day, title: input.title, body: input.body, kind: input.kind, recurrence: input.recurrence,
+      ...(Object.hasOwn(input, 'anniversary') ? { anniversary: input.anniversary } : {}),
     }, {
       author: 'assistant', source: context.surface === 'official_mcp' ? 'official_mcp' : 'coast_chat',
       conversation_id: context.conversation_id || input.source_conversation_id || null,
