@@ -80,10 +80,14 @@ fun ModelQuickPicker(
     onOpenModelBox: () -> Unit,
     imageModels: List<String> = emptyList(),
     currentImage: String = "",
-    onPickImage: (String) -> Unit = {}
+    onPickImage: (String) -> Unit = {},
+    headerTitle: String = "ChatGPT",
+    onHeaderTitle: (String) -> Unit = {}
 ) {
     var query by remember { mutableStateOf("") }
     var kind by remember { mutableStateOf(ModelKind.Chat) }
+    var editingHeader by remember { mutableStateOf(false) }
+    var headerDraft by remember(headerTitle) { mutableStateOf(headerTitle) }
     var imageQuery by remember { mutableStateOf("") }
     var imageOpen by remember { mutableStateOf<Set<ImageGroup>>(emptySet()) }
     var channel by remember { mutableStateOf(if (currentModel.startsWith("chatgpt-plan:") || (currentModel.isBlank() && chatGpt.connected)) LocalModelChannel.Codex else LocalModelChannel.Provider) }
@@ -129,6 +133,24 @@ fun ModelQuickPicker(
                 TextButton(onClick = onOpenModelBox) { Text("打开模型箱") }
             }
             Spacer(Modifier.height(4.dp))
+            Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.45f),RoundedCornerShape(16.dp)).padding(10.dp)){
+                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+                    Column(Modifier.weight(1f)){
+                        Text("主页显示名",style=MaterialTheme.typography.labelSmall)
+                        Text(headerTitle,style=MaterialTheme.typography.titleSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
+                    }
+                    TextButton(onClick={headerDraft=headerTitle;editingHeader=!editingHeader}){Text(if(editingHeader)"收起" else "编辑")}
+                }
+                if(editingHeader){
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){
+                        TextButton(onClick={onHeaderTitle("ChatGPT");editingHeader=false}){Text("ChatGPT")}
+                        TextButton(onClick={onHeaderTitle("Tideloom");editingHeader=false}){Text("Tideloom")}
+                    }
+                    OutlinedTextField(headerDraft,{headerDraft=it.take(40)},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("自定义名称")})
+                    TextButton(onClick={onHeaderTitle(headerDraft);editingHeader=false}){Text("保存")}
+                }
+            }
+            Spacer(Modifier.height(8.dp))
             ModelKindTabs(kind){kind=it}
             Spacer(Modifier.height(8.dp))
             if(kind==ModelKind.Image){
