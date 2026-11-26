@@ -251,4 +251,12 @@ class ChatSyncMapperTest {
         assertEquals(1, cleared.turns.size)
         assertEquals(null, ChatSyncMapper.toUi(cleared).single().errorDetail)
     }
+
+    @Test fun assistantImageOnlyVariantMapsToAssistantBubble(){
+        val image=com.elementeracoast.app.core.remote.RemoteAttachment("picture1","image","picture.png","image/png",8)
+        val h=RemoteHistory(turns=listOf(RemoteTurn(id="turn1",user=RemoteUserBranch(variants=listOf(RemoteVariant("u","draw"))),assistant=RemoteAssistantBranches(variantsByUserVariant=mapOf("0" to listOf(RemoteVariant("a","",attachments=listOf(image))))))))
+        val ui=ChatSyncMapper.toUi(h)
+        assertEquals("picture1",ui.single{it.role==MessageRole.Assistant}.attachments.single().id)
+        assertTrue(ui.single{it.role==MessageRole.User}.attachments.isEmpty())
+    }
 }

@@ -38,7 +38,8 @@ const profile = between(settings, "router.register('settings-profile'", "router.
 for (const expected of ['昵称', '聊天署名 / 导出时显示名', '用户气泡颜色', '头像在碳硅圈资料中设置', '不会自动进入模型伙伴']) assert.ok(profile.includes(expected), `profile missing: ${expected}`);
 assert.equal(profile.includes('ownerAvatar'), false, 'Wolf profile must not introduce a second avatar field');
 assert.match(settings, /ownerSignature/);
-assert.match(settings, /buildOfflineArchive\(archive, auditFullArchiveCompleteness\(archive\), signature\)/);
+assert.match(settings, /saveOfflineV2\(\{/);
+assert.match(settings, /ownerLabel:signature/);
 const { buildOfflineArchive } = await import(pathToFileURL(resolve(pages, 'public/features/offline-archive.js')).href);
 const archive = buildOfflineArchive({chat:{conversations:[{conversation:{id:'c'},history:{turns:[{user:{variants:[{content:'署名测试'}]},assistant:{variantsByUserVariant:{}}}]}}]}}, [], '归档署名');
 const archiveText = new TextDecoder().decode(await archive.blob.arrayBuffer());

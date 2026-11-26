@@ -59,39 +59,29 @@ internal fun ChatRecordsScreen(
     val scope = rememberCoroutineScope()
     val stamp = remember { DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").format(LocalDateTime.now()) }
     var busy by remember { mutableStateOf(false) }
-    var pendingArchive by remember { mutableStateOf<JsonElement?>(null) }
     val operations = remember(archive, localMode, context) { (archive as? DefaultGlobalArchiveRepository)?.archiveV2(context, localMode) }
     val htmlExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
-        val snapshot = pendingArchive
-        pendingArchive = null
-        if (uri == null || snapshot == null) { busy = false; return@rememberLauncherForActivityResult }
+        if(uri==null || operations==null){busy=false;return@rememberLauncherForActivityResult}
         scope.launch {
             runCatching {
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri)?.use { output ->
-                        OfflineHtmlArchive.write(snapshot, output, if (localMode) listOf("本机仅含当前已实现的模块") else GlobalArchive.auditFullArchive(snapshot))
-                    } ?: error("无法打开目标文件")
-                }
+                val (file,manifest)=operations.export { _,_-> }
+                try {
+                    withContext(Dispatchers.IO) {
+                        context.contentResolver.openOutputStream(uri)?.use { output ->
+                            OfflineV2HtmlArchive.write(file,output,GlobalArchive.withNativeSettings(kotlinx.serialization.json.JsonObject(emptyMap()),nativeSettings,localMode))
+                        }?:error("无法打开目标文件")
+                    }
+                }finally{file.parentFile?.deleteRecursively()}
             }.onSuccess { warnings ->
-                onSnackbar(if (warnings.isEmpty()) "离线 HTML ZIP 已导出，解压后打开 index.html" else "离线归档已导出；有缺失或范围限制，详见 manifest.json")
+                onSnackbar(if(warnings.isEmpty())"离线 HTML ZIP 已导出；范围见清单，解压后打开 index.html" else "离线归档已导出；有缺失，详见 manifest.json")
             }.onFailure { onSnackbar("离线归档失败："+it.message) }
-            busy = false
+            busy=false
         }
     }
-
-
     fun launchHtml(){
-        if(busy)return
+        if(busy||operations==null)return
         busy=true
-        scope.launch {
-            runCatching {
-                val raw = if (localMode) archive.snapshot() else archive.fullArchive()
-                withContext(Dispatchers.Default) { GlobalArchive.withNativeSettings(raw, nativeSettings, localMode) }
-            }.onSuccess { snapshot ->
-                pendingArchive=snapshot
-                htmlExport.launch("elementera-coast-offline-$stamp.zip")
-            }.onFailure { busy=false;onSnackbar("离线导出失败："+(it.message?:"无法读取海岸快照")) }
-        }
+        htmlExport.launch("elementera-coast-offline-$stamp.zip")
     }
     LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("海岸归档", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) }

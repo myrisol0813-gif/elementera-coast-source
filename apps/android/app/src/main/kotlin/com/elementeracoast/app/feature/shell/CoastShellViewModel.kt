@@ -59,7 +59,8 @@ class CoastShellViewModel(
     private val backend: CoastBackendGraph,
     private val workDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
     private val chatGpt: ChatGptPlanRepository? = null,
-    private val localMode: Boolean = false
+    private val localMode: Boolean = false,
+    private val foregroundLease: ((()->Unit,()->Unit)->AutoCloseable?)? = null
 ) : ViewModel() {
     private val _state = MutableStateFlow(CoastShellState(
         currentModel = chatGpt?.preferredModel()?.let { CHATGPT_PLAN_PREFIX + it }.orEmpty(),
@@ -85,6 +86,7 @@ class CoastShellViewModel(
     val archive: GlobalArchiveRepository get() = backend.archive
     private var generationJob: Job? = null
     private class GenerationRun(var ownerId: String) {
+        var lease: AutoCloseable? = null
         var preparing = true
         var streaming = false
         var messageId: Long? = null
@@ -108,11 +110,16 @@ class CoastShellViewModel(
     private fun beginGeneration(ownerId: String) {
         check(generationRun == null)
         historyJob?.cancel()
-        generationRun = GenerationRun(ownerId)
+        val run = GenerationRun(ownerId)
+        generationRun = run
         _state.update { generationUi(it.copy(historyLoading = false)) }
+        run.lease = foregroundLease?.invoke({ if (generationRun === run) generationJob?.cancel() }, {
+            if (generationRun === run) showPlaceholder("系统后台保护不可用；本轮仍可在应用内继续，切出应用可能中断。")
+        })
     }
 
     private fun finishGeneration() {
+        generationRun?.lease?.close()
         generationRun = null
         generationJob = null
         _state.update(::generationUi)
@@ -371,6 +378,20 @@ class CoastShellViewModel(
         _state.update { it.copy(showModelPicker = false) }
     }
 
+    fun selectImageModel(model: String) {
+        if (generationJob?.isActive == true || _state.value.isStreaming || _state.value.isFinalizing) {
+            _state.update { it.copy(snackbarMessage = "当前对话还未结束，请稍后切换生图模型。") }
+            return
+        }
+        if (model !in _state.value.imageModels || model == _state.value.currentImageModel) return
+        viewModelScope.launch(workDispatcher) {
+            try {
+                val profile = backend.profile.setCurrentImageModel(model)
+                _state.update { it.copy(currentImageModel = profile.currentImageModel, snackbarMessage = "生图模型已选定；按所选 API 正常计费。") }
+            } catch (error: CoastApiException) { handleBackendError(error, "生图模型切换失败") }
+        }
+    }
+
     fun selectModel(model: String) {
         if (tourBlocksCloudAction()) return
         if (generationJob?.isActive == true || _state.value.isStreaming || _state.value.isFinalizing) {
@@ -609,6 +630,46 @@ class CoastShellViewModel(
             }
         } catch (_: Exception) {
             _state.update { it.copy(snackbarMessage = "消息已经保存，但未能清除输入草稿。") }
+        }
+    }
+
+    fun sendImage(text: String) {
+        val prompt=text.trim()
+        val current=_state.value
+        if(generationJob?.isActive==true||generationRun!=null||current.isStreaming||current.isFinalizing||current.attachmentUploading||current.historyLoading)return
+        if(prompt.length !in 1..4000){showPlaceholder("请输入1—4000字符的绘图提示。");return}
+        if(current.currentImageModel.isBlank()){showPlaceholder("请先在模型箱选择生图模型。");return}
+        if(current.activeRoomType==RoomType.Lighthouse){showPlaceholder("灯塔窗口不支持生图。");return}
+        if(current.pendingAttachments.isNotEmpty()){showPlaceholder("手动生图暂不接收参考图或文件，请先移除待发送附件。");return}
+        if(current.searchFocus!=null){showPlaceholder("请先结束旧版本预览。");return}
+        beginGeneration(current.activeConversationId)
+        generationJob=viewModelScope.launch(workDispatcher){
+            var cid=""
+            var requested=false
+            try{
+                val conversation=ensureRemoteConversation()
+                cid=conversation.id
+                generationRun?.ownerId=cid
+                val base=backend.chat.loadHistory(cid)
+                val appended=ChatSyncMapper.appendUser(base,prompt)
+                val persisted=backend.chat.persistHistory(cid,appended.history)
+                val turn=persisted.turns.first{it.id==appended.turnId}
+                val uid=turn.user.variants[turn.user.active].id
+                val mid=ChatSyncMapper.nextAssistantVariantId(persisted,turn.id)
+                clearAcceptedDraft(cid,conversation.roomType,text)
+                showHistory(cid,persisted)
+                showPlaceholder("正在绘制图片…")
+                requested=true
+                val result=backend.chat.generateImage(cid,turn.id,uid,mid,prompt)
+                showHistory(cid,result)
+                showPlaceholder("图片已保存。")
+            }catch(error:kotlinx.coroutines.CancellationException){
+                if(requested&&cid.isNotBlank())kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable){runCatching{backend.chat.loadHistory(cid)}.onSuccess{showHistory(cid,it)}}
+                throw error
+            }catch(error:Exception){
+                if(requested&&cid.isNotBlank())runCatching{backend.chat.loadHistory(cid)}.onSuccess{showHistory(cid,it)}
+                showPlaceholder("生图未确认完成；请刷新窗口检查，不会自动重试。")
+            }finally{finishGeneration()}
         }
     }
 
@@ -915,6 +976,7 @@ class CoastShellViewModel(
         _state.update {
             it.copy(
                 currentModel = if (isChatGptPlanModel(it.currentModel)) it.currentModel else current.ifBlank { it.currentModel },
+                currentImageModel = profile?.currentImageModel ?: it.currentImageModel,
                 modelPartnerAvatarDataUrl = model_partner,
                 ownerAvatarDataUrl = daily.ownerAvatarDataUrl,
                 coverDataUrl = daily.momentCoverDataUrl
@@ -927,14 +989,15 @@ class CoastShellViewModel(
         val models = buildList {
             addAll(catalog.groups.openAiChat.map { it.id })
             addAll(catalog.groups.freeTest.map { it.id })
-            addAll(catalog.groups.openAiImage.map { it.id })
         }.filter(String::isNotBlank).distinct()
+        val images = catalog.groups.openAiImage.map { it.id }.filter(String::isNotBlank).distinct()
         val current = _state.value.currentModel
         _state.update {
             it.copy(
-                models = if (!localMode && current.isNotBlank() && !isChatGptPlanModel(current) && current !in models) listOf(current) + models else models,
+                imageModels = images,
+                models = if (!localMode && current.isNotBlank() && !isChatGptPlanModel(current) && current !in images && current !in models) listOf(current) + models else models,
                 modelReasoningChoices = (catalog.groups.openAiChat + catalog.groups.freeTest).associate { it.id to it.reasoningEfforts },
-                currentModel = if (localMode) current.takeIf { isChatGptPlanModel(it) || it in models }.orEmpty() else current.ifBlank { models.firstOrNull().orEmpty() }
+                currentModel = if (localMode) current.takeIf { isChatGptPlanModel(it) || it in models }.orEmpty() else current.takeUnless { it in images }.orEmpty().ifBlank { models.firstOrNull().orEmpty() }
             )
         }
     }
@@ -1200,26 +1263,36 @@ class CoastShellViewModel(
             }
         } catch (cancelled: CancellationException) {
             if (replySaved) throw cancelled
-            val stopped = backend.chat.cancelledHistory(cleared, turnId, modelId, partial)
-            backend.chat.cacheHistory(conversationId, stopped)
-            withContext(NonCancellable) {
-                runCatching { backend.chat.persistHistory(conversationId, stopped) }
-            }
+            val stopped = withContext(NonCancellable) { settleInterruptedReply(conversationId,cleared,turnId,modelId,partial,null) }
             showHistory(conversationId, stopped)
             _state.update { it.copy(snackbarMessage = "已停止生成") }
             throw cancelled
         } catch (error: CoastApiException) {
-            val failed = backend.chat.failedHistory(cleared, turnId, modelId, error, partial)
-            backend.chat.cacheHistory(conversationId, failed)
-            withContext(NonCancellable) {
-                runCatching { backend.chat.persistHistory(conversationId, failed) }
-            }
+            val failed = withContext(NonCancellable) { settleInterruptedReply(conversationId,cleared,turnId,modelId,partial,error) }
             showHistory(conversationId, failed)
             handleBackendError(error, "模型回复失败", keepAuthenticatedOnNetworkError = true)
         } finally {
             generationRun?.apply { streaming = false; preview = null }
             _state.update(::generationUi)
         }
+    }
+
+    private suspend fun settleInterruptedReply(cid:String,base:RemoteHistory,tid:String,model:String,partial:String,failure:CoastApiException?):RemoteHistory {
+        val cached=backend.chat.cachedHistory(cid)
+        val fresh=runCatching{backend.chat.loadHistory(cid)}.getOrNull()
+        val mid=ChatSyncMapper.nextAssistantVariantId(base,tid)
+        val source=base.turns.firstOrNull{it.id==tid}
+        val uid=source?.user?.variants?.getOrNull(source.user.active)?.id.orEmpty()
+        fun reserved(h:RemoteHistory?)=h?.turns?.firstOrNull{it.id==tid}?.assistant?.variantsByUserVariant?.values?.flatten()?.firstOrNull{it.id==mid&&it.finishReason in setOf("image_tool_ready","image_pending","image_saved","image_failed")}
+        val v=reserved(fresh)
+        if(v!=null&&fresh!=null){
+            if(v.finishReason=="image_pending")return fresh
+            val next=runCatching{ChatSyncMapper.completeReservedAssistant(fresh,tid,uid,mid,partial,model,if(failure==null)"cancelled"else "error",error=failure?.message)}.getOrElse{return fresh}
+            return runCatching{backend.chat.persistHistory(cid,next)}.getOrElse{fresh}
+        }
+        if(fresh==null&&(reserved(cached)!=null||_state.value.currentImageModel.isNotBlank()))return cached?:base
+        val next=if(failure==null)backend.chat.cancelledHistory(base,tid,model,partial)else backend.chat.failedHistory(base,tid,model,failure,partial)
+        return runCatching{backend.chat.persistHistory(cid,next)}.getOrElse{fresh?:cached?:base}
     }
 
     private suspend fun refreshGeneratedTitle(conversationId: String, user: String, assistant: String) {
@@ -1279,7 +1352,7 @@ class CoastShellViewModel(
 
     private fun deleteMessage(message: ChatMessage) {
         val turnId = message.turnId ?: return
-        mutateMessageHistory("删除消息失败", "消息已删除") { history ->
+        mutateMessageHistory("删除消息失败", "消息已删除", explicitDeletion=true) { history ->
             when (message.role) {
                 MessageRole.User -> ChatHistoryMutations.deleteActiveUser(history, turnId)
                 MessageRole.Assistant -> ChatHistoryMutations.deleteActiveAssistant(history, turnId)
@@ -1371,6 +1444,7 @@ class CoastShellViewModel(
     private fun mutateMessageHistory(
         failureLabel: String,
         successMessage: String,
+        explicitDeletion:Boolean=false,
         transform: (RemoteHistory) -> RemoteHistory
     ) {
         if (_state.value.isStreaming || generationJob?.isActive == true) {
@@ -1391,12 +1465,13 @@ class CoastShellViewModel(
         showHistory(conversationId, next)
         viewModelScope.launch(workDispatcher) {
             try {
-                val persisted = backend.chat.persistHistory(conversationId, next)
+                val persisted = if(explicitDeletion)backend.chat.deleteFromHistory(conversationId,next,previous.updatedAt)else backend.chat.persistHistory(conversationId,next)
                 showHistory(conversationId, persisted)
                 _state.update { it.copy(backendOffline = false, snackbarMessage = successMessage) }
             } catch (error: CoastApiException) {
-                backend.chat.cacheHistory(conversationId, previous)
-                showHistory(conversationId, previous)
+                val restored=runCatching{backend.chat.loadHistory(conversationId)}.getOrElse{previous}
+                backend.chat.cacheHistory(conversationId, restored)
+                showHistory(conversationId, restored)
                 handleBackendError(error, failureLabel, keepAuthenticatedOnNetworkError = true)
             }
         }
@@ -1555,6 +1630,12 @@ class CoastShellViewModel(
         )
     }
 
+    override fun onCleared() {
+        generationJob?.cancel()
+        generationRun?.lease?.close()
+        super.onCleared()
+    }
+
     companion object {
         private const val KEY_CURRENT_CONVERSATION = "remote.current-conversation.v1"
 
@@ -1566,7 +1647,8 @@ class CoastShellViewModel(
                 val persistence = NativeWorkspace.persistence(appContext)
                 val chatGpt = ChatGptPlanRepository(ChatGptSecureStore(appContext, localMode = isLocal))
                 val backend = CoastBackendGraph.production(appContext, persistence, chatGpt)
-                return CoastShellViewModel(persistence, backend, chatGpt = chatGpt, localMode = isLocal) as T
+                return CoastShellViewModel(persistence, backend, chatGpt = chatGpt, localMode = isLocal,
+                    foregroundLease = { cancel, unavailable -> GenerationForegroundService.acquire(appContext, cancel, unavailable) }) as T
             }
         }
     }

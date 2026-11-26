@@ -42,8 +42,10 @@ sealed interface ChatProgress {
 
 interface ChatRepository {
     fun cachedHistory(conversationId: String): RemoteHistory?
+    suspend fun generateImage(conversationId:String,turnId:String,userId:String,messageId:String,prompt:String):RemoteHistory = error("Image generation unavailable")
     suspend fun loadHistory(conversationId: String): RemoteHistory
     suspend fun persistHistory(conversationId: String, history: RemoteHistory): RemoteHistory
+    suspend fun deleteFromHistory(conversationId:String,history:RemoteHistory,revision:String):RemoteHistory=persistHistory(conversationId,history)
     suspend fun uploadAttachment(conversationId: String, name: String, mime: String, bytes: ByteArray): RemoteAttachment
     suspend fun deleteAttachment(conversationId: String, attachmentId: String)
     suspend fun modelMetadata(
@@ -84,11 +86,16 @@ class DefaultChatRepository(
 ) : ChatRepository {
     override fun cachedHistory(conversationId: String): RemoteHistory? = cache.history(conversationId)
 
+    override suspend fun generateImage(conversationId:String,turnId:String,userId:String,messageId:String,prompt:String):RemoteHistory =
+        api.generateChatImage(conversationId,turnId,userId,messageId,prompt).also { cache.putHistory(conversationId,it) }
+
     override suspend fun loadHistory(conversationId: String): RemoteHistory =
         api.getHistory(conversationId).also { cache.putHistory(conversationId, it) }
 
     override suspend fun persistHistory(conversationId: String, history: RemoteHistory): RemoteHistory =
         api.putHistory(conversationId, history).also { cache.putHistory(conversationId, it) }
+
+    override suspend fun deleteFromHistory(conversationId:String,history:RemoteHistory,revision:String):RemoteHistory=api.putHistory(conversationId,history,revision).also{cache.putHistory(conversationId,it)}
 
     override suspend fun uploadAttachment(conversationId: String, name: String, mime: String, bytes: ByteArray): RemoteAttachment =
         api.uploadChatAttachment(conversationId, name, mime, bytes)
@@ -124,6 +131,11 @@ class DefaultChatRepository(
         var done = false
         val normalizedRecentTurns = recentTurns.coerceAtLeast(1)
         val assistantVariantId = ChatSyncMapper.nextAssistantVariantId(historyWithUser, turnId)
+        val sourceTurn=historyWithUser.turns.firstOrNull{it.id==turnId}
+        val userId=sourceTurn?.user?.variants?.getOrNull(sourceTurn.user.active)?.id.orEmpty()
+        val imageEnabled=cache.profile()?.currentImageModel?.isNotBlank()==true&&userId.isNotBlank()&&
+            cache.conversations().any{it.id==conversationId&&it.roomType in setOf("main","radio")&&it.deletedAt==null}
+        if(imageEnabled)persistHistory(conversationId,ChatSyncMapper.appendAssistant(historyWithUser,turnId,"",modelId,"image_tool_ready",assistantVariantId=assistantVariantId))
         val offered = cache.modelCatalog()?.groups?.let { it.openAiChat + it.freeTest }
             ?.firstOrNull { it.id == modelId }?.reasoningEfforts.orEmpty()
         val effort = reasoningStore?.get(modelId, offered)
@@ -144,7 +156,9 @@ class DefaultChatRepository(
                 "maxOutputTokens" to maxOutputTokens.coerceIn(64, 65536).toString()
             ) + (effort?.let { mapOf("reasoningEffort" to it) } ?: emptyMap()),
             crossWindow = crossWindow.toRemote(),
-            stream = true
+            stream = true,
+            imageToolEnabled = imageEnabled,
+            imageModelId = cache.profile()?.currentImageModel?.takeIf{imageEnabled}
         )
         api.streamChat(request).collect { event ->
             when (event) {
@@ -195,7 +209,8 @@ class DefaultChatRepository(
             "stream_incomplete",
             "回复流提前中断。"
         )
-        val completed = ChatSyncMapper.appendAssistant(
+        val completed = if(imageEnabled) ChatSyncMapper.completeReservedAssistant(loadHistory(conversationId),turnId,userId,assistantVariantId,content,actualModel,finishReason,mergeFurnitureRuns(furnitureRuns,deskSlip),deskSlip)
+        else ChatSyncMapper.appendAssistant(
             history = ChatSyncMapper.clearUserFailure(historyWithUser, turnId),
             turnId = turnId,
             content = content,

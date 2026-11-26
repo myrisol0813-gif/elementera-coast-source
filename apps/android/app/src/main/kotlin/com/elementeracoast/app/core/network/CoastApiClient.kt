@@ -238,6 +238,12 @@ class CoastApiClient(
             )
     }
 
+    suspend fun generateChatImage(conversationId:String,turnId:String,userId:String,messageId:String,prompt:String):RemoteHistory {
+        val payload=buildJsonObject{put("conversation_id",conversationId);put("turn_id",turnId);put("user_variant_id",userId);put("message_id",messageId);put("prompt",prompt)}
+        val request=Request.Builder().url(config.url("/api/chat/image-generate")).post(jsonBody(payload.toString())).build()
+        return jsonRequest(request,RemoteHistoryResponse.serializer()).history
+    }
+
     suspend fun getProfile(): RemoteProfile = jsonRequest(Request.Builder().url(config.url("/api/chat/profile")).get().build(), RemoteProfileResponse.serializer()).profile
 
     suspend fun putProfile(profile: RemoteProfile): RemoteProfile {
@@ -386,9 +392,9 @@ class CoastApiClient(
         )
     }
 
-    suspend fun putHistory(conversationId: String, history: RemoteHistory): RemoteHistory {
+    suspend fun putHistory(conversationId: String, history: RemoteHistory, deleteRevision:String?=null): RemoteHistory {
         val payload = historyJson.encodeToString(RemoteHistory.serializer(), history.copy(conversationId = null))
-        return jsonRequest(Request.Builder().url(config.url("/api/chat/history?conversation_id=${encodeQuery(conversationId)}")).put(jsonBody(payload)).build(), RemoteHistoryResponse.serializer()).history
+        return jsonRequest(Request.Builder().url(config.url("/api/chat/history?conversation_id=${encodeQuery(conversationId)}")).put(jsonBody(payload)).apply{deleteRevision?.let{header("X-Coast-Delete-Revision",it)}}.build(), RemoteHistoryResponse.serializer()).history
     }
 
     /** Authenticated context assembly; ChatGPT bearer tokens stay on this device. */

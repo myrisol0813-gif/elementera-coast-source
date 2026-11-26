@@ -22,8 +22,7 @@ export function createModelsView({ chat, getCatalog, getSearch, getSearchDraft }
     };
     const profile = chat.getProfile();
     const groupIds = profile.model_box?.[groupName] || [];
-    const current = profile.current_chat_model === modelId
-      || (groupName === 'image' && profile.current_image_model === modelId);
+    const current = groupName === 'image' ? profile.current_image_model === modelId : profile.current_chat_model === modelId;
     const inBox = groupIds.includes(modelId);
     const action = mode === 'current'
       ? ''
@@ -34,7 +33,7 @@ export function createModelsView({ chat, getCatalog, getSearch, getSearchDraft }
       ? `<button class="${current ? 'is-current' : ''}" type="button" data-action="models:select-image" data-id="${escapeAttribute(modelId)}">${current ? '当前' : '设为当前'}</button>`
       : `<button class="${current ? 'is-current' : ''}" type="button" data-action="models:select-chat" data-id="${escapeAttribute(modelId)}">${current ? '当前' : '设为当前'}</button>`;
     return `<article class="model-row">
-      <div><strong>${escapeHtml(model.name || model.id)}</strong><code>${escapeHtml(model.id)}</code><small><span class="model-badge ${model.is_free ? 'is-free' : ''}">${escapeHtml(modelKind(catalog, model.id, model))}</span>${escapeHtml(priceText(model))}<br>${escapeHtml(tagText(model))}</small></div>
+      <div><strong>${escapeHtml(model.name || model.id)}</strong><code>${escapeHtml(model.id)}</code><small><span class="model-badge ${model.is_free ? 'is-free' : ''}">${escapeHtml(modelKind(catalog, model.id, model))}</span>${escapeHtml(groupName === 'image' ? (model.is_free ? '免费标识 · 以供应商计费为准' : '按图像 API 实际计费') : priceText(model))}<br>${escapeHtml(tagText(model))}</small></div>
       <div class="model-actions">${select}${action}</div>
     </article>`;
   }
@@ -69,7 +68,7 @@ export function createModelsView({ chat, getCatalog, getSearch, getSearchDraft }
       subtitle: '选择、搜索与管理模型',
       className: 'model-box',
       body: `<form class="model-toolbar" data-submit="models:search">
-          <input type="search" data-input="models:search-draft" placeholder="搜索 OpenAI Chat 模型" value="${escapeAttribute(getSearchDraft())}" autocomplete="off" enterkeyhint="search">
+          <input type="search" data-input="models:search-draft" placeholder="搜索聊天或图片模型" value="${escapeAttribute(getSearchDraft())}" autocomplete="off" enterkeyhint="search">
           <button type="submit">搜索</button>
           <button type="button" data-action="models:refresh">刷新</button>
         </form>
@@ -79,6 +78,8 @@ export function createModelsView({ chat, getCatalog, getSearch, getSearchDraft }
         ${catalogGroups(groups.openai_chat || [])}
         ${group('Free Test', (box.free || []).map((id) => row(id, 'free')).join(''))}
         ${group('Free Test 目录', filtered(groups.free_test || []).map((model) => row(model.id, 'free', 'catalog')).join(''))}
+        ${group('当前生图模型', profile.current_image_model ? row(profile.current_image_model, 'image', 'current') : '')}
+        ${catalog?.image_catalog_status === 'unavailable' ? '<p class="feature-meta">图片模型目录暂不可用；已选模型保留，生成时重新核验。</p>' : ''}
         ${group('图片模型', (box.image || []).map((id) => row(id, 'image')).join(''))}
         ${group('图片模型目录', filtered(groups.openai_image || []).map((model) => row(model.id, 'image', 'catalog')).join(''))}`,
     };

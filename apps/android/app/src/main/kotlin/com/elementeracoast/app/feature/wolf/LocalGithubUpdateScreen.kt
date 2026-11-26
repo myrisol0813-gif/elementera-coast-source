@@ -15,11 +15,19 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @Composable
-internal fun LocalGithubUpdateScreen(onSnackbar: (String) -> Unit) {
+internal fun LocalGithubUpdateScreen(onSnackbar: (String) -> Unit, onlineMetadata: com.elementeracoast.app.feature.serpentdesk.DevHandsRepository? = null) {
     val context = LocalContext.current
     val updater = remember { LocalGithubUpdater() }
     val scope = rememberCoroutineScope()
     var release by remember { mutableStateOf<LocalRelease?>(null) }
+    var pwaVersion by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(onlineMetadata) {
+        if (onlineMetadata != null) {
+            try { pwaVersion = onlineMetadata.latestUpdate().update?.pwaCacheVersion }
+            catch (e: CancellationException) { throw e }
+            catch (_: Exception) { pwaVersion = null }
+        }
+    }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     fun refresh() {
@@ -55,6 +63,7 @@ internal fun LocalGithubUpdateScreen(onSnackbar: (String) -> Unit) {
                     WolfUpdateFact("本机版本", BuildConfig.VERSION_NAME)
                     WolfUpdateFact("versionCode", BuildConfig.VERSION_CODE.toString())
                     WolfUpdateFact("applicationId", BuildConfig.APPLICATION_ID)
+                    if (onlineMetadata != null) WolfUpdateFact("PWA cache", pwaVersion ?: "未核实")
                     WolfUpdateFact("交付来源", "GitHub Releases · 本机直连")
                     latest?.let {
                         WolfUpdateFact("最新版本", it.version)

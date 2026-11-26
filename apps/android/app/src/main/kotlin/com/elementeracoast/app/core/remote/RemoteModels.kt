@@ -136,6 +136,17 @@ data class RemoteAssistantBranches(
     @SerialName("variantsByUserVariant") val variantsByUserVariant: Map<String, List<RemoteVariant>> = emptyMap()
 )
 
+
+@Serializable
+data class RemoteImageGeneration(
+    @SerialName("message_id") val messageId: String,
+    val provider: String,
+    @SerialName("requested_model") val requestedModel: String,
+    val prompt: String,
+    @SerialName("reported_model") val reportedModel: String? = null,
+    @SerialName("cost_usd") val costUsd: Double? = null
+)
+
 @Serializable
 data class RemoteAttachment(
     val id: String,
@@ -144,7 +155,8 @@ data class RemoteAttachment(
     val mime: String = "application/octet-stream",
     val size: Long = 0L,
     @SerialName("storage_key") val storageKey: String = "",
-    @SerialName("created_at") val createdAt: String = ""
+    @SerialName("created_at") val createdAt: String = "",
+    @SerialName("image_generation") val imageGeneration: RemoteImageGeneration? = null
 )
 
 @Serializable
@@ -257,7 +269,9 @@ data class RemoteChatRequest(
     @SerialName("cross_window") val crossWindow: RemoteCrossWindowRequest? = null,
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.ALWAYS)
     val stream: Boolean = true,
-    @SerialName("client_info") val clientInfo: String = "native_android"
+    @SerialName("client_info") val clientInfo: String = "native_android",
+    @SerialName("image_tool_enabled") val imageToolEnabled: Boolean = false,
+    @SerialName("image_model_id") val imageModelId: String? = null
 )
 
 @Serializable

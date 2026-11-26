@@ -7,9 +7,12 @@ import { paginateReaderParagraphs, readerPageForParagraph, READER_SIZES, READER_
 import { renderTidalReader, attachTidalSelection } from './library-reader.js';
 
 const BASE=API.tidalLibrary;
-const dateLabel=t=>new Date(t).toLocaleDateString('zh-CN');
-const quote=value=>escapeHtml(String(value||'').slice(0,210));
-const authorLabel=a=>a==='owner'?'用户':'助手';
+const dateLabel=t=>{const d=new Date(t);return t!=null&&Number.isFinite(d.getTime())?d.toLocaleString('zh-CN',{hour12:false}):'时间未记录';};
+const authorLabel=a=>a==='owner'?'屋主':'模型伙伴';
+export const libraryDisplayAuthor=a=>['owner'].includes(a)?'owner':['assistant','model_partner'].includes(a)?'assistant':a;
+export const libraryDisplayCount=(b,model)=>Number((model?b.assistant_notes??b.model_partner_notes:b.owner_notes)??0)||0;
+export const libraryNoteAnchor=n=>Number.isInteger(n.chapter_index)&&Number.isInteger(n.paragraph_index)?{index:n.chapter_index,paragraph:n.paragraph_index,offset:Number.isInteger(n.start_offset)?n.start_offset:0}:null;
+export const libraryNotePayload=(kind,body,index,paragraph)=>kind==='reflection'?{kind,body}:{kind,body,chapter_index:index,paragraph_index:paragraph};
 const button=(action,label,attrs='')=>`<button type="button" data-action="library:${action}" ${attrs}>${label}</button>`;
 export function createTidalLibrary({router,toast}) {
   const ownsRoute=route=>['library-home','library-chapter','library-notes','library-note'].includes(route?.name);
@@ -25,7 +28,7 @@ export function createTidalLibrary({router,toast}) {
       requestJson(`${BASE}/books/${encodeURIComponent(bookId)}`),
       requestJson(`${BASE}/books/${encodeURIComponent(bookId)}/notes`),
     ]);
-    memo.book=b.book;memo.notes=n.notes||[];
+    memo.book=b.book;memo.notes=(n.notes||[]).map(x=>({...x,author:libraryDisplayAuthor(x.author)}));
   }
   async function homeView() {
     const response=await requestJson(`${BASE}/books`);
@@ -34,29 +37,24 @@ export function createTidalLibrary({router,toast}) {
       headerAction:button('choose','＋','class="feature-head-action tidal-library-add" aria-label="导入书籍" title="导入 EPUB 或 TXT 电子书"'),
       body:`<section class="tidal-library-home">
         <p class="tidal-library-intro">这里是你的书房，可以保存阅读进度与笔记。</p><details class="tidal-library-limits"><summary>EPUB / TXT · 导入须知</summary>最多 80 本书；源文件最多 40 MB；正文最多 1,200 万字、2,048 个正文分段。批注最多 4,000 字，封面会压缩至 600 KB 内。暂不保留复杂版式和图片。</details>
-        <div class="tidal-library-shelf">${memo.books.map(b=>{
-          const chapter=Number.isInteger(b.reader_chapter_index)?b.reader_chapter_index:0;
-          const percent=b.reader_chapter_index==null?0:Math.round((chapter+1)/(b.chapters_count||1)*100);
-          return `<article class="tidal-library-entry"><button type="button" class="tidal-library-cover" data-action="library:cover" data-book="${escapeAttribute(b.id)}" aria-label="上传或更换封面">${b.has_cover?'<img src="'+escapeAttribute(`${BASE}/books/${encodeURIComponent(b.id)}/cover`)+'" loading="lazy" alt="书籍封面" />':'＋'}</button><button type="button" class="tidal-library-book" data-action="library:continue" data-book="${escapeAttribute(b.id)}" data-index="${chapter}" data-paragraph="${b.reader_paragraph_index||0}">
-            <span class="tidal-library-book-spine">✦</span><span class="tidal-library-book-meta">
-              <strong>${escapeHtml(b.title)}</strong><small>${escapeHtml(b.format.toUpperCase())} · ${b.chapters_count} 个正文分段</small>
-              <span class="tidal-library-track"><i style="width:${percent}%"></i></span>
-              <small>阅读进度：${b.reader_chapter_index==null?'尚未开始':`第 ${chapter+1} / ${b.chapters_count} 章`} · 按章节显示</small>
-              <span class="tidal-library-reader-count">用户 <small>${b.owner_notes||0} 条批注与读后感</small></span>
-              <span class="tidal-library-reader-count">助手 <small>${b.assistant_notes||0} 条批注与读后感</small></span>
-            </span></button></article>`;
-        }).join('')||'<p class="feature-empty">书架还空着。点右上角的 ＋，导入一本喜欢的书吧。</p>'}</div>
+        <div class="tidal-library-shelf tidal-book-grid">${memo.books.map(b=>`<article class="tidal-book-tile"><button type="button" class="tidal-book-volume" data-action="library:notes" data-book="${escapeAttribute(b.id)}" aria-label="打开阅读档案">${coverFace(b)}</button><button type="button" class="tidal-book-caption" data-action="library:notes" data-book="${escapeAttribute(b.id)}"><strong>${escapeHtml(b.title)}</strong><small>${libraryDisplayCount(b,false)+libraryDisplayCount(b,true)} 条批注与读后感</small></button></article>`).join('')||'<p class="feature-empty">书架还空着。点右上角的 ＋，导入一本喜欢的书吧。</p>'}</div>
       </section>` };
   }
+  function coverFace(b) {
+    return `<span class="tidal-book-fallback">${escapeHtml(b.title)}</span>${b.has_cover?'<img src="'+escapeAttribute(BASE+'/books/'+encodeURIComponent(b.id)+'/cover')+'" loading="lazy" alt="书籍封面" />':''}`;
+  }
   function noteCard(n) {
-    const anchor=n.kind==='annotation' ? button('jump',`<u>${quote(n.quote)}</u>`,`data-book="${escapeAttribute(n.book_id)}" data-index="${n.chapter_index}" data-paragraph="${n.paragraph_index}"`) : '';
+    const pos=libraryNoteAnchor(n);
+    const kind=({highlight:'划线',annotation:'批注',reflection:'读后感'})[n.kind]||'笔迹';
+    const anchor=pos?button('jump',`回到原文 · 第 ${pos.index+1} 分段`,`data-book="${escapeAttribute(n.book_id)}" data-index="${pos.index}" data-paragraph="${pos.paragraph}" data-offset="${pos.offset}"`):'<small>整本书的读后感</small>';
     const editable=n.author==='owner' ? `<div class="tidal-library-note-actions">
-      ${button('edit','编辑',`data-id="${escapeAttribute(n.id)}" data-book="${escapeAttribute(n.book_id)}"`)}
+      ${button('edit',n.kind==='highlight'?'写批注':'编辑',`data-id="${escapeAttribute(n.id)}" data-book="${escapeAttribute(n.book_id)}"`)}
       ${button('delete-note','删除',`data-id="${escapeAttribute(n.id)}" data-book="${escapeAttribute(n.book_id)}"`)}
     </div>` : '';
-    return `<article class="tidal-library-note">
-      <small>${authorLabel(n.author)} · ${n.kind==='annotation'?'书页批注':'读后感'} · ${dateLabel(n.created_at)}</small>
-      ${anchor}<p>${escapeHtml(n.body)}</p>${editable}
+    return `<article class="tidal-library-note" data-kind="${escapeAttribute(n.kind)}">
+      <strong>${authorLabel(n.author)} · ${kind}</strong><small>${escapeHtml(dateLabel(n.created_at))}${n.updated_at&&n.updated_at!==n.created_at?' · 编辑于 '+escapeHtml(dateLabel(n.updated_at)):''}</small>
+      ${n.quote?`<blockquote>${escapeHtml(n.quote)}</blockquote>`:''}
+      ${n.body?`<p>${escapeHtml(n.body)}</p>`:''}${anchor}${editable}
     </article>`;
   }
   function saveReaderSettings(){
@@ -70,10 +68,10 @@ export function createTidalLibrary({router,toast}) {
     }
     return memo.chapters.get(key);
   }
-  async function openReader(bookId,index=0,paragraph=0){
+  async function openReader(bookId,index=0,paragraph=0,offset=0){
     const chapter=await readerChapter(bookId,index);
     const pages=paginateReaderParagraphs(chapter.paragraphs,reader.fontSize===14?620:reader.fontSize===15?520:reader.fontSize===16?440:380);
-    return router.open('library-chapter',{bookId,index,page:readerPageForParagraph(pages,paragraph),focus:paragraph});
+    return router.open('library-chapter',{bookId,index,page:readerPageForParagraph(pages,paragraph,offset),focus:paragraph,offset});
   }
   function readerBubble(root,content,rect){
     root.querySelector('.tidal-reader-popover')?.remove();
@@ -84,14 +82,14 @@ export function createTidalLibrary({router,toast}) {
     pop.style.left=`${left}px`;pop.style.top=`${top}px`;
     root.append(pop);
   }
-  async function chapterView({bookId,index=0,page=0,focus=-1}) {
+  async function chapterView({bookId,index=0,page=0,focus=-1,offset=0}) {
     index=Number(index)||0;
     if(!memo.book||memo.book.id!==bookId)await loadBook(bookId);
-    else memo.notes=(await requestJson(`${BASE}/books/${encodeURIComponent(bookId)}/notes`)).notes||[];
+    else memo.notes=((await requestJson(`${BASE}/books/${encodeURIComponent(bookId)}/notes`)).notes||[]).map(x=>({...x,author:libraryDisplayAuthor(x.author)}));
     const chapter=await readerChapter(bookId,index);
     const budget=reader.fontSize===14?620:reader.fontSize===15?520:reader.fontSize===16?440:380;
     const pages=paginateReaderParagraphs(chapter.paragraphs,budget);
-    const selectedPage=Number(focus)>=0?readerPageForParagraph(pages,Number(focus)):Math.min(Math.max(0,Number(page)||0),pages.length-1);
+    const selectedPage=Number(focus)>=0?readerPageForParagraph(pages,Number(focus),Number(offset)||0):Math.min(Math.max(0,Number(page)||0),pages.length-1);
     memo.readerIndex=index;memo.readerPage=selectedPage;
     const visible=pages[selectedPage];
     if(visible.length){
@@ -108,7 +106,7 @@ export function createTidalLibrary({router,toast}) {
             const val=field==='fontSize'?Number(event.target.value):event.target.value;
             if(!allowed.includes(val))return;
             reader[field]=val;saveReaderSettings();
-            void openReader(bookId,index,visible[0]?.paragraph??0);
+            void openReader(bookId,index,visible[0]?.paragraph??0,visible[0]?.start??0);
           });
         }
         attachTidalSelection(root,info=>{
@@ -127,15 +125,25 @@ export function createTidalLibrary({router,toast}) {
       }
     };
   }
-  async function notesView({bookId}) {
+  async function notesView({bookId,filter='all'}) {
     await loadBook(bookId);
+    const b=memo.book,progress=b.progress?.[0],chapter=progress?.chapter_index??0,paragraph=progress?.paragraph_index??0;
+    const shelf=(await requestJson(BASE+'/books')).books||[];
+    const entry=shelf.find(x=>x.id===bookId);
     const both=['owner','assistant'].map(author=>`<section class="tidal-library-notes-group"><h2>${authorLabel(author)}的笔记</h2>
-      ${memo.notes.filter(n=>n.author===author && n.kind!=='highlight').map(noteCard).join('')||'<p class="feature-empty">还没有留下笔记。</p>'}</section>`).join('');
-    return {title:'批注与读后感',subtitle:memo.book.title,className:'tidal-library',
+      ${memo.notes.filter(n=>n.author===author&&(filter==='all'||n.kind===filter)).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(noteCard).join('')||'<p class="feature-empty">暂无笔迹。</p>'}</section>`).join('');
+    return {title:'阅读档案',subtitle:b.title,className:'tidal-library',
       body:`<section class="tidal-library-notes">
-        ${both}
+        <div class="tidal-dossier-heading"><button class="tidal-book-volume" type="button" data-action="library:cover" data-book="${escapeAttribute(bookId)}" aria-label="更换封面">${coverFace({...b,has_cover:entry?.has_cover??b.has_cover})}</button><div><h2>${escapeHtml(b.title)}</h2><small>${escapeHtml(b.format.toUpperCase())} · ${b.chapters.length} 个正文分段</small>
+        ${button('continue','继续阅读',`class="tidal-library-primary" data-book="${escapeAttribute(bookId)}" data-index="${chapter}" data-paragraph="${paragraph}"`)}
+        ${button('cover','更换封面',`data-book="${escapeAttribute(bookId)}"`)}</div></div>
+        <details class="tidal-library-toc"><summary>查看目录</summary>${b.chapters.map(c=>button('chapter',escapeHtml(c.title),`data-book="${escapeAttribute(bookId)}" data-index="${c.chapter_index}"`)).join('')}</details>
+        <div class="tidal-library-reading-state"><h2>我们的阅读情况</h2><p class="tidal-library-progress">屋主 · ${progress?'上次读到第 '+(chapter+1)+' 分段':'尚无阅读位置'}</p><p class="tidal-library-progress">模型伙伴 · 暂无独立阅读进度统计</p></div>
+        <h2>书页间的笔迹</h2>
+        <div class="tidal-note-filters">${[['all','全部'],['highlight','划线'],['annotation','批注'],['reflection','读后感']].map(([key,label])=>button('filter',label,`data-book="${escapeAttribute(bookId)}" data-filter="${key}" aria-pressed="${filter===key}"`)).join('')}</div>
         ${button('reflect','＋ 写一篇读后感',`class="tidal-library-primary" data-book="${escapeAttribute(bookId)}"`)}
-        ${button('delete-book','删除这本书与全部笔记',`class="tidal-library-danger" data-book="${escapeAttribute(bookId)}"`)}
+        ${both}
+        <details class="tidal-book-manage"><summary>书籍管理</summary>${button('delete-book','删除这本书与全部笔记',`class="tidal-library-danger" data-book="${escapeAttribute(bookId)}"`)}</details>
       </section>`};
   }
   async function noteView({bookId,kind='annotation',index=0,paragraph=0,id=''}) {
@@ -162,7 +170,7 @@ export function createTidalLibrary({router,toast}) {
           },
         });
         toast('整本书已核对完整，放上书架了。');
-        await openReader(book.id,0,0);
+        await router.open('library-notes',{bookId:book.id});
       }catch(e){toast(`导入失败：${e.message||'文件无法阅读。'}`,6000);}
     },{once:true});
     input.click();
@@ -221,7 +229,8 @@ export function createTidalLibrary({router,toast}) {
     if(name==='notes')return router.open('library-notes',{bookId:d.book});
     if(name==='reflect')return router.open('library-note',{bookId:d.book,kind:'reflection'});
     if(name==='annotate')return router.open('library-note',{bookId:d.book,kind:'annotation',index:Number(d.index),paragraph:Number(d.paragraph)});
-    if(name==='jump')return openReader(d.book,Number(d.index)||0,Number(d.paragraph)||0);
+    if(name==='jump')return openReader(d.book,Number(d.index)||0,Number(d.paragraph)||0,Number(d.offset)||0);
+    if(name==='filter')return router.open('library-notes',{bookId:d.book,filter:d.filter},{replace:true});
     if(name==='edit')return router.open('library-note',{bookId:d.book,id:d.id});
     if(name==='save-note'){
       const body=document.querySelector('#tidalLibraryNoteBody')?.value||'';
@@ -229,9 +238,9 @@ export function createTidalLibrary({router,toast}) {
       try{
         if(d.id)await requestJson(`${BASE}/notes/${encodeURIComponent(d.id)}`,{method:'PATCH',body:JSON.stringify({body})});
         else await requestJson(`${BASE}/books/${encodeURIComponent(d.book)}/notes`,{method:'POST',
-          body:JSON.stringify({body,kind:d.kind,chapter_index:Number(d.index),paragraph_index:Number(d.paragraph)})});
+          body:JSON.stringify(libraryNotePayload(d.kind,body,Number(d.index),Number(d.paragraph)))});
         toast('笔记已经留在书页边上。');
-        if(d.kind==='annotation'&&d.id)return router.open('library-chapter',{bookId:d.book,index:memo.readerIndex,page:memo.readerPage},{replace:true});
+        if(d.kind==='annotation'&&d.id){const existing=memo.notes.find(n=>n.id===d.id),pos=existing&&libraryNoteAnchor(existing);if(pos)return openReader(d.book,pos.index,pos.paragraph,pos.offset);}
         return router.open('library-notes',{bookId:d.book},{replace:true});
       }catch(e){return toast(`保存失败：${e.message}`,4500);}
     }

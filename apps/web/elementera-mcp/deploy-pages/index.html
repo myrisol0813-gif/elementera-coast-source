@@ -116,6 +116,7 @@
             <button id="attachmentButton" class="composer-side" type="button" data-action="chat:attachments-menu" data-icon="plus" aria-label="添加图片或文件" aria-haspopup="menu" aria-expanded="false" disabled></button>
             <div id="attachmentMenu" class="composer-attachment-menu" role="menu" hidden>
               <button type="button" role="menuitem" data-action="chat:attachment-image"><span data-icon="image"></span><span>图片<br><small>JPG / PNG / WebP · 单个 ≤ 8 MB</small></span></button>
+              <button type="button" role="menuitem" data-action="chat:generate-image"><span data-icon="image"></span><span>生成图片<br><small>使用当前输入作为绘图提示 · 正常 API 计费</small></span></button>
               <button type="button" role="menuitem" data-action="chat:attachment-file"><span data-icon="file"></span><span>文件<br><small>TXT / MD / JSON / CSV / 代码 · 读取 ≤ 1 MB<br>PDF / Office 暂不解析 · 上传 ≤ 8 MB</small></span></button>
               <p class="composer-attachment-limit">每轮最多 12 个附件</p>
             </div>

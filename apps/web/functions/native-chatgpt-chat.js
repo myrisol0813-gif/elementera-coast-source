@@ -1,3 +1,4 @@
+import { attachImageTool } from './chat-image-tool.js';
 import { assembleCleanContext } from './context-assemble-clean.js';
 import { resolveChatAttachmentsForModel, applyChatAttachmentsToMessages, attachmentDeskReceipt } from './chat-attachments.js';
 import { ChatStoreError, getConversation, readConversationState, sanitizeId } from './chat-store.js';
@@ -71,7 +72,7 @@ async function contextFromRequest(env, value, { preview = false } = {}) {
     throw new ChatStoreError('turn_stale', '聊天记录已更新，请重新发送本轮。', 409);
   }
   const model = acceptedModel(value);
-  const assembled = await assembleCleanContext(env, {
+  let assembled = await assembleCleanContext(env, {
     conversationId, sourceTurnId:turnId, messages,
     lastUser: messages.at(-1), settings: chatSettings(value.settings),
     localDate: value.local_date, localDateTime: value.local_datetime,
@@ -79,6 +80,13 @@ async function contextFromRequest(env, value, { preview = false } = {}) {
     surface:room.room_type==='radio'?'radio':'main_chat', model,
     permission:'owner', crossWindow:value.cross_window,
     preview, exposeOpenRouterSearch:false,
+  });
+  // The direct Responses route already uses the native input_image contract
+  // for owner attachments. No OpenRouter chat request is made on this path.
+  assembled=await attachImageTool(env,assembled,{
+    conversationId,turnId,messageId:String(value.message_id||''),roomType:room.room_type,
+    chatModel:model,enabled:value.image_tool_enabled===true&&typeof value.image_model_id==='string'&&!!value.image_model_id,
+    expectedImageModel:value.image_model_id??null,visionOverride:true
   });
   return { assembled, conversationId, turnId, model };
 }
@@ -131,8 +139,10 @@ export async function executeNativeChatGptTool(request, env) {
       type:'function',
       function:{name,arguments:call.function.arguments},
     });
+    const privateContinuation=assembled.takePrivateContinuation?.()||[];
     return json({
-      ok:true, output:JSON.stringify(result??null).slice(0,30000),
+      ok:result?.ok!==false, output:JSON.stringify(result??null).slice(0,30000),
+      ...(privateContinuation.length?{private_continuation:privateContinuation}:{}),
       furniture_runs:assembled.furnitureRuns(), desk_slip:assembled.deskSlip(),
     });
   } catch (error) {

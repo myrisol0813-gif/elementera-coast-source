@@ -30,8 +30,9 @@ data class LocalProviderConfig(
 }
 
 /** Deliberately separate from workspace snapshots, online profile and OAuth credentials. */
-class LocalProviderStore(context: Context) {
-    private val prefs = context.applicationContext.getSharedPreferences("coast_local_providers_v1", Context.MODE_PRIVATE)
+class LocalProviderStore(context: Context, searchOnly:Boolean=false, voiceOnly:Boolean=false) {
+    private val alias=if(voiceOnly) "coast_local_voice_aes_v1" else if(searchOnly) "coast_local_search_aes_v1" else ALIAS
+    private val prefs = context.applicationContext.getSharedPreferences(if(voiceOnly) "coast_local_voice_v1" else if(searchOnly) "coast_local_search_v1" else "coast_local_providers_v1", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
 
     @Synchronized fun load(): List<LocalProviderConfig> {
@@ -65,12 +66,28 @@ class LocalProviderStore(context: Context) {
         return if (model in provider.models) provider to model else null
     }
 
-    fun catalog(): RemoteModelCatalogResponse = RemoteModelCatalogResponse(
-        ok = true,
-        groups = RemoteModelGroups(openAiChat = load().flatMap { p ->
-            p.models.map { RemoteModelCatalogItem(p.modelId(it), p.name + " · " + it) }
-        })
-    )
+    // Image API selection is namespaced by the same existing provider ID.
+    // Never route credentials for arbitrary endpoints to OpenRouter.
+    fun resolveImageProvider(selected:String):LocalProviderConfig? {
+        if(!selected.startsWith("local:")||'/' !in selected)return null
+        val provider=load().firstOrNull{it.id==selected.removePrefix("local:").substringBefore('/')&&it.baseUrl.trimEnd('/')=="https://openrouter.ai/api/v1"}?:return null
+        val raw=selected.substringAfter('/')
+        if(!Regex("[a-z0-9][a-z0-9_.-]{0,79}/[a-z0-9][a-z0-9_.-]{0,119}(:free)?",RegexOption.IGNORE_CASE).matches(raw))return null
+        return provider.copy(models=listOf(raw))
+    }
+
+    fun catalog(): RemoteModelCatalogResponse {
+        val providers=load()
+        val chat=mutableListOf<RemoteModelCatalogItem>()
+        val images=mutableListOf<RemoteModelCatalogItem>()
+        for(p in providers){
+            val directory=if(p.baseUrl.trimEnd('/')=="https://openrouter.ai/api/v1")runCatching{LocalImageProvider().discover(p.apiKey)}.getOrNull()else null
+            val imageIds=directory.orEmpty().map{it.id}.toSet()
+            chat+=p.models.filterNot{it in imageIds}.map{RemoteModelCatalogItem(p.modelId(it),p.name+" · "+it)}
+            images+=directory.orEmpty().map{RemoteModelCatalogItem(p.modelId(it.id),p.name+" · "+it.name)}
+        }
+        return RemoteModelCatalogResponse(ok=true,groups=RemoteModelGroups(openAiChat=chat,openAiImage=images))
+    }
 
     private fun save(values: List<LocalProviderConfig>) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -81,9 +98,9 @@ class LocalProviderStore(context: Context) {
 
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        (store.getKey(ALIAS, null) as? SecretKey)?.let { return it }
+        (store.getKey(alias, null) as? SecretKey)?.let { return it }
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
-        generator.init(KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+        generator.init(KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
             .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
             .setRandomizedEncryptionRequired(true).build())

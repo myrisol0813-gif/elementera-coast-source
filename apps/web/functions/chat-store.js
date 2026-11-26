@@ -1,3 +1,4 @@
+import { recoverImageTasks, protectImageHistory } from './image-task-recovery.js';
 import { ensureChatSchema as ensureSchema } from './chat-schema.js';
 import { sanitizeFurnitureRuns } from './tool-furniture-summary.js';
 
@@ -71,7 +72,21 @@ function clamp(value, length) {
   return length < 1 ? 0 : Math.min(Math.max(0, Number(value) || 0), length - 1);
 }
 
-function normalizeAttachments(value) {
+
+ // Generated-image provenance belongs to the exact assistant variant reference.
+function normalizeImageGeneration(value, assistantId) {
+  const model = /^[a-z0-9][a-z0-9_.-]{0,79}\/[a-z0-9][a-z0-9_.-]{0,119}(?::free)?$/i;
+  if (!assistantId || !value || typeof value !== 'object' || Array.isArray(value) ||
+      value.message_id !== assistantId || value.provider !== 'openrouter' ||
+      typeof value.requested_model !== 'string' || !model.test(value.requested_model) ||
+      typeof value.prompt !== 'string' || !value.prompt.trim() || value.prompt.length > 4000) return null;
+  const out = {message_id:assistantId,provider:'openrouter',requested_model:value.requested_model,prompt:value.prompt};
+  if (typeof value.reported_model === 'string' && model.test(value.reported_model)) out.reported_model=value.reported_model;
+  if (typeof value.cost_usd === 'number' && Number.isFinite(value.cost_usd) && value.cost_usd>=0) out.cost_usd=value.cost_usd;
+  return out;
+}
+
+function normalizeAttachments(value, assistantId) {
   return (Array.isArray(value) ? value : []).slice(0, 12).map((item) => {
     const id = sanitizeId(item?.id || '', 'attachment');
     const type = item?.type === 'image' ? 'image' : 'file';
@@ -81,7 +96,8 @@ function normalizeAttachments(value) {
     const storageKey = clip(item?.storage_key || '', 220).trim();
     const createdAt = typeof item?.created_at === 'string' ? item.created_at : new Date().toISOString();
     if (!item?.id || !name || !storageKey) return null;
-    return { id, type, name, mime, size, storage_key: storageKey, created_at: createdAt };
+    const imageGeneration=type==='image'?normalizeImageGeneration(item.image_generation,assistantId):null;
+    return { id, type, name, mime, size, storage_key: storageKey, created_at: createdAt, ...(imageGeneration?{image_generation:imageGeneration}:{}) };
   }).filter(Boolean);
 }
 
@@ -207,7 +223,7 @@ function normalizeVariant(value = {}, prefix = 'variant') {
   const displayAuthor = clip(value.display_author, 180).trim();
   const sourceModelLabel = clip(value.source_model_label || value.model_label, 180).trim();
   const furnitureRuns = sanitizeFurnitureRuns(value.furniture_runs);
-  const attachments = normalizeAttachments(value.attachments);
+  const attachments = normalizeAttachments(value.attachments, prefix.startsWith('assistant') ? value.id : null);
   const deskSlip = normalizeDeskSlip(value.desk_slip);
   return {
     id: sanitizeId(value.id || crypto.randomUUID(), prefix),
@@ -519,20 +535,33 @@ export async function readConversationState(db, id) {
     throw new ChatStoreError('conversation_state_missing', '聊天记录不存在，未创建替代数据。', 500);
   }
   try {
-    return normalizeState(JSON.parse(row.state_json));
+    const state=normalizeState(JSON.parse(row.state_json));
+    if(recoverImageTasks(state)){
+      const stamp=nowMs();state.updated_at=iso(stamp);
+      const changed=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=?',[JSON.stringify(normalizeState(state)),stamp,conversationId,row.state_json]);
+      if(changed.meta?.changes!==1)return readConversationState(db,conversationId);
+    }
+    return state;
   } catch {
     throw new ChatStoreError('conversation_state_corrupt', '聊天记录格式损坏，未覆盖原数据。', 500);
   }
 }
 
-export async function writeConversationState(db, id, value) {
+export async function writeConversationState(db, id, value, {deleteRevision=null}={}) {
   await ensureChatSchema(db);
   const conversationId = sanitizeId(id, 'conversation');
   await requireActiveConversation(db, conversationId);
   const state = normalizeState(value);
+  const previous = await first(db,'SELECT state_json FROM conversation_states WHERE conversation_id=?',[conversationId]);
+  if(!previous?.state_json)throw new ChatStoreError('conversation_state_missing','聊天记录不存在，未创建替代数据。',409);
+  const old=normalizeState(JSON.parse(previous.state_json));
+  const conflict=protectImageHistory(old,state,{allowDelete:deleteRevision!==null&&deleteRevision===old.updated_at});
+  if(conflict)throw new ChatStoreError(conflict,conflict==='image_pending'?'绘图仍在进行；请刷新原窗口，不覆盖任务。':'历史已包含新生成的图片，请刷新后再明确删除。',409);
   await carryArchiveDeskSlips(db, conversationId, state);
   const timestamp = nowMs();
-  await writeStateRow(db, conversationId, state, timestamp);
+  state.updated_at=iso(timestamp);
+  const changed=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS (SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL)',[JSON.stringify(normalizeState(state)),timestamp,conversationId,previous.state_json,conversationId]);
+  if(changed.meta?.changes!==1)throw new ChatStoreError('history_changed','聊天在保存时发生变化，请刷新；未覆盖原记录。',409);
   await run(db, `UPDATE conversations SET updated_at = ?
     WHERE id = ? AND user_id = ? AND deleted_at IS NULL`, [timestamp, conversationId, USER_ID]);
   state.updated_at = iso(timestamp);

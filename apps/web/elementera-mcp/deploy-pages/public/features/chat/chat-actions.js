@@ -20,6 +20,7 @@ export function createChatActions({
   generationDetail,
   generate,
   send,
+  sendImage,
   newConversation,
   openRoomType,
   refreshFromCoast,
@@ -90,6 +91,12 @@ export function createChatActions({
     const conversationId = target.dataset.id;
     if (name.startsWith('window-')) return windowSettings?.handleAction?.(name, target);
     if (name === 'composer-primary') return submitComposer();
+    if (name === 'generate-image') {
+      attachments?.closeMenu?.();
+      if(runtime.searchPreview?.has(runtime.currentId))return toast('请先结束旧版本预览。');
+      if(attachments?.current?.().length||runtime.attachmentUploading)return toast('手动生图暂不接收参考图或文件，请先移除待发送附件。');
+      return sendImage(ui.input?.value||'');
+    }
     if (name === 'new') return newConversation();
     if (name === 'refresh') return refreshFromCoast();
     if (name === 'open-type') return openRoomType(target.dataset.kind || 'main');
@@ -145,16 +152,18 @@ export function createChatActions({
       return generate(runtime.currentId, turnId);
     }
     if (name === 'delete-user') {
-      const state = deleteActiveUserVariant(currentHistory(), turnId);
+      const previous=currentHistory();
+      const state = deleteActiveUserVariant(previous, turnId);
       setHistory(runtime.currentId, state);
       renderMessages();
-      return saveHistory(runtime.currentId, state).catch(() => undefined);
+      return saveHistory(runtime.currentId, state,{deleteRevision:previous.updated_at}).catch(() => undefined);
     }
     if (name === 'delete-assistant') {
-      const state = deleteActiveAssistantVariant(currentHistory(), turnId);
+      const previous=currentHistory();
+      const state = deleteActiveAssistantVariant(previous, turnId);
       setHistory(runtime.currentId, state);
       renderMessages();
-      return saveHistory(runtime.currentId, state).catch(() => undefined);
+      return saveHistory(runtime.currentId, state,{deleteRevision:previous.updated_at}).catch(() => undefined);
     }
     if (name === 'regenerate') {
       const conversation = runtime.conversations.find((item) => item.id === runtime.currentId);

@@ -8,6 +8,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,6 +73,7 @@ internal fun TidalCoverSlot(
     hasCover: Boolean,
     revision: Int,
     repository: SideRoomsRepository,
+    title: String = "",
     onClick: () -> Unit
 ) {
     var cover by remember(bookId,revision) { mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -80,20 +86,23 @@ internal fun TidalCoverSlot(
     Surface(
         modifier=Modifier.size(width=88.dp,height=124.dp).clickable(onClick=onClick),
         color=MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.35f),
-        shape=RoundedCornerShape(13.dp),
+        shape=RoundedCornerShape(3.dp),
+        shadowElevation=3.dp,
         tonalElevation=0.dp
     ) {
         val borderColor=MaterialTheme.colorScheme.outline.copy(alpha=.55f)
         Box(contentAlignment=Alignment.Center) {
-            if(cover==null) Canvas(modifier=Modifier.fillMaxSize()) {
-                drawRoundRect(color=borderColor,cornerRadius=CornerRadius(13.dp.toPx()),
-                    style=Stroke(width=1.dp.toPx(),pathEffect=PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx(),5.dp.toPx()))))
-            }
             if(cover!=null){
                 Image(bitmap=cover!!.asImageBitmap(),contentDescription="封面，点击更换",
                     modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
             }else{
-                Text("＋",fontSize=26.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(title.ifBlank { "未设置封面" },modifier=Modifier.padding(12.dp),fontSize=13.sp,
+                    textAlign=TextAlign.Center,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Box(Modifier.align(Alignment.CenterStart).fillMaxHeight().width(5.dp).background(borderColor.copy(alpha=.28f)))
+            Box(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(3.dp).background(MaterialTheme.colorScheme.surface.copy(alpha=.8f)))
+            if(hasCover && cover==null) {
+                Text("封面暂不可读",modifier=Modifier.align(Alignment.BottomCenter).padding(3.dp),fontSize=9.sp)
             }
         }
     }

@@ -51,4 +51,4 @@ const zip = buildOfflineArchive({calendar:{entries:[{title:'日历归档验收'}
 const html = new TextDecoder().decode(await zip.blob.arrayBuffer());
 assert.ok(html.includes('calendar') && html.includes('日历归档验收'));
 assert.ok(html.includes('tidal_library') && html.includes('书籍归档验收'));
-assert.match(settings, /buildOfflineArchive\(archive/);
+assert.match(settings, /saveOfflineV2\(\{/);

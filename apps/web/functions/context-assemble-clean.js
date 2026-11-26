@@ -185,8 +185,9 @@ export async function assembleCleanContext(env, {
   const crossWindowRequest = permission === 'owner' && CROSS_WINDOW_SURFACES.has(surface)
     ? normalizeCrossWindowRequest(crossWindow || {})
     : { mode: 'off', sources: [] };
-  const selection = exposeTools ? resolveToolSelection({ permission, surface, authScope, visitorId, cross_window_mode: crossWindowRequest.mode, global_excerpt_write_enabled: globalExcerpt?.write_enabled === true, user_portrait_write_enabled: userPortrait?.write_enabled === true && isThinkingSoilEnabled(papers.soil) }) : { backendTools: [], modelVisibleToolRecords: [], modelVisibleTools: [] };
-  const webSearchEnabled = Boolean(exposeTools && permission === 'owner' && WEB_SEARCH_SURFACES.has(surface)
+  const independentWebEnabled = exposeTools && permission === 'owner' && WEB_SEARCH_SURFACES.has(surface) && crossWindowRequest.mode !== 'keyword' && env.COAST_INDEPENDENT_WEB_ENABLED === 'true' && Boolean(env.TAVILY_API_KEY?.trim());
+  const selection = exposeTools ? resolveToolSelection({ permission, surface, authScope, visitorId, env, independent_web_enabled: independentWebEnabled, cross_window_mode: crossWindowRequest.mode, global_excerpt_write_enabled: globalExcerpt?.write_enabled === true, user_portrait_write_enabled: userPortrait?.write_enabled === true && isThinkingSoilEnabled(papers.soil) }) : { backendTools: [], modelVisibleToolRecords: [], modelVisibleTools: [] };
+  const webSearchEnabled = Boolean(!independentWebEnabled && exposeTools && permission === 'owner' && WEB_SEARCH_SURFACES.has(surface)
     && crossWindowRequest.mode !== 'keyword');
   const modelVisibleToolRecords = webSearchEnabled
     ? [...selection.modelVisibleToolRecords, WEB_SEARCH_TOOL_RECORD]
@@ -260,6 +261,7 @@ export async function assembleCleanContext(env, {
       const result = await executeModelTool(env.COAST_CHAT_DB, toolCall, {
         env, permission, surface, visitorId, room_scope: roomId || surface, authScope, actor: surface === 'official_mcp' ? 'official_mcp' : 'api_model_partner',
         conversation_id: conversationId, source_turn_id: sourceTurnId, local_date: localDate, model_label: model, user_query: query,
+        independent_web_enabled: independentWebEnabled,
         cross_window_mode: crossWindowRequest.mode,
         global_excerpt_write_enabled: globalExcerpt?.write_enabled === true,
         user_portrait_write_enabled: userPortrait?.write_enabled === true && isThinkingSoilEnabled(papers.soil),

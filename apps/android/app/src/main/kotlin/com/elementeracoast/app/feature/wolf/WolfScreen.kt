@@ -35,7 +35,6 @@ import androidx.compose.ui.unit.dp
 import com.elementeracoast.app.BuildConfig
 import com.elementeracoast.app.core.model.ChatMessage
 import com.elementeracoast.app.core.model.CoastShellState
-import com.elementeracoast.app.core.remote.RemoteDevUpdate
 import com.elementeracoast.app.feature.chatgpt.ChatGptConnectState
 import com.elementeracoast.app.feature.serpentdesk.DevHandsRepository
 import com.elementeracoast.app.feature.shell.FeaturePageTopBar
@@ -55,11 +54,13 @@ fun WolfScreen(
     devHands: DevHandsRepository,
     archive: GlobalArchiveRepository,
     onSelectModel: (String) -> Unit,
+    onSelectImageModel: (String) -> Unit = {},
     onRefreshModels: () -> Unit,
     onChatGptConnect: () -> Unit,
     onChatGptDisconnect: () -> Unit,
     onChatGptRefresh: () -> Unit,
     onChatGptProbe: (String) -> Unit,
+    onEnterLocalWorkspace: () -> Unit,
     onLogout: () -> Unit,
     onImportMessages: (List<ChatMessage>) -> Unit,
     onActionLogged: (String, String, String) -> Unit,
@@ -128,7 +129,7 @@ fun WolfScreen(
             when (current) {
                 WolfDestination.Profile -> ProfileScreen(state, store, onAppearance = { page = WolfDestination.Appearance }, onSnackbar = onSnackbar)
                 WolfDestination.Appearance -> AppearanceScreen(state, store, onSnackbar)
-                WolfDestination.Account -> AccountScreen(shellState, onLogout)
+                WolfDestination.Account -> AccountScreen(shellState, onEnterLocalWorkspace, onLogout)
                 WolfDestination.ChatRecords -> ChatRecordsScreen(
                     profile = state.profile,
                     messages = messages,
@@ -144,6 +145,9 @@ fun WolfScreen(
                     models = shellState.models,
                     current = shellState.currentModel,
                     onSelect = onSelectModel,
+                    imageModels = shellState.imageModels,
+                    currentImage = shellState.currentImageModel,
+                    onSelectImage = onSelectImageModel,
                     onRefresh = onRefreshModels,
                     chatGpt = chatGpt,
                     onChatGptConnect = onChatGptConnect,
@@ -156,7 +160,7 @@ fun WolfScreen(
                 )
                 WolfDestination.BasicSettings -> BasicSettingsScreen(state.basic, store, onSnackbar)
                 WolfDestination.Diagnostics -> DiagnosticsScreen(shellState, state)
-                WolfDestination.Update -> if (shellState.localMode) LocalGithubUpdateScreen(onSnackbar) else WolfUpdateScreen(devHands, onSnackbar)
+                WolfDestination.Update -> LocalGithubUpdateScreen(onSnackbar, if (shellState.localMode) null else devHands)
             }
         }
     }
@@ -202,6 +206,7 @@ private fun WolfHome(
 @Composable
 private fun AccountScreen(
     shellState: CoastShellState,
+    onEnterLocalWorkspace: () -> Unit,
     onLogout: () -> Unit
 ) {
     var confirming by remember { mutableStateOf(false) }
@@ -243,108 +248,34 @@ private fun AccountScreen(
                 }
             }
         }
+        if (!shellState.localMode) item {
+            Button(onClick = onEnterLocalWorkspace, modifier = Modifier.fillMaxWidth(),
+                enabled = !shellState.isStreaming && !shellState.isFinalizing && !shellState.backgroundGeneration && !shellState.attachmentUploading) {
+                Text("切换到本机模式")
+            }
+            Text("保留有效的在线登录状态；本机资料与在线资料独立保存。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         item {
             Button(onClick = { confirming = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(if (shellState.localMode) "返回开屏" else if (shellState.sessionPersistence == "source_tour") "离开参观" else "退出账号")
+                Text(if (shellState.localMode) "返回在线模式" else if (shellState.sessionPersistence == "source_tour") "离开参观" else "退出账号")
             }
         }
     }
     if (confirming) {
         AlertDialog(
             onDismissRequest = { confirming = false },
-            title = { Text(if (shellState.localMode) "返回开屏？" else if (shellState.sessionPersistence == "source_tour") "离开参观模式？" else "退出当前账号？") },
-            text = { Text(if (shellState.localMode) "本机资料会完整保留，下次仍可从本机模式进入。" else if (shellState.sessionPersistence == "source_tour") "返回入口；参观模式不创建云端会话。" else "只会清除当前登录态；聊天、记忆与后端数据不会被删除。") },
+            title = { Text(if (shellState.localMode) "返回在线模式？" else if (shellState.sessionPersistence == "source_tour") "离开参观模式？" else "退出当前账号？") },
+            text = { Text(if (shellState.localMode) "本机资料会完整保留；有效的在线登录会话将自动恢复，失效时需重新登录。" else if (shellState.sessionPersistence == "source_tour") "返回入口；参观模式不创建云端会话。" else "只会清除当前登录态；聊天、记忆与后端数据不会被删除。") },
             confirmButton = {
                 TextButton(onClick = {
                     confirming = false
                     onLogout()
-                }) { Text(if (shellState.localMode) "返回开屏" else "退出账号") }
+                }) { Text(if (shellState.localMode) "返回在线模式" else "退出账号") }
             },
             dismissButton = {
                 TextButton(onClick = { confirming = false }) { Text("取消") }
             }
         )
-    }
-}
-
-@Composable
-private fun WolfUpdateScreen(
-    repository: DevHandsRepository,
-    onSnackbar: (String) -> Unit
-) {
-    val scope = rememberCoroutineScope()
-    var update by remember { mutableStateOf<RemoteDevUpdate?>(null) }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    fun refresh() {
-        if (busy) return
-        busy = true
-        error = null
-        scope.launch {
-            try {
-                update = repository.latestUpdate().update
-            } catch (cause: Throwable) {
-                error = cause.message ?: "更新信息读取失败。"
-            } finally {
-                busy = false
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) { refresh() }
-
-    val native = update?.native
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            SnowLetterSurface(
-                modifier = Modifier.fillMaxWidth(),
-                role = SnowLetterSurfaceRole.StatusCard,
-                fallbackColor = MaterialTheme.colorScheme.surfaceVariant,
-                fallbackShape = RoundedCornerShape(22.dp)
-            ) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 18.dp)) {
-                    Text(native?.versionName ?: "版本与更新", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(10.dp))
-                    WolfUpdateFact("PWA cache", update?.pwaCacheVersion ?: "—")
-                    WolfUpdateFact("versionCode", native?.versionCode?.toString() ?: "—")
-                    WolfUpdateFact("applicationId", native?.applicationId ?: "—")
-                    WolfUpdateFact("稳定签名", when (native?.stableSigning) { true -> "是"; false -> "否"; null -> "—" })
-                    WolfUpdateFact("可覆盖安装", when (native?.overwriteInstallable) { true -> "是"; false -> "否"; null -> "—" })
-                    WolfUpdateFact("APK SHA-256", native?.apkSha256 ?: "—", mono = true)
-                    WolfUpdateFact("交付来源", "Source build")
-                    WolfUpdateFact("Release", "—")
-                    WolfUpdateFact("APK", native?.apkFilename ?: "—")
-                    native?.updateTime?.let { WolfUpdateFact("更新时间", it) }
-                    native?.updateNotes?.let {
-                        Spacer(Modifier.height(8.dp))
-                        Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                    }
-                    native?.knownRisk?.let {
-                        Spacer(Modifier.height(6.dp))
-                        Text("已知风险：$it", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                    }
-                    update?.reason?.takeIf { update?.available != true }?.let {
-                        Spacer(Modifier.height(8.dp))
-                        Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                    }
-                    error?.let {
-                        Spacer(Modifier.height(8.dp))
-                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(onClick = ::refresh, enabled = !busy) {
-                            Text(if (busy) "处理中" else "刷新")
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 

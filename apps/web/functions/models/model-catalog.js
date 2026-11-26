@@ -1,3 +1,4 @@
+import { discoverImageModels } from '../independent-image.js';
 import { CATALOG_TTL_MS, OPENROUTER_MODELS_URL } from './model-constants.js';
 import { ModelRequestError } from './model-validation.js';
 
@@ -84,12 +85,18 @@ function chooseDefaultChat(models) {
   return models[0]?.id || '';
 }
 
-export function buildModelCatalog(raw) {
+export function buildModelCatalog(raw, imageDirectory = undefined) {
   const source = Array.isArray(raw?.data) ? raw.data : [];
   const openaiChat = sortModels(source.filter(isOpenAiChat).map((model) => safeModel(model)));
   const imageTwo = source.filter((model) => isOpenAiImage(model, 2)).map((model) => safeModel(model));
   const imageOne = source.filter((model) => isOpenAiImage(model, 1)).map((model) => safeModel(model));
-  const openaiImage = sortModels(imageTwo.length ? imageTwo : imageOne);
+  const legacyImages = sortModels(imageTwo.length ? imageTwo : imageOne);
+  // Retain the old group name for clients and archives, but populate the real
+  // independent-image directory when checked. Never guess support from a name.
+  const openaiImage = imageDirectory === undefined ? legacyImages : sortModels((imageDirectory || []).map(item => ({
+    ...safeModel(source.find(m => m.id === item.id) || {id:item.id,name:item.name,architecture:{output_modalities:['image']}}, {is_free:item.free}),
+    image_api_supported:true,
+  })));
   const freeModels = sortModels(source
     .filter((item) => hasOutput(item, 'text') && isFreeModel(item))
     .map((model) => safeModel(model, { is_free: true })));
@@ -105,6 +112,7 @@ export function buildModelCatalog(raw) {
       image: openaiImage[0]?.id || '',
       free: freeModels[0]?.id || '',
     },
+    ...(imageDirectory !== undefined ? { image_catalog_status: imageDirectory === null ? 'unavailable' : 'verified' } : {}),
     updated_at: new Date().toISOString(),
   };
 }
@@ -135,4 +143,22 @@ export async function fetchModelCatalog(env, force = false) {
   catalogCache = buildModelCatalog(raw);
   catalogExpiresAt = now + CATALOG_TTL_MS;
   return catalogCache;
+}
+
+let imageCatalogCache=null;
+let imageCatalogExpiresAt=0;
+/** Only model-box requests refresh the independent image directory. Chat
+ * inference retains its original catalog request and capability lookup. */
+export async function fetchModelBoxCatalog(env,force=false){
+  const chat=await fetchModelCatalog(env,force);
+  if(force||!imageCatalogCache||imageCatalogExpiresAt<=Date.now()){
+    let images=null;
+    if(openRouterKey(env))try{images=await discoverImageModels(fetch,openRouterKey(env));}catch{ /* chat remains usable */ }
+    imageCatalogCache={images};
+    imageCatalogExpiresAt=Date.now()+(images===null?10000:CATALOG_TTL_MS);
+  }
+  const images=imageCatalogCache.images;
+  const all=Object.values(chat.groups).flat();
+  const image=sortModels((images||[]).map(item=>({...safeModel(all.find(m=>m.id===item.id)||{id:item.id,name:item.name,architecture:{output_modalities:['image']}},{is_free:item.free}),image_api_supported:true})));
+  return {...chat,groups:{...chat.groups,openai_image:image},defaults:{...chat.defaults,image:image[0]?.id||''},image_catalog_status:images===null?'unavailable':'verified'};
 }

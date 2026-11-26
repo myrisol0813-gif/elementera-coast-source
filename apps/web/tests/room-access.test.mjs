@@ -26,13 +26,14 @@ for (const access of ownerAccess) {
   assert.equal(access.soil, 'conversation');
   assert.equal(access.memory, 'conversation_and_global');
   assert.deepEqual(access.modelVisibleTools, [
+    'web.independent_search', 'web.independent_read',
     'daily.create_moment', 'daily.create_diary', 'daily.moment_comment', 'daily.moment_like',
     'dogtalk.read', 'vault.search', 'vault.read', 'memory.search', 'memory.write_candidate', 'memory.global_excerpt_propose', 'memory.user_portrait_propose',
     'cross_window.search', 'cross_window.keyword_search', 'cross_window.read_messages', 'cross_window.read_recent',
     'calendar.list', 'calendar.create', 'calendar.update', 'calendar.delete',
     'library.books', 'library.read', 'library.notes', 'library.write', 'voice.create',
   ]);
-  assert.deepEqual(access.backendTools, ['daily.*', 'dogtalk.*', 'memory.*', 'cross_window.*', 'calendar.*', 'library.*', 'voice.create', 'vault.*']);
+  assert.deepEqual(access.backendTools, ['web.independent_search', 'web.independent_read', 'daily.*', 'dogtalk.*', 'memory.*', 'cross_window.*', 'calendar.*', 'library.*', 'voice.create', 'vault.*']);
 }
 for (const access of ownerAccess.slice(1)) {
   assert.deepEqual(access.backendTools, ownerAccess[0].backendTools, 'main/radio/lighthouse backend tools must stay identical');
@@ -148,3 +149,13 @@ assert.deepEqual(visitorContext.tools, []);
 assert.equal(Object.hasOwn(visitorContext, 'desk_slip'), false);
 
 console.log('room-access: ok');
+// Independent networking remains opt-in and uses the same privacy boundary as hosted search.
+const networkEnv={...env,COAST_INDEPENDENT_WEB_ENABLED:'true',TAVILY_API_KEY:'fixture-not-a-real-key'};
+for(const [surface,conversation,mode,expected] of [['main_chat',main,'off',true],['radio',radio,'off',true],['lighthouse',lighthouse,'off',false],['main_chat',main,'keyword',false]]){
+  const input={role:'user',content:'public fixture'};
+  const a=await assembleCleanContext(networkEnv,{surface,conversationId:conversation.id,messages:[input],lastUser:input,permission:'owner',preview:true,crossWindow:{mode}});
+  assert.equal(a.tools.some(t=>t.function?.name==='independent_web_search'),expected);
+  assert.equal(a.tools.some(t=>t.function?.name==='independent_web_read'),expected);
+  if(expected)assert.equal(a.tools.some(t=>t.type==='openrouter:web_search'),false);
+  assert.doesNotMatch(JSON.stringify(a.deskSlip()),/fixture-not-a-real-key/);
+}

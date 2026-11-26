@@ -71,7 +71,7 @@ data class CoastBackendGraph(
                 auth = DefaultAuthRepository(authStore, api),
                 conversations = DefaultConversationRepository(api, cache, titleRemote),
                 profile = DefaultProfileRepository(api, cache),
-                chat = if (config.localTransport != null) LocalDirectChatRepository(chatRepository, LocalProviderStore(context), LocalKnowledgeStore(persistence)) else chatRepository,
+                chat = if (config.localTransport != null) LocalDirectChatRepository(chatRepository, LocalProviderStore(context), LocalKnowledgeStore(persistence,com.elementeracoast.app.core.local.LocalIndependentWeb(context.applicationContext),com.elementeracoast.app.core.local.LocalVoiceProvider(context.applicationContext))) else chatRepository,
                 reality = AndroidRealityContextSource(context.applicationContext, persistence,config.localTransport!=null),
                 thoughtSoil = DefaultThoughtSoilRepository(api, chatGptPlan,
                     if (config.localTransport != null) LocalSoilOrganizer(persistence, LocalProviderStore(context), chatGptPlan)::organize else null),

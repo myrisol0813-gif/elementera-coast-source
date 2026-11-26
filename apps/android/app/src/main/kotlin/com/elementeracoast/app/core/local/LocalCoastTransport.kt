@@ -20,11 +20,14 @@ import okio.Buffer
  * The existing repositories, chat branching and UI remain the same.
  */
 class LocalCoastTransport(private val store: LocalPersistence,
+    private val web:LocalIndependentWeb?=null,
+    private val voice:LocalVoiceProvider?=null,
     private val providerCatalog: () -> RemoteModelCatalogResponse = { RemoteModelCatalogResponse(ok = true) }
 ) : Interceptor {
+    internal var imageConfig:(String)->LocalProviderConfig?={null}
     private val cache = RemoteCacheStore(store)
     private val calendar = LocalCalendarStore(store)
-    private val knowledge = LocalKnowledgeStore(store)
+    private val knowledge = LocalKnowledgeStore(store,web,voice)
     private val memory = LocalMemoryStore(store)
     private val portraits = LocalPortraitStore(store)
     private val soil = LocalSoilStore(store)
@@ -32,12 +35,23 @@ class LocalCoastTransport(private val store: LocalPersistence,
     private val toolSessions=linkedMapOf<String,LocalToolSession>()
     private val media = "application/json; charset=utf-8".toMediaType()
 
-    override fun intercept(chain: Interceptor.Chain): Response = synchronized(this) {
+    override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         // Never proceed to a real network, even for an unexpected host.
-        try {
+        return try {
             if (request.url.host != HOST) failure(request, 403, "local_boundary", "本机模式禁止连接海岸服务器。")
-            else route(request)
+            else if(request.url.encodedPath=="/api/chat/native-tool"&&request.method=="POST") executeNativeTool(request)
+            else if(request.url.encodedPath=="/api/voice/clips"&&request.method=="POST") {
+                val provider=voice?:throw VoiceFailure("voice_not_configured","请在模型箱配置本机语音。",503)
+                val clip=generateLocalManualVoice(store,provider,body(request))
+                response(request,201,buildJsonObject{put("ok",true);put("clip",clip)})
+            }
+            else if(request.url.encodedPath=="/api/chat/image-generate"&&request.method=="POST") response(request,201,runLocalManualImageGeneration(store,imageConfig(cache.profile()?.currentImageModel.orEmpty()),body(request)))
+            else synchronized(this){route(request)}
+        } catch (error: ManualImageFailure) {
+            failure(request,error.status,error.type,error.message)
+        } catch (error: VoiceFailure) {
+            failure(request,error.status,error.type,error.message)
         } catch (error: LocalCalendarError) {
             failure(request, error.status, error.type, error.message.orEmpty())
         } catch (error: IllegalArgumentException) {
@@ -45,6 +59,18 @@ class LocalCoastTransport(private val store: LocalPersistence,
         } catch (_: Exception) {
             failure(request, 500, "local_storage_error", "本机读写失败，原始资料未自动转发到服务器。")
         }
+    }
+
+    private fun executeNativeTool(r:Request):Response {
+            val b=body(r)
+            val request=json.decodeFromJsonElement(RemoteChatRequest.serializer(),b)
+            val session=synchronized(this){toolSessions[request.conversationId+":"+request.messageId]}
+                ?:return failure(r,403,"local_tool_session_missing","本轮没有已授权的本机工具会话。")
+            val call=b.getValue("tool_call").jsonObject
+            val fn=call.getValue("function").jsonObject
+            val result=session.execute(call.str("id").orEmpty(),fn.str("name").orEmpty(),fn.str("arguments").orEmpty())
+            val privateContinuation=if(fn.str("name")=="image_generate"&&result.ok)session.takePrivateContinuation()else emptyList()
+            return response(r,200,element(RemoteNativeToolResult.serializer(),result.copy(privateContinuation=privateContinuation)).jsonObject)
     }
 
     fun uploadAttachment(cid:String,name:String,mime:String,bytes:ByteArray):RemoteAttachment=synchronized(this){
@@ -120,15 +146,23 @@ class LocalCoastTransport(private val store: LocalPersistence,
         if (path == "/api/chat/history") {
             val cid = r.url.queryParameter("conversation_id").orEmpty()
             if (!conversationExists(cid)) return missing(r)
-            if (method == "GET") return ok(r, "source" to JsonPrimitive("local"),
-                "history" to element(RemoteHistory.serializer(), cache.history(cid) ?: RemoteHistory(conversationId = cid)))
+            if (method == "GET") {
+                val h=store.readConsistent{s->val c=RemoteCacheStore(s,strictReads=true);val old=c.history(cid)?:RemoteHistory(conversationId=cid)
+                    LocalImageRecovery.recover(old).also{if(it!=old)c.putHistory(cid,it)}}
+                return ok(r,"source" to JsonPrimitive("local"),"history" to element(RemoteHistory.serializer(),h))
+            }
             if (method == "PUT") {
-                val h = json.decodeFromJsonElement(RemoteHistory.serializer(), body(r))
-                    .copy(conversationId = cid, updatedAt = now())
-                val originals=LocalAttachmentStore(store)
-                if(originals.needsHistoryLink(cid,h))store.atomic{staged->LocalAttachmentStore(staged).linkHistory(cid,h);RemoteCacheStore(staged).putHistory(cid,h)}
-                else{originals.linkHistory(cid,h);cache.putHistory(cid,h)}
-                return ok(r, "source" to JsonPrimitive("local"), "history" to element(RemoteHistory.serializer(), h))
+                val input=json.decodeFromJsonElement(RemoteHistory.serializer(),body(r))
+                val h=store.readConsistent{s->
+                    val c=RemoteCacheStore(s,strictReads=true)
+                    val old=c.history(cid)?:RemoteHistory(conversationId=cid)
+                    val next=LocalImageRecovery.protect(old,input,r.header("X-Coast-Delete-Revision")).copy(conversationId=cid,updatedAt=now())
+                    val originals=LocalAttachmentStore(s)
+                    if(originals.needsHistoryLink(cid,next))s.atomic{staged->LocalAttachmentStore(staged).linkHistory(cid,next);RemoteCacheStore(staged).putHistory(cid,next)}
+                    else{originals.linkHistory(cid,next);c.putHistory(cid,next)}
+                    next
+                }
+                return ok(r,"source" to JsonPrimitive("local"),"history" to element(RemoteHistory.serializer(),h))
             }
         }
         if(path.startsWith("/api/chat/attachments/")&&r.url.pathSegments.size==4){
@@ -219,7 +253,14 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val policy = LocalInputBudget.resolve(requestedBudget,8000,false,null)
             val room=cache.conversations().first { it.id==request.conversationId }.roomType
             val prepared=knowledge.context(request.messages,policy.comfort,if(room=="main")"main_chat" else room,request.conversationId,request.attachmentIds,request.sourceTurnId.orEmpty(),request.crossWindow,request.realityContext?:RemoteRealityContext(),policy)
-            val session=knowledge.toolSession(request.conversationId,request.sourceTurnId,request.crossWindow,prepared.receipt,request.model.let{if(it.startsWith("chatgpt-plan:"))it else "chatgpt-plan:"+it})
+            val selected=cache.profile()?.currentImageModel.orEmpty()
+            val h=cache.history(request.conversationId)
+            val source=h?.turns?.firstOrNull{it.id==request.sourceTurnId}
+            val uid=source?.user?.variants?.getOrNull(source.user.active)?.id
+            val target=source?.assistant?.variantsByUserVariant?.get(source.user.active.toString())?.singleOrNull{it.id==request.messageId}
+            val image=if(request.imageToolEnabled&&request.imageModelId==selected&&selected.isNotBlank()&&uid!=null&&target?.finishReason=="image_tool_ready"&&h?.contextSettings?.localModelWriteEnabled==true&&room in setOf("main","radio")&&imageConfig(selected)!=null)
+                LocalImageTool(store,imageConfig,request.conversationId,request.sourceTurnId,uid,request.messageId,selected,true)else null
+            val session=knowledge.toolSession(request.conversationId,request.sourceTurnId,request.crossWindow,prepared.receipt,request.model.let{if(it.startsWith("chatgpt-plan:"))it else "chatgpt-plan:"+it},image=image)
             val key=request.conversationId+":"+request.messageId
             toolSessions.remove(key)
             if(session!=null){require(request.messageId.isNotBlank());while(toolSessions.size>=8)toolSessions.remove(toolSessions.keys.first());toolSessions[key]=session}
@@ -229,16 +270,6 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 modelMessages = localMultimodalMessages(prepared.messages,prepared.imageParts),
                 deskSlip = session?.receipt?:prepared.receipt
             )).jsonObject)
-        }
-        if (path == "/api/chat/native-tool" && method == "POST") {
-            val b=body(r)
-            val request=json.decodeFromJsonElement(RemoteChatRequest.serializer(),b)
-            val session=toolSessions[request.conversationId+":"+request.messageId]
-                ?:return failure(r,403,"local_tool_session_missing","本轮没有已授权的本机工具会话。")
-            val call=b.getValue("tool_call").jsonObject
-            val fn=call.getValue("function").jsonObject
-            val result=session.execute(call.str("id").orEmpty(),fn.str("name").orEmpty(),fn.str("arguments").orEmpty())
-            return response(r,200,element(RemoteNativeToolResult.serializer(),result).jsonObject)
         }
         if (path == "/api/chat/message-metadata" && method == "GET") {
             val cid=r.url.queryParameter("conversation_id").orEmpty()

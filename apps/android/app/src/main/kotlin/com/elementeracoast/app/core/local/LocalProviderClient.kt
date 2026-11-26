@@ -249,6 +249,7 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                         history.add(buildJsonObject{put("role","tool");put("tool_call_id",part.id.toString());put("content",result.output)})
                         send(LocalProviderEvent.Tool(part.id.toString(),part.name.toString(),result))
                     }
+                    history.addAll(session.takePrivateContinuation())
                     session.requireContinuationBudget(history)
                 }
             }catch(e:CancellationException){throw e}

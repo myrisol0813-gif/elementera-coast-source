@@ -5,11 +5,11 @@ const table=Uint32Array.from({length:256},(_,n)=>{for(let i=0;i<8;i++)n=n&1?0xed
 const header=(n,s)=>{const b=new Uint8Array(n),v=new DataView(b.buffer);v.setUint32(0,s,true);return [b,v];};
 const check=(ok,msg)=>{if(!ok)throw Error(msg);};
 export class ArchiveV2ZipWriter {
-  constructor(sink){this.sink=sink;this.offset=0;this.central=[];this.names=new Set();this.state='open';}
+  constructor(sink,{readingCopy=false}={}){this.sink=sink;this.readingCopy=readingCopy;this.offset=0;this.central=[];this.names=new Set();this.state='open';}
   async write(b){check(this.offset+b.length<=MAX,'ZIP32 byte limit');await this.sink.write(b);this.offset+=b.length;}
   async entry(name,size,source){
     check(this.state==='open','ZIP writer closed');
-    check((name==='manifest.json'||/^objects\/[0-9a-f]{64}$/.test(name))&&!this.names.has(name),'invalid or duplicate archive path');
+    check((this.readingCopy?/^(?:index\.html|manifest\.json|data\.json|device\.json|records\/[1-9][0-9]*\.(?:html|json)|media\/[1-9][0-9]*\.[a-z0-9]+)$/.test(name):(name==='manifest.json'||/^objects\/[0-9a-f]{64}$/.test(name)))&&!this.names.has(name),'invalid or duplicate archive path');
     check(Number.isSafeInteger(size)&&size>=0&&size<=MAX&&this.central.length<65535,'ZIP32 entry limit');
     this.state='entry';
     try{

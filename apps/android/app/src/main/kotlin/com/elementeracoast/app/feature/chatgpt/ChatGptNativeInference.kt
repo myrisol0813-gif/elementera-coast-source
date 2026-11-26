@@ -7,6 +7,7 @@ import com.elementeracoast.app.core.remote.RemoteChatRequest
 import com.elementeracoast.app.core.remote.RemoteDeskSlip
 import com.elementeracoast.app.core.remote.RemoteFurnitureRun
 import com.elementeracoast.app.core.remote.RemoteNativeChatContext
+import com.elementeracoast.app.core.remote.RemoteNativeToolResult
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
@@ -81,6 +82,14 @@ internal fun normalizeNativeInput(obj: JsonObject): JsonObject {
             }
         })
     }
+}
+
+/** Keep trusted image readback outside the function-call output. */
+internal fun nativeSavedImageContinuation(name:String,result:RemoteNativeToolResult):Pair<Boolean,List<JsonObject>> {
+    if(name!="image_generate"||!result.ok)return false to emptyList()
+    val receipt=runCatching{Json.parseToJsonElement(result.output).jsonObject}.getOrNull()
+    if(receipt?.get("ok")?.jsonPrimitive?.booleanOrNull!=true||receipt["status"]?.jsonPrimitive?.contentOrNull!="saved")return false to emptyList()
+    return true to result.privateContinuation.take(1).map(::normalizeNativeInput)
 }
 
 internal data class NativeCoastToolCall(val callId: String, val name: String)
@@ -278,6 +287,7 @@ internal class ChatGptNativeInference(
                 }
                 val instructions = nativeSystemInstructions(prepared.modelMessages) +
                     if (voiceToolAvailable) "\\n用户明确要求合成或留存语音时，使用 coast.voice_create 工具。没有成功的真实工具结果时，不得声称已生成语音，不得编造音频 URL 或输出占位变量。" else ""
+                var generatedImageSaved=false
                 val history = mutableListOf<JsonElement>()
                 prepared.modelMessages.forEach { message ->
                     val obj = message.jsonObject
@@ -426,7 +436,7 @@ internal class ChatGptNativeInference(
                     }
                     val pending = output.toolCalls
                     if (pending.isEmpty()) {
-                        if (text.isBlank()) {
+                        if (text.isBlank()&&!generatedImageSaved) {
                             val detail = when {
                                 output.hasReasoning -> "只有推理输出"
                                 output.items.isNotEmpty() -> "没有可显示的正文或可执行工具"
@@ -469,6 +479,7 @@ internal class ChatGptNativeInference(
                         CoastApiErrorKind.Model, "tool_limit", "这轮的工具调用超过 12 次。"
                     )
                     history.addAll(output.items)
+                    val privateImages=mutableListOf<JsonObject>()
                     for (tool in pending) {
                         stage = "coast_tool_execution"
                         val requestedTool = parseNativeCoastToolCall(tool)
@@ -487,7 +498,11 @@ internal class ChatGptNativeInference(
                         desk = result.deskSlip
                         trySend(NativeChatEvent.Tool(callId, name, result.ok))
                         history.add(nativeCoastToolOutput(requestedTool, result.output))
+                        val (imageSaved,images)=nativeSavedImageContinuation(name,result)
+                        if(imageSaved){generatedImageSaved=true;privateImages.addAll(images)}
                     }
+                    history.addAll(privateImages)
+                    imageCount=nativeVisionCount(JsonArray(history))
                 }
             } catch (cancelled: CancellationException) {
                 close()

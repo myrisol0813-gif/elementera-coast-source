@@ -93,6 +93,7 @@ class MainActivity : ComponentActivity() {
                         onRemovePendingAttachment = vm::removePendingAttachment,
                         onComposerDraftChange = vm::updateComposerDraft,
                         onSend = vm::sendMessage,
+                        onSendImage = vm::sendImage,
                         onStop = vm::stopGeneration,
                         onMessageAction = vm::handleMessageAction,
                         onOpenActionLog = vm::openActionLog,
@@ -105,6 +106,7 @@ class MainActivity : ComponentActivity() {
                         onOpenModels = vm::openModelPicker,
                         onDismissModels = vm::dismissModelPicker,
                         onSelectModel = vm::selectModel,
+                         onSelectImageModel = vm::selectImageModel,
                         onRefreshModels = vm::refreshModels,
                         onChatGptConnect = {
                             vm.connectChatGpt { url ->
@@ -114,7 +116,15 @@ class MainActivity : ComponentActivity() {
                         onChatGptDisconnect = vm::disconnectChatGpt,
                         onChatGptRefresh = vm::refreshChatGptModels,
                         onChatGptProbe = vm::probeChatGpt,
-                        onLogout = { if (state.localMode) switchWorkspace(false) else vm.logout() },
+                        onEnterLocalWorkspace = {
+                            if (state.isStreaming || state.isFinalizing || state.backgroundGeneration || state.attachmentUploading) vm.showPlaceholder("请等待本轮任务结束后再切换工作区。")
+                            else switchWorkspace(true)
+                        },
+                        onLogout = {
+                            if (!state.localMode) vm.logout()
+                            else if (state.isStreaming || state.isFinalizing || state.backgroundGeneration || state.attachmentUploading) vm.showPlaceholder("请等待本轮任务结束后再切换工作区。")
+                            else switchWorkspace(false)
+                        },
                         onPlaceholder = vm::showPlaceholder,
                         onSnackbarShown = vm::clearSnackbar
                     )

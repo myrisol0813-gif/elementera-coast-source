@@ -49,6 +49,7 @@ internal fun AssistantMessage(
     timeLabel: String,
     metadataMessageId: String?,
     metadataSource: ModelMetadataRemoteDataSource,
+    attachmentPreviewSource: AttachmentPreviewRemoteDataSource,
     isStreamingTail: Boolean,
     avatarBitmap: ImageBitmap?,
     thoughtSoil: ThoughtSoilSnapshot?,
@@ -108,6 +109,10 @@ internal fun AssistantMessage(
                         Text(detail, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }
                 }
+            }
+            if(message.attachments.isNotEmpty()){
+                Spacer(Modifier.height(6.dp))
+                MessageAttachmentList(conversationId=conversationId,attachments=message.attachments,previewSource=attachmentPreviewSource)
             }
             Spacer(Modifier.height(CoastChatTokens.MessageActionTopGap))
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {

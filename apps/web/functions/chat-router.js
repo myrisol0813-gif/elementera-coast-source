@@ -1,3 +1,4 @@
+import { attachImageTool } from './chat-image-tool.js';
 import {
   apiError,
   json,
@@ -18,6 +19,7 @@ import {
   deleteChatAttachment,
   getChatAttachmentRecord,
   resolveChatAttachmentsForModel,
+  runManualImageGeneration,
   uploadChatAttachment,
 } from './chat-attachments.js';
 import {
@@ -191,7 +193,7 @@ async function history(request, env) {
   }
   if (request.method === 'PUT') {
     requireSameOrigin(request);
-    const value = await writeConversationState(env.COAST_CHAT_DB, conversationId, await body(request));
+    const value = await writeConversationState(env.COAST_CHAT_DB, conversationId, await body(request), {deleteRevision:request.headers.get('X-Coast-Delete-Revision')});
     return json({ ok: true, source: 'd1-json-v4', history: { ...value, conversation_id: conversationId } });
   }
   return methodNotAllowed('GET, PUT');
@@ -411,6 +413,8 @@ function streamFormalChat(request, env, input, assembled, metadataContext, dogta
           allowSystem: assembled.modelMessages[0]?.role === 'system',
           signal: request.signal,
           executeTool: assembled.executeTool,
+          takePrivateContinuation: assembled.takePrivateContinuation,
+          hasGeneratedImage: assembled.hasGeneratedImage,
           onMetadata: async (snapshot) => {
             metadataCaptured = true;
             await saveModelEcho(env, metadataContext.conversationId, metadataContext.messageId, snapshot);
@@ -497,7 +501,7 @@ async function formalChat(request, env) {
     });
   }
 
-  const assembled = await assembleCleanContext(env, {
+  let assembled = await assembleCleanContext(env, {
     conversationId,
     sourceTurnId,
     messages,
@@ -514,6 +518,7 @@ async function formalChat(request, env) {
     initialFurniture: dogtalkSubmission ? ['收好一张私人草稿纸条'] : [],
     crossWindow: value.cross_window,
   });
+  assembled=await attachImageTool(env,assembled,{conversationId,turnId:sourceTurnId,messageId,roomType:conversation.room_type,chatModel:value.model,enabled:value.image_tool_enabled===true,expectedImageModel:value.image_model_id??null,signal:request.signal});
   const attachmentIds = (Array.isArray(value.attachment_ids) ? value.attachment_ids : [])
     .map((item) => String(item || '').trim())
     .filter(Boolean)
@@ -548,6 +553,8 @@ async function formalChat(request, env) {
     }, {
       allowSystem: assembled.modelMessages[0]?.role === 'system',
       executeTool: assembled.executeTool,
+      takePrivateContinuation: assembled.takePrivateContinuation,
+      hasGeneratedImage: assembled.hasGeneratedImage,
       captureMetadata: true,
     });
   } catch (error) {
@@ -728,6 +735,7 @@ export function isChatApiPath(pathname) {
     || pathname.startsWith(`${ATTACHMENTS_PATH}/`)
     || pathname === LANDING_LETTER_PATH
     || pathname === MODEL_METADATA_PATH
+    || pathname === '/api/chat/image-generate'
     || pathname === '/api/chat/native-context'
     || pathname === '/api/chat/native-tool'
     || pathname === '/api/chat/native-echo'
@@ -744,6 +752,11 @@ export async function routeChatApi(request, env) {
   const pathname = new URL(request.url).pathname;
   try {
     if (pathname === FORMAL_CHAT_PATH) return await formalChat(request, env);
+    if (pathname === '/api/chat/image-generate') {
+      if (request.method !== 'POST') return methodNotAllowed('POST');
+      requireSameOrigin(request);
+      return json(await runManualImageGeneration(env,await body(request)),201);
+    }
     if (pathname === ATTACHMENTS_PATH || pathname.startsWith(`${ATTACHMENTS_PATH}/`)) return await attachments(request, env, pathname);
     if (pathname === LANDING_LETTER_PATH) return await landingLetter(request, env);
     if (pathname === MODEL_METADATA_PATH) return await modelMetadataApi(request, env);

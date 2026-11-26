@@ -160,3 +160,10 @@ longState = appendAssistantVariant(longState.state, longState.turn.id, { content
 assert.equal(activeBranch(longState.turns[0]).assistant.content, longReply, 'long replies must not be sliced while entering client state');
 
 console.log('chat-state: ok');
+
+const provenance={message_id:'image-assistant',provider:'openrouter',requested_model:'fixture/image:free',prompt:'draw a wolf',cost_usd:0};
+const media={id:'generated-image',type:'image',name:'generated.png',mime:'image/png',size:28,storage_key:'chat-attachment:generated-image',created_at:'2026-11-26T00:00:00Z',image_generation:{...provenance,key:'must-not-travel'}};
+const generatedState=normalizeState({turns:[{id:'image-turn',user:{variants:[{id:'image-user',content:'draw',attachments:[media]}]},assistant:{variantsByUserVariant:{0:[{id:'image-assistant',content:'',attachments:[media]},{id:'other-assistant',content:'',attachments:[media]}]}}}]});
+assert.equal(generatedState.turns[0].user.variants[0].attachments[0].image_generation,undefined);
+assert.deepEqual(generatedState.turns[0].assistant.variantsByUserVariant['0'][0].attachments[0].image_generation,provenance);
+assert.equal(generatedState.turns[0].assistant.variantsByUserVariant['0'][1].attachments[0].image_generation,undefined);

@@ -3,7 +3,7 @@ import { API, requestJson } from '../core/api.js';
 import { shortModelName } from '../core/model-format.js';
 import { createTransferSettings } from './settings-transfer.js';
 import { saveArchiveV2 } from '../core/archive-v2-save.js';
-import { buildOfflineArchive } from './offline-archive.js';
+import { saveOfflineV2 } from './offline-v2-archive.js';
 import { openGuideTarget, manualMarkup, dismissGuideHint } from '../core/feature-guide.js';
 
 const LOADED_AT = new Date().toISOString();
@@ -240,13 +240,14 @@ export function createSettings({ storage, shell, chat, router, toast, memory, da
 
 
   async function exportHtml() {
-    toast('正在整理离线海岸 ZIP…', 3000);
-    const data = await requestJson(API.fullArchive);
-    const archive = { ...(data.archive || {}), local_device: localArchiveState(storage, chat) };
+    toast('正在采集已验证的 V2 资料…', 3000);
     const signature = preferences().ownerSignature || preferences().ownerName || '屋主';
-    const result = buildOfflineArchive(archive, auditFullArchiveCompleteness(archive), signature);
-    downloadFile(result.blob, `elementera-coast-offline-${timestampLabel()}.zip`, 'application/zip');
-    toast('离线海岸已导出 · 原件 '+result.mediaCount+' 个'+(result.warnings.length?' · 有缺失，请查看 manifest.json':' · 解压后打开 index.html'), 6500);
+    const prefs=preferences();
+    const safeRunKeys=['recentTurns','contextBudget','outputLength','maxOutputTokens','creativity','streamingEnabled','soilBudget','seedCooldownTurns','worldbookEnabled','worldbookLimit','memoryLimit'];
+    const run_control=Object.fromEntries(Object.entries(storage.read().runControl||{}).filter(([key,value])=>safeRunKeys.includes(key)&&['string','number','boolean'].includes(typeof value)));
+    const device={exported_from:'pwa',current_app_version:currentAppVersion(),signature,theme:prefs.theme,userBubble:prefs.userBubble,accent:prefs.accent,run_control};
+    const result=await saveOfflineV2({applicationId:'com.elementeracoast.source',filename:`elementera-coast-offline-${timestampLabel()}.zip`,ownerLabel:signature,device});
+    toast('离线海岸已导出 · 原件 '+result.mediaCount+' 个'+(result.warnings.length?' · 有缺失，请查看 manifest.json':' · 解压后打开 index.html'),6500);
   }
 
   function importJson() {

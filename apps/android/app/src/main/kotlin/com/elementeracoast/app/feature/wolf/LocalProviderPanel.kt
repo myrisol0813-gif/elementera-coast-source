@@ -62,6 +62,8 @@ internal fun LocalProviderPanel(current: String, onRefresh: () -> Unit) {
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        LocalIndependentWebPanel()
+        LocalVoicePanel()
         Text("本机 API 供应商", style = MaterialTheme.typography.titleMedium)
         Text("支持 HTTPS OpenAI 兼容 Chat Completions。Key 加密留在本机，聊天只发送给选中的模型服务。当前仅支持近期文字上下文；记忆、工具、附件与自动整理待接入。",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -162,4 +164,77 @@ internal fun LocalProviderPanel(current: String, onRefresh: () -> Unit) {
         confirmButton = { TextButton(onClick = { remove = null; run("移除供应商") { withContext(Dispatchers.IO) { store.remove(p.id) }; reload(); "已移除。" } }) { Text("移除") } },
         dismissButton = { TextButton(onClick = { remove = null }) { Text("取消") } }
     ) }
+}
+
+
+@Composable
+private fun LocalIndependentWebPanel(){
+    val context=LocalContext.current.applicationContext
+    val store=remember(context){LocalProviderStore(context,searchOnly=true)}
+    val scope=rememberCoroutineScope()
+    var configured by remember{mutableStateOf(false)}
+    var key by remember{mutableStateOf("")}
+    var status by remember{mutableStateOf("")}
+    var busy by remember{mutableStateOf(false)}
+    LaunchedEffect(store){configured=withContext(Dispatchers.IO){runCatching{store.load().any{it.id=="tavily"}}.getOrDefault(false)}}
+    Surface(shape=RoundedCornerShape(18.dp),color=MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.6f)){
+        Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
+            Text("独立联网 · Tavily",style=MaterialTheme.typography.titleSmall)
+            Text(if(configured)"Key 已保存 · 窗口开启模型工具后可使用" else "尚未配置 · 不开放联网工具",style=MaterialTheme.typography.bodySmall)
+            Text("仅发送检索词或公开网址。使用你的供应商额度，Key 不进入归档。",style=MaterialTheme.typography.bodySmall)
+            OutlinedTextField(key,{key=it},label={Text("Tavily API Key")},singleLine=true,visualTransformation=PasswordVisualTransformation())
+            Row{
+                TextButton(enabled=!busy&&key.isNotBlank(),onClick={
+                    busy=true;val submitted=key.trim();key=""
+                    scope.launch{
+                        try{withContext(Dispatchers.IO){store.upsert(LocalProviderConfig("tavily","Tavily","https://api.tavily.com",submitted))};configured=true;status="已加密保存，尚未真实测试。"}
+                        catch(e:CancellationException){throw e}catch(_:Exception){status="保存失败，请检查凭据存储。"}finally{busy=false}
+                    }
+                }){Text("保存并启用")}
+                TextButton(enabled=!busy&&configured,onClick={
+                    busy=true;scope.launch{try{withContext(Dispatchers.IO){store.remove("tavily")};configured=false;status="已停用并移除凭据。"}catch(e:CancellationException){throw e}catch(_:Exception){status="移除失败。"}finally{busy=false}}
+                }){Text("停用")}
+            }
+            if(status.isNotBlank())Text(status,style=MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+
+@Composable
+private fun LocalVoicePanel(){
+    val context=LocalContext.current.applicationContext
+    val store=remember(context){LocalProviderStore(context,voiceOnly=true)}
+    val scope=rememberCoroutineScope()
+    var configured by remember{mutableStateOf(false)}
+    var key by remember{mutableStateOf("")}
+    var voiceId by remember{mutableStateOf("")}
+    var status by remember{mutableStateOf("")}
+    var busy by remember{mutableStateOf(false)}
+    LaunchedEffect(store){
+        val saved=withContext(Dispatchers.IO){runCatching{store.load().firstOrNull{it.id=="elevenlabs"}}.getOrNull()}
+        configured=saved!=null;voiceId=saved?.models?.singleOrNull().orEmpty()
+    }
+    Surface(shape=RoundedCornerShape(18.dp),color=MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.6f)){
+        Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
+            Text("独立语音 · ElevenLabs",style=MaterialTheme.typography.titleSmall)
+            Text(if(configured)"已配置 · 可选段生成；窗口开启模型写入后允许模型主动生成" else "尚未配置",style=MaterialTheme.typography.bodySmall)
+            Text("使用你的声音ID与额度。只发送待朗读文字；凭据不进入归档。",style=MaterialTheme.typography.bodySmall)
+            OutlinedTextField(voiceId,{voiceId=it},label={Text("Voice ID")},singleLine=true)
+            OutlinedTextField(key,{key=it},label={Text("API Key（已配置可留空）")},singleLine=true,visualTransformation=PasswordVisualTransformation())
+            Row{
+                TextButton(enabled=!busy&&LocalVoiceProvider.VOICE_ID.matches(voiceId.trim())&&(configured||key.isNotBlank()),onClick={
+                    busy=true;val entered=key.trim();val id=voiceId.trim();key=""
+                    scope.launch{
+                        try{withContext(Dispatchers.IO){val previous=store.load().firstOrNull{it.id=="elevenlabs"};val secret=entered.ifBlank{previous?.apiKey.orEmpty()};store.upsert(LocalProviderConfig("elevenlabs","ElevenLabs","https://api.elevenlabs.io",secret,listOf(id)))};configured=true;status="配置已加密保存；未发起收费测试。"}
+                        catch(e:CancellationException){throw e}catch(_:Exception){status="配置保存失败。"}finally{busy=false}
+                    }
+                }){Text("保存并启用")}
+                TextButton(enabled=!busy&&configured,onClick={
+                    busy=true;scope.launch{try{withContext(Dispatchers.IO){store.remove("elevenlabs")};configured=false;voiceId="";status="已停用；历史音频保留。"}catch(e:CancellationException){throw e}catch(_:Exception){status="移除失败。"}finally{busy=false}}
+                }){Text("停用")}
+            }
+            if(status.isNotBlank())Text(status,style=MaterialTheme.typography.bodySmall)
+        }
+    }
 }
