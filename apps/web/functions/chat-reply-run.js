@@ -1,4 +1,4 @@
-import {ensureChatSchema,normalizeState,ChatStoreError} from './chat-store.js';
+import {ensureChatSchema,normalizeState,readConversationState,ChatStoreError} from './chat-store.js';
 
 // Internal durable ledger. No public route or provider call in this module.
 // An uncertain claimed request is never replayed, even after recovery.
@@ -151,4 +151,71 @@ export function protectReplyGroupHistory(old,next,{allowDelete=false}={}){
     }
   }
   return null;
+}
+
+// Canonical context before the target. The active old alternative of the
+// target turn is deliberately excluded; regeneration is a new group.
+export function canonicalReplyContext(state,identity,recentTurns=8){
+  branch(state,identity.turnId,identity.userVariantId);
+  const rounds=[];
+  for(const turn of state.turns){
+    const key=String(turn.user.active),user=turn.user.variants[turn.user.active];
+    const messages=[];
+    if(user&&!user.hidden&&(user.content.trim()||user.attachments?.length)){
+      const body=user.content||'请查看本轮附件。';
+      messages.push({role:'user',content:user.message_source==='official_mcp'?'[来源：官端 ChatGPT / official_mcp]\n'+body:body});
+    }
+    if(turn.id!==identity.turnId){
+      const list=turn.assistant.variantsByUserVariant[key]||[],active=list[turn.assistant.activeByUserVariant[key]];
+      const group=active?.reply_sequence?list.filter(v=>v.reply_sequence?.id===active.reply_sequence.id).sort((a,b)=>a.reply_sequence.index-b.reply_sequence.index):active?[active]:[];
+      if(group.some((v,i)=>v.reply_sequence&&v.reply_sequence.index!==i))fail('reply_group_history_changed','连续回复组不完整。');
+      for(const v of group)if(v.content.trim())messages.push({role:'assistant',content:v.content});
+    }
+    rounds.push(messages);
+    if(turn.id===identity.turnId)break;
+  }
+  const count=Number.isSafeInteger(recentTurns)&&recentTurns>0?recentTurns:8;
+  const messages=rounds.slice(-count).flat();
+  while(messages[0]?.role==='assistant')messages.shift();
+  if(messages.at(-1)?.role!=='user')fail('reply_run_branch_changed','原用户消息不可读取。');
+  return messages;
+}
+export async function isReplyRunActive(db,cid){
+  await ensureChatSchema(db);
+  return Boolean(await stmt(db,"SELECT sequence_id FROM chat_reply_runs WHERE conversation_id=? AND status='running'",cid).first());
+}
+
+/** A real run owns its entire lifecycle. Each invocation is separate and
+ * receives the canonical prior messages from its claimed reservation.
+ * No caller-provided assistant content, usage or continuation receipt.
+ * Event delivery is not the commit boundary; disconnect never replays. */
+export async function executeDurableReplyRun(db,identity,budget,{invoke,emit=()=>{},signal,newMessageId=()=>crypto.randomUUID()}={}){
+  if(signal?.aborted)return {status:'cancelled',saved:0};
+  if(!await acquireReplyRun(db,identity,budget))fail('reply_run_not_acquired','窗口未启用、额度不足或另一个回复组正在运行。');
+  let saved=0,status='completed',failure=null;
+  try{
+    const row=await rowFor(db,identity);
+    emit('reply_group_start',{sequence_id:identity.sequenceId,max_messages:row.max_messages});
+    for(let index=0;index<row.max_messages;index++){
+      if(signal?.aborted){status='cancelled';break;}
+      const messageId=newMessageId();
+      if(!await reserveReplyStep(db,identity,messageId,index)){status='permission_or_budget';break;}
+      if(signal?.aborted){status='cancelled';break;}
+      const claim=await claimReplyStep(db,identity,messageId);
+      if(!claim){status='reservation_lost';break;}
+      if(signal?.aborted){status='cancelled';break;}
+      emit('reply_begin',{message_id:messageId,index});
+      const state=await readConversationState(db,identity.conversationId);
+      const result=await invoke({identity,messageId,...claim,state,signal},chunk=>emit('reply_delta',{message_id:messageId,content:chunk}));
+      const committed=await commitReplyStep(db,identity,messageId,result.variant,result.receipt);
+      if(!committed)fail('reply_commit_unconfirmed','回复未确认写入；不会重放。');
+      saved++;
+      emit('reply_committed',{message_id:messageId,index,history:await readConversationState(db,identity.conversationId)});
+      if(signal?.aborted){status='cancelled';break;}
+      if(!committed.receipt.continue_requested)break;
+      if(!claim.mayContinue){status='limit_reached';break;}
+    }
+  }catch(error){status=signal?.aborted?'cancelled':'failed';failure=error;}
+  if(!await settleReplyRun(db,identity,status))fail('reply_settle_unconfirmed','整组状态未确认，请刷新窗口；不会重试。');
+  return {status,saved,...(failure?{error_type:String(failure.type||'reply_failed'),message:String(failure.message||'连续回复中断。').slice(0,1200)}:{})};
 }

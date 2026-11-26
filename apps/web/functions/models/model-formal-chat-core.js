@@ -2,7 +2,7 @@ import { OPENROUTER_CHAT_URL, OPENROUTER_REFERER } from './model-constants.js';
 import { normalizeToolCallLimit, DEFAULT_TOOL_CALL_LIMIT } from '../turn-tool-policy.js';
 import { openRouterKey } from './model-catalog.js';
 import { prepareFormalChat } from './model-payload.js';
-import { assertWireInputBudget } from '../context-budget.js';
+import { assertWireInputBudget, estimateWireInputTokens } from '../context-budget.js';
 import { SseParseError, parseSseEventBlock } from '../stream-format.js';
 import {
   ModelRequestError,
@@ -41,11 +41,12 @@ function providerRequest(env, payload, title, signal) {
   });
 }
 
-export async function requestOpenRouter(env, payload, title) {
+export async function requestOpenRouter(env, payload, title, signal) {
   let response;
   try {
-    response = await providerRequest(env, payload, title);
-  } catch {
+    response = await providerRequest(env, payload, title, signal);
+  } catch (error) {
+    if(error?.name==='AbortError')throw error;
     throw new ModelRequestError('provider_unavailable', '上游模型暂时不可用。', 502, { model: payload.model });
   }
   if (!response.ok) {
@@ -282,6 +283,13 @@ function sequenceControl(config, input){
       return next;
     },
     beforeRequest,observe,
+    boundPayload(payload){
+      const estimate=estimateWireInputTokens(payload);
+      const available=config.tokenBudget-tokens-estimate;
+      if(available<1)throw new ModelRequestError('reply_sequence_budget_exhausted','预计完整输入已耗尽连续回复预算；未发送给模型。',409);
+      const limit=Math.min(available,Number(payload.max_completion_tokens??payload.max_tokens??8000));
+      return {...payload,max_completion_tokens:limit,...('max_tokens' in payload?{max_tokens:limit}:{})};
+    },
     async execute(call,executor){
       if(call.function.name==='continue_reply'){
         if(!allowed||attempted)return {ok:false,error:{type:'continuation_unavailable'}};
@@ -373,6 +381,7 @@ export async function performFormalChatWithTools(env, input = {}, {
   takePrivateContinuation = () => [],
   hasGeneratedImage = () => false,
   replySequence = null,
+  signal,
 } = {}) {
   const sequence=sequenceControl(replySequence,input);
   const prepared = await prepareFormalChat(env, sequence?.input || input, allowSystem);
@@ -388,9 +397,10 @@ export async function performFormalChatWithTools(env, input = {}, {
     const finalOnly = sequence ? rounds++ >= sequence.rounds : rounds++ >= toolLimit || allToolResults.length >= toolLimit;
     sequence?.beforeRequest();
     const base={...prepared.payload,messages};
-    const payload = finalToolPayload(sequence?sequence.payload(base):base, finalOnly);
+    const candidate = finalToolPayload(sequence?sequence.payload(base):base, finalOnly);
+    const payload=sequence?sequence.boundPayload(candidate):candidate;
     assertWireInputBudget(payload, undefined, providerCalls.length > 0);
-    const upstream = await requestOpenRouter(env, payload, 'Elementera Coast Formal Chat');
+    const upstream = await requestOpenRouter(env, payload, 'Elementera Coast Formal Chat',signal);
     providerCalls.push(upstream);
     webSearch.observe(upstream);
     usage = addUsage(usage, upstream?.usage);
@@ -495,7 +505,8 @@ export async function* performFormalChatStream(env, input = {}, {
       const finalOnly = sequence ? rounds++ >= sequence.rounds : rounds++ >= toolLimit || completedToolCalls >= toolLimit;
       sequence?.beforeRequest();
       const base={...prepared.payload,messages,stream:true,stream_options:{include_usage:true}};
-      const payload=finalToolPayload(sequence?sequence.payload(base):base,finalOnly);
+      const candidate=finalToolPayload(sequence?sequence.payload(base):base,finalOnly);
+      const payload=sequence?sequence.boundPayload(candidate):candidate;
       assertWireInputBudget(payload, undefined, completedToolCalls > 0);
       const response = await requestOpenRouterStream(env, payload, 'Elementera Coast Formal Chat', signal);
       let finishReason = null;

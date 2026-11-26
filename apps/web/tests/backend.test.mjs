@@ -455,7 +455,7 @@ globalThis.fetch=async(_url,options={})=>{
     : {finish_reason:'stop',message:{content:'完成第一条'}}]}),{status:200,headers:{'Content-Type':'application/json'}});
 };
 const seqResult=await performFormalChatWithTools(modelEnv,{model:'openai/gpt-4.1-nano',messages:[{role:'user',content:'hello'}],tools:testTools},{
-  replySequence:{mayContinue:true,toolBudget:0,tokenBudget:100},executeTool:async()=>{ordinaryCalls++;return {ok:true};}
+  replySequence:{mayContinue:true,toolBudget:0,tokenBudget:1000},executeTool:async()=>{ordinaryCalls++;return {ok:true};}
 });
 assert.deepEqual(seqResult.reply_sequence_receipt,{continue_requested:true,tool_calls:0,total_tokens:24,provider_requests:2});
 assert.equal(seqResult.message.content,'完成第一条');
@@ -465,7 +465,7 @@ assert.equal(sequencePayloads[1].tools,undefined);
 assert.equal(sequencePayloads[1].messages.at(-1).role,'tool');
 assert.equal(sequencePayloads[1].messages.filter(m=>m.role==='user').length,1);
 globalThis.fetch=async()=>new Response(JSON.stringify({model:'openai/gpt-4.1-nano',choices:[{finish_reason:'stop',message:{content:'无回执'}}]}),{status:200});
-const missing=await performFormalChatWithTools(modelEnv,{model:'openai/gpt-4.1-nano',messages:[{role:'user',content:'hello'}]},{replySequence:{mayContinue:true,toolBudget:0,tokenBudget:100}});
+const missing=await performFormalChatWithTools(modelEnv,{model:'openai/gpt-4.1-nano',messages:[{role:'user',content:'hello'}]},{replySequence:{mayContinue:true,toolBudget:0,tokenBudget:1000}});
 assert.equal(missing.reply_sequence_receipt.total_tokens,null);
 assert.equal(missing.reply_sequence_receipt.continue_requested,false);
 globalThis.fetch = originalFetch;

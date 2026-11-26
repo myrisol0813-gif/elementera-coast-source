@@ -129,3 +129,21 @@ assert.equal(await recoverStaleReplyRuns(db,Date.now()+31*60*1000),1);
 assert.equal(await claimReplyStep(db,interrupted,'uncertain'),null);
 assert.equal(await acquireReplyRun(db,interrupted,quota),false);
 assert.equal(await commitReplyStep(db,interrupted,'uncertain',{id:'uncertain',content:'late',finish_reason:'stop'},{tool_calls:0,total_tokens:1}),null);
+
+const {executeDurableReplyRun,canonicalReplyContext}=await import('../functions/chat-reply-run.js');
+const third={...ident,sequenceId:'real-runner'};
+const invoked=[],events=[];
+const runResult=await executeDurableReplyRun(db,third,{maxMessages:3,toolBudget:8,tokenBudget:1000},{
+  newMessageId:()=> 'runner-'+(invoked.length+1),
+  emit:(event,data)=>events.push([event,data]),
+  async invoke(step,delta){
+    assert.deepEqual(canonicalReplyContext(step.state,third,8),[{role:'user',content:'hello'}]);
+    invoked.push(step.previous.map(v=>v.content));
+    delta('partial');
+    return {variant:{id:step.messageId,content:'runner text '+step.index,finish_reason:'stop'},receipt:{tool_calls:0,total_tokens:10,continue_requested:step.index===0}};
+  }
+});
+assert.deepEqual(runResult,{status:'completed',saved:2});
+assert.deepEqual(invoked,[[],['runner text 0']]);
+assert.deepEqual(events.map(e=>e[0]),['reply_group_start','reply_begin','reply_delta','reply_committed','reply_begin','reply_delta','reply_committed']);
+assert.deepEqual(events.filter(e=>e[0]==='reply_committed').map(e=>e[1].history.turns[0].assistant.variantsByUserVariant['0'].filter(v=>v.reply_sequence?.id===third.sequenceId).length),[1,2]);
