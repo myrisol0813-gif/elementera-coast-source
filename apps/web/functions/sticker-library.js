@@ -1,5 +1,5 @@
 import {ensureChatAttachmentSchema,getChatAttachmentRecord,MAX_ATTACHMENT_BYTES} from './chat-attachments.js';
-import {readConversationState} from './chat-store.js';
+import {readConversationState,normalizeState} from './chat-store.js';
 import {attachmentOrigin} from './attachment-origin.js';
 import {prepareGeneratedImageReadback} from './independent-image.js';
 
@@ -100,4 +100,64 @@ export async function resolveStickerOriginal(db,id,{allowSend=false}={}){
   if(!entry)fail('sticker_unavailable','素材已停用或不存在。',404);
   const {row,bytes}=await verifiedOriginal(db,entry.conversation_id,entry.attachment_id);
   return {id:entry.id,description:entry.description,name:row.name,mime:row.mime,bytes};
+}
+
+/** Atomically copy a verified original into the exact reserved assistant reply.
+ * This internal operation is not an upload endpoint or a provider request.
+ * The caller must supply trusted current-window permission and reserve the reply.
+ * Repeated selection of the same sticker on that reply returns its original receipt. */
+export async function deliverSticker(db,input,{allowSend=false}={}){
+  if(allowSend!==true)fail('sticker_send_denied','当前窗口未允许发送表情包。',403);
+  const cid=identifier(input.conversation_id),tid=identifier(input.turn_id),uid=identifier(input.user_variant_id);
+  const mid=identifier(input.message_id),sid=identifier(input.sticker_id);
+  const original=await resolveStickerOriginal(db,sid,{allowSend});
+  const snap=await query(db,`SELECT s.state_json FROM conversation_states s JOIN conversations c ON c.id=s.conversation_id
+    WHERE s.conversation_id=? AND c.user_id='owner' AND c.deleted_at IS NULL AND c.conversation_kind='chat'
+    AND c.room_type IN ('main','radio')`,[cid]).first();
+  if(!snap)fail('sticker_target_unavailable','找不到当前回复。',404);
+  const state=normalizeState(JSON.parse(snap.state_json)),turn=state.turns.find(t=>t.id===tid);
+  const index=turn?.user?.variants?.findIndex(v=>v.id===uid)??-1;
+  const target=index<0?null:turn.assistant.variantsByUserVariant[String(index)]?.find(v=>v.id===mid);
+  if(!target||target.hidden||turn.user.active!==index||
+    !['sticker_tool_ready','sticker_saved'].includes(target.finish_reason))
+    fail('sticker_reservation_lost','原回复版本不再等待表情包。',409);
+  const attachments=target.attachments||[];
+  const existing=attachments.find(a=>a.sticker_delivery?.sticker_id===sid&&a.sticker_delivery?.message_id===mid);
+  if(existing){
+    const saved=await getChatAttachmentRecord(db,cid,existing.id);
+    if(saved.turn_id!==tid)fail('sticker_target_unavailable','已发送素材的来源不一致。',409);
+    return {status:'saved',attachment:existing,reused:true};
+  }
+  if(attachments.length>=12)fail('sticker_attachment_limit','当前回复附件已满。',409);
+  const stamp=Date.now(),id='att_'+crypto.randomUUID(),created=new Date(stamp).toISOString();
+  const attachment={id,type:'image',name:original.name,mime:original.mime,size:original.bytes.length,
+    storage_key:'chat-attachment:'+id,created_at:created,sticker_delivery:{message_id:mid,sticker_id:sid}};
+  target.attachments=[...attachments,attachment];target.finish_reason='sticker_saved';delete target.errorDetail;
+  state.updated_at=created;
+  const encoded=JSON.stringify(normalizeState(state));
+  // Every statement shares the same compare-and-swap guard and current
+  // catalogue permission check. Failed/concurrent saves cannot leave partial
+  // chunks or replace an unrelated reply. The original source remains intact.
+  const guard=`EXISTS (SELECT 1 FROM conversation_states s JOIN conversations c ON c.id=s.conversation_id
+    WHERE s.conversation_id=? AND s.state_json=? AND c.deleted_at IS NULL AND c.user_id='owner')
+    AND EXISTS (SELECT 1 FROM coast_sticker_library x JOIN chat_attachments a
+      ON a.id=x.attachment_id AND a.conversation_id=x.conversation_id JOIN conversations c ON c.id=a.conversation_id
+      WHERE x.id=? AND x.enabled=1 AND c.deleted_at IS NULL AND c.user_id='owner')`;
+  const args=[cid,snap.state_json,sid];
+  const stmts=[query(db,'INSERT INTO chat_attachments (id,conversation_id,turn_id,kind,name,mime,size,data,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,?,? WHERE '+guard,
+    [id,cid,tid,'image',original.name,original.mime,original.bytes.length,new Uint8Array(),stamp,stamp,...args])];
+  const chunkSize=1500000;
+  for(let i=0;i<original.bytes.length;i+=chunkSize)stmts.push(query(db,
+    'INSERT INTO chat_attachment_chunks (attachment_id,chunk_index,data) SELECT ?,?,? WHERE '+guard,
+    [id,Math.floor(i/chunkSize),original.bytes.slice(i,i+chunkSize),...args]));
+  stmts.push(query(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND '+guard,
+    [encoded,stamp,cid,...args]));
+  stmts.push(query(db,'UPDATE conversations SET updated_at=? WHERE id=? AND deleted_at IS NULL AND EXISTS (SELECT 1 FROM conversation_states WHERE conversation_id=? AND state_json=?)',
+    [stamp,cid,cid,encoded]));
+  const results=await db.batch(stmts);
+  if(results.at(-2)?.meta?.changes!==1)fail('sticker_state_changed','回复或素材权限发生变化，未覆盖记录。',409);
+  const saved=await getChatAttachmentRecord(db,cid,id),data=new Uint8Array(saved.data);
+  if(saved.turn_id!==tid||data.length!==original.bytes.length||data.some((x,i)=>x!==original.bytes[i]))
+    fail('sticker_original_mismatch','已发送原件读回校验失败。',500);
+  return {status:'saved',attachment,reused:false};
 }

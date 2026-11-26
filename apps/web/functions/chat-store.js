@@ -97,7 +97,10 @@ function normalizeAttachments(value, assistantId) {
     const createdAt = typeof item?.created_at === 'string' ? item.created_at : new Date().toISOString();
     if (!item?.id || !name || !storageKey) return null;
     const imageGeneration=type==='image'?normalizeImageGeneration(item.image_generation,assistantId):null;
-    return { id, type, name, mime, size, storage_key: storageKey, created_at: createdAt, ...(imageGeneration?{image_generation:imageGeneration}:{}) };
+    const sticker=item?.sticker_delivery;
+    const stickerDelivery=type==='image'&&assistantId&&sticker?.message_id===assistantId&&typeof sticker.sticker_id==='string'&&/^sticker_[A-Za-z0-9_.:-]{1,152}$/.test(sticker.sticker_id)
+      ?{message_id:assistantId,sticker_id:sticker.sticker_id}:null;
+    return { id, type, name, mime, size, storage_key: storageKey, created_at: createdAt, ...(imageGeneration?{image_generation:imageGeneration}:{}), ...(stickerDelivery?{sticker_delivery:stickerDelivery}:{}) };
   }).filter(Boolean);
 }
 
