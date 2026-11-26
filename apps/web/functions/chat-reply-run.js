@@ -48,8 +48,11 @@ export async function acquireReplyRun(db,identity,budget){
   if(!int(budget.maxMessages,1,20)||!int(budget.toolBudget,0,128)||!int(budget.tokenBudget,1,1000000))
     fail('reply_run_invalid_budget','连续回复预算无效。');
   const cfg=state.context_settings;
-  const max=Math.min(cfg.reply_sequence_max_messages??budget.maxMessages,20-list.length);
-  const tools=cfg.reply_sequence_tool_budget??budget.toolBudget,tokens=cfg.reply_sequence_token_budget??budget.tokenBudget;
+  // The caller already resolved the window override against its device
+  // defaults. A stale window must never enlarge that submitted allowance.
+  const max=Math.min(budget.maxMessages,cfg.reply_sequence_max_messages??budget.maxMessages,20-list.length);
+  const tools=Math.min(budget.toolBudget,cfg.reply_sequence_tool_budget??budget.toolBudget);
+  const tokens=Math.min(budget.tokenBudget,cfg.reply_sequence_token_budget??budget.tokenBudget);
   if(max<1||list.some(v=>v.reply_sequence?.id===identity.sequenceId||['image_pending','image_tool_ready','sticker_tool_ready','image_saved','sticker_saved'].includes(v.finish_reason)))return false;
   return changes(await stmt(db,`INSERT OR IGNORE INTO chat_reply_runs(sequence_id,conversation_id,turn_id,user_variant_id,status,max_messages,tool_budget,token_budget,updated_at)
     SELECT ?,?,?,?,'running',?,?,?,? WHERE EXISTS(SELECT 1 FROM conversation_states s JOIN conversations c ON c.id=s.conversation_id WHERE s.conversation_id=? AND s.state_json=? AND c.deleted_at IS NULL)`,

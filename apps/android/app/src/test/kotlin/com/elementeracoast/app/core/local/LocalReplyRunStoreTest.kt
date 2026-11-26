@@ -70,4 +70,17 @@ class LocalReplyRunStoreTest {
         assertFalse(ledger.claimSoil("cid","seq"))
     }
 
+    @Test fun storedWindowBudgetCannotIncreaseSubmittedAllowance(){
+        val store=MemoryLocalPersistence();val cache=RemoteCacheStore(store)
+        cache.putConversations(listOf(RemoteConversation("cid","test","main")))
+        val base=ChatSyncMapper.appendUser(RemoteHistory(conversationId="cid",contextSettings=ConversationContextSettings(replySequenceEnabled=true,replySequenceMaxMessages=8,replySequenceToolBudget=24,replySequenceTokenBudget=48000)),"question")
+        cache.putHistory("cid",base.history)
+        val req=RemoteReplyRunRequest("cid",base.turnId,base.history.turns.single().user.variants.single().id,"seq","model",RemoteReplyRunBudget(1,0,2000),"2026-11-26","2026-11-26 12:00",JsonObject(emptyMap()))
+        val ledger=LocalReplyRunStore(store)
+        assertTrue(ledger.acquire(req));assertEquals(1,ledger.maxMessages("cid","seq"))
+        assertTrue(ledger.reserve("cid","seq","a0",0))
+        val c=ledger.claim("cid","seq","a0")!!
+        assertFalse(c.mayContinue);assertEquals(0,c.tools);assertEquals(2000,c.tokens)
+    }
+
 }

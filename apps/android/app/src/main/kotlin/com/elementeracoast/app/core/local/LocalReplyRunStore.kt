@@ -62,10 +62,11 @@ internal class LocalReplyRunStore(private val store:LocalPersistence){
         if(c.conversations().none{it.id==cid&&it.deletedAt==null&&it.roomType in setOf("main","radio")}||!h.contextSettings.replySequenceEnabled)return@readConsistent false
         val (_,list)=branch(h,request.turnId,request.userVariantId)
         val cfg=h.contextSettings.normalized()
-        val max=minOf(cfg.replySequenceMaxMessages?:request.budget.maxMessages,20-list.size)
+        val max=minOf(request.budget.maxMessages,cfg.replySequenceMaxMessages?:request.budget.maxMessages,20-list.size)
         if(max<1||list.any{it.replySequence?.id==seq||it.finishReason in setOf("image_pending","image_tool_ready","sticker_tool_ready","image_saved","sticker_saved")})return@readConsistent false
         val row=Row(seq,request.turnId,request.userVariantId,"running",max,
-            cfg.replySequenceToolBudget?:request.budget.toolBudget,cfg.replySequenceTokenBudget?:request.budget.tokenBudget,hash(h),System.currentTimeMillis())
+            minOf(request.budget.toolBudget,cfg.replySequenceToolBudget?:request.budget.toolBudget),
+            minOf(request.budget.tokenBudget,cfg.replySequenceTokenBudget?:request.budget.tokenBudget),hash(h),System.currentTimeMillis())
         s.atomic{staged->put(staged,cid,row);staged.put(activeKey(cid),seq)}
         true
     }

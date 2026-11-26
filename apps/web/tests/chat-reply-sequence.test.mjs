@@ -246,3 +246,14 @@ try{
   assert.deepEqual(new Uint8Array((await getChatAttachmentRecord(routeDb,mediaCv.id,group[0].attachments[0].id)).data),png);
   assert.equal(group[1].desk_slip.reply_sequence_previous[0].media_receipt.not_delivered[0].reason,'model_no_vision');
 }finally{globalThis.fetch=routeFetch;}
+
+{
+  const cv=await createConversation(routeDb,'stale device budget','main');
+  const ident={conversationId:cv.id,turnId:'limit-turn',userVariantId:'limit-user',sequenceId:'limit-group'};
+  await writeConversationState(routeDb,cv.id,{context_settings:{reply_sequence_enabled:true,reply_sequence_max_messages:8,reply_sequence_tool_budget:24,reply_sequence_token_budget:48000},turns:[{id:ident.turnId,user:{variants:[{id:ident.userVariantId,content:'hello'}]}}]});
+  assert.equal(await acquireReplyRun(routeDb,ident,{maxMessages:1,toolBudget:0,tokenBudget:2000}),true);
+  assert.equal(await reserveReplyStep(routeDb,ident,'limit-message',0),true);
+  const claim=await claimReplyStep(routeDb,ident,'limit-message');
+  assert.equal(claim.mayContinue,false);assert.equal(claim.toolBudget,0);assert.equal(claim.tokenBudget,2000);
+  assert.equal(await settleReplyRun(routeDb,ident,'cancelled'),true);
+}

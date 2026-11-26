@@ -285,7 +285,12 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                         put("function",buildJsonObject{put("name",part.name.toString());put("arguments",part.arguments.toString())})
                     }}
                     history.add(buildJsonObject{put("role","assistant");put("content",if(roundText.isEmpty())JsonNull else JsonPrimitive(roundText.toString()));put("tool_calls",JsonArray(calls))})
+                    val exposedNames=exposed.orEmpty().mapNotNull{(it as? JsonObject)?.get("function")?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNull}.toSet()
                     for(part in pending.values){
+                        if(sequence!=null&&part.name.toString() !in exposedNames){
+                            history.add(buildJsonObject{put("role","tool");put("tool_call_id",part.id.toString());put("content","""{"ok":false,"reason":"tool_not_exposed"}""")})
+                            continue
+                        }
                         if(sequence!=null&&part.name.toString()=="continue_reply"){
                             val valid=!controlSeen&&sequence.mayContinue&&runCatching{json.parseToJsonElement(part.arguments.toString()).jsonObject.isEmpty()}.getOrDefault(false)
                             controlSeen=true
