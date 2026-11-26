@@ -40,6 +40,7 @@ const CORE = Object.freeze([
   '/public/features/chat/chat-furniture.js',
   '/public/features/chat/chat-conversations.js',
   '/public/features/chat/chat-generation.js',
+  '/public/features/chat/chat-manual-image.js',
   '/public/features/chat/chat-local-time.js',
   '/public/features/chat/chat-title-landing.js',
   '/public/features/chat/chat-model-metadata.js',

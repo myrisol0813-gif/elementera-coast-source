@@ -90,7 +90,6 @@ export function createChatGeneration({
     if (render) renderMessages(conversationId);
     return latest;
   }
-
   async function generate(conversationId, turnId, { dogtalkSubmission = null, crossWindowSubmission = null } = {}) {
     if (runtime.generation || runtime.finalizing || runtime.deletedIds.has(conversationId)) return;
     const targetConversation = runtime.conversations.find((item) => item.id === conversationId);
@@ -103,7 +102,6 @@ export function createChatGeneration({
     runtime.generation = { conversationId, turnId, userIndex: appended.userIndex, assistantIndex: appended.assistantIndex, controller };
     renderMessages(conversationId);
     composerState();
-
     const requestContext = chatRequestContext(conversationId);
     const streamingEnabled = requestContext.settings.streamingEnabled === true;
     if (!streamingEnabled) saveHistory(conversationId, appended.state).catch(() => undefined);
@@ -192,7 +190,6 @@ export function createChatGeneration({
       };
       finishReason = patch.finish_reason;
     }
-
     if (runtime.deletedIds.has(conversationId)) {
       if (runtime.generation?.controller === controller) runtime.generation = null;
       composerState();
