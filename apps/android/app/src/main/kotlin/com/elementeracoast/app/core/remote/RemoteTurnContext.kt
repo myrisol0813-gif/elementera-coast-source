@@ -90,7 +90,7 @@ data class RemoteDeskCurrentMessage(
 )
 
 @Serializable
-data class RemoteDeskSequenceMessage(@SerialName("message_id") val messageId:String,val content:String)
+data class RemoteDeskSequenceMessage(@SerialName("message_id") val messageId:String,val content:String,@SerialName("media_receipt") val mediaReceipt:RemoteDeskAttachments?=null)
 
 @Serializable
 data class RemoteDeskRecentContext(

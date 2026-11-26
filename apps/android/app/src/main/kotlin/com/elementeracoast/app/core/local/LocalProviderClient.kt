@@ -179,8 +179,8 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
     fun stream(p: LocalProviderConfig, model: String, messages: List<RemoteChatMessage>, maxTokens: Int,imageParts:List<JsonObject> = emptyList(),temperature:Double?=null): Flow<LocalProviderEvent> =
         streamWithTools(p,model,messages,maxTokens,imageParts,null,temperature)
 
-    internal fun streamWithTools(p:LocalProviderConfig, model:String, messages:List<RemoteChatMessage>,maxTokens:Int,imageParts:List<JsonObject>,session:LocalToolSession?,temperature:Double?=null,sequence:LocalSequenceControl?=null):Flow<LocalProviderEvent> = callbackFlow {
-        val history=localMultimodalMessages(messages,imageParts).toMutableList()
+    internal fun streamWithTools(p:LocalProviderConfig, model:String, messages:List<RemoteChatMessage>,maxTokens:Int,imageParts:List<JsonObject>,session:LocalToolSession?,temperature:Double?=null,sequence:LocalSequenceControl?=null,priorGroupMessages:List<JsonObject> = emptyList()):Flow<LocalProviderEvent> = callbackFlow {
+        val history=(localMultimodalMessages(messages,imageParts)+priorGroupMessages).toMutableList()
         val echo=LocalProviderEcho(p,model,maxTokens)
         val active=java.util.concurrent.atomic.AtomicReference<okhttp3.Call?>()
         val reader=launch(Dispatchers.IO) {
@@ -207,7 +207,8 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                             val obj=m.jsonObject;val content=obj["content"]
                             if(content is JsonArray)JsonObject(obj+("content" to JsonArray(content.filterNot{it is JsonObject&&it["type"]?.jsonPrimitive?.contentOrNull=="image_url"})))else obj
                         }
-                        val estimate=LocalContextPolicy.estimate(JsonArray(withoutImages).toString())+imageParts.size*2048+
+                        val imageCount=history.sumOf{m->(m.jsonObject["content"] as? JsonArray)?.count{it is JsonObject&&it["type"]?.jsonPrimitive?.contentOrNull=="image_url"}?:0}
+                        val estimate=LocalContextPolicy.estimate(JsonArray(withoutImages).toString())+imageCount*2048+
                             LocalContextPolicy.estimate(exposed.toString())
                         if(sequence.wireLimit?.let{estimate>it}==true)throw CoastApiException(CoastApiErrorKind.Model,"reply_sequence_context_limit","本组前序回复使完整输入超过模型目录估算容量；未再次请求。")
                         val left=sequence.tokenBudget.toLong()-used-estimate

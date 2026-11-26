@@ -1294,9 +1294,7 @@ class CoastShellViewModel(
         }
         val window=initial.contextSettings
         val imageModel=_state.value.currentImageModel
-        if(localMode&&(window.stickerSendEnabled||window.stickerAddEnabled||imageModel.isNotBlank())){
-            showPlaceholder("本机连续回复媒体工具尚未接通；未发起模型请求。");return
-        }
+ 
         val source=initial.turns.firstOrNull{it.id==tid}?:return
         val user=source.user.variants.getOrNull(source.user.active)?:return
         val global=local.wolf.state.value.basic

@@ -47,7 +47,7 @@ internal class LocalDirectChatRepository(
             val cache=com.elementeracoast.app.core.remote.RemoteCacheStore(store,strictReads=true)
             val h=cache.history(cid)?:error("原窗口不存在")
             val cfg=h.contextSettings
-            require(!cfg.stickerAddEnabled&&!cfg.stickerSendEnabled&&cache.profile()?.currentImageModel.isNullOrBlank()){"本机连续回复媒体工具尚未接通。"}
+            if(request.imageToolEnabled)require(cache.profile()?.currentImageModel==request.imageModelId){"生图模型选择已变化。"}
             h
         }}catch(e:CancellationException){throw e}catch(e:Exception){
             throw CoastApiException(CoastApiErrorKind.Request,"local_reply_preflight",e.message.orEmpty().take(240).ifBlank{"连续回复准备失败。"})
@@ -73,14 +73,49 @@ internal class LocalDirectChatRepository(
                     knowledge.context(ChatSyncMapper.contextMessages(claim.history,tid,recent),policy.comfort,knowledge.surfaceFor(cid),cid,attachmentIds,tid,request.crossWindow,request.realityContext?:RemoteRealityContext(),policy,groupDogtalk=if(index==0)null else deliveredDogtalk)
                 }
                 if(index==0)deliveredDogtalk=prepared.receipt.dogtalk.context.takeIf{prepared.receipt.dogtalk.delivered}.orEmpty()
-                val messages=prepared.messages+claim.previous.map{RemoteChatMessage("assistant",it.content)}
-                val session=if(claim.tools>0)withContext(Dispatchers.IO){knowledge.toolSession(cid,tid,request.crossWindow,prepared.receipt,request.model,policy.wireLimit,messageId=null)}else null
+                val previous=withContext(Dispatchers.IO){
+                    val wire=mutableListOf<JsonObject>()
+                    val receipts=mutableListOf<com.elementeracoast.app.core.remote.RemoteDeskSequenceMessage>()
+                    val originals=LocalAttachmentStore(store)
+                    for(v in claim.previous){
+                        if(v.content.isNotBlank())wire.add(buildJsonObject{put("role","assistant");put("content",v.content)})
+                        val refs=v.attachments.filter{it.imageGeneration?.messageId==v.id||it.stickerDelivery?.messageId==v.id}
+                        val delivered=mutableListOf<com.elementeracoast.app.core.remote.RemoteDeskAttachmentItem>()
+                        val withheld=mutableListOf<com.elementeracoast.app.core.remote.RemoteDeskAttachmentItem>()
+                        val parts=mutableListOf<JsonObject>()
+                        for(a in refs){
+                            val row=originals.entries().singleOrNull{it.metadata["id"]?.jsonPrimitive?.content==a.id&&it.metadata["conversation_id"]?.jsonPrimitive?.content==cid}
+                            val read=row?.let{prepareGeneratedImageReadback(a.id,originals.bytes(it),a.mime,policy.vision)}
+                            if(read?.continuationMessage!=null){
+                                parts.addAll(read.continuationMessage.getValue("content").jsonArray.map{it.jsonObject}.filter{it["type"]?.jsonPrimitive?.content=="image_url"})
+                                delivered.add(com.elementeracoast.app.core.remote.RemoteDeskAttachmentItem(id=a.id,name=a.name,type="image",mode="image"))
+                            }else withheld.add(com.elementeracoast.app.core.remote.RemoteDeskAttachmentItem(id=a.id,name=a.name,type="image",reason=read?.receipt?.get("status")?.jsonPrimitive?.contentOrNull?:"attachment_not_found"))
+                        }
+                        if(refs.isNotEmpty()){
+                            val note="【本组前序媒体 · 系统转交，非人类新发言】原助手消息 "+v.id+"；已保存图像 "+refs.joinToString("、"){it.id}+"。"+if(parts.isEmpty())"本次未递入像素，不要声称看见。" else "附已核验的部分或全部像素；未递入："+withheld.joinToString("、"){it.id}
+                            wire.add(buildJsonObject{
+                                if(parts.isEmpty()){put("role","system");put("content",note)}
+                                else{put("role","user");put("content",JsonArray(listOf(buildJsonObject{put("type","text");put("text",note)})+parts))}
+                            })
+                        }
+                        receipts.add(com.elementeracoast.app.core.remote.RemoteDeskSequenceMessage(v.id,v.content,
+                            if(refs.isEmpty())null else com.elementeracoast.app.core.remote.RemoteDeskAttachments(uploaded=refs.size,deliveredToModel=delivered.size,delivered=delivered,notDelivered=withheld,vision=com.elementeracoast.app.core.remote.RemoteDeskAttachmentVision(supported=policy.vision==true,imagesDelivered=parts.size))))
+                    }
+                    wire to receipts
+                }
+                val image=if(claim.tools>0&&request.imageToolEnabled)withContext(Dispatchers.IO){
+                    knowledge.imageTool(cid,tid,request.userVariantId,mid,providers,policy.vision,seq)
+                        ?:throw CoastApiException(CoastApiErrorKind.Request,"local_image_unavailable","所选本机生图模型或写入授权不可用。")
+                }else null
+                val sticker=claim.tools>0&&cfg.localModelWriteEnabled&&(cfg.stickerAddEnabled||cfg.stickerSendEnabled&&cfg.localModelToolsEnabled)
+                if(image!=null||sticker)require(withContext(Dispatchers.IO){ledger.reserveMedia(cid,seq,mid,request.model,image!=null)}){"媒体预约未确认。"}
+                val session=if(claim.tools>0)withContext(Dispatchers.IO){knowledge.toolSession(cid,tid,request.crossWindow,prepared.receipt,request.model,policy.wireLimit,image,mid,seq)}else null
                 var content="";var done:LocalProviderEvent.Done?=null
                 val runs=mutableListOf<RemoteFurnitureRun>()
                 currentCoroutineContext().ensureActive()
                 emit(ReplyRunEvent.Begin(mid,index))
-                client.streamWithTools(provider,model,messages,output,prepared.imageParts,session,temperature,
-                    LocalSequenceControl(claim.mayContinue,claim.tools,claim.tokens,policy.wireLimit)).collect{event->
+                client.streamWithTools(provider,model,prepared.messages,output,prepared.imageParts,session,temperature,
+                    LocalSequenceControl(claim.mayContinue,claim.tools,claim.tokens,policy.wireLimit),previous.first).collect{event->
                     when(event){
                         is LocalProviderEvent.Delta->{content+=event.text;emit(ReplyRunEvent.Delta(mid,event.text))}
                         is LocalProviderEvent.Tool->{runs.addAll(event.result.furnitureRuns);ToolActivityBus.publish(event.id,event.name,event.result.ok)}
@@ -88,10 +123,10 @@ internal class LocalDirectChatRepository(
                     }
                 }
                 val finished=done?:throw CoastApiException(CoastApiErrorKind.Stream,"local_stream_incomplete","本机回复流未正常完成。")
-                if(content.isBlank())throw CoastApiException(CoastApiErrorKind.Model,"local_empty_reply","供应商未返回可显示正文。")
+                if(content.isBlank()&&image?.saved!=true&&session?.stickerSaved!=true)throw CoastApiException(CoastApiErrorKind.Model,"local_empty_reply","供应商未返回可显示正文。")
                 val receipt=LocalReplyRunStore.Usage(mid,finished.ordinaryToolCalls,finished.metadata?.usage?.totalTokens,finished.continueRequested)
                 val variant=RemoteVariant(mid,content,Instant.now().toString(),modelId=request.model,finishReason=finished.reason,generationSource="chat",
-                    furnitureRuns=runs,deskSlip=(session?.receipt?:prepared.receipt).copy(replySequencePrevious=claim.previous.map{com.elementeracoast.app.core.remote.RemoteDeskSequenceMessage(it.id,it.content)},archivedJson=null),usage=finished.metadata?.usage,modelEcho=finished.metadata?.copy(usage=null))
+                    furnitureRuns=runs,deskSlip=(session?.receipt?:prepared.receipt).copy(replySequencePrevious=previous.second,archivedJson=null),usage=finished.metadata?.usage,modelEcho=finished.metadata?.copy(usage=null))
                 val result=withContext(Dispatchers.IO){ledger.commit(cid,seq,variant,receipt)}
                     ?:throw CoastApiException(CoastApiErrorKind.Request,"reply_commit_unconfirmed","回复未确认写入；不会自动重放。")
                 val canonical=result.first
@@ -110,7 +145,7 @@ internal class LocalDirectChatRepository(
         }
         val settled=withContext(NonCancellable+Dispatchers.IO){ledger.settle(cid,seq,status)}
         if(!settled)throw CoastApiException(CoastApiErrorKind.Request,"reply_settle_unconfirmed","任务状态未确认；请重新打开窗口。")
-        emit(ReplyRunEvent.End(status,saved,detail))
+        emit(ReplyRunEvent.End(status,saved,detail,if(status in setOf("completed","limit_reached"))null else withContext(Dispatchers.IO){com.elementeracoast.app.core.remote.RemoteCacheStore(store,strictReads=true).history(cid)}))
     }
 
     override fun streamReply(

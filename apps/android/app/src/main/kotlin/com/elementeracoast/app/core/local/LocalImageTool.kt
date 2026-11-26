@@ -7,7 +7,7 @@ import kotlinx.serialization.json.*
 internal class LocalImageTool(
     private val store:LocalPersistence, private val resolveProvider:(String)->LocalProviderConfig?,
     private val cid:String,private val tid:String,private val uid:String,val messageId:String,
-    private val selected:String,private val vision:Boolean?
+    private val selected:String,private val vision:Boolean?,private val sequenceId:String?=null
 ){
     private var attempted=false
     var saved=false; private set
@@ -26,7 +26,7 @@ internal class LocalImageTool(
         val config=resolveProvider(selected)
         val result=runLocalManualImageGeneration(store,config,buildJsonObject{
             put("conversation_id",cid);put("turn_id",tid);put("user_variant_id",uid);put("message_id",messageId);put("prompt",prompt)
-        },modelTool=true,visionSupported=vision,expectedModel=selected,onSaved={r->saved=true;continuation=r.readback.continuationMessage})
+        },modelTool=true,visionSupported=vision,expectedModel=selected,onSaved={r->saved=true;continuation=r.readback.continuationMessage},sequenceId=sequenceId)
         val a=result.getValue("attachment").jsonObject
         return buildJsonObject{put("ok",true);put("status","saved");put("attachment",JsonObject(a.filterKeys{it in setOf("id","type","mime","size")}));put("readback",result.getValue("readback"))}
     }

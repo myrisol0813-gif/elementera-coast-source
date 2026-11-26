@@ -21,7 +21,9 @@ internal class LocalToolSession private constructor(
     private val image:LocalImageTool?=null,
     private val stickerMessageId:String?=null,
     private val stickerSend:Boolean=false,
-    private val stickerAdd:Boolean=false
+    private val stickerAdd:Boolean=false,
+    private val sequenceId:String?=null,
+    private val groupMessageId:String?=null
 ) {
     private data class Spec(val name:String,val key:String,val title:String,val description:String,val parameters:JsonObject)
     private fun schema(fields:Map<String,JsonObject> = emptyMap(),required:List<String> = emptyList())=buildJsonObject {
@@ -107,6 +109,8 @@ internal class LocalToolSession private constructor(
         val cache=RemoteCacheStore(s,strictReads=true)
         val h=cache.history(cid)?:return false
         val now=h.turns.firstOrNull{it.id==turn}?:return false
+        if(sequenceId!=null&&!LocalReplyRunStore(s).allowsMedia(cid,turn,sourceTurn.user.variants[sourceTurn.user.active].id,groupMessageId.orEmpty(),sequenceId))return false
+        if(sequenceId==null&&LocalReplyRunStore(s).active(cid))return false
         fun withoutTarget(t:RemoteTurn)=t.copy(assistant=t.assistant.copy(variantsByUserVariant=t.assistant.variantsByUserVariant.mapValues{(_,v)->v.filterNot{it.id==stickerMessageId}}))
         val same=if(stickerMessageId!=null)withoutTarget(sourceTurn)==withoutTarget(now) else image?.sameTurn(sourceTurn,now)?: (now==sourceTurn)
         if(cache.conversations().none{it.id==cid&&it.deletedAt==null}||!same)return false
@@ -212,7 +216,7 @@ internal class LocalToolSession private constructor(
                 }
                 "sticker_send"->{
                     val uid=sourceTurn.user.variants[sourceTurn.user.active].id
-                    val sent=lib.deliver(cid,turn,uid,requireNotNull(stickerMessageId),string("sticker_id",160),true)
+                    val sent=lib.deliver(cid,turn,uid,requireNotNull(stickerMessageId),string("sticker_id",160),true,sequenceId)
                     stickerSaved=true
                     buildJsonObject{put("ok",true);put("status","saved");put("reused",sent.reused);putJsonObject("attachment"){put("id",sent.attachment.id);put("type","image");put("mime",sent.attachment.mime);put("size",sent.attachment.size)}}
                 }
@@ -410,7 +414,7 @@ internal class LocalToolSession private constructor(
     companion object {
         const val MAX_CALLS=com.elementeracoast.app.core.network.TurnToolPolicy.MAX_CALLS
         private val WRITE_NAMES=setOf("image_generate","voice_create","create_moment","create_diary","moment_comment","moment_like","calendar_create","library_write","memory_write_candidate","global_excerpt_propose","user_portrait_propose")
-        fun open(store:LocalPersistence,cid:String,turn:String,request:RemoteCrossWindowRequest?,base:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null,web:LocalIndependentWeb?=null,voice:LocalVoiceProvider?=null,image:LocalImageTool?=null,messageId:String?=null):LocalToolSession?{
+        fun open(store:LocalPersistence,cid:String,turn:String,request:RemoteCrossWindowRequest?,base:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null,web:LocalIndependentWeb?=null,voice:LocalVoiceProvider?=null,image:LocalImageTool?=null,messageId:String?=null,sequenceId:String?=null):LocalToolSession?{
             val h=RemoteCacheStore(store,strictReads=true).history(cid)?:return null
             val cross=h.contextSettings.crossWindowAuto&&request?.mode=="model_decides"
             val tools=h.contextSettings.localModelToolsEnabled
@@ -418,7 +422,7 @@ internal class LocalToolSession private constructor(
             if(!cross&&!tools&&!write)return null
             val sourceTurn=h.turns.firstOrNull{it.id==turn}?:return null
             val mediaId=messageId?.takeIf{mid->(h.contextSettings.stickerAddEnabled||h.contextSettings.stickerSendEnabled)&&LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")&&sourceTurn.assistant.variantsByUserVariant[sourceTurn.user.active.toString()]?.any{it.id==mid&&!it.hidden&&it.finishReason in setOf("image_tool_ready","sticker_tool_ready")}==true}
-            return LocalToolSession(store,cid,turn,sourceTurn,cross,tools,write,modelId,base,wireLimit,web?.takeIf{request?.mode!="keyword"&&LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},voice?.takeIf{LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},image,mediaId,mediaId!=null&&tools&&write&&h.contextSettings.stickerSendEnabled,mediaId!=null&&write&&h.contextSettings.stickerAddEnabled)
+            return LocalToolSession(store,cid,turn,sourceTurn,cross,tools,write,modelId,base,wireLimit,web?.takeIf{request?.mode!="keyword"&&LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},voice?.takeIf{LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},image,mediaId,mediaId!=null&&tools&&write&&h.contextSettings.stickerSendEnabled,mediaId!=null&&write&&h.contextSettings.stickerAddEnabled,sequenceId,messageId)
         }
     }
 }
