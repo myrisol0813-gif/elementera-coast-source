@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -96,11 +97,11 @@ internal fun AssistantMessage(
             ) {
                 Column(modifier = Modifier.padding(snowLetterInnerPadding(SnowLetterSurfaceRole.AssistantBubble))) {
                     Text(
-                        text = when {
+                        text = remember(message.text,isStreamingTail) { renderChatMarkdown(when {
                             message.text.isEmpty() && isStreamingTail -> "•••"
                             isStreamingTail -> message.text + " ▍"
                             else -> message.text
-                        },
+                        }) },
                         color = MaterialTheme.colorScheme.onSurface,
                         style = coastReadingMessageStyle(CoastChatTokens.ChatBodyLineHeight)
                     )
