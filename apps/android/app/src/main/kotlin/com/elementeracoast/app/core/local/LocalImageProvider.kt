@@ -76,3 +76,31 @@ internal class LocalImageProvider(
         private val B64=Regex("[A-Za-z0-9+/]+={0,2}")
     }
 }
+
+/** Private wire-only continuation from a verified saved original, never a
+ * persisted human message. Prepared is not a claim of provider delivery. */
+internal class GeneratedImageReadback(val receipt:JsonObject,val continuationMessage:JsonObject?){
+    override fun toString()="GeneratedImageReadback(receipt="+receipt+", continuation=redacted)"
+}
+internal fun prepareGeneratedImageReadback(attachmentId:String,bytes:ByteArray,mime:String,visionSupported:Boolean?):GeneratedImageReadback{
+    require(Regex("[A-Za-z0-9_.:-]{1,160}").matches(attachmentId)){"缺少已保存图像原件的标识。"}
+    require(bytes.size in 1..8*1024*1024){"图像原件缺失或超限。"}
+    fun starts(vararg signature:Int,offset:Int=0)=signature.indices.all{i->bytes.getOrNull(i+offset)?.toInt()?.and(255)==signature[i]}
+    val detected=when{
+        bytes.size>=24&&starts(137,80,78,71,13,10,26,10)->"image/png"
+        bytes.size>=4&&starts(255,216,255)->"image/jpeg"
+        bytes.size>=16&&starts(82,73,70,70)&&starts(87,69,66,80,offset=8)->"image/webp"
+        else->null
+    }
+    require(detected!=null&&mime==detected){"图像原件 MIME 与内容不符。"}
+    val receipt=buildJsonObject{put("attachment_id",attachmentId);put("status",when(visionSupported){true->"prepared";false->"model_no_vision";null->"vision_unknown"})}
+    if(visionSupported!=true)return GeneratedImageReadback(receipt,null)
+    val message=buildJsonObject{
+        put("role","user")
+        put("content",JsonArray(listOf(
+            buildJsonObject{put("type","text");put("text","【生成图像回读 · 系统转交】这是本轮图像工具生成的已保存作品原件，并非人类新发言。请根据实际像素继续回应。")},
+            buildJsonObject{put("type","image_url");put("image_url",buildJsonObject{put("url","data:"+mime+";base64,"+Base64.getEncoder().encodeToString(bytes))})}
+        )))
+    }
+    return GeneratedImageReadback(receipt,message)
+}

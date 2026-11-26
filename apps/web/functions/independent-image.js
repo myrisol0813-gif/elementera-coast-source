@@ -58,3 +58,25 @@ export async function generateIndependentImage(config,input,fetcher=fetch){
   // Cost is reported by the provider, never inferred from the selected model.
   return {bytes,mime,provider:'openrouter',requested_model:config.model,reported_model:reported,cost_usd:cost,prompt:input.prompt.trim()};
 }
+
+/** Prepare private, transient multimodal continuation from the verified saved
+ * original. The user role below is only a Chat Completions wire envelope:
+ * never persist it as a human message, audit payload or tool result. A prepared
+ * message does not prove that any provider received or understood the image. */
+export function prepareGeneratedImageReadback({attachmentId,bytes,mime,visionSupported}={}){
+  if(typeof attachmentId!=='string'||! /^[A-Za-z0-9_.:-]{1,160}$/.test(attachmentId))fail('readback_source_invalid','缺少已保存图像原件的标识。');
+  if(!(bytes instanceof Uint8Array)||!bytes.length||bytes.length>IMAGE_LIMITS.bytes)fail('readback_original_invalid','图像原件缺失或超限。');
+  const starts=(signature,offset=0)=>signature.every((v,i)=>bytes[i+offset]===v);
+  const detected=bytes.length>=24&&starts([137,80,78,71,13,10,26,10])?'image/png':
+    bytes.length>=4&&starts([255,216,255])?'image/jpeg':
+    bytes.length>=16&&starts([82,73,70,70])&&starts([87,69,66,80],8)?'image/webp':null;
+  if(!detected||mime!==detected)fail('readback_original_invalid','图像原件 MIME 与内容不符。');
+  const receipt={attachment_id:attachmentId,status:visionSupported===true?'prepared':visionSupported===false?'model_no_vision':'vision_unknown'};
+  if(visionSupported!==true)return {receipt,continuationMessage:null};
+  let binary='';
+  for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+  return {receipt,continuationMessage:{role:'user',content:[
+    {type:'text',text:'【生成图像回读 · 系统转交】这是本轮图像工具生成的已保存作品原件，并非人类新发言。请根据实际像素继续回应。'},
+    {type:'image_url',image_url:{url:'data:'+mime+';base64,'+btoa(binary)}}
+  ]}};
+}
