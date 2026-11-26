@@ -84,6 +84,45 @@ class CoastShellViewModel(
     val crossWindowRepository: CrossWindowRepository get() = backend.crossWindow
     val archive: GlobalArchiveRepository get() = backend.archive
     private var generationJob: Job? = null
+    private class GenerationRun(var ownerId: String) {
+        var preparing = true
+        var streaming = false
+        var messageId: Long? = null
+        var preview: List<ChatMessage>? = null
+    }
+    private var generationRun: GenerationRun? = null
+
+    private fun generationUi(state: CoastShellState): CoastShellState {
+        val run = generationRun
+        val visible = run != null && run.ownerId == state.activeConversationId && state.activeFeature == null
+        val streaming = visible && run?.streaming == true
+        return state.copy(
+            isStreaming = streaming,
+            isFinalizing = run != null && !streaming,
+            backgroundGeneration = run != null && !visible,
+            streamingMessageId = if (streaming) run?.messageId else null,
+            streamingVariantIndex = null
+        )
+    }
+
+    private fun beginGeneration(ownerId: String) {
+        check(generationRun == null)
+        historyJob?.cancel()
+        generationRun = GenerationRun(ownerId)
+        _state.update { generationUi(it.copy(historyLoading = false)) }
+    }
+
+    private fun finishGeneration() {
+        generationRun = null
+        generationJob = null
+        _state.update(::generationUi)
+    }
+
+    private fun canNavigateDuringGeneration(): Boolean {
+        if (generationRun?.preparing != true) return true
+        showPlaceholder("正在保存本轮消息，保存后可以离开窗口。")
+        return false
+    }
     private var historyJob: Job? = null
     private var pendingSearchHit: ChatSearchHit? = null
     private var searchNavigationId = 0L
@@ -150,7 +189,7 @@ class CoastShellViewModel(
     }
 
     fun logout() {
-        stopGeneration()
+        generationJob?.cancel()
         resetCrossWindow()
         historyJob?.cancel()
         if (SourceVisitGate.isActive) {
@@ -194,7 +233,7 @@ class CoastShellViewModel(
     }
 
     fun openRoomType(roomType: RoomType) {
-        stopGeneration()
+        if (!canNavigateDuringGeneration()) return
         if (roomType != RoomType.Main) {
             openRoomLanding(roomType)
             return
@@ -220,7 +259,7 @@ class CoastShellViewModel(
             showPlaceholder("搜索结果的原窗口已不存在。")
             return
         }
-        stopGeneration()
+        if (!canNavigateDuringGeneration()) return
         if (id != _state.value.activeConversationId) discardPendingAttachments()
         pendingSearchHit = hit
         searchNavigationId += 1
@@ -230,7 +269,7 @@ class CoastShellViewModel(
 
     fun newConversation() {
         if (tourBlocksCloudAction()) return
-        stopGeneration()
+        if (!canNavigateDuringGeneration()) return
         discardPendingAttachments()
         val roomType = _state.value.activeRoomType
         viewModelScope.launch(workDispatcher) {
@@ -273,7 +312,10 @@ class CoastShellViewModel(
     fun deleteConversation(id: String) {
         if (tourBlocksCloudAction()) return
         val target = _state.value.conversations.firstOrNull { it.id == id } ?: return
-        if (target.id == _state.value.activeConversationId) stopGeneration()
+        if (generationRun?.ownerId == id || generationRun?.preparing == true) {
+            showPlaceholder("这个窗口仍有未结束的生成任务，请先停止或等待完成。")
+            return
+        }
         viewModelScope.launch(workDispatcher) {
             try {
                 backend.conversations.delete(id)
@@ -296,29 +338,29 @@ class CoastShellViewModel(
     }
 
     fun openFeature(destination: FeatureDestination) {
-        stopGeneration()
+        if (!canNavigateDuringGeneration()) return
         _state.update {
-            it.copy(
+            generationUi(it.copy(
                 activeFeature = destination,
                 actionLogFocusIds = if (destination == FeatureDestination.ActionLog) emptySet() else it.actionLogFocusIds,
                 showModelPicker = false
-            )
+            ))
         }
     }
 
     fun openActionLog(actionIds: Set<String>) {
-        stopGeneration()
+        if (!canNavigateDuringGeneration()) return
         _state.update {
-            it.copy(
+            generationUi(it.copy(
                 activeFeature = FeatureDestination.ActionLog,
                 actionLogFocusIds = actionIds,
                 showModelPicker = false
-            )
+            ))
         }
     }
 
     fun backToChat() {
-        _state.update { it.copy(activeFeature = null, actionLogFocusIds = emptySet()) }
+        _state.update { generationUi(it.copy(activeFeature = null, actionLogFocusIds = emptySet())) }
     }
 
     fun openModelPicker() {
@@ -581,10 +623,14 @@ class CoastShellViewModel(
         }
         pendingSearchHit = null
         _state.update { it.copy(searchFocus = null) }
+        val submittedModel = _state.value.currentModel
+        val submittedCrossWindow = consumeCrossWindowRequest()
+        beginGeneration(_state.value.activeConversationId)
         generationJob = viewModelScope.launch(workDispatcher) {
             try {
                 val conversation = ensureRemoteConversation()
                 val conversationId = conversation.id
+                generationRun?.ownerId = conversationId
                 if (_state.value.activeConversationId == conversationId) {
                     _state.update { it.copy(turnDeskReceipt = null) }
                 }
@@ -599,7 +645,7 @@ class CoastShellViewModel(
                     val failed = backend.chat.failedHistory(
                         appended.history,
                         appended.turnId,
-                        _state.value.currentModel,
+                        submittedModel,
                         error
                     )
                     backend.chat.cacheHistory(conversationId, failed)
@@ -611,7 +657,7 @@ class CoastShellViewModel(
                 clearAcceptedDraft(conversationId, conversation.roomType, text)
                 _state.update { it.copy(pendingAttachments = emptyList(), attachmentUploading = false) }
 
-                if (conversation.roomType == RoomType.Lighthouse || (localMode && _state.value.currentModel.isBlank())) {
+                if (conversation.roomType == RoomType.Lighthouse || (localMode && submittedModel.isBlank())) {
                     resetCrossWindow()
                     showHistory(conversationId, persistedUser)
                     _state.update { it.copy(snackbarMessage = if (localMode) "记录已保存在本机；当前不触发模型回复。" else "MCP 对话区已写入后端；这里按房间规则不触发模型回复") }
@@ -621,13 +667,13 @@ class CoastShellViewModel(
                     conversationId,
                     persistedUser,
                     appended.turnId,
-                    _state.value.currentModel,
-                    consumeCrossWindowRequest()
+                    submittedModel,
+                    submittedCrossWindow
                 )
             } catch (error: CoastApiException) {
                 handleBackendError(error, "消息发送失败", keepAuthenticatedOnNetworkError = true)
             } finally {
-                generationJob = null
+                finishGeneration()
             }
         }
     }
@@ -749,15 +795,8 @@ class CoastShellViewModel(
     }
 
     fun stopGeneration() {
+        if (generationRun?.ownerId != _state.value.activeConversationId || generationRun?.streaming != true) return
         generationJob?.cancel()
-        _state.update {
-            it.copy(
-                isStreaming = false,
-                isFinalizing = false,
-                streamingMessageId = null,
-                streamingVariantIndex = null
-            )
-        }
     }
 
     fun showPlaceholder(message: String) {
@@ -902,6 +941,10 @@ class CoastShellViewModel(
 
     private fun loadConversation(conversation: ConversationSummary) {
         historyJob?.cancel()
+        if (generationRun?.ownerId == conversation.id) {
+            _state.update { generationUi(it.copy(historyLoading = false)) }
+            return
+        }
         val cached = backend.chat.cachedHistory(conversation.id)
         if (cached != null) showHistory(conversation.id, cached)
         loadThoughtSoil(conversation.id)
@@ -1106,15 +1149,14 @@ class CoastShellViewModel(
             .orEmpty()
         backend.chat.cacheHistory(conversationId, cleared)
         val streamingId = ChatSyncMapper.streamingMessageId(turnId)
-        showStreaming(conversationId, cleared, turnId, modelId, partial)
-        _state.update {
-            it.copy(
-                isStreaming = true,
-                streamingMessageId = streamingId,
-                streamingVariantIndex = null,
-                turnDeskReceipt = null
-            )
+        generationRun?.apply {
+            ownerId = conversationId
+            preparing = false
+            streaming = true
+            messageId = streamingId
         }
+        showStreaming(conversationId, cleared, turnId, modelId, partial)
+        _state.update { generationUi(it.copy(turnDeskReceipt = null)) }
         try {
             val realityContext = backend.reality.capture(cleared.contextSettings)
             (if (isChatGptPlanModel(modelId)) backend.officialChat
@@ -1140,14 +1182,14 @@ class CoastShellViewModel(
                     }
                     is ChatProgress.Completed -> {
                         replySaved = true
+                        generationRun?.apply { streaming = false; preview = null }
+                        _state.update(::generationUi)
                         showHistory(conversationId, progress.history)
                         if (_state.value.activeConversationId == conversationId) {
                             _state.update {
                                 it.copy(
                                     backendOffline = false,
-                                    turnDeskReceipt = progress.deskReceipt,
-                                    isStreaming = false,
-                                    isFinalizing = true
+                                    turnDeskReceipt = progress.deskReceipt
                                 )
                             }
                         }
@@ -1175,16 +1217,8 @@ class CoastShellViewModel(
             showHistory(conversationId, failed)
             handleBackendError(error, "模型回复失败", keepAuthenticatedOnNetworkError = true)
         } finally {
-            if (_state.value.streamingMessageId == streamingId) {
-                _state.update {
-                    it.copy(
-                        isStreaming = false,
-                        isFinalizing = false,
-                        streamingMessageId = null,
-                        streamingVariantIndex = null
-                    )
-                }
-            }
+            generationRun?.apply { streaming = false; preview = null }
+            _state.update(::generationUi)
         }
     }
 
@@ -1217,19 +1251,21 @@ class CoastShellViewModel(
             showPlaceholder("当前模型还没有从后端载入，暂时不能重试。")
             return
         }
+        val submittedCrossWindow = consumeCrossWindowRequest()
+        beginGeneration(conversationId)
         generationJob = viewModelScope.launch(workDispatcher) {
             try {
                 val cleared = backend.chat.clearFailure(history, turnId)
                 val persisted = backend.chat.persistHistory(conversationId, cleared)
                 showHistory(conversationId, persisted)
-                generateTurn(conversationId, persisted, turnId, model, consumeCrossWindowRequest())
+                generateTurn(conversationId, persisted, turnId, model, submittedCrossWindow)
             } catch (error: CoastApiException) {
                 val failed = backend.chat.failedHistory(history, turnId, model, error)
                 backend.chat.cacheHistory(conversationId, failed)
                 showHistory(conversationId, failed)
                 handleBackendError(error, "重试失败", keepAuthenticatedOnNetworkError = true)
             } finally {
-                generationJob = null
+                finishGeneration()
             }
         }
     }
@@ -1270,6 +1306,9 @@ class CoastShellViewModel(
         backend.chat.cacheHistory(conversationId, edited)
         showHistory(conversationId, edited)
 
+        val submittedModel = _state.value.currentModel
+        val submittedCrossWindow = consumeCrossWindowRequest()
+        beginGeneration(conversationId)
         generationJob = viewModelScope.launch(workDispatcher) {
             try {
                 val persisted = backend.chat.persistHistory(conversationId, edited)
@@ -1279,18 +1318,18 @@ class CoastShellViewModel(
                     _state.update { it.copy(snackbarMessage = "编辑版本已写回后端") }
                     return@launch
                 }
-                val model = _state.value.currentModel
+                val model = submittedModel
                 if (model.isBlank()) {
                     _state.update { it.copy(snackbarMessage = "编辑版本已写回；当前没有可用聊天模型，未生成新回复") }
                     return@launch
                 }
-                generateTurn(conversationId, persisted, turnId, model, consumeCrossWindowRequest())
+                generateTurn(conversationId, persisted, turnId, model, submittedCrossWindow)
             } catch (error: CoastApiException) {
                 backend.chat.cacheHistory(conversationId, previous)
                 showHistory(conversationId, previous)
                 handleBackendError(error, "编辑消息失败", keepAuthenticatedOnNetworkError = true)
             } finally {
-                generationJob = null
+                finishGeneration()
             }
         }
     }
@@ -1318,11 +1357,13 @@ class CoastShellViewModel(
             showPlaceholder("当前模型还没有从后端载入，暂时不能重新生成。")
             return
         }
+        val submittedCrossWindow = consumeCrossWindowRequest()
+        beginGeneration(conversationId)
         generationJob = viewModelScope.launch(workDispatcher) {
             try {
-                generateTurn(conversationId, history, turnId, model, consumeCrossWindowRequest())
+                generateTurn(conversationId, history, turnId, model, submittedCrossWindow)
             } finally {
-                generationJob = null
+                finishGeneration()
             }
         }
     }
@@ -1368,9 +1409,9 @@ class CoastShellViewModel(
         modelId: String,
         partial: String
     ) {
-        if (_state.value.activeConversationId != conversationId) return
         val messages = ChatSyncMapper.toUi(history) + ChatSyncMapper.streamingAssistant(turnId, modelId, partial)
-        _state.update { it.copy(messages = messages) }
+        generationRun?.takeIf { it.ownerId == conversationId }?.preview = messages
+        if (_state.value.activeConversationId == conversationId) _state.update { it.copy(messages = messages) }
     }
 
     private fun showHistory(conversationId: String, history: RemoteHistory) {
@@ -1391,11 +1432,12 @@ class CoastShellViewModel(
         resetCrossWindow()
         persistence.put(KEY_CURRENT_CONVERSATION, conversation.id)
         val history = backend.chat.cachedHistory(conversation.id)
-        val hit = pendingSearchHit?.takeIf { it.conversationId == conversation.id }
+        val run = generationRun?.takeIf { it.ownerId == conversation.id }
+        val hit = pendingSearchHit?.takeIf { it.conversationId == conversation.id && run == null }
         val displayed = if (hit != null && history != null) previewSearchVariant(history, hit) ?: history
             else history
         _state.update {
-            it.copy(
+            generationUi(it.copy(
                 activeRoomType = conversation.roomType,
                 activeFeature = null,
                 actionLogFocusIds = emptySet(),
@@ -1403,7 +1445,7 @@ class CoastShellViewModel(
                 composerDraft = readComposerDraft(conversation.id, conversation.roomType),
                 searchFocus = hit?.let { ChatSearchFocus(conversation.id, it.messageId, searchNavigationId) },
                 contextSettings = displayed?.contextSettings?.normalized() ?: ConversationContextSettings(),
-                messages = displayed?.let(ChatSyncMapper::toUi).orEmpty(),
+                messages = run?.preview ?: displayed?.let(ChatSyncMapper::toUi).orEmpty(),
                 thoughtSoil = null,
                 turnDeskReceipt = null,
                 showModelPicker = false,
@@ -1411,7 +1453,7 @@ class CoastShellViewModel(
                 isFinalizing = false,
                 streamingMessageId = null,
                 streamingVariantIndex = null
-            )
+            ))
         }
     }
 
@@ -1421,7 +1463,7 @@ class CoastShellViewModel(
         pendingSearchHit = null
         persistence.remove(KEY_CURRENT_CONVERSATION)
         _state.update {
-            it.copy(
+            generationUi(it.copy(
                 activeRoomType = roomType,
                 activeFeature = null,
                 actionLogFocusIds = emptySet(),
@@ -1438,7 +1480,7 @@ class CoastShellViewModel(
                 isFinalizing = false,
                 streamingMessageId = null,
                 streamingVariantIndex = null
-            )
+            ))
         }
     }
 
