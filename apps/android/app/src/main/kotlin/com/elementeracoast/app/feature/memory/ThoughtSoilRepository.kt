@@ -20,6 +20,7 @@ interface ThoughtSoilRepository {
     suspend fun saveManual(conversationId: String, current: String, afterthoughts: List<String>): ThoughtSoilSnapshot
     suspend fun resumeAutomatic(conversationId: String): ThoughtSoilSnapshot
     suspend fun organizeAfterReply(conversationId: String, modelId: String): ThoughtSoilSnapshot
+    suspend fun organizeAfterSequence(conversationId:String,modelId:String,sequenceId:String):ThoughtSoilSnapshot = error("连续回复整理未接入")
 }
 
 class DefaultThoughtSoilRepository(
@@ -51,6 +52,13 @@ class DefaultThoughtSoilRepository(
 
     override suspend fun resumeAutomatic(conversationId: String): ThoughtSoilSnapshot {
         api.resumeThoughtSoil(conversationId)
+        return load(conversationId)
+    }
+
+    override suspend fun organizeAfterSequence(conversationId:String,modelId:String,sequenceId:String):ThoughtSoilSnapshot{
+        require(localOrganizer==null&&!modelId.startsWith("chatgpt-plan:")){"当前模型通道尚未接通连续回复整理"}
+        val result=api.organizeReplyRunSoil(conversationId,modelId,sequenceId)
+        require(result.ok){"思维壤整理未确认"}
         return load(conversationId)
     }
 

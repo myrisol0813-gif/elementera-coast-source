@@ -4,6 +4,8 @@ import com.elementeracoast.app.core.model.CrossWindowMode
 import com.elementeracoast.app.core.model.CrossWindowRequest
 import com.elementeracoast.app.core.model.TurnDeskReceipt
 import com.elementeracoast.app.core.network.ApiStreamEvent
+import com.elementeracoast.app.core.network.RemoteReplyRunRequest
+import com.elementeracoast.app.core.network.ReplyRunEvent
 import com.elementeracoast.app.core.network.CoastApiClient
 import com.elementeracoast.app.core.network.CoastApiErrorKind
 import com.elementeracoast.app.core.network.CoastApiException
@@ -41,6 +43,7 @@ sealed interface ChatProgress {
 }
 
 interface ChatRepository {
+    fun streamReplyRun(request:RemoteReplyRunRequest):Flow<ReplyRunEvent> = flow { throw CoastApiException(CoastApiErrorKind.Model,"reply_sequence_unavailable","当前模式尚未接通连续回复。") }
     fun cachedHistory(conversationId: String): RemoteHistory?
     suspend fun generateImage(conversationId:String,turnId:String,userId:String,messageId:String,prompt:String):RemoteHistory = error("Image generation unavailable")
     suspend fun loadHistory(conversationId: String): RemoteHistory
@@ -85,6 +88,12 @@ class DefaultChatRepository(
     private val reasoningStore: ReasoningEffortStore? = null,
     private val toolLimit: () -> Int = { com.elementeracoast.app.core.network.TurnToolPolicy.DEFAULT_CALLS }
 ) : ChatRepository {
+    override fun streamReplyRun(request:RemoteReplyRunRequest):Flow<ReplyRunEvent> = flow {
+        api.streamReplyRun(request).collect { event ->
+            if(event is ReplyRunEvent.Committed)cache.putHistory(request.conversationId,event.history)
+            emit(event)
+        }
+    }
     override fun cachedHistory(conversationId: String): RemoteHistory? = cache.history(conversationId)
 
     override suspend fun generateImage(conversationId:String,turnId:String,userId:String,messageId:String,prompt:String):RemoteHistory =

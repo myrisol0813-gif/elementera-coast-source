@@ -492,6 +492,13 @@ class CoastApiClient(
         return jsonRequest(Request.Builder().url(config.url("/api/memory/soil/organize")).post(jsonBody(payload)).build(), RemoteSoilOrganizeResponse.serializer())
     }
 
+    suspend fun organizeReplyRunSoil(conversationId:String,modelId:String,sequenceId:String):RemoteSoilOrganizeResponse{
+        val payload=buildJsonObject{
+            put("conversation_id",conversationId);put("model",modelId);put("trigger","reply");put("force",true);put("reply_sequence_id",sequenceId)
+        }.toString()
+        return jsonRequest(Request.Builder().url(config.url("/api/memory/soil/organize")).post(jsonBody(payload)).build(),RemoteSoilOrganizeResponse.serializer())
+    }
+
     suspend fun preparePlanSoil(conversationId: String, modelId: String): RemotePlanSoilPrepareResponse {
         val payload = buildJsonObject {
             put("conversation_id", conversationId)

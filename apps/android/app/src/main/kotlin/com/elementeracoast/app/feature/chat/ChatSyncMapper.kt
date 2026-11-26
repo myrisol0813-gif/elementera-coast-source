@@ -268,6 +268,22 @@ object ChatSyncMapper {
         createdAt = value.createdAt
     )
 
+    /** Ephemeral preview only, sharing the exact identity of the future saved
+     * bubble. This never changes canonical history or writes a placeholder. */
+    internal fun replyRunPreview(history:RemoteHistory,turnId:String,userId:String,sequenceId:String,messageId:String,index:Int,modelId:String,partial:String):List<ChatMessage>{
+        val turn=history.turns.single{it.id==turnId}
+        val key=turn.user.active.toString()
+        require(turn.user.variants[turn.user.active].id==userId)
+        val list=turn.assistant.variantsByUserVariant[key].orEmpty()
+        require(list.size<20&&list.none{it.id==messageId}&&list.count{it.replySequence?.id==sequenceId}==index)
+        val preview=RemoteVariant(id=messageId,content=partial,modelId=modelId,generationSource="chat",
+            replySequence=com.elementeracoast.app.core.remote.RemoteReplySequence(sequenceId,index))
+        val changed=turn.copy(assistant=turn.assistant.copy(
+            variantsByUserVariant=turn.assistant.variantsByUserVariant+(key to (list+preview)),
+            activeByUserVariant=turn.assistant.activeByUserVariant+(key to list.size)))
+        return toUi(history.copy(turns=history.turns.map{if(it.id==turnId)changed else it}))
+    }
+
     fun streamingAssistant(turnId: String, modelId: String, partialContent: String): ChatMessage = ChatMessage(
         id = streamingMessageId(turnId),
         role = MessageRole.Assistant,
