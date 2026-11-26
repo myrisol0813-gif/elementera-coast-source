@@ -16,7 +16,7 @@ import {
 import { DOGTALK_MODEL_TOOL, executeDogtalkModelTool } from './dogtalk-model-tool.js';
 import { dogtalkContext, saveMysticDogtalkWithSnapshot } from './dogtalk-store.js';
 import { safeLogError } from './http.js';
-import { GLOBAL_EXCERPT_WRITE_GUIDANCE, createGlobalExcerptCandidate, createPocket } from './memory-store.js';
+import { GLOBAL_EXCERPT_WRITE_GUIDANCE, USER_PORTRAIT_WRITE_GUIDANCE, createUserPortraitCandidate, createGlobalExcerptCandidate, createPocket } from './memory-store.js';
 import { searchMemory } from './memory-recall.js';
 import {
   listRoomConversation,
@@ -113,6 +113,7 @@ async function dogtalkHandler(db, input, context) {
 }
 
 const globalExcerptGate = (context) => context.permission === 'owner' && context.global_excerpt_write_enabled === true;
+const userPortraitGate = (context) => context.permission === 'owner' && context.user_portrait_write_enabled === true;
 const crossWindowBaseGate = (context) => context.permission === 'owner'
   && ['main_chat', 'radio'].includes(context.surface);
 const crossWindowLetterGate = (context) => crossWindowBaseGate(context)
@@ -212,6 +213,26 @@ const REGISTRY = Object.freeze([
         reason: { type: 'string', minLength: 1, maxLength: 4000 },
       }, required: ['proposed_body', 'reason'] }),
     handler: (db, input, context) => createGlobalExcerptCandidate(db, {
+      ...input,
+      source_conversation_id: context.conversation_id || null,
+      source_message_id: context.source_turn_id || null,
+      source_model: context.model_label || '',
+    }),
+  }),
+  entry({
+    tool_key: 'memory.user_portrait_propose',
+    display_name: '提出用户画像修改稿',
+    description: '为用户画像提出完整修改稿；只进入待确认区。',
+    model_exposed: true, model_group: 'core',
+    auth_scopes: ['write:soil'], turn_gate: userPortraitGate, summary_policy: 'content_redacted',
+    model_tool: modelTool('user_portrait_propose',
+      `${USER_PORTRAIT_WRITE_GUIDANCE} 提交完整的新正文及理由，不直接改写正式画像。`,
+      { properties: {
+        proposed_body: { type: 'string', minLength: 1, maxLength: 240000 },
+        change_kind: { type: 'string', enum: ['append', 'rewrite', 'refine'] },
+        reason: { type: 'string', minLength: 1, maxLength: 4000 },
+      }, required: ['proposed_body', 'reason'] }),
+    handler: (db, input, context) => createUserPortraitCandidate(db, {
       ...input,
       source_conversation_id: context.conversation_id || null,
       source_message_id: context.source_turn_id || null,
@@ -608,6 +629,7 @@ function cleanModelToolResult(toolKey, output) {
     return { memories, count: memories.length, vector_enabled: output?.vector_enabled === true };
   }
   if (toolKey === 'memory.write_candidate') return { created: true, candidate_id: String(output?.id || ''), title: String(output?.title || '').slice(0, 120), status: 'pending' };
+  if (toolKey === 'memory.user_portrait_propose') return { created: true, candidate_id: String(output?.id || ''), status: 'pending', area: 'user_portrait' };
   if (toolKey === 'memory.global_excerpt_propose') return { created: true, candidate_id: String(output?.id || ''), status: 'pending', area: 'global_excerpt' };
   return output;
 }
