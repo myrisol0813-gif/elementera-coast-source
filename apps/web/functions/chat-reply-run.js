@@ -87,6 +87,25 @@ export async function claimReplyStep(db,identity,messageId){
   return {index,mayContinue:index+1<row.max_messages&&list.length+1<20,toolBudget:budget.tools,tokenBudget:budget.tokens,
     previous:list.filter(v=>v.reply_sequence?.id===identity.sequenceId).map(v=>({id:v.id,content:v.content}))};
 }
+// Materialize a media reservation only for the currently claimed step.
+// It is not a committed group member until commitReplyStep promotes it.
+// Existing media transactions may attach verified originals to this exact ID.
+export async function reserveReplyMedia(db,identity,messageId,modelId,{image=false,sticker=false}={}){
+  ids(messageId);
+  if(!image&&!sticker)return false;
+  const row=await rowFor(db,identity);
+  if(!row||row.status!=='running'||row.pending_id!==messageId||row.pending_state!=='claimed')return false;
+  const {raw,state}=await source(db,identity.conversationId);
+  const {turn,key,list}=branch(state,identity.turnId,identity.userVariantId);
+  if(!state.context_settings.reply_sequence_enabled||list.length>=20||state.turns.some(t=>[...t.user.variants,...Object.values(t.assistant.variantsByUserVariant).flat()].some(v=>v.id===messageId)))return false;
+  if(sticker&&!image&&!state.context_settings.sticker_send_enabled&&!state.context_settings.sticker_add_enabled)return false;
+  const stamp=Date.now();
+  const slot={id:messageId,content:'',created_at:new Date(stamp).toISOString(),model_id:modelId,generation_source:'chat',finish_reason:image?'image_tool_ready':'sticker_tool_ready'};
+  turn.assistant.variantsByUserVariant[key]=[...list,slot];
+  state.updated_at=new Date(stamp).toISOString();
+  return changes(await stmt(db,`UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS(SELECT 1 FROM chat_reply_runs WHERE sequence_id=? AND status='running' AND pending_id=? AND pending_state='claimed' AND receipts_json=?) AND EXISTS(SELECT 1 FROM conversations WHERE id=? AND deleted_at IS NULL)`,
+    JSON.stringify(normalizeState(state)),stamp,identity.conversationId,raw,identity.sequenceId,messageId,row.receipts_json,identity.conversationId).run());
+}
 export async function commitReplyStep(db,identity,messageId,variant,receipt){
   ids(messageId);
   const row=await rowFor(db,identity);
@@ -94,14 +113,18 @@ export async function commitReplyStep(db,identity,messageId,variant,receipt){
   const {raw,state}=await source(db,identity.conversationId);
   const {turn,key,list}=branch(state,identity.turnId,identity.userVariantId);
   const prior=receipts(row),index=prior.length,budget=remaining(row);
-  if(list.length>=20||!budget||typeof variant?.content!=='string'||!variant.content.trim()||variant.id!==messageId)return null;
+  const slotIndex=list.findIndex(v=>v.id===messageId);
+  const slot=slotIndex<0?null:list[slotIndex];
+  if(slot&&(slotIndex!==list.length-1||slot.reply_sequence||!['image_tool_ready','sticker_tool_ready','image_saved','sticker_saved','image_failed'].includes(slot.finish_reason)))return null;
+  const originals=(slot?.attachments||[]).filter(a=>a.image_generation?.message_id===messageId||a.sticker_delivery?.message_id===messageId);
+  if((slot?list.length>20:list.length>=20)||!budget||typeof variant?.content!=='string'||(!variant.content.trim()&&!originals.length)||variant.id!==messageId)return null;
   const calls=receipt?.tool_calls,tokens=receipt?.total_tokens;
   const known=Number.isSafeInteger(calls)&&calls>=0&&calls<=budget.tools&&Number.isSafeInteger(tokens)&&tokens>=0;
   const record={message_id:messageId,tool_calls:known?calls:null,total_tokens:known?tokens:null,
     continue_requested:known&&tokens<budget.tokens&&receipt?.continue_requested===true&&variant.finish_reason==='stop'};
-  const next={...variant,id:messageId,reply_sequence:{id:identity.sequenceId,index},archive_retained_desk_slip:true};
-  turn.assistant.variantsByUserVariant[key]=[...list,next];
-  turn.assistant.activeByUserVariant[key]=list.length;
+  const next={...variant,id:messageId,...(slot?{created_at:slot.created_at,attachments:originals}:{}),reply_sequence:{id:identity.sequenceId,index},archive_retained_desk_slip:true};
+  turn.assistant.variantsByUserVariant[key]=slot?[...list.slice(0,slotIndex),next]:[...list,next];
+  turn.assistant.activeByUserVariant[key]=slot?slotIndex:list.length;
   const stamp=Date.now();
   state.updated_at=new Date(stamp).toISOString();
   const newRaw=JSON.stringify(normalizeState(state)),newReceipts=JSON.stringify([...prior,record]);
@@ -122,6 +145,36 @@ export async function settleReplyRun(db,identity,status){
   const row=await rowFor(db,identity);if(!row||row.status!=='running')return false;
   if(!['completed','limit_reached','permission_or_budget','reservation_lost','failed','cancelled','interrupted'].includes(status))fail('reply_run_invalid_status','任务状态无效。');
   if(row.pending_id&&['completed','limit_reached'].includes(status))return false;
+  // A failed media step must not discard originals or leave a ready slot
+  // callable after settlement. Preserve an interrupted picture on its own
+  // exact message ID; no continuation or organizer receipt is fabricated.
+  if(row.pending_id){
+    const {raw,state}=await source(db,identity.conversationId);
+    const {turn,key,list}=branch(state,identity.turnId,identity.userVariantId);
+    const i=list.findIndex(v=>v.id===row.pending_id);
+    const slot=list[i];
+    if(slot&&!slot.reply_sequence&&['image_tool_ready','sticker_tool_ready','image_pending','image_saved','sticker_saved','image_failed'].includes(slot.finish_reason)){
+      const originals=(slot.attachments||[]).filter(a=>a.image_generation?.message_id===slot.id||a.sticker_delivery?.message_id===slot.id);
+      if(originals.length||['image_pending','image_failed'].includes(slot.finish_reason)){
+        slot.finish_reason=originals.length?(originals.some(a=>a.image_generation)?'image_saved_interrupted':'sticker_saved_interrupted'):'image_failed';
+        slot.errorDetail=originals.length?'图片原件已保存，连续回复文字未确认完成。':'绘图未确认完成；不会自动重试，供应商可能已计费。';
+        // Keep the original as a member of the interrupted group, but
+        // deliberately leave the unconfirmed step out of the usage ledger.
+        slot.reply_sequence={id:identity.sequenceId,index:receipts(row).length};
+        turn.assistant.activeByUserVariant[key]=i;
+      }else{
+        list.splice(i,1);
+        turn.assistant.activeByUserVariant[key]=Math.min(turn.assistant.activeByUserVariant[key]||0,Math.max(0,list.length-1));
+      }
+      const stamp=Date.now();state.updated_at=new Date(stamp).toISOString();
+      const encoded=JSON.stringify(normalizeState(state));
+      const result=await db.batch([
+        stmt(db,`UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=? AND EXISTS(SELECT 1 FROM chat_reply_runs WHERE sequence_id=? AND status='running' AND pending_id=? AND pending_state IS ? AND receipts_json=?)`,encoded,stamp,identity.conversationId,raw,identity.sequenceId,row.pending_id,row.pending_state,row.receipts_json),
+        stmt(db,`UPDATE chat_reply_runs SET status=?,updated_at=? WHERE sequence_id=? AND status='running' AND pending_id=? AND pending_state IS ? AND receipts_json=? AND EXISTS(SELECT 1 FROM conversation_states WHERE conversation_id=? AND state_json=?)`,status,stamp,identity.sequenceId,row.pending_id,row.pending_state,row.receipts_json,identity.conversationId,encoded)
+      ]);
+      return changes(result[0])&&changes(result[1]);
+    }
+  }
   return changes(await stmt(db,`UPDATE chat_reply_runs SET status=?,updated_at=? WHERE sequence_id=? AND status='running' AND receipts_json=? AND pending_id IS ? AND pending_state IS ?`,
     status,Date.now(),identity.sequenceId,row.receipts_json,row.pending_id,row.pending_state).run());
 }

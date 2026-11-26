@@ -135,3 +135,43 @@ for(const order of [['sticker_send','image_generate'],['image_generate','sticker
   assert.equal(calls,1);
 }
 console.log('sticker library index: ok');
+
+// A claimed reply-group media slot can use both existing original transactions;
+// commit promotes that same ID rather than appending a duplicate bubble.
+const {acquireReplyRun,reserveReplyStep,claimReplyStep,reserveReplyMedia,commitReplyStep,settleReplyRun}=await import('../functions/chat-reply-run.js');
+for(const order of [['sticker_send','image_generate'],['image_generate','sticker_send']]){
+  const chat=await createConversation(directDb,'连续回复原件','main');
+  const identity={conversationId:chat.id,turnId:'group-turn',userVariantId:'group-user',sequenceId:'group-run'};
+  // sequence IDs are globally unique in the ledger
+  identity.sequenceId+='-'+order[0];
+  await writeConversationState(directDb,chat.id,{context_settings:{reply_sequence_enabled:true,sticker_send_enabled:true},turns:[{id:identity.turnId,user:{variants:[{id:identity.userVariantId,content:'图片'}]}}]});
+  assert.equal(await acquireReplyRun(directDb,identity,{maxMessages:2,toolBudget:4,tokenBudget:1000}),true);
+  assert.equal(await reserveReplyStep(directDb,identity,'group-first',0),true);
+  assert.equal(await reserveReplyMedia(directDb,identity,'group-first','fixture/chat',{image:true,sticker:true}),false);
+  assert.ok(await claimReplyStep(directDb,identity,'group-first'));
+  assert.equal(await reserveReplyMedia(directDb,identity,'wrong-id','fixture/chat',{image:true}),false);
+  assert.equal(await reserveReplyMedia(directDb,identity,'group-first','fixture/chat',{image:true,sticker:true}),true);
+  assert.equal(await reserveReplyMedia(directDb,identity,'group-first','fixture/chat',{image:true}),false);
+  const env={COAST_CHAT_DB:directDb,OPENROUTER_API_KEY:'fixture'};
+  const opts={conversationId:chat.id,turnId:identity.turnId,messageId:'group-first',roomType:'main',chatModel:'fixture/chat',enabled:true,visionOverride:false};
+  const image=await attachImageTool(env,{...blank,tools:[{type:'function',function:{name:'fixture'}}]},opts,{discover:async()=>[{id:'fixture/paid'}],generate:async(c,p)=>({bytes:png,mime:'image/png',provider:'openrouter',requested_model:c.model,prompt:p.prompt})});
+  const tools=await attachStickerTools(env,image,opts);
+  for(const name of order)assert.equal((await tools.executeTool(call(name,name==='sticker_send'?{sticker_id:direct.id}:{prompt:'draw wolf'}))).ok,true);
+  assert.ok(await commitReplyStep(directDb,identity,'group-first',{id:'group-first',content:'',finish_reason:'stop',model_id:'fixture/chat'},{tool_calls:2,total_tokens:100,continue_requested:true}));
+  const saved=(await readConversationState(directDb,chat.id)).turns[0].assistant.variantsByUserVariant['0'];
+  assert.equal(saved.length,1);assert.equal(saved[0].id,'group-first');
+  assert.equal(saved[0].attachments.length,2);assert.equal(saved[0].reply_sequence.index,0);
+  for(const a of saved[0].attachments)assert.deepEqual(new Uint8Array((await getChatAttachmentRecord(directDb,chat.id,a.id)).data),png);
+  assert.equal(await reserveReplyStep(directDb,identity,'group-second',1),true);
+  assert.ok(await claimReplyStep(directDb,identity,'group-second'));
+  assert.equal(await reserveReplyMedia(directDb,identity,'group-second','fixture/chat',{sticker:true}),true);
+  const next=await attachStickerTools(env,blank,{...opts,messageId:'group-second'});
+  assert.equal((await next.executeTool(call('sticker_send',{sticker_id:direct2.id}))).ok,true);
+  assert.equal(await settleReplyRun(directDb,identity,'cancelled'),true);
+  const interrupted=(await readConversationState(directDb,chat.id)).turns[0].assistant.variantsByUserVariant['0'];
+  assert.deepEqual(interrupted.map(v=>v.id),['group-first','group-second']);
+  assert.deepEqual(interrupted.map(v=>v.reply_sequence.index),[0,1]);
+  assert.equal(interrupted[1].finish_reason,'sticker_saved_interrupted');
+  assert.equal(interrupted[1].attachments.length,1);
+  assert.equal((await next.executeTool(call('sticker_send',{sticker_id:direct2.id}))).ok,false);
+}
