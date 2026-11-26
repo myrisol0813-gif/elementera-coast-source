@@ -291,7 +291,8 @@ try{
       if(chatCalls===4)assert.ok(urls(payload).includes(imageUrl));
       if(chatCalls===5){
         const stored=(await readConversationState(routeDb,cv.id)).turns[0].assistant.variantsByUserVariant['0'];
-        assert.equal(stored.length,2);
+        assert.equal(stored.filter(v=>v.reply_sequence?.id==='mixed-group').length,2);
+        assert.ok(stored.filter(v=>!v.reply_sequence).every(v=>v.finish_reason==='image_tool_ready'));
         assert.ok(urls(payload).includes(stickerUrl));assert.ok(urls(payload).includes(imageUrl));
         assert.ok(payload.messages.some(m=>Array.isArray(m.content)&&m.content.some(p=>p.type==='text'&&p.text.includes('非人类新发言'))));
       }
@@ -302,7 +303,9 @@ try{
     await fetchModelCatalog(routeEnv,true);
     const request=new Request('https://coast.test/api/chat/reply-sequence',{method:'POST',headers:{Origin:'https://coast.test','Content-Type':'application/json'},body:JSON.stringify({conversation_id:cv.id,source_turn_id:'mixed-turn',user_variant_id:'mixed-user',sequence_id:'mixed-group',model:visionModel,image_tool_enabled:true,image_model_id:imageModel,settings:{streamingEnabled:false,contextBudget:6000},budget:{maxMessages:3,toolBudget:4,tokenBudget:48000}})});
     const response=await routeChatApi(request,routeEnv),wire=await response.text();
-    assert.equal((wire.match(/event: reply_committed/g)||[]).length,3,wire.slice(-1500));
+    const end=wire.match(/event: reply_group_end\ndata: ([^\n]+)/)?.[1];
+    const summary=end?JSON.parse(end):{};
+    assert.equal((wire.match(/event: reply_committed/g)||[]).length,3,JSON.stringify({status:summary.status,error_type:summary.error_type,message:summary.message,chatCalls,imageCalls}));
     assert.equal(chatCalls,5);assert.equal(imageCalls,1);
     const group=(await readConversationState(routeDb,cv.id)).turns[0].assistant.variantsByUserVariant['0'];
     assert.deepEqual(group.map(v=>v.content),['','','after both originals']);
