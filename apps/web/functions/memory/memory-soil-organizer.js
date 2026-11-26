@@ -1,5 +1,5 @@
 import { readConversationState, readProfile } from '../chat-store.js';
-import { claimReplyRunSoil, finishReplyRunSoil } from '../chat-reply-run.js';
+import { claimReplyRunSoil, finishReplyRunSoil, claimNativePlanSoilCommit } from '../chat-reply-run.js';
 import { safeLogError } from '../http.js';
 import { soilSettings } from '../memory-config.js';
 import {
@@ -393,7 +393,29 @@ export async function organizeConversationSoil(env,conversationId,value){
   if(!seq&&!value.reply_sequence_id)return organizeConversationSoilInternal(env,conversationId,value);
   const skipped=async reason=>({ok:true,skipped:true,reason,soil:await readSoil(db,conversationId)});
   if(!seq||value.reply_sequence_id!==seq)return skipped('reply_sequence_not_current');
-  if(value.plan_phase)return skipped('reply_sequence_plan_unavailable');
+  if(value.plan_phase){
+    const model=String(value.model||'');
+    if(!model.startsWith('chatgpt-plan:')||latest.assistant.model_id!==model)return skipped('reply_sequence_plan_model_mismatch');
+    const options={...value,expected_sequence_tail:latest.assistant.id,expected_history_revision:state.updated_at};
+    if(value.plan_phase==='prepare'){
+      if(!await claimReplyRunSoil(db,conversationId,seq,latest.assistant.id,{nativePlanRevision:state.updated_at,nativePlanModel:model}))return skipped('reply_sequence_already_claimed_or_unsettled');
+      try{
+        const result=await organizeConversationSoilInternal(env,conversationId,options);
+        if(result.skipped)await finishReplyRunSoil(db,conversationId,seq,'skipped');
+        else if(!result.ok)await finishReplyRunSoil(db,conversationId,seq,'failed');
+        return {...result,expected_history_revision:state.updated_at};
+      }catch(error){await finishReplyRunSoil(db,conversationId,seq,'failed');throw error;}
+    }
+    if(value.plan_phase!=='commit'||value.expected_history_revision!==state.updated_at||
+        !await claimNativePlanSoilCommit(db,conversationId,seq,model,latest.assistant.id,state.updated_at))
+      return skipped('reply_sequence_plan_commit_unconfirmed');
+    let status='failed';
+    try{
+      const result=await organizeConversationSoilInternal(env,conversationId,options);
+      status=result.skipped?'skipped':result.degraded?'failed':'done';
+      return result;
+    }finally{await finishReplyRunSoil(db,conversationId,seq,status);}
+  }
   if(!await claimReplyRunSoil(db,conversationId,seq,latest.assistant.id))return skipped('reply_sequence_already_claimed_or_unsettled');
   let status='failed';
   try{
