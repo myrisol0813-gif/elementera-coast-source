@@ -1,5 +1,6 @@
 import { attachImageTool } from './chat-image-tool.js';
 import { attachStickerTools } from './chat-sticker-tool.js';
+import { prepareReplyGroupDogtalk } from './dogtalk-store.js';
 import { canonicalReplyContext, executeDurableReplyRun, isReplyRunActive, recoverStaleReplyRuns } from './chat-reply-run.js';
 import {
   apiError,
@@ -482,8 +483,8 @@ async function replySequenceChat(request,env){
   const initial=await readConversationState(db,identity.conversationId);
   if(initial.context_settings.sticker_send_enabled||initial.context_settings.sticker_add_enabled||value.image_tool_enabled===true)
     throw new ChatStoreError('reply_sequence_media_unavailable','连续回复的媒体工具预约尚未接通，请勿在此测试路径启用。',409);
-  if(value.dogtalk)
-    throw new ChatStoreError('reply_sequence_context_unavailable','连续回复的私人草稿递送尚未接通。',409);
+  if(value.dogtalk&&(!value.dogtalk.snapshot_id||typeof value.dogtalk!=='object'||Array.isArray(value.dogtalk)))
+    throw new ChatStoreError('dogtalk_group_scope_mismatch','私人草稿缺少明确的一次性提交身份。',409);
   const settings=formalChatRequestSettings(value.settings||{});
   const budget=value.budget||{};
   const controller=new AbortController();
@@ -498,19 +499,22 @@ async function replySequenceChat(request,env){
       }
       try{
         await recoverStaleReplyRuns(db);
+        let deliveredDogtalk=null;
         const result=await executeDurableReplyRun(db,identity,budget,{
           signal:controller.signal,emit,
           async invoke(step,delta){
             const messages=canonicalReplyContext(step.state,identity,settings.recentTurns);
             const lastUser=messages.at(-1);
             const turn=step.state.turns.find(t=>t.id===identity.turnId);
-            const attachmentIds=(turn.user.variants[turn.user.active].attachments||[]).map(a=>a.id);
+            const activeUser=turn.user.variants[turn.user.active];
+            const attachmentIds=(activeUser.attachments||[]).map(a=>a.id);
+            const groupDogtalk=step.index===0?await prepareReplyGroupDogtalk(db,{conversationId:identity.conversationId,turnId:identity.turnId,user:activeUser,submission:value.dogtalk}):deliveredDogtalk;
             const assembled=await assembleCleanContext(env,{
               conversationId:identity.conversationId,sourceTurnId:identity.turnId,messages,lastUser,
               settings,localDate:localDate(value.local_date),localDateTime:value.local_datetime,
               realityContext:value.reality_context,realityAllowedFields:PWA_REALITY_FIELDS,
               surface:conversationSurface(conversation.room_type),model:value.model,
-              permission:'owner',recentEntryIds:value.recent_entry_ids,preview:step.index>0,crossWindow:value.cross_window,
+              permission:'owner',recentEntryIds:value.recent_entry_ids,preview:step.index>0,crossWindow:value.cross_window,groupDogtalk,
             });
             const resolved=attachmentIds.length?await resolveChatAttachmentsForModel(env,db,{
               conversationId:identity.conversationId,turnId:identity.turnId,attachmentIds,modelId:value.model
@@ -540,6 +544,7 @@ async function replySequenceChat(request,env){
             }
             if(!receipt||!content.trim()||!finishReason)throw new ChatStoreError('reply_sequence_incomplete','模型未返回可保存的完整回复。',502);
             const desk=withRuntimeDeskSlip(assembled.deskSlip(),{attachments:attachmentDeskReceipt(resolved),serverTools});
+            if(step.index===0)deliveredDogtalk=desk.dogtalk?.delivered&&desk.dogtalk.context?{context:desk.dogtalk.context,selected:true,reason:'same_group'}:null;
             if(step.previous.length)desk.reply_sequence_previous=step.previous.map(v=>({message_id:v.id,content:v.content}));
             return {variant:{id:step.messageId,content,model_id:model,finish_reason:finishReason,generation_source:'chat',
               ...(usage?{usage}:{}),furniture_runs:assembled.furnitureRuns(),

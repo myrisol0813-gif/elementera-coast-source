@@ -163,7 +163,7 @@ function mergeModelReads(previous, next) {
 
 export async function assembleCleanContext(env, {
   surface, conversationId, roomId, visitorId, sourceTurnId = null, messages = [], lastUser, settings = {}, localDate = new Date().toISOString().slice(0, 10),
-  localDateTime = '', realityContext = null, realityAllowedFields = null, recentEntryIds = [], authScope = null, model = '', permission: requestedPermission, preview = false, baseSystemPrompt = '', exposeTools = true, initialFurniture = [], crossWindow = null,
+  localDateTime = '', realityContext = null, realityAllowedFields = null, recentEntryIds = [], authScope = null, model = '', permission: requestedPermission, preview = false, baseSystemPrompt = '', exposeTools = true, initialFurniture = [], crossWindow = null, groupDogtalk = undefined,
 } = {}) {
   const permission = requestedPermission || (surface === 'mailbox_visitor' ? 'visitor' : 'owner');
   const access = roomAccess(surface, { permission, visitorId }); const request = requestSettings(settings);
@@ -201,7 +201,7 @@ export async function assembleCleanContext(env, {
   const budgetPolicy = await contextBudgetForModel(env, settings, model, modelVisibleTools);
   const [worldbook, directDogtalk, manualCrossWindow, reality] = await Promise.all([
     request.worldbookEnabled && request.worldbookLimit ? matchWorldbook(env.COAST_CHAT_DB, { input: query, messages: recent.slice(0, -1), surface, allowedScopes: access.worldbook, limit: request.worldbookLimit }) : Promise.resolve([]),
-    OWNER_CUSTOM_INSTRUCTION_SURFACES.has(surface) ? dogtalkContext(env.COAST_CHAT_DB, { room_scope: 'conversation', conversation_id: conversationId }, query, { consume_direct: !preview }) : Promise.resolve(null),
+    OWNER_CUSTOM_INSTRUCTION_SURFACES.has(surface) ? (groupDogtalk!==undefined?Promise.resolve(groupDogtalk):dogtalkContext(env.COAST_CHAT_DB, { room_scope: 'conversation', conversation_id: conversationId }, query, { consume_direct: !preview })) : Promise.resolve(null),
     crossWindowRequest.mode === 'manual'
       ? readCrossWindow(env.COAST_CHAT_DB, { ...crossWindowRequest, current_conversation_id: conversationId })
       : Promise.resolve(null),

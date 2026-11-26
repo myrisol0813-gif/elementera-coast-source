@@ -274,3 +274,19 @@ assert.equal(
 );
 
 console.log('dogtalk: ok');
+
+const previewScope={room_scope:'conversation',conversation_id:conversation.id};
+const previewDraft=await saveMysticDogtalk(db,{...previewScope,body:'preview must not consume',read_mode:'read_now'});
+assert.equal((await dogtalkContext(db,previewScope,'',{consume_direct:false})).selected,true);
+assert.equal((await getMysticDogtalk(db,previewScope)).read_mode,'read_now');
+assert.equal((await dogtalkContext(db,previewScope)).context.includes('preview must not consume'),true);
+assert.equal((await getMysticDogtalk(db,previewScope)).read_mode,'keep_private');
+const {prepareReplyGroupDogtalk}=await import('../functions/dogtalk-store.js');
+const groupSubmission={...previewScope,body:'authorized group text',read_mode:'read_now',snapshot_id:'dogtalk-snapshot-group-test'};
+await assert.rejects(()=>prepareReplyGroupDogtalk(db,{conversationId:conversation.id,turnId:'group-turn',user:{},submission:groupSubmission}),/不属于/);
+const groupContext=await prepareReplyGroupDogtalk(db,{conversationId:conversation.id,turnId:'group-turn',user:{dogtalk_snapshot_id:groupSubmission.snapshot_id},submission:groupSubmission});
+assert.match(groupContext.context,/authorized group text/);
+await saveMysticDogtalk(db,{...previewScope,body:'new draft must remain',read_mode:'read_now'});
+await assert.rejects(()=>prepareReplyGroupDogtalk(db,{conversationId:conversation.id,turnId:'group-turn',user:{dogtalk_snapshot_id:groupSubmission.snapshot_id},submission:groupSubmission}),/已有/);
+assert.equal((await getMysticDogtalk(db,previewScope)).body,'new draft must remain');
+assert.equal((await getMysticDogtalk(db,previewScope)).read_mode,'read_now');

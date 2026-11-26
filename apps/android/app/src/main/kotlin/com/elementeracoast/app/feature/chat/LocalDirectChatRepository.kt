@@ -48,7 +48,6 @@ internal class LocalDirectChatRepository(
             val h=cache.history(cid)?:error("原窗口不存在")
             val cfg=h.contextSettings
             require(!cfg.stickerAddEnabled&&!cfg.stickerSendEnabled&&cache.profile()?.currentImageModel.isNullOrBlank()){"本机连续回复媒体工具尚未接通。"}
-            require(LocalDogtalkStore(store).pending(cid,knowledge.surfaceFor(cid),tid)==null){"本机连续回复私人草稿递送尚未接通。"}
             h
         }}catch(e:CancellationException){throw e}catch(e:Exception){
             throw CoastApiException(CoastApiErrorKind.Request,"local_reply_preflight",e.message.orEmpty().take(240).ifBlank{"连续回复准备失败。"})
@@ -56,6 +55,7 @@ internal class LocalDirectChatRepository(
         val acquired=withContext(Dispatchers.IO){ledger.acquire(request)}
         if(!acquired)throw CoastApiException(CoastApiErrorKind.Request,"reply_run_not_acquired","连续回复任务未取得资格；没有调用模型。")
         var saved=0;var status="completed";var detail:String?=null
+        var deliveredDogtalk=""
         try{
             val max=withContext(Dispatchers.IO){ledger.maxMessages(cid,seq)}
             emit(ReplyRunEvent.Start(max))
@@ -70,9 +70,9 @@ internal class LocalDirectChatRepository(
                 val attachmentIds=ChatSyncMapper.activeAttachmentIds(claim.history,tid)
                 val policy=client.inputBudget(provider,model,context,output,claim.mayContinue||claim.tools>0&&(cfg.localModelToolsEnabled||cfg.localModelWriteEnabled||cfg.crossWindowAuto))
                 val prepared=withContext(Dispatchers.IO){
-                    require(LocalDogtalkStore(store).pending(cid,knowledge.surfaceFor(cid),tid)==null){"本机连续回复私人草稿递送尚未接通。"}
-                    knowledge.context(ChatSyncMapper.contextMessages(claim.history,tid,recent),policy.comfort,knowledge.surfaceFor(cid),cid,attachmentIds,tid,request.crossWindow,request.realityContext?:RemoteRealityContext(),policy)
+                    knowledge.context(ChatSyncMapper.contextMessages(claim.history,tid,recent),policy.comfort,knowledge.surfaceFor(cid),cid,attachmentIds,tid,request.crossWindow,request.realityContext?:RemoteRealityContext(),policy,groupDogtalk=if(index==0)null else deliveredDogtalk)
                 }
+                if(index==0)deliveredDogtalk=prepared.receipt.dogtalk.context.takeIf{prepared.receipt.dogtalk.delivered}.orEmpty()
                 val messages=prepared.messages+claim.previous.map{RemoteChatMessage("assistant",it.content)}
                 val session=if(claim.tools>0)withContext(Dispatchers.IO){knowledge.toolSession(cid,tid,request.crossWindow,prepared.receipt,request.model,policy.wireLimit,messageId=null)}else null
                 var content="";var done:LocalProviderEvent.Done?=null

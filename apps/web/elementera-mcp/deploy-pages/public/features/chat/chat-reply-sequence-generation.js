@@ -15,8 +15,8 @@ export function createReplySequenceGenerator({runtime,toast,dogtalk,setHistory,c
     if(!userId)return false;
     const cfg=resolveReplySequenceBudget(runtime.runSettings()||{},original.context_settings,branch.assistants.length);
     if(!cfg.maxMessages){toast('当前回复分支已满，请先整理旧版本；没有发起模型请求。');return false;}
-    if(runtime.profile.current_image_model||original.context_settings.sticker_send_enabled||original.context_settings.sticker_add_enabled||dogtalkSubmission){
-      toast('连续回复的媒体工具、私人草稿尚未接通；没有偷偷切换普通回复。');return false;
+    if(runtime.profile.current_image_model||original.context_settings.sticker_send_enabled||original.context_settings.sticker_add_enabled){
+      toast('连续回复的媒体工具尚未接通；没有偷偷切换普通回复。');return false;
     }
     const sequenceId=crypto.randomUUID(),controller=new AbortController();
     const task={conversationId,turnId,userIndex:branch.userIndex,assistantIndex:-1,controller,sequenceId};
@@ -31,7 +31,7 @@ export function createReplySequenceGenerator({runtime,toast,dogtalk,setHistory,c
       if(controller.signal.aborted)return true;
       const payload={conversation_id:conversationId,source_turn_id:turnId,user_variant_id:userId,sequence_id:sequenceId,
         model:modelId,settings:requestContext.settings,budget:cfg,local_date:localDateKey(),local_datetime:localDateTimeKey(),
-        recent_entry_ids:requestContext.recentEntryIds,...(crossWindowSubmission?{cross_window:crossWindowSubmission}:{})};
+        recent_entry_ids:requestContext.recentEntryIds,...(crossWindowSubmission?{cross_window:crossWindowSubmission}:{}),...(dogtalkSubmission?{dogtalk:dogtalkSubmission}:{})};
       await requestChatStream(payload,{endpoint:API.replySequence,signal:controller.signal,onEvent:item=>{
         const data=item.data||{};
         if(runtime.deletedIds.has(conversationId)){controller.abort();return;}
