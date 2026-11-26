@@ -349,7 +349,7 @@ internal class LocalToolSession private constructor(
     }
     private fun JsonObject.filterMetadata()=JsonObject(filterKeys{it !in setOf("reading_logs","progress")})
     companion object {
-        const val MAX_CALLS=12
+        const val MAX_CALLS=com.elementeracoast.app.core.network.TurnToolPolicy.MAX_CALLS
         private val WRITE_NAMES=setOf("image_generate","voice_create","create_moment","create_diary","moment_comment","moment_like","calendar_create","library_write","memory_write_candidate","global_excerpt_propose","user_portrait_propose")
         fun open(store:LocalPersistence,cid:String,turn:String,request:RemoteCrossWindowRequest?,base:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null,web:LocalIndependentWeb?=null,voice:LocalVoiceProvider?=null,image:LocalImageTool?=null):LocalToolSession?{
             val h=RemoteCacheStore(store,strictReads=true).history(cid)?:return null

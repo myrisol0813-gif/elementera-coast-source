@@ -10,8 +10,12 @@ data class RemoteNativeChatContext(
     val ok: Boolean = false,
     @SerialName("model_messages") val modelMessages: JsonArray = JsonArray(emptyList()),
     val tools: JsonArray = JsonArray(emptyList()),
-    @SerialName("desk_slip") val deskSlip: RemoteDeskSlip = RemoteDeskSlip()
+    @SerialName("desk_slip") val deskSlip: RemoteDeskSlip = RemoteDeskSlip(),
+    val limitations: RemoteNativeToolLimits? = null
 )
+
+@Serializable
+data class RemoteNativeToolLimits(@SerialName("max_tools_per_turn") val maxToolsPerTurn: Int = 12)
 
 @Serializable
 data class RemoteNativeToolResult(

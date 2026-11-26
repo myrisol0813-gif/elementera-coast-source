@@ -2,6 +2,7 @@ package com.elementeracoast.app.core.local
 
 import com.elementeracoast.app.core.network.CoastApiErrorKind
 import com.elementeracoast.app.core.network.CoastApiException
+import com.elementeracoast.app.core.network.TurnToolPolicy
 import com.elementeracoast.app.core.remote.RemoteChatMessage
 import java.io.IOException
 import java.util.concurrent.TimeUnit
@@ -180,7 +181,8 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
         val reader=launch(Dispatchers.IO) {
             try {
                 var callsMade=0
-                for(round in 0..LocalToolSession.MAX_CALLS){
+                for(round in 0..TurnToolPolicy.MAX_ROUNDS){
+                    val finalOnly=TurnToolPolicy.finalOnly(round,callsMade)
                     val payload=buildJsonObject {
                         put("model",model);put("stream",true)
                         val host=normalizeLocalProviderUrl(p.baseUrl).toHttpUrl().host
@@ -189,7 +191,7 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                         put(if(official)"max_completion_tokens"else "max_tokens",maxTokens.coerceIn(64,65536))
                         put("messages",JsonArray(history))
                         temperature?.let{put("temperature",it)}
-                        if(session!=null){put("tools",session.completionsTools);put("tool_choice",if(round==LocalToolSession.MAX_CALLS||callsMade>=LocalToolSession.MAX_CALLS)"none"else "auto")}
+                        if(session!=null){put("tools",session.completionsTools);put("tool_choice",if(finalOnly)"none"else "auto")}
                     }
                     val call=http.newCall(request(p,"/chat/completions").header("Accept","text/event-stream").post(payload.toString().toRequestBody(media)).build())
                     active.set(call)
@@ -236,8 +238,11 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                         val finish=reason?:"stop"
                         send(LocalProviderEvent.Done(finish,echo.metadata(finish)));close();return@launch
                     }
-                    if(session==null||round==LocalToolSession.MAX_CALLS||callsMade+pending.size>LocalToolSession.MAX_CALLS||reason!="tool_calls")throw CoastApiException(CoastApiErrorKind.Model,"local_tool_limit","本机工具调用超限或协议不完整。")
-                    callsMade+=pending.size
+                    if(session==null||reason!="tool_calls")throw CoastApiException(CoastApiErrorKind.Model,"local_tool_format","供应商未返回兼容的工具调用。")
+                    if(finalOnly){
+                        send(LocalProviderEvent.Delta(TurnToolPolicy.LIMIT_NOTICE))
+                        send(LocalProviderEvent.Done("stop",echo.metadata("stop")));close();return@launch
+                    }
                     require(pending.values.all{it.id.isNotBlank()&&it.name.isNotBlank()})
                     val calls=pending.values.map{part->buildJsonObject{
                         put("id",part.id.toString());put("type","function")
@@ -245,7 +250,10 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                     }}
                     history.add(buildJsonObject{put("role","assistant");put("content",if(roundText.isEmpty())JsonNull else JsonPrimitive(roundText.toString()));put("tool_calls",JsonArray(calls))})
                     for(part in pending.values){
-                        val result=session.execute(part.id.toString(),part.name.toString(),part.arguments.toString())
+                        val result=if(TurnToolPolicy.canExecute(callsMade)){
+                            callsMade++
+                            session.execute(part.id.toString(),part.name.toString(),part.arguments.toString())
+                        }else com.elementeracoast.app.core.remote.RemoteNativeToolResult(ok=false,output=TurnToolPolicy.LIMIT_RECEIPT,deskSlip=session.receipt)
                         history.add(buildJsonObject{put("role","tool");put("tool_call_id",part.id.toString());put("content",result.output)})
                         send(LocalProviderEvent.Tool(part.id.toString(),part.name.toString(),result))
                     }
@@ -254,7 +262,17 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                 }
             }catch(e:CancellationException){throw e}
             catch(e:CoastApiException){close(e)}
-            catch(_:Exception){close(CoastApiException(CoastApiErrorKind.Stream,"local_provider_stream","模型连接中断、工具预算超限或返回格式不兼容。"))}
+            catch(e:Exception){
+                val (kind,code,message)=when(e){
+                    is java.net.SocketTimeoutException -> Triple(CoastApiErrorKind.Network,"timeout","等待供应商回复超时。")
+                    is java.net.UnknownHostException -> Triple(CoastApiErrorKind.Network,"dns","供应商域名解析失败。")
+                    is javax.net.ssl.SSLException -> Triple(CoastApiErrorKind.Network,"tls","供应商安全连接失败。")
+                    is java.io.IOException -> Triple(CoastApiErrorKind.Network,"connection","供应商网络传输中断。")
+                    is IllegalArgumentException -> if(e.message=="工具续请求超出预算。") Triple(CoastApiErrorKind.Model,"budget","本轮工具续请求超出上下文预算。") else Triple(CoastApiErrorKind.Decode,"format","供应商返回或工具参数格式不兼容。")
+                    else -> Triple(CoastApiErrorKind.Decode,"processing","模型响应处理未完成。")
+                }
+                close(CoastApiException(kind,"local_provider_"+code,message))
+            }
         }
         awaitClose{active.getAndSet(null)?.cancel();reader.cancel()}
     }

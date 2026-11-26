@@ -6,7 +6,7 @@ import { json, methodNotAllowed, readJson, sameOrigin } from './http.js';
 import { saveModelEcho } from './model-metadata-api.js';
 
 const BODY_BYTES = 2 * 1024 * 1024;
-const MAX_TOOLS_PER_TURN = 12;
+const MAX_TOOLS_PER_TURN = 24;
 
 function assertRequest(request) {
   if (request.method !== 'POST') return methodNotAllowed('POST');
