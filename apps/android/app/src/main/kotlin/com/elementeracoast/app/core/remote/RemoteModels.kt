@@ -269,7 +269,8 @@ data class RemoteChatRequest(
     @SerialName("cross_window") val crossWindow: RemoteCrossWindowRequest? = null,
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.ALWAYS)
     val stream: Boolean = true,
-    @SerialName("client_info") val clientInfo: String = "native_android"
+    @SerialName("client_info") val clientInfo: String = "native_android",
+    @SerialName("image_tool_enabled") val imageToolEnabled: Boolean = false
 )
 
 @Serializable

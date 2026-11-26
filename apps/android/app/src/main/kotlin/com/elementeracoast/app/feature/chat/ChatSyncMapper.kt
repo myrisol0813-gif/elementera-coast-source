@@ -120,6 +120,24 @@ object ChatSyncMapper {
         return history.copy(updatedAt = Instant.now().toString(), turns = turns)
     }
 
+    /** Complete the exact persisted image-capable reply without creating a new
+     * variant or copying the generated attachment to a different user branch. */
+    fun completeReservedAssistant(history: RemoteHistory, turnId: String, userId: String, messageId: String,
+        content: String, modelId: String, reason: String, runs: List<RemoteFurnitureRun> = emptyList(),
+        desk: RemoteDeskSlip? = null, error: String? = null,
+        echo: com.elementeracoast.app.core.remote.RemoteModelMetadata? = null): RemoteHistory {
+        val turn=history.turns.firstOrNull{it.id==turnId}?:error("原轮次已不存在")
+        val key=turn.user.variants.indexOfFirst{it.id==userId}.also{require(it>=0)}.toString()
+        val branch=turn.assistant.variantsByUserVariant[key].orEmpty()
+        require(branch.count{it.id==messageId}==1){"原回复版本已不存在"}
+        val original=branch.first{it.id==messageId}
+        require(original.finishReason!="image_pending"){"图像仍在生成，未覆盖"}
+        val updated=original.copy(content=content,modelId=modelId,finishReason=reason,errorDetail=error,
+            furnitureRuns=runs,deskSlip=desk,usage=echo?.usage?:original.usage,modelEcho=echo?.copy(usage=null)?:original.modelEcho)
+        val next=turn.copy(assistant=turn.assistant.copy(variantsByUserVariant=turn.assistant.variantsByUserVariant+(key to branch.map{if(it.id==messageId)updated else it})))
+        return history.copy(updatedAt=Instant.now().toString(),turns=history.turns.map{if(it.id==turnId)next else it})
+    }
+
     fun contextMessages(history: RemoteHistory, targetTurnId: String, recentTurns: Int): List<RemoteChatMessage> {
         val messages = buildList {
             for (turn in history.turns) {

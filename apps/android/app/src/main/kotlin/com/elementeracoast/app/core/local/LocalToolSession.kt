@@ -17,7 +17,8 @@ internal class LocalToolSession private constructor(
     base:RemoteDeskSlip,
     private val wireLimit:Int?=null,
     private val web:LocalIndependentWeb?=null,
-    private val voice:LocalVoiceProvider?=null
+    private val voice:LocalVoiceProvider?=null,
+    private val image:LocalImageTool?=null
 ) {
     private data class Spec(val name:String,val key:String,val title:String,val description:String,val parameters:JsonObject)
     private fun schema(fields:Map<String,JsonObject> = emptyMap(),required:List<String> = emptyList())=buildJsonObject {
@@ -51,6 +52,7 @@ internal class LocalToolSession private constructor(
             add(Spec("worldbook_list","worldbook.list","翻世界书","按关键词查找当前屋主可读的词条。",schema(mapOf("query" to string()),listOf("query"))))
         }
         if(writeAllowed){
+            if(image!=null)add(Spec("image_generate","image.generate","绘制图片","自行决定是否绘制一张图，使用已选生图模型、正常API计费。本轮至多一次；只发送必要绘图提示。收到原件像素才可声称看见。",schema(mapOf("prompt" to string(4000)),listOf("prompt"))))
             if(voice?.configured()==true) add(Spec("voice_create","voice.create","留下语音","把自己写的一小段文字念成真实MP3，保存到当前轮次。使用已授权的独立ElevenLabs额度，一轮至多一次；只发送待朗读文字。",schema(mapOf("text" to string(2400)),listOf("text"))))
             if(base.thinkingSoil.enabled && LocalPortraitStore(store).read("self_portrait")?.root?.get("write_enabled")?.jsonPrimitive?.int != 0)
                 add(Spec("global_excerpt_propose","memory.global_excerpt_propose","提出自我画像修改稿","仅在自动整理和画像写入均开启时提出整篇完整修改稿，说明长期价值；只进入待确认区，不覆盖正式正文。本机单次工具参数最多12000字符；不要提交截断的正文。",schema(mapOf("proposed_body" to string(10000),"reason" to string(4000),"change_kind" to string(40)),listOf("proposed_body","reason"))))
@@ -95,7 +97,8 @@ internal class LocalToolSession private constructor(
     private fun allowedNow(s:LocalPersistence,spec:Spec):Boolean {
         val cache=RemoteCacheStore(s,strictReads=true)
         val h=cache.history(cid)?:return false
-        if(cache.conversations().none{it.id==cid&&it.deletedAt==null}||h.turns.firstOrNull{it.id==turn}!=sourceTurn)return false
+        val now=h.turns.firstOrNull{it.id==turn}?:return false
+        if(cache.conversations().none{it.id==cid&&it.deletedAt==null}||!(image?.sameTurn(sourceTurn,now)?: (now==sourceTurn)))return false
         return when {
             spec.name in setOf("global_excerpt_propose","user_portrait_propose") -> writeAllowed&&h.contextSettings.localModelWriteEnabled&&LocalSoilStore(s).current(cid)?.get("auto_refresh_enabled")?.jsonPrimitive?.int==1&&LocalPortraitStore(s).read(if(spec.name=="user_portrait_propose")"user_portrait" else "self_portrait")?.root?.get("write_enabled")?.jsonPrimitive?.int!=0
             spec.name in WRITE_NAMES -> writeAllowed&&h.contextSettings.localModelWriteEnabled
@@ -117,6 +120,7 @@ internal class LocalToolSession private constructor(
         if(calls>=MAX_CALLS||callId.isBlank()||!seenCalls.add(callId))return errorResult("工具次数上限或重复调用。")
         calls++
         val start=System.currentTimeMillis()
+        if(name=="image_generate")return executeImage(spec,arguments,start)
         if(name=="voice_create")return executeVoice(spec,arguments,start)
         if(name in WRITE_NAMES)return executeWrite(spec,arguments,start)
         var success=false
@@ -165,6 +169,22 @@ internal class LocalToolSession private constructor(
         reports.add(RemoteDeskToolResult(name=name,delivered=true,content=if(success&&spec.key.startsWith("web.independent_"))output.toString() else if(success)"成功返回 "+output.toString().length+" 字符"else output["message"]?.jsonPrimitive?.contentOrNull.orEmpty()))
         val run=RemoteFurnitureRun(id=auditId,toolKey=spec.key,label=spec.title,status=if(success)"success"else "error")
         return RemoteNativeToolResult(ok=success,output=output.toString(),furnitureRuns=listOf(run),deskSlip=receipt)
+    }
+    fun takePrivateContinuation():List<JsonObject> = image?.takeContinuation().orEmpty()
+    private fun executeImage(spec:Spec,arguments:String,start:Long):RemoteNativeToolResult {
+        val id=UUID.randomUUID().toString()
+        val output=try{
+            require(arguments.length<=6000)
+            val input=parseInput(spec,arguments)
+            if(!store.readConsistent{s->allowedNow(s,spec)})throw LocalToolFailure("permission_revoked","原窗口或写入权限已变化。")
+            if(estimated+estimate(arguments)+2600>toolBudget)throw LocalToolFailure("budget_exceeded","本轮工具预算不足，未发起绘图。")
+            requireNotNull(image).execute(input)
+        }catch(e:Exception){buildJsonObject{put("ok",false);put("code",if(e is ManualImageFailure)e.type else if(e is LocalToolFailure)e.code else "image_failed");put("message","绘图未确认完成，不自动重试。")}}
+        val success=output["ok"]?.jsonPrimitive?.booleanOrNull==true
+        estimated+=estimate(arguments.take(6000))+estimate(output.toString())+32+(if(success&&output["readback"]?.jsonObject?.get("status")?.jsonPrimitive?.contentOrNull=="prepared")2048 else 0)
+        runCatching{store.readConsistent{s->auditWrite(s,id,spec.key,start,success)}}
+        reports.add(RemoteDeskToolResult(name=spec.name,delivered=true,content=output.toString()))
+        return RemoteNativeToolResult(ok=success,output=output.toString(),deskSlip=receipt,furnitureRuns=listOf(RemoteFurnitureRun(id=id,toolKey=spec.key,label=spec.title,status=if(success)"success"else "error")))
     }
     private var voiceAttempted=false
     private fun executeVoice(spec:Spec,arguments:String,start:Long):RemoteNativeToolResult {
@@ -330,15 +350,15 @@ internal class LocalToolSession private constructor(
     private fun JsonObject.filterMetadata()=JsonObject(filterKeys{it !in setOf("reading_logs","progress")})
     companion object {
         const val MAX_CALLS=12
-        private val WRITE_NAMES=setOf("voice_create","create_moment","create_diary","moment_comment","moment_like","calendar_create","library_write","memory_write_candidate","global_excerpt_propose","user_portrait_propose")
-        fun open(store:LocalPersistence,cid:String,turn:String,request:RemoteCrossWindowRequest?,base:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null,web:LocalIndependentWeb?=null,voice:LocalVoiceProvider?=null):LocalToolSession?{
+        private val WRITE_NAMES=setOf("image_generate","voice_create","create_moment","create_diary","moment_comment","moment_like","calendar_create","library_write","memory_write_candidate","global_excerpt_propose","user_portrait_propose")
+        fun open(store:LocalPersistence,cid:String,turn:String,request:RemoteCrossWindowRequest?,base:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null,web:LocalIndependentWeb?=null,voice:LocalVoiceProvider?=null,image:LocalImageTool?=null):LocalToolSession?{
             val h=RemoteCacheStore(store,strictReads=true).history(cid)?:return null
             val cross=h.contextSettings.crossWindowAuto&&request?.mode=="model_decides"
             val tools=h.contextSettings.localModelToolsEnabled
             val write=h.contextSettings.localModelWriteEnabled&&modelId.isNotBlank()
             if(!cross&&!tools&&!write)return null
             val sourceTurn=h.turns.firstOrNull{it.id==turn}?:return null
-            return LocalToolSession(store,cid,turn,sourceTurn,cross,tools,write,modelId,base,wireLimit,web?.takeIf{request?.mode!="keyword"&&LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},voice?.takeIf{LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")})
+            return LocalToolSession(store,cid,turn,sourceTurn,cross,tools,write,modelId,base,wireLimit,web?.takeIf{request?.mode!="keyword"&&LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},voice?.takeIf{LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},image)
         }
     }
 }

@@ -125,8 +125,34 @@ class LocalAttachmentArchiveTest {
         assertArrayEquals(png,LocalAttachmentStore(store).bytes(original))
         assertTrue(runCatching{runLocalManualImageGeneration(store,config,input,discover,mock)}.isFailure);assertEquals(1,calls)
         val failed=JsonObject(input+("message_id" to JsonPrimitive("assistant2")))
-        assertTrue(runCatching{runLocalManualImageGeneration(store,config,failed,discover){_,_->error("private upstream failure")}}.isFailure)
+        assertTrue(runCatching{runLocalManualImageGeneration(store,config,failed,discover,generate={_,_->error("private upstream failure")})}.isFailure)
         assertEquals("image_failed",cache.history(cid)!!.turns.single().assistant.variantsByUserVariant.getValue("0").last().finishReason)
         assertEquals(1,LocalAttachmentStore(store).entries().size)
     }
+
+    @Test fun autonomousImageKeepsExactAssistantAndReturnsOnlyPrivatePixels(){
+        val store=MemoryLocalPersistence();val cid="image-tool";val cache=RemoteCacheStore(store)
+        val config=LocalProviderConfig("image","image","https://openrouter.ai/api/v1","test-key",listOf("fixture/paid"))
+        cache.putConversations(listOf(RemoteConversation(cid,"图片","main")))
+        cache.putProfile(RemoteProfile(currentImageModel=config.modelId("fixture/paid")))
+        val base=RemoteHistory(conversationId=cid,turns=listOf(RemoteTurn("turn1",user=RemoteUserBranch(0,listOf(RemoteVariant("user1","draw"))))))
+        val enabled=base.copy(contextSettings=base.contextSettings.copy(localModelWriteEnabled=true))
+        val prepared=com.elementeracoast.app.feature.chat.ChatSyncMapper.appendAssistant(enabled,"turn1","","chat/model","image_tool_ready",assistantVariantId="assistant1")
+        cache.putHistory(cid,prepared)
+        val input=buildJsonObject{put("conversation_id",cid);put("turn_id","turn1");put("user_variant_id","user1");put("message_id","assistant1");put("prompt","wolf")}
+        val png=byteArrayOf(137.toByte(),80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,6,0,0,0)
+        var calls=0;var privateResult:SavedGeneratedImage?=null
+        val discover:(String)->List<LocalImageProvider.Model> = {listOf(LocalImageProvider.Model("fixture/paid","paid",false))}
+        val generate:(LocalImageProvider.Config,JsonObject)->LocalImageProvider.Generated={c,p->calls++;LocalImageProvider.Generated(png,"image/png","openrouter",c.model,null,0.025,p.getValue("prompt").jsonPrimitive.content)}
+        val result=runLocalManualImageGeneration(store,config,input,discover,generate,modelTool=true,visionSupported=true,expectedModel=config.modelId("fixture/paid"),onSaved={privateResult=it})
+        assertTrue(!result.toString().contains("data:image"))
+        val pixel=privateResult!!.readback.continuationMessage!!.getValue("content").jsonArray[1].jsonObject.getValue("image_url").jsonObject.getValue("url").jsonPrimitive.content
+        assertEquals("data:image/png;base64,"+java.util.Base64.getEncoder().encodeToString(png),pixel)
+        val completed=com.elementeracoast.app.feature.chat.ChatSyncMapper.completeReservedAssistant(cache.history(cid)!!,"turn1","user1","assistant1","here","chat/model","stop")
+        val reply=completed.turns.single().assistant.variantsByUserVariant.getValue("0").single()
+        assertEquals("assistant1",reply.id);assertEquals("here",reply.content);assertEquals(privateResult!!.attachment,reply.attachments.single())
+        assertTrue(runCatching{runLocalManualImageGeneration(store,config,input,discover,generate,modelTool=true)}.isFailure)
+        assertEquals(1,calls)
+    }
+
 }

@@ -168,7 +168,7 @@ internal object ArchiveV2Attachments{
 /** Store original atomically in the existing workspace, not in a human upload
  * draft. The caller still owns committing the exact assistant variant. */
 internal data class SavedGeneratedImage(val attachment:RemoteAttachment,val readback:GeneratedImageReadback)
-internal fun saveGeneratedImageOriginal(store:LocalPersistence,cid:String,tid:String,messageId:String,generated:LocalImageProvider.Generated,visionSupported:Boolean?,reservedUserId:String?=null):SavedGeneratedImage{
+internal fun saveGeneratedImageOriginal(store:LocalPersistence,cid:String,tid:String,messageId:String,generated:LocalImageProvider.Generated,visionSupported:Boolean?,reservedUserId:String?=null,modelTool:Boolean=false):SavedGeneratedImage{
     val idPattern=Regex("[A-Za-z0-9_.:-]{1,160}")
     require(listOf(cid,tid,messageId).all{idPattern.matches(it)})
     val model=Regex("[a-z0-9][a-z0-9_.-]{0,79}/[a-z0-9][a-z0-9_.-]{0,119}(:free)?",RegexOption.IGNORE_CASE)
@@ -196,7 +196,7 @@ internal fun saveGeneratedImageOriginal(store:LocalPersistence,cid:String,tid:St
             val i=t.user.variants.indexOfFirst{it.id==reservedUserId};require(i>=0)
             val k=i.toString();val branch=t.assistant.variantsByUserVariant[k].orEmpty()
             require(branch.count{it.id==messageId&&it.finishReason=="image_pending"&&it.attachments.isEmpty()}==1){"原回复版本已不再等待生成图像。"}
-            val next=t.copy(assistant=t.assistant.copy(variantsByUserVariant=t.assistant.variantsByUserVariant+(k to branch.map{if(it.id==messageId)it.copy(content="",attachments=listOf(attachment),finishReason="stop",errorDetail=null)else it})))
+            val next=t.copy(assistant=t.assistant.copy(variantsByUserVariant=t.assistant.variantsByUserVariant+(k to branch.map{if(it.id==messageId)it.copy(content="",attachments=listOf(attachment),finishReason=if(modelTool)"image_saved"else "stop",errorDetail=null)else it})))
             cache.putHistory(cid,history.copy(updatedAt=java.time.Instant.ofEpochMilli(stamp).toString(),turns=history.turns.map{if(it.id==tid)next else it}))
         }
         SavedGeneratedImage(attachment,prepareGeneratedImageReadback(id,saved,generated.mime,visionSupported))
@@ -207,13 +207,14 @@ internal class ManualImageFailure(val type:String,override val message:String,va
 
 /** Explicit owner request, exact reserved branch, no repeated provider request.
  * The network is deliberately outside the workspace transaction and router lock. */
-internal fun runLocalManualImageGeneration(store:LocalPersistence,config:LocalProviderConfig?,input:JsonObject,discover:(String)->List<LocalImageProvider.Model> = {key->LocalImageProvider().discover(key)},generate:(LocalImageProvider.Config,JsonObject)->LocalImageProvider.Generated={c,p->LocalImageProvider().generate(c,p)}):JsonObject{
+internal fun runLocalManualImageGeneration(store:LocalPersistence,config:LocalProviderConfig?,input:JsonObject,discover:(String)->List<LocalImageProvider.Model> = {key->LocalImageProvider().discover(key)},generate:(LocalImageProvider.Config,JsonObject)->LocalImageProvider.Generated={c,p->LocalImageProvider().generate(c,p)},modelTool:Boolean=false,visionSupported:Boolean?=null,expectedModel:String?=null,onSaved:((SavedGeneratedImage)->Unit)?=null):JsonObject{
     fun fail(type:String,message:String,status:Int=400):Nothing=throw ManualImageFailure(type,message,status)
     if(input.keys!=setOf("conversation_id","turn_id","user_variant_id","message_id","prompt"))fail("image_request_invalid","生成图像请求无效。")
     fun str(k:String)=(input[k] as? JsonPrimitive)?.takeIf{it.isString}?.content?:fail("image_request_invalid","缺少消息版本或绘图提示。")
     val cid=str("conversation_id");val tid=str("turn_id");val uid=str("user_variant_id");val mid=str("message_id");val prompt=str("prompt").trim()
     if(listOf(cid,tid,uid,mid).any{!Regex("[A-Za-z0-9_.:-]{1,160}").matches(it)}||prompt.length !in 1..4000)fail("image_request_invalid","缺少明确的消息版本或绘图提示。")
     val selected=RemoteCacheStore(store,strictReads=true).profile()?.currentImageModel.orEmpty()
+    if(expectedModel!=null&&selected!=expectedModel)fail("image_model_changed","生图模型选择已变化。",409)
     val model=config?.models?.firstOrNull{config.modelId(it)==selected&&Regex("[a-z0-9][a-z0-9_.-]{0,79}/[a-z0-9][a-z0-9_.-]{0,119}(:free)?",RegexOption.IGNORE_CASE).matches(it)}
     if(config==null||model==null||config.apiKey.isBlank()||config.baseUrl.trimEnd('/')!="https://openrouter.ai/api/v1")fail("image_not_configured","请在模型箱选择已配置的 OpenRouter 生图模型。",503)
     val catalog=try{discover(config.apiKey)}catch(_:Exception){fail("image_catalog_unavailable","无法核验生图模型目录，未发起生成。",502)}
@@ -227,17 +228,21 @@ internal fun runLocalManualImageGeneration(store:LocalPersistence,config:LocalPr
         val i=t.user.variants.indexOfFirst{it.id==uid}
         if(i<0||i!=t.user.active||t.user.variants[i].hidden)fail("generated_source_invalid","原消息版本已变化。",409)
         val existing=h.turns.flatMap{it.user.variants+it.assistant.variantsByUserVariant.values.flatten()}
-        if(existing.any{it.id==mid||it.finishReason=="image_pending"})fail("image_already_reserved","已有生成任务或此请求已使用；不会再次生成。",409)
         val k=i.toString();val branch=t.assistant.variantsByUserVariant[k].orEmpty()
-        if(branch.size>=20)fail("image_branch_full","当前回复版本已满。",409)
+        val target=branch.singleOrNull{it.id==mid}
+        if(modelTool&&!h.contextSettings.localModelWriteEnabled)fail("image_permission_revoked","本机模型写入权限未开启。",403)
+        if(existing.any{it.finishReason=="image_pending"}||(if(modelTool) target==null||target.hidden||target.finishReason!="image_tool_ready"||target.attachments.isNotEmpty()||existing.count{it.id==mid}!=1 else existing.any{it.id==mid}))fail("image_already_reserved","已有生成任务或此请求已使用；不会再次生成。",409)
+        if(!modelTool&&branch.size>=20)fail("image_branch_full","当前回复版本已满。",409)
         val now=java.time.Instant.now().toString()
         val pending=RemoteVariant(id=mid,content="",createdAt=now,modelId=model,finishReason="image_pending",generationSource="chat")
-        val next=t.copy(assistant=t.assistant.copy(variantsByUserVariant=t.assistant.variantsByUserVariant+(k to (branch+pending)),activeByUserVariant=t.assistant.activeByUserVariant+(k to branch.size)))
+        val variants=if(modelTool)branch.map{if(it.id==mid)it.copy(finishReason="image_pending")else it}else branch+pending
+        val next=t.copy(assistant=t.assistant.copy(variantsByUserVariant=t.assistant.variantsByUserVariant+(k to variants),activeByUserVariant=if(modelTool)t.assistant.activeByUserVariant else t.assistant.activeByUserVariant+(k to branch.size)))
         cache.putHistory(cid,h.copy(updatedAt=now,turns=h.turns.map{if(it.id==tid)next else it}))
     }
     try{
         val generated=generate(LocalImageProvider.Config(config.apiKey,model,true),buildJsonObject{put("prompt",prompt)})
-        val saved=saveGeneratedImageOriginal(store,cid,tid,mid,generated,null,uid)
+        val saved=saveGeneratedImageOriginal(store,cid,tid,mid,generated,visionSupported,uid,modelTool)
+        onSaved?.invoke(saved)
         val history=store.readConsistent{requireNotNull(RemoteCacheStore(it,strictReads=true).history(cid))}
         val codec=Json{encodeDefaults=false;explicitNulls=false}
         return buildJsonObject{put("ok",true);put("attachment",codec.encodeToJsonElement(RemoteAttachment.serializer(),saved.attachment));put("readback",saved.readback.receipt);put("history",codec.encodeToJsonElement(RemoteHistory.serializer(),history.copy(conversationId=cid)))}

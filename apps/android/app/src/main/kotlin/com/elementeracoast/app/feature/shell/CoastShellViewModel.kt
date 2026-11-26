@@ -1263,26 +1263,36 @@ class CoastShellViewModel(
             }
         } catch (cancelled: CancellationException) {
             if (replySaved) throw cancelled
-            val stopped = backend.chat.cancelledHistory(cleared, turnId, modelId, partial)
-            backend.chat.cacheHistory(conversationId, stopped)
-            withContext(NonCancellable) {
-                runCatching { backend.chat.persistHistory(conversationId, stopped) }
-            }
+            val stopped = withContext(NonCancellable) { settleInterruptedReply(conversationId,cleared,turnId,modelId,partial,null) }
             showHistory(conversationId, stopped)
             _state.update { it.copy(snackbarMessage = "已停止生成") }
             throw cancelled
         } catch (error: CoastApiException) {
-            val failed = backend.chat.failedHistory(cleared, turnId, modelId, error, partial)
-            backend.chat.cacheHistory(conversationId, failed)
-            withContext(NonCancellable) {
-                runCatching { backend.chat.persistHistory(conversationId, failed) }
-            }
+            val failed = withContext(NonCancellable) { settleInterruptedReply(conversationId,cleared,turnId,modelId,partial,error) }
             showHistory(conversationId, failed)
             handleBackendError(error, "模型回复失败", keepAuthenticatedOnNetworkError = true)
         } finally {
             generationRun?.apply { streaming = false; preview = null }
             _state.update(::generationUi)
         }
+    }
+
+    private suspend fun settleInterruptedReply(cid:String,base:RemoteHistory,tid:String,model:String,partial:String,failure:CoastApiException?):RemoteHistory {
+        val cached=backend.chat.cachedHistory(cid)
+        val fresh=runCatching{backend.chat.loadHistory(cid)}.getOrNull()
+        val mid=ChatSyncMapper.nextAssistantVariantId(base,tid)
+        val source=base.turns.firstOrNull{it.id==tid}
+        val uid=source?.user?.variants?.getOrNull(source.user.active)?.id.orEmpty()
+        fun reserved(h:RemoteHistory?)=h?.turns?.firstOrNull{it.id==tid}?.assistant?.variantsByUserVariant?.values?.flatten()?.firstOrNull{it.id==mid&&it.finishReason in setOf("image_tool_ready","image_pending","image_saved","image_failed")}
+        val v=reserved(fresh)
+        if(v!=null&&fresh!=null){
+            if(v.finishReason=="image_pending")return fresh
+            val next=runCatching{ChatSyncMapper.completeReservedAssistant(fresh,tid,uid,mid,partial,model,if(failure==null)"cancelled"else "error",error=failure?.message)}.getOrElse{return fresh}
+            return runCatching{backend.chat.persistHistory(cid,next)}.getOrElse{fresh}
+        }
+        if(fresh==null&&(reserved(cached)!=null||_state.value.currentImageModel.isNotBlank()))return cached?:base
+        val next=if(failure==null)backend.chat.cancelledHistory(base,tid,model,partial)else backend.chat.failedHistory(base,tid,model,failure,partial)
+        return runCatching{backend.chat.persistHistory(cid,next)}.getOrElse{fresh?:cached?:base}
     }
 
     private suspend fun refreshGeneratedTitle(conversationId: String, user: String, assistant: String) {
