@@ -183,7 +183,8 @@ internal object LocalSoilRun {
                 })
             }
         }))
-        val prompt = LocalSoilPrompt.text + (if(inputTurns.any{it.messages.isNotEmpty()})"\n若有 assistant_messages，按 index 阅读所有独立回复；assistant 仅为末条索引及摘录。truncated=true 表示摘录已裁短，不要推测省略内容。\n" else "") + input.toString()
+        val template=if(inputTurns.any{it.messages.isNotEmpty()})LocalSoilPrompt.text.replace("整理输入结构：\n","若有 assistant_messages，按 index 阅读所有独立回复；assistant 仅为末条索引及摘录。truncated=true 表示摘录已裁短，不要推测省略内容。\n\n整理输入结构：\n")else LocalSoilPrompt.text
+        val prompt = template + input.toString()
         Prepared(cid, model, row, history, inputTurns, portraits, prompt)
     }
     private data class Proposal(val update: Boolean, val body: String, val reason: String, val excerpt: String)

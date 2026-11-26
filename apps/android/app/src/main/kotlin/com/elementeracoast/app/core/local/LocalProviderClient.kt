@@ -27,7 +27,7 @@ sealed interface LocalProviderEvent {
     data class Tool(val id:String,val name:String,val result:com.elementeracoast.app.core.remote.RemoteNativeToolResult):LocalProviderEvent
 }
 
-internal data class LocalSequenceControl(val mayContinue:Boolean,val toolBudget:Int,val tokenBudget:Int){
+internal data class LocalSequenceControl(val mayContinue:Boolean,val toolBudget:Int,val tokenBudget:Int,val wireLimit:Int?=null){
     init{require(toolBudget in 0..128&&tokenBudget in 1..1000000)}
 }
 
@@ -209,6 +209,7 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                         }
                         val estimate=LocalContextPolicy.estimate(JsonArray(withoutImages).toString())+imageParts.size*2048+
                             LocalContextPolicy.estimate(exposed.toString())
+                        if(sequence.wireLimit?.let{estimate>it}==true)throw CoastApiException(CoastApiErrorKind.Model,"reply_sequence_context_limit","本组前序回复使完整输入超过模型目录估算容量；未再次请求。")
                         val left=sequence.tokenBudget.toLong()-used-estimate
                         if(left<64)throw CoastApiException(CoastApiErrorKind.Model,"reply_sequence_budget","累计预算不足以发起新的供应商请求。")
                         minOf(maxTokens.coerceIn(64,65536).toLong(),left).toInt()
@@ -292,7 +293,8 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
                             continue
                         }
                         if(session==null)throw CoastApiException(CoastApiErrorKind.Model,"local_tool_not_exposed","供应商调用了未开放的工具。")
-                        val result=if(TurnToolPolicy.canExecute(callsMade,limit)){
+                        val budgetAllows=sequence==null||echo.metadata("stop").usage?.totalTokens?.let{it<sequence.tokenBudget}==true
+                        val result=if(budgetAllows&&TurnToolPolicy.canExecute(callsMade,limit)){
                             callsMade++
                             session.execute(part.id.toString(),part.name.toString(),part.arguments.toString())
                         }else com.elementeracoast.app.core.remote.RemoteNativeToolResult(ok=false,output=TurnToolPolicy.LIMIT_RECEIPT,deskSlip=session.receipt)

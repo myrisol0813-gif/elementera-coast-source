@@ -36,13 +36,13 @@ internal class LocalDirectChatRepository(
         val store=sequenceStore?:throw CoastApiException(CoastApiErrorKind.Model,"local_sequence_unavailable","本机连续回复存储尚未接通。")
         val ledger=LocalReplyRunStore(store)
         val cid=request.conversationId;val seq=request.sequenceId;val tid=request.turnId
-        val (provider,model)=providers.resolve(request.model)?:throw CoastApiException(CoastApiErrorKind.Model,"local_provider_missing","请先选择本机供应商模型。")
+        val (provider,model)=try{providers.resolve(request.model)}catch(_:Exception){null}?:throw CoastApiException(CoastApiErrorKind.Model,"local_provider_missing","请先选择本机供应商模型。")
         fun number(key:String,fallback:Int)=request.settings[key]?.jsonPrimitive?.intOrNull?:fallback
         val recent=number("recentTurns",8).coerceAtLeast(1)
         val context=number("contextBudget",6000)
         val output=number("maxOutputTokens",8000).coerceIn(64,65536)
         val temperature=when(request.settings["creativity"]?.jsonPrimitive?.contentOrNull){"stable"->0.3;"expansive"->1.0;else->0.7}
-        withContext(Dispatchers.IO){
+        try{withContext(Dispatchers.IO){
             ledger.recover(cid)
             val cache=com.elementeracoast.app.core.remote.RemoteCacheStore(store,strictReads=true)
             val h=cache.history(cid)?:error("原窗口不存在")
@@ -50,6 +50,8 @@ internal class LocalDirectChatRepository(
             require(!cfg.stickerAddEnabled&&!cfg.stickerSendEnabled&&!cfg.crossWindowAuto&&cache.profile()?.currentImageModel.isNullOrBlank()){"本机连续回复媒体与跨窗工具尚未接通。"}
             require(LocalDogtalkStore(store).pending(cid,knowledge.surfaceFor(cid),tid)==null){"本机连续回复私人草稿递送尚未接通。"}
             h
+        }}catch(e:CancellationException){throw e}catch(e:Exception){
+            throw CoastApiException(CoastApiErrorKind.Request,"local_reply_preflight",e.message.orEmpty().take(240).ifBlank{"连续回复准备失败。"})
         }
         val acquired=withContext(Dispatchers.IO){ledger.acquire(request)}
         if(!acquired)throw CoastApiException(CoastApiErrorKind.Request,"reply_run_not_acquired","连续回复任务未取得资格；没有调用模型。")
@@ -78,7 +80,7 @@ internal class LocalDirectChatRepository(
                 currentCoroutineContext().ensureActive()
                 emit(ReplyRunEvent.Begin(mid,index))
                 client.streamWithTools(provider,model,messages,output,prepared.imageParts,session,temperature,
-                    LocalSequenceControl(claim.mayContinue,claim.tools,claim.tokens)).collect{event->
+                    LocalSequenceControl(claim.mayContinue,claim.tools,claim.tokens,policy.wireLimit)).collect{event->
                     when(event){
                         is LocalProviderEvent.Delta->{content+=event.text;emit(ReplyRunEvent.Delta(mid,event.text))}
                         is LocalProviderEvent.Tool->{runs.addAll(event.result.furnitureRuns);ToolActivityBus.publish(event.id,event.name,event.result.ok)}

@@ -60,4 +60,17 @@ class ReplySequenceTest {
         org.junit.Assert.assertEquals(5,ReplySequence.resolveBudget(global,window.copy(replySequenceMaxMessages=-1),0).maxMessages)
     }
 
+    @Test fun previewUsesSameExactBubbleIdentityAndDoesNotMutateHistory(){
+        val appended=ChatSyncMapper.appendUser(com.elementeracoast.app.core.remote.RemoteHistory(),"question")
+        val h=appended.history;val t=h.turns.single();val uid=t.user.variants.single().id
+        val preview=ChatSyncMapper.replyRunPreview(h,t.id,uid,"seq","a0",0,"model","draft").last()
+        assertEquals("a0",preview.remoteVariantId)
+        assertTrue(h.turns.single().assistant.variantsByUserVariant["0"].orEmpty().isEmpty())
+        val v=com.elementeracoast.app.core.remote.RemoteVariant("a0","saved",modelId="model",replySequence=com.elementeracoast.app.core.remote.RemoteReplySequence("seq",0))
+        val saved=h.copy(turns=listOf(t.copy(assistant=t.assistant.copy(variantsByUserVariant=mapOf("0" to listOf(v))))))
+        assertEquals(preview.id,ChatSyncMapper.toUi(saved).last().id)
+        val next=ChatSyncMapper.replyRunPreview(saved,t.id,uid,"seq","a1",1,"model","second draft")
+        assertEquals(listOf("saved","second draft"),next.filter{it.role==com.elementeracoast.app.core.model.MessageRole.Assistant}.map{it.text})
+    }
+
 }
