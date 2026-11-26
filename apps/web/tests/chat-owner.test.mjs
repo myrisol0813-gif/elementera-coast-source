@@ -12,6 +12,7 @@ const window = new Window({ url: 'https://coast.test/' });
 const { document } = window;
 globalThis.window = window;
 globalThis.document = document;
+globalThis.localStorage = window.localStorage;
 globalThis.requestAnimationFrame = (callback) => { callback(); return 1; };
 
 document.body.innerHTML = `
@@ -50,6 +51,7 @@ const dogtalk = {
 
 const fetchCalls = [];
 let blockNextChat = false;
+let failHistoryPut = false;
 let blockedSignal = null;
 globalThis.fetch = async (url, options = {}) => {
   const path = String(url);
@@ -67,11 +69,13 @@ globalThis.fetch = async (url, options = {}) => {
   }
   if (path === '/api/chat/conversations' && (options.method || 'GET') === 'GET') {
     return new Response(JSON.stringify({
-      conversations: [{ id: 'conversation-1', title: 'Test conversation', title_manual: true }],
+      conversations: [{ id: 'conversation-1', title: 'Test conversation', title_manual: true }, { id: 'conversation-2', title: 'Other conversation', title_manual: true }],
     }), { status: 200 });
   }
   if (path.startsWith('/api/chat/history?')) {
-    if ((options.method || 'GET') === 'PUT') return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    if ((options.method || 'GET') === 'PUT') return failHistoryPut
+      ? new Response(JSON.stringify({ error: { message: 'fixture save failure' } }), { status: 503 })
+      : new Response(JSON.stringify({ ok: true }), { status: 200 });
     return new Response(JSON.stringify({ history: { turns: [] } }), { status: 200 });
   }
   if (path === '/api/chat' && options.method === 'POST') {
@@ -137,6 +141,7 @@ assert.equal(chatPayload.conversation_id, 'conversation-1');
 assert.equal(chatPayload.model, 'openai/gpt-4.1-nano');
 assert.equal(chatPayload.messages.at(-1)?.content, 'hello owner');
 assert.equal(chat.getActiveMessages().at(-1)?.content, 'assistant reply');
+assert.equal(input.value, '', 'accepted send clears only its submitted draft');
 
 const menuButton = document.querySelector('[data-action="chat:menu"]');
 assert.ok(menuButton, 'conversation menu button rendered');
@@ -166,7 +171,31 @@ assert.equal(stopOutcome.ownerId, 'chat');
 assert.equal(blockedSignal.aborted, true, 'Chat primary button keeps the original stop/abort behavior');
 await pendingGeneration;
 
+// Composer storage is private to its conversation and survives reconstruction.
+input.value = 'draft A ';
+await spine.dispatch(syntheticEvent('input', input));
+await chat.handleAction('open', { dataset: { id: 'conversation-2' } });
+assert.equal(input.value, '');
+input.value = 'draft B';
+await spine.dispatch(syntheticEvent('input', input));
+await chat.handleAction('open', { dataset: { id: 'conversation-1' } });
+assert.equal(input.value, 'draft A ');
+failHistoryPut = true;
+await spine.dispatch(syntheticEvent('submit', composer));
+failHistoryPut = false;
+assert.equal(input.value, 'draft A ', 'failed history save keeps the submitted draft');
 await spine.unmount();
+const reopened = createChat({ storage, dogtalk, toast() {} });
+await reopened.mount();
+assert.equal(input.value, 'draft A ');
+await reopened.handleAction('open', { dataset: { id: 'conversation-2' } });
+assert.equal(input.value, 'draft B');
+input.value = '';
+reopened.handleInput('composer');
+await reopened.handleAction('open', { dataset: { id: 'conversation-1' } });
+await reopened.handleAction('open', { dataset: { id: 'conversation-2' } });
+assert.equal(input.value, '');
+reopened.destroy();
 
 const chatSource = await read('elementera-mcp/deploy-pages/public/features/chat.js');
 const chatModuleDir = resolve(rootDir, 'elementera-mcp/deploy-pages/public/features/chat');
