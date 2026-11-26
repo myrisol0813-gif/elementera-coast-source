@@ -148,8 +148,9 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val cid = r.url.queryParameter("conversation_id").orEmpty()
             if (!conversationExists(cid)) return missing(r)
             if (method == "GET") {
+                LocalReplyRunStore(store).recover(cid)
                 val h=store.readConsistent{s->val c=RemoteCacheStore(s,strictReads=true);val old=c.history(cid)?:RemoteHistory(conversationId=cid)
-                    LocalImageRecovery.recover(old).also{if(it!=old)c.putHistory(cid,it)}}
+                    if(LocalReplyRunStore(s).active(cid))old else LocalImageRecovery.recover(old).also{if(it!=old)c.putHistory(cid,it)}}
                 return ok(r,"source" to JsonPrimitive("local"),"history" to element(RemoteHistory.serializer(),h))
             }
             if (method == "PUT") {

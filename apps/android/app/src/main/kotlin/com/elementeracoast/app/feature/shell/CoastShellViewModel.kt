@@ -1210,7 +1210,7 @@ class CoastShellViewModel(
         crossWindowRequest: CrossWindowRequest
     ) {
         if(history.contextSettings.replySequenceEnabled){
-            generateCloudReplyRun(conversationId,history,turnId,modelId,crossWindowRequest)
+            generateReplyRun(conversationId,history,turnId,modelId,crossWindowRequest)
             return
         }
         var partial = ""
@@ -1287,9 +1287,9 @@ class CoastShellViewModel(
         }
     }
 
-    private suspend fun generateCloudReplyRun(cid:String,initial:RemoteHistory,tid:String,model:String,crossWindow:CrossWindowRequest){
+    private suspend fun generateReplyRun(cid:String,initial:RemoteHistory,tid:String,model:String,crossWindow:CrossWindowRequest){
         // Never silently switch a requested group into a paid single reply.
-        if(localMode||isChatGptPlanModel(model)){
+        if(isChatGptPlanModel(model)){
             showPlaceholder("当前模型通道尚未接通连续回复；未发起模型请求。");return
         }
         val window=initial.contextSettings

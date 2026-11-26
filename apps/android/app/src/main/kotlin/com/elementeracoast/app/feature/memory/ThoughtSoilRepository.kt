@@ -26,7 +26,8 @@ interface ThoughtSoilRepository {
 class DefaultThoughtSoilRepository(
     private val api: CoastApiClient,
     private val plan: ChatGptPlanRepository? = null,
-    private val localOrganizer: (suspend (String, String) -> Unit)? = null
+    private val localOrganizer: (suspend (String, String) -> Unit)? = null,
+    private val localSequenceOrganizer:(suspend (String,String,String)->Unit)?=null
 ) : ThoughtSoilRepository {
     override suspend fun load(conversationId: String): ThoughtSoilSnapshot {
         val response = api.getThoughtSoilResponse(conversationId)
@@ -56,7 +57,11 @@ class DefaultThoughtSoilRepository(
     }
 
     override suspend fun organizeAfterSequence(conversationId:String,modelId:String,sequenceId:String):ThoughtSoilSnapshot{
-        require(localOrganizer==null&&!modelId.startsWith("chatgpt-plan:")){"当前模型通道尚未接通连续回复整理"}
+        if(localOrganizer!=null){
+            requireNotNull(localSequenceOrganizer){"本机连续回复整理尚未接通"}.invoke(conversationId,modelId,sequenceId)
+            return load(conversationId)
+        }
+        require(!modelId.startsWith("chatgpt-plan:")){"当前模型通道尚未接通连续回复整理"}
         val result=api.organizeReplyRunSoil(conversationId,modelId,sequenceId)
         require(result.ok){"思维壤整理未确认"}
         return load(conversationId)

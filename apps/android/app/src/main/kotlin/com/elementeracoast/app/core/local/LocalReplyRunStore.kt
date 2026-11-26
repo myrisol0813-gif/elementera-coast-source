@@ -70,6 +70,7 @@ internal class LocalReplyRunStore(private val store:LocalPersistence){
         s.atomic{staged->put(staged,cid,row);staged.put(activeKey(cid),seq)}
         true
     }
+    fun maxMessages(cid:String,seq:String):Int=store.readConsistent{s->requireNotNull(get(s,cid,seq)).max}
     fun reserve(cid:String,seq:String,mid:String,index:Int):Boolean=store.readConsistent{s->
         checkIds(cid,seq,mid)
         val r=get(s,cid,seq)?:return@readConsistent false
