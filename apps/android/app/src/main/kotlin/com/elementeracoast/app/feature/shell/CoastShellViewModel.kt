@@ -277,6 +277,8 @@ class CoastShellViewModel(
         viewModelScope.launch(workDispatcher) {
             try {
                 backend.conversations.delete(id)
+                try { persistence.remove(composerDraftKey(id, target.roomType)) }
+                catch (_: Exception) { _state.update { it.copy(snackbarMessage = "窗口已删除，但未能清除本机输入草稿。") } }
                 val remaining = _state.value.conversations.filterNot { it.id == id }
                 _state.update { it.copy(conversations = remaining, backendOffline = false) }
                 if (target.id != _state.value.activeConversationId) return@launch
@@ -537,6 +539,37 @@ class CoastShellViewModel(
         _crossWindow.value = value
     }
 
+    private fun composerDraftKey(id: String, room: RoomType): String =
+        if (id.isBlank()) "chat.composer.draft.v1.landing.${room.wireValue}" else "chat.composer.draft.v1.window.$id"
+
+    private fun readComposerDraft(id: String, room: RoomType): String =
+        persistence.get(composerDraftKey(id, room))
+
+    fun updateComposerDraft(text: String) {
+        val current = _state.value
+        if (!current.authenticated) return
+        val key = composerDraftKey(current.activeConversationId, current.activeRoomType)
+        _state.update { it.copy(composerDraft = text) }
+        try {
+            if (text.isEmpty()) persistence.remove(key) else persistence.put(key, text)
+        } catch (_: Exception) {
+            _state.update { it.copy(snackbarMessage = "输入草稿未能保存；请暂勿退出或切换窗口。") }
+        }
+    }
+
+    private fun clearAcceptedDraft(id: String, room: RoomType, submitted: String) {
+        val key = composerDraftKey(id, room)
+        try {
+            if (persistence.get(key) == submitted) persistence.remove(key)
+            _state.update { current ->
+                if (current.activeConversationId == id && current.composerDraft == submitted)
+                    current.copy(composerDraft = "") else current
+            }
+        } catch (_: Exception) {
+            _state.update { it.copy(snackbarMessage = "消息已经保存，但未能清除输入草稿。") }
+        }
+    }
+
     fun sendMessage(text: String) {
         if (tourBlocksCloudAction()) return
         val clean = text.trim()
@@ -575,6 +608,7 @@ class CoastShellViewModel(
                     return@launch
                 }
 
+                clearAcceptedDraft(conversationId, conversation.roomType, text)
                 _state.update { it.copy(pendingAttachments = emptyList(), attachmentUploading = false) }
 
                 if (conversation.roomType == RoomType.Lighthouse || (localMode && _state.value.currentModel.isBlank())) {
@@ -826,6 +860,7 @@ class CoastShellViewModel(
                 conversations = conversations,
                 activeRoomType = target?.roomType ?: RoomType.Main,
                 activeConversationId = target?.id.orEmpty(),
+                composerDraft = readComposerDraft(target?.id.orEmpty(), target?.roomType ?: RoomType.Main),
                 messages = history?.let(ChatSyncMapper::toUi).orEmpty(),
                 thoughtSoil = null,
                 turnDeskReceipt = null
@@ -1028,10 +1063,17 @@ class CoastShellViewModel(
         val empty = RemoteHistory(conversationId = created.id)
         backend.chat.cacheHistory(created.id, empty)
         persistence.put(KEY_CURRENT_CONVERSATION, created.id)
+        // The first send or attachment allocates a real window; move its landing draft once.
+        val landingKey = composerDraftKey("", current.activeRoomType)
+        val realKey = composerDraftKey(created.id, created.roomType)
+        val landingDraft = current.composerDraft
+        if (landingDraft.isNotEmpty()) persistence.put(realKey, landingDraft)
+        persistence.remove(landingKey)
         _state.update {
             it.copy(
                 conversations = listOf(created) + it.conversations.filterNot { row -> row.id == created.id },
                 activeConversationId = created.id,
+                composerDraft = landingDraft,
                 activeRoomType = created.roomType,
                 contextSettings = empty.contextSettings.normalized(),
                 messages = emptyList(),
@@ -1358,6 +1400,7 @@ class CoastShellViewModel(
                 activeFeature = null,
                 actionLogFocusIds = emptySet(),
                 activeConversationId = conversation.id,
+                composerDraft = readComposerDraft(conversation.id, conversation.roomType),
                 searchFocus = hit?.let { ChatSearchFocus(conversation.id, it.messageId, searchNavigationId) },
                 contextSettings = displayed?.contextSettings?.normalized() ?: ConversationContextSettings(),
                 messages = displayed?.let(ChatSyncMapper::toUi).orEmpty(),
@@ -1383,6 +1426,7 @@ class CoastShellViewModel(
                 activeFeature = null,
                 actionLogFocusIds = emptySet(),
                 activeConversationId = "",
+                composerDraft = readComposerDraft("", roomType),
                 searchFocus = null,
                 contextSettings = ConversationContextSettings(),
                 messages = emptyList(),
