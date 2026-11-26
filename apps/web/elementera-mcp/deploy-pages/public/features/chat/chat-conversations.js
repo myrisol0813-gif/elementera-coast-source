@@ -137,7 +137,7 @@ export function createChatConversations({
     }
   }
 
-  function saveHistory(conversationId, value) {
+  function saveHistory(conversationId, value, {deleteRevision=null}={}) {
     if (runtime.deletedIds.has(conversationId)) return Promise.resolve();
     const snapshot = normalizeState(value);
     runtime.histories.set(conversationId, snapshot);
@@ -147,11 +147,13 @@ export function createChatConversations({
       const saved=await requestJson(`${API.history}?conversation_id=${encodeURIComponent(conversationId)}`, {
         method: 'PUT',
         body: JSON.stringify(snapshot),
+        ...(deleteRevision?{headers:{'X-Coast-Delete-Revision':deleteRevision}}:{}),
       });
       if(saved.history&&runtime.histories.get(conversationId)===snapshot)setHistory(conversationId,saved.history);
       if (runtime.currentId === conversationId) setStatus('');
     }).catch((error) => {
       if (runtime.currentId === conversationId && !runtime.deletedIds.has(conversationId)) {
+        if(['image_pending','image_history_changed','history_changed'].includes(error.type))try{const fresh=await requestJson(`${API.history}?conversation_id=${encodeURIComponent(conversationId)}`);setHistory(conversationId,fresh.history);renderMessages(conversationId);}catch{}
         setStatus(`聊天记录写入失败：${error.message}`, 'error');
       }
       throw error;

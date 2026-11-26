@@ -1,3 +1,4 @@
+import {recoverImageTasks,protectImageHistory,IMAGE_RECOVERY_MS} from '../functions/image-task-recovery.js';
 import { attachImageTool } from '../functions/chat-image-tool.js';
 import { performFormalChatWithTools } from '../functions/models/model-formal-chat-core.js';
 import { D1Database } from './d1-helper.mjs';
@@ -195,3 +196,28 @@ oldClient.turns[0].assistant.variantsByUserVariant[0][0].content='Here is your p
 const merged=await writeConversationState(jobDb,toolChat.id,oldClient);
 assert.deepEqual(merged.turns[0].assistant.variantsByUserVariant['0'][0].attachments,afterImage.attachments);
 assert.equal(merged.turns[0].assistant.variantsByUserVariant['0'][0].content,'Here is your picture.');
+
+const leaseClock=Date.parse('2026-11-26T00:00:00Z');
+const leaseState={turns:[{id:'lease-turn',user:{variants:[{id:'lease-user'}]},assistant:{variantsByUserVariant:{'0':[
+  {id:'pending',content:'',created_at:new Date(leaseClock).toISOString(),finish_reason:'image_pending'},
+  {id:'ready',content:'connecting',created_at:new Date(leaseClock).toISOString(),finish_reason:'image_tool_ready'},
+  {id:'saved',content:'',created_at:new Date(leaseClock).toISOString(),finish_reason:'image_saved',attachments:[{id:'original',image_generation:{message_id:'saved'}}]}
+]}}}]};
+assert.equal(recoverImageTasks(leaseState,leaseClock+IMAGE_RECOVERY_MS-1),false);
+assert.equal(protectImageHistory(leaseState,{turns:[]}), 'image_pending');
+assert.equal(recoverImageTasks(leaseState,leaseClock+IMAGE_RECOVERY_MS),true);
+assert.deepEqual(leaseState.turns[0].assistant.variantsByUserVariant['0'].map(v=>v.finish_reason),['image_failed','cancelled','image_saved_interrupted']);
+assert.equal(leaseState.turns[0].assistant.variantsByUserVariant['0'][2].attachments[0].id,'original');
+assert.equal(recoverImageTasks(leaseState,leaseClock+2*IMAGE_RECOVERY_MS),false);
+assert.equal(protectImageHistory(leaseState,{turns:[]}), 'image_history_changed');
+assert.equal(protectImageHistory(leaseState,{turns:[]},{allowDelete:true}),null);
+const staleImageHistory=structuredClone(leaseState);
+staleImageHistory.turns[0].assistant.variantsByUserVariant['0'][2].attachments=[];
+staleImageHistory.turns[0].assistant.variantsByUserVariant['0'][2].finish_reason='image_tool_ready';
+assert.equal(protectImageHistory(leaseState,staleImageHistory),null);
+assert.equal(staleImageHistory.turns[0].assistant.variantsByUserVariant['0'][2].attachments[0].id,'original');
+assert.equal(staleImageHistory.turns[0].assistant.variantsByUserVariant['0'][2].finish_reason,'image_saved_interrupted');
+const deletionRevision=await readConversationState(jobDb,toolChat.id);
+await assert.rejects(()=>writeConversationState(jobDb,toolChat.id,{turns:[]}),e=>e.type==='image_history_changed');
+await assert.rejects(()=>writeConversationState(jobDb,toolChat.id,{turns:[]},{deleteRevision:'wrong'}),e=>e.type==='image_history_changed');
+assert.equal((await writeConversationState(jobDb,toolChat.id,{turns:[]},{deleteRevision:deletionRevision.updated_at})).turns.length,0);

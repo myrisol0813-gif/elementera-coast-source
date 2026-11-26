@@ -523,6 +523,7 @@ export async function runManualImageGeneration(env,input,{generate=generateIndep
   if(!key||! /^[a-z0-9][a-z0-9_.-]{0,79}\/[a-z0-9][a-z0-9_.-]{0,119}(?::free)?$/i.test(model))fail('image_not_configured','请在模型箱选择生图模型，并配置 OpenRouter API Key。',503);
   const conv=await getConversation(db,cid);
   if(!['main','radio'].includes(conv.room_type))fail('generated_surface_invalid','该窗口不允许生成图像。',403);
+  await readConversationState(db,cid); // recover expired reservations without calling the provider
   const snapshot=await first(db,'SELECT state_json FROM conversation_states WHERE conversation_id=?',[cid]);
   if(!snapshot?.state_json)fail('generated_source_invalid','找不到原消息。',409);
   const state=normalizeState(JSON.parse(snapshot.state_json));
@@ -540,7 +541,7 @@ export async function runManualImageGeneration(env,input,{generate=generateIndep
   if(!catalog.some(m=>m.id===model))fail('image_model_unavailable','所选模型不在独立生图 API 目录中，未发起生成。',409);
   if((await readProfile(db)).current_image_model!==model)fail('image_model_changed','生成模型选择已变化，请重新发起。',409);
   const stamp=nowMs();
-  if(modelTool)target.finish_reason='image_pending';
+  if(modelTool){target.finish_reason='image_pending';target.created_at=iso(stamp);}
   else {
     branch.push({id:mid,content:'',created_at:iso(stamp),model_id:model,finish_reason:'image_pending',generation_source:'chat'});
     turn.assistant.variantsByUserVariant[String(index)]=branch;

@@ -48,6 +48,7 @@ export async function prepareAutonomousImageTurn(runtime,conversationId,appended
   appended.variant.finish_reason='image_tool_ready';
   await saveHistory(conversationId,appended.state);
   payload.image_tool_enabled=true;
+  payload.image_model_id=runtime.profile.current_image_model;
 }
 export function imageToolSucceeded(data){
   return data?.name==='image_generate'&&data?.result?.ok===true&&data.result.status==='saved'&&typeof data.result.attachment?.id==='string';

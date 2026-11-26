@@ -193,7 +193,7 @@ async function history(request, env) {
   }
   if (request.method === 'PUT') {
     requireSameOrigin(request);
-    const value = await writeConversationState(env.COAST_CHAT_DB, conversationId, await body(request));
+    const value = await writeConversationState(env.COAST_CHAT_DB, conversationId, await body(request), {deleteRevision:request.headers.get('X-Coast-Delete-Revision')});
     return json({ ok: true, source: 'd1-json-v4', history: { ...value, conversation_id: conversationId } });
   }
   return methodNotAllowed('GET, PUT');
@@ -518,7 +518,7 @@ async function formalChat(request, env) {
     initialFurniture: dogtalkSubmission ? ['收好一张私人草稿纸条'] : [],
     crossWindow: value.cross_window,
   });
-  assembled=await attachImageTool(env,assembled,{conversationId,turnId:sourceTurnId,messageId,roomType:conversation.room_type,chatModel:value.model,enabled:value.image_tool_enabled===true,signal:request.signal});
+  assembled=await attachImageTool(env,assembled,{conversationId,turnId:sourceTurnId,messageId,roomType:conversation.room_type,chatModel:value.model,enabled:value.image_tool_enabled===true,expectedImageModel:value.image_model_id??null,signal:request.signal});
   const attachmentIds = (Array.isArray(value.attachment_ids) ? value.attachment_ids : [])
     .map((item) => String(item || '').trim())
     .filter(Boolean)

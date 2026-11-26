@@ -152,16 +152,18 @@ export function createChatActions({
       return generate(runtime.currentId, turnId);
     }
     if (name === 'delete-user') {
-      const state = deleteActiveUserVariant(currentHistory(), turnId);
+      const previous=currentHistory();
+      const state = deleteActiveUserVariant(previous, turnId);
       setHistory(runtime.currentId, state);
       renderMessages();
-      return saveHistory(runtime.currentId, state).catch(() => undefined);
+      return saveHistory(runtime.currentId, state,{deleteRevision:previous.updated_at}).catch(() => undefined);
     }
     if (name === 'delete-assistant') {
-      const state = deleteActiveAssistantVariant(currentHistory(), turnId);
+      const previous=currentHistory();
+      const state = deleteActiveAssistantVariant(previous, turnId);
       setHistory(runtime.currentId, state);
       renderMessages();
-      return saveHistory(runtime.currentId, state).catch(() => undefined);
+      return saveHistory(runtime.currentId, state,{deleteRevision:previous.updated_at}).catch(() => undefined);
     }
     if (name === 'regenerate') {
       const conversation = runtime.conversations.find((item) => item.id === runtime.currentId);

@@ -1,3 +1,4 @@
+import { recoverImageTasks, protectImageHistory } from './image-task-recovery.js';
 import { ensureChatSchema as ensureSchema } from './chat-schema.js';
 import { sanitizeFurnitureRuns } from './tool-furniture-summary.js';
 
@@ -534,13 +535,19 @@ export async function readConversationState(db, id) {
     throw new ChatStoreError('conversation_state_missing', '聊天记录不存在，未创建替代数据。', 500);
   }
   try {
-    return normalizeState(JSON.parse(row.state_json));
+    const state=normalizeState(JSON.parse(row.state_json));
+    if(recoverImageTasks(state)){
+      const stamp=nowMs();state.updated_at=iso(stamp);
+      const changed=await run(db,'UPDATE conversation_states SET state_json=?,updated_at=? WHERE conversation_id=? AND state_json=?',[JSON.stringify(normalizeState(state)),stamp,conversationId,row.state_json]);
+      if(changed.meta?.changes!==1)return readConversationState(db,conversationId);
+    }
+    return state;
   } catch {
     throw new ChatStoreError('conversation_state_corrupt', '聊天记录格式损坏，未覆盖原数据。', 500);
   }
 }
 
-export async function writeConversationState(db, id, value) {
+export async function writeConversationState(db, id, value, {deleteRevision=null}={}) {
   await ensureChatSchema(db);
   const conversationId = sanitizeId(id, 'conversation');
   await requireActiveConversation(db, conversationId);
@@ -548,20 +555,8 @@ export async function writeConversationState(db, id, value) {
   const previous = await first(db,'SELECT state_json FROM conversation_states WHERE conversation_id=?',[conversationId]);
   if(!previous?.state_json)throw new ChatStoreError('conversation_state_missing','聊天记录不存在，未创建替代数据。',409);
   const old=normalizeState(JSON.parse(previous.state_json));
-  for(const t of old.turns){
-    const incoming=state.turns.find(x=>x.id===t.id);
-    for(const [key,variants] of Object.entries(t.assistant.variantsByUserVariant)){
-      const uid=t.user.variants[Number(key)]?.id;
-      const i=incoming?.user.variants.findIndex(v=>v.id===uid)??-1;
-      for(const v of variants){
-        const match=i<0?null:incoming.assistant.variantsByUserVariant[String(i)]?.find(x=>x.id===v.id);
-        if(v.finish_reason==='image_pending'&&(!match||match.finish_reason!=='image_pending'))throw new ChatStoreError('image_pending','绘图仍在进行；请刷新原窗口，不覆盖任务。',409);
-        if(!match)continue; // explicit deletion is not resurrected
-        const saved=(v.attachments||[]).filter(a=>a.image_generation?.message_id===v.id);
-        if(saved.length)match.attachments=[...(match.attachments||[]).filter(a=>!saved.some(x=>x.id===a.id)),...saved];
-      }
-    }
-  }
+  const conflict=protectImageHistory(old,state,{allowDelete:deleteRevision!==null&&deleteRevision===old.updated_at});
+  if(conflict)throw new ChatStoreError(conflict,conflict==='image_pending'?'绘图仍在进行；请刷新原窗口，不覆盖任务。':'历史已包含新生成的图片，请刷新后再明确删除。',409);
   await carryArchiveDeskSlips(db, conversationId, state);
   const timestamp = nowMs();
   state.updated_at=iso(timestamp);
