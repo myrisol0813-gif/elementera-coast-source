@@ -1,6 +1,6 @@
 import { API, requestJson } from '../../core/api.js';
 import { escapeHtml, escapeAttribute } from '../../core/dom.js';
-import { activeBranch } from '../chat-state.js';
+import { selectedAssistantMessage } from '../chat-state.js';
 
 export function createChatVoice({ runtime, toast, renderMessages }) {
   const clips = new Map();
@@ -27,7 +27,7 @@ export function createChatVoice({ runtime, toast, renderMessages }) {
     const messageId = article?.dataset.messageId || '';
     const turnId = article?.dataset.turn || '';
     const turn = runtime.histories.get(conversationId)?.turns?.find(item => item.id === turnId);
-    const assistant = turn ? activeBranch(turn).assistant : null;
+    const assistant = turn ? selectedAssistantMessage(turn,messageId) : null;
     if (!assistant || assistant.id !== messageId || !assistant.content.trim()) return toast('这条消息没有可以朗读的正文。');
     const paragraphs = assistant.content.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
     if (!paragraphs.length) return toast('这条消息没有可以朗读的段落。');

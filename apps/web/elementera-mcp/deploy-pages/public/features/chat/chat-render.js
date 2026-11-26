@@ -121,10 +121,15 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
   const streamingPatches = new Map();
   let streamingFrame = 0;
 
-  function patchAssistantStreamingText(conversationId, turnId, content, { errorDetail = '', loading = true } = {}) {
+  function patchAssistantStreamingText(conversationId, turnId, content, { errorDetail = '', loading = true, messageId = '' } = {}) {
     if (!ui.messages || conversationId !== runtime.currentId) return false;
-    const key = JSON.stringify([conversationId, turnId]);
-    streamingPatches.set(key, { conversationId, turnId, content: String(content || ''), errorDetail: String(errorDetail || ''), loading: loading === true });
+    const generation=runtime.generation;
+    const turn=runtime.histories.get(conversationId)?.turns.find(t=>t.id===turnId);
+    const exactId=messageId || (generation?.conversationId===conversationId&&generation.turnId===turnId
+      ? turn?.assistant?.variantsByUserVariant?.[String(generation.userIndex)]?.[generation.assistantIndex]?.id : '');
+    if (!exactId) return false;
+    const key = JSON.stringify([conversationId, turnId, exactId]);
+    streamingPatches.set(key, { conversationId, turnId, messageId:exactId, content: String(content || ''), errorDetail: String(errorDetail || ''), loading: loading === true });
     if (!streamingFrame) {
       streamingFrame = -1;
       const frameId = requestAnimationFrame(() => {
@@ -133,7 +138,7 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
         streamingPatches.clear();
         for (const patch of pending) {
           if (!ui.messages || patch.conversationId !== runtime.currentId) continue;
-          const article = qa('.message.assistant', ui.messages).find((node) => node.dataset.turn === patch.turnId);
+          const article = qa('.message.assistant', ui.messages).find((node) => node.dataset.turn === patch.turnId && node.dataset.messageId === patch.messageId);
           const text = article?.querySelector('.assistant-text');
           if (!text) continue;
           text.innerHTML = formatRichText(patch.content)
@@ -165,9 +170,9 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
     ui.list.innerHTML = `${coastHtml}<section class="rikkahub-conversation-section"><button class="rikkahub-section-toggle" type="button" data-action="chat:toggle-rikkahub" aria-expanded="${runtime.rikkahubExpanded ? 'true' : 'false'}"><span>RikkaHub</span><span aria-hidden="true">${runtime.rikkahubExpanded ? '⌃' : '⌄'}</span></button>${rikkaBody}</section>`;
   }
 
-  function voiceAudioCards(conversationId, turnId, messageId) {
+  function voiceAudioCards(conversationId, turnId, messageId, allowLegacy = true) {
     const items = (runtime.voiceClips?.get(conversationId) || []).filter(item =>
-      item.message_id === messageId || (!item.message_id && item.turn_id === turnId));
+      item.message_id === messageId || (allowLegacy && !item.message_id && item.turn_id === turnId));
     if (!items.length) return '';
     return `<div class="coast-message-voices">${items.map(item => `<div class="coast-message-voice">
       <span>语音留存</span>
@@ -195,24 +200,12 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
       const treasureIndex = runtime.treasureIndicators?.get(conversationId);
       const userSaved = treasureIndex?.messageIds.has(branch.user?.id || '')
         || treasureIndex?.userMediaTurns.has(turn.id) || false;
-      const assistantSaved = treasureIndex?.messageIds.has(branch.assistant?.id || '') || false;
-      const legacyAssistantHeart = branch.assistant?.favorite === true;
-      const legacyAssistantPending = Boolean(treasureIndex) && legacyAssistantHeart && !assistantSaved;
-      const assistantHeartActive = assistantSaved || legacyAssistantHeart;
-      const loading = runtime.generation
-        && runtime.generation.conversationId === conversationId
-        && runtime.generation.turnId === turn.id
-        && runtime.generation.userIndex === branch.userIndex
-        && runtime.generation.assistantIndex === branch.assistantIndex;
       const userAttachment = [
         renderMessageAttachments(branch.user?.attachments || [], conversationId),
         branch.user?.id ? renderRikkaAttachments(runtime, conversationId, branch.user.id) : '',
       ].join('');
-      const assistantAttachment = branch.assistant?.id ? renderMessageAttachments(branch.assistant.attachments || [], conversationId) + renderRikkaAttachments(runtime, conversationId, branch.assistant.id) : '';
       const userImported = branch.user?.message_source === 'rikkahub';
-      const assistantImported = branch.assistant?.message_source === 'rikkahub';
       const userStamp = messageStamp(branch.user?.created_at);
-      const assistantStamp = messageStamp(branch.assistant?.created_at);
       const userDivider = branch.user && !branch.user.hidden && userStamp?.key && userStamp.key !== lastDateKey
         ? `<div class="message-date-divider">${escapeHtml(userStamp.date)}</div>`
         : '';
@@ -222,15 +215,35 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
           ? officialMcpLetter(branch.user, turn.id, userAttachment, userStamp?.time || '')
           : `<article class="message user ${userImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}" data-message-id="${escapeAttribute(branch.user.id || '')}"><div class="content">${branch.user.content ? `<div class="user-bubble">${escapeHtml(branch.user.content)}</div>` : ''}${userAttachment}${userImported ? '<span class="message-dogtalk-mark">RikkaHub 旧档案</span>' : ''}${branch.user.dogtalk_snapshot_id ? '<span class="message-dogtalk-mark">私人草稿 · 随本轮</span>' : ''}${userStamp?.time ? `<span class="message-time is-user">${escapeHtml(userStamp.time)}</span>` : ''}<div class="message-actions">${actionButton('edit-user', '编辑')}${actionButton('favorite', '拾入潮间', { active: userSaved, reaction: 'favorite' })}${actionButton('delete-user', '删除')}${variantControl('user', turn.id, branch.userIndex, turn.user.variants.length)}</div></div></article>`
         : '';
-      const assistantDivider = branch.assistant && assistantStamp?.key && assistantStamp.key !== lastDateKey
-        ? `<div class="message-date-divider">${escapeHtml(assistantStamp.date)}</div>`
-        : '';
-      if (branch.assistant && assistantStamp?.key) lastDateKey = assistantStamp.key;
-      const assistant = branch.assistant ? `<article class="message assistant ${assistantImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}" data-message-id="${escapeAttribute(branch.assistant.id || '')}" data-legacy-favorite="${legacyAssistantHeart}"><button class="avatar" type="button" data-action="settings:avatar" aria-label="更换助手头像"></button><div class="content">${renderFurnitureBubble(branch.assistant.furniture_runs, { conversationId })}<div class="assistant-text">${formatRichText(branch.assistant.content || (branch.assistant.finish_reason==='image_pending'?'正在绘制图片 · 刷新窗口查看结果':branch.assistant.finish_reason==='image_tool_ready'?'等待回复 · 刷新窗口查看结果':''))}${branch.assistant.errorDetail ? `<span class="message-error">${escapeHtml(branch.assistant.errorDetail)}</span>` : ''}${loading ? '<span class="typing-cursor"></span>' : ''}</div>${assistantAttachment}${voiceAudioCards(conversationId, turn.id, branch.assistant.id)}${assistantImported ? `<span class="message-dogtalk-mark">RikkaHub 旧档案${branch.assistant.model_id ? ` · ${escapeHtml(shortModelName(branch.assistant.model_id))}` : ''}</span>` : ''}${assistantStamp?.time ? `<span class="message-time is-assistant">${escapeHtml(assistantStamp.time)}</span>` : ''}<div class="message-actions">${actionButton('copy', '复制')}${actionButton('voice', '生成语音')}${actionButton('like', '点赞', { active: branch.assistant.liked, reaction: 'liked' })}${actionButton('regenerate', '重新生成')}${actionButton('favorite', legacyAssistantPending ? '旧红心 · 待迁入收藏' : '收藏', { active: assistantHeartActive, legacy: legacyAssistantPending, reaction: 'favorite' })}${actionButton('delete-assistant', '删除')}${variantControl('assistant', turn.id, alternativeIndex, alternatives.length)}${generationFootprint(branch.assistant, turn.id)}</div>${loading ? '' : renderModelMetadataTrace(branch.assistant, conversationId)}</div></article>` : '';
+      const group=alternatives[alternativeIndex]?.messages || [];
+      const assistants=group.map((assistant,index)=>{
+        const isLast=index===group.length-1;
+        return renderAssistant({...branch,assistant,assistantIndex:branch.assistants.indexOf(assistant)},isLast);
+      }).join('');
+      function renderAssistant(branch,isLast){
+        const assistantSaved = treasureIndex?.messageIds.has(branch.assistant?.id || '') || false;
+        const legacyAssistantHeart = branch.assistant?.favorite === true;
+        const legacyAssistantPending = Boolean(treasureIndex) && legacyAssistantHeart && !assistantSaved;
+        const assistantHeartActive = assistantSaved || legacyAssistantHeart;
+        const loading = runtime.generation
+          && runtime.generation.conversationId === conversationId
+          && runtime.generation.turnId === turn.id
+          && runtime.generation.userIndex === branch.userIndex
+          && runtime.generation.assistantIndex === branch.assistantIndex;
+        const assistantAttachment = branch.assistant?.id ? renderMessageAttachments(branch.assistant.attachments || [], conversationId) + renderRikkaAttachments(runtime, conversationId, branch.assistant.id) : '';
+        const assistantImported = branch.assistant?.message_source === 'rikkahub';
+        const assistantStamp = messageStamp(branch.assistant?.created_at);
+        const assistantDivider = branch.assistant && assistantStamp?.key && assistantStamp.key !== lastDateKey
+          ? `<div class="message-date-divider">${escapeHtml(assistantStamp.date)}</div>`
+          : '';
+        if (branch.assistant && assistantStamp?.key) lastDateKey = assistantStamp.key;
+        const assistant = branch.assistant ? `<article class="message assistant ${assistantImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}" data-message-id="${escapeAttribute(branch.assistant.id || '')}" data-legacy-favorite="${legacyAssistantHeart}"><button class="avatar" type="button" data-action="settings:avatar" aria-label="更换助手头像"></button><div class="content">${renderFurnitureBubble(branch.assistant.furniture_runs, { conversationId })}<div class="assistant-text">${formatRichText(branch.assistant.content || (branch.assistant.finish_reason==='image_pending'?'正在绘制图片 · 刷新窗口查看结果':branch.assistant.finish_reason==='image_tool_ready'?'等待回复 · 刷新窗口查看结果':''))}${branch.assistant.errorDetail ? `<span class="message-error">${escapeHtml(branch.assistant.errorDetail)}</span>` : ''}${loading ? '<span class="typing-cursor"></span>' : ''}</div>${assistantAttachment}${voiceAudioCards(conversationId, turn.id, branch.assistant.id, isLast)}${assistantImported ? `<span class="message-dogtalk-mark">RikkaHub 旧档案${branch.assistant.model_id ? ` · ${escapeHtml(shortModelName(branch.assistant.model_id))}` : ''}</span>` : ''}${assistantStamp?.time ? `<span class="message-time is-assistant">${escapeHtml(assistantStamp.time)}</span>` : ''}<div class="message-actions">${actionButton('copy', '复制')}${actionButton('voice', '生成语音')}${actionButton('like', '点赞', { active: branch.assistant.liked, reaction: 'liked' })}${isLast ? actionButton('regenerate', '重新生成') : ''}${actionButton('favorite', legacyAssistantPending ? '旧红心 · 待迁入收藏' : '收藏', { active: assistantHeartActive, legacy: legacyAssistantPending, reaction: 'favorite' })}${isLast ? actionButton('delete-assistant', '删除') + variantControl('assistant', turn.id, alternativeIndex, alternatives.length) : ''}${generationFootprint(branch.assistant, turn.id)}</div>${loading ? '' : renderModelMetadataTrace(branch.assistant, conversationId)}</div></article>` : '';
+        return assistantDivider + assistant;
+      }
       const soil = branch.assistant
         ? runtime.memory?.renderSoilEntry(conversationId, turn.id, branch.assistant.id || '', turn.id === latestAssistantTurnId) || ''
         : '';
-      return userDivider + user + soil + assistantDivider + assistant;
+      return userDivider + user + soil + assistants;
     }).join('');
     const previewNote = preview
       ? '<div class="coast-search-preview-note" role="status">正在预览搜索命中的旧消息版本 · 不影响正式聊天历史 <button type="button" data-action="chat:end-search-preview">结束预览</button></div>'

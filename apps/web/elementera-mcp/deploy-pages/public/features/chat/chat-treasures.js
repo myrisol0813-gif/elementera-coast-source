@@ -1,5 +1,5 @@
 import { API, requestJson } from '../../core/api.js';
-import { activeBranch } from '../chat-state.js';
+import { activeBranch, selectedAssistantMessage } from '../chat-state.js';
 
 function textNode(tag, value, className = '') {
   const element = document.createElement(tag);
@@ -95,10 +95,10 @@ export function createChatTreasures({ runtime, currentHistory, toast, renderMess
     const turn = visibleHistory.turns.find((item) => item.id === turnId);
     const branch = turn ? activeBranch(turn) : null;
     const role = article.classList.contains('user') ? 'user' : 'assistant';
-    const variant = role === 'user' ? branch?.user : branch?.assistant;
+    const variant = role === 'user' ? branch?.user : (turn ? selectedAssistantMessage(turn,messageId) : null);
     if (!variant || variant.id !== messageId) return toast('原消息版本已经改变，请重新打开。');
     const voices = (runtime.voiceClips?.get(conversationId) || []).filter((clip) =>
-      clip.message_id === messageId || (!clip.message_id && role === 'assistant' && clip.turn_id === turnId));
+      clip.message_id === messageId || (!clip.message_id && role === 'assistant' && branch?.assistant?.id===messageId && clip.turn_id === turnId));
     const choices = mediaChoices(variant, role, voices);
     if (!choices.length) return toast('这条消息暂时没有可收藏的内容。');
 

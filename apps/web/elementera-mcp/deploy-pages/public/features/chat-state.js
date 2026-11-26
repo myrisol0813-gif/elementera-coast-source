@@ -266,6 +266,13 @@ export function activeBranch(turn) {
   };
 }
 
+// Resolve only messages in the currently selected alternative.
+export function selectedAssistantMessage(turn, messageId) {
+  const branch=activeBranch(turn);
+  if (!messageId) return branch.assistant;
+  return selectedReplyGroup(branch.assistants,branch.assistantIndex).find(v=>v.id===messageId) || null;
+}
+
 export function activeMessages(value) {
   const result = [];
   for (const turn of normalizeState(value).turns) {
@@ -455,13 +462,13 @@ export function switchVariant(value, turnId, kind, direction) {
   return state;
 }
 
-export function toggleAssistantReaction(value, turnId, reaction) {
+export function toggleAssistantReaction(value, turnId, reaction, messageId) {
   const state = normalizeState(value);
   const turn = state.turns.find((item) => item.id === turnId);
   if (!turn || !['liked', 'favorite'].includes(reaction)) return state;
-  const branch = activeBranch(turn);
-  if (!branch.assistant) return state;
-  branch.assistant[reaction] = !branch.assistant[reaction];
+  const assistant=selectedAssistantMessage(turn,messageId);
+  if (!assistant) return state;
+  assistant[reaction] = !assistant[reaction];
   state.updated_at = now();
   return state;
 }

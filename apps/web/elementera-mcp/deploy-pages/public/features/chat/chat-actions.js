@@ -1,5 +1,6 @@
 import {
   activeBranch,
+  selectedAssistantMessage,
   deleteActiveAssistantVariant,
   deleteActiveUserVariant,
   editUserVariant,
@@ -123,9 +124,10 @@ export function createChatActions({
       return;
     }
     const turnId = turnIdFrom(target);
+    const messageId=target.closest('[data-message-id]')?.dataset.messageId || '';
     if (name === 'generation-detail') {
       const turn = currentHistory().turns.find((item) => item.id === turnId);
-      const variant = turn ? activeBranch(turn).assistant : null;
+      const variant = turn ? selectedAssistantMessage(turn,messageId) : null;
       if (variant?.model_id) return toast(generationDetail(variant), 5200);
       return;
     }
@@ -174,13 +176,17 @@ export function createChatActions({
     if (name === 'copy') {
       const visible = runtime.searchPreview?.get(runtime.currentId) || currentHistory();
       const turn = visible.turns.find((item) => item.id === turnId);
-      const text = turn ? activeBranch(turn).assistant?.content || '' : '';
-      await navigator.clipboard.writeText(text);
+      const assistant=turn ? selectedAssistantMessage(turn,messageId) : null;
+      if (!assistant) return toast('原消息版本已经改变，请重新打开。');
+      await navigator.clipboard.writeText(assistant.content || '');
       return toast('已复制');
     }
     if (name === 'favorite') return treasures?.open(target);
     if (name === 'like') {
-      const state = toggleAssistantReaction(currentHistory(), turnId, 'liked');
+      const current=currentHistory();
+      const turn=current.turns.find(item=>item.id===turnId);
+      if (!turn || !selectedAssistantMessage(turn,messageId)) return toast('原消息版本已经改变，请重新打开。');
+      const state = toggleAssistantReaction(current, turnId, 'liked', messageId);
       setHistory(runtime.currentId, state);
       renderMessages();
       return saveHistory(runtime.currentId, state).catch(() => undefined);
