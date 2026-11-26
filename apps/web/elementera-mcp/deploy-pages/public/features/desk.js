@@ -111,15 +111,15 @@ function webSearchDeskDetails(section = {}) {
   ].join('');
 }
 
-function attachmentDeskDetails(section = {}) {
+function attachmentDeskDetails(section = {}, {previous=false}={}) {
   const delivered = Array.isArray(section.delivered) ? section.delivered : [];
   const notDelivered = Array.isArray(section.not_delivered) ? section.not_delivered : [];
   const rows = [
-    ...delivered.map((item) => `<section class="desk-record"><header><strong>${escapeHtml(item.name || item.id || '附件')}</strong><small>${item.type === 'image' ? '图片' : '文件'} · 已递给模型 · ${escapeHtml(item.mode === 'vision' ? '识图' : '文本读取')}</small></header></section>`),
+    ...delivered.map((item) => `<section class="desk-record"><header><strong>${escapeHtml(item.name || item.id || '附件')}</strong><small>${item.type === 'image' ? '图片' : '文件'} · 已递给模型 · ${escapeHtml(['vision','image'].includes(item.mode) ? '像素已递入，不代表已识别' : '文本读取')}</small></header></section>`),
     ...notDelivered.map((item) => `<section class="desk-record"><header><strong>${escapeHtml(item.name || item.id || '附件')}</strong><small>未递给模型</small></header>${paragraph('原因：', item.reason || 'unknown')}</section>`),
   ];
   return [
-    `<p><b>本轮上传：</b>${Math.max(0, Number(section.uploaded) || 0)} 个 · <b>递给模型：</b>${Math.max(0, Number(section.delivered_to_model) || 0)} 个</p>`,
+    `<p><b>${previous?'前序原件：':'本轮上传：'}</b>${Math.max(0, Number(section.uploaded) || 0)} 个 · <b>递给模型：</b>${Math.max(0, Number(section.delivered_to_model) || 0)} 个</p>`,
     `<p><b>识图：</b>${section.vision?.supported ? '当前模型支持' : '当前模型未确认支持'} · 已递图片 ${Math.max(0, Number(section.vision?.images_delivered) || 0)} 张</p>`,
     rows.length ? `<div class="desk-record-list">${rows.join('')}</div>` : emptyNote(),
   ].join('');
@@ -235,7 +235,7 @@ export function createDesk({ router, toast }) {
       body: `<section class="desk-slip-list">
         ${deskRow(current.label || '当前消息', current.status, [sourceNote(current.description), deskText(current.content), current.content ? '' : emptyNote()].join(''))}
         ${deskRow(recent.label || '最近上下文', recentStatus, [sourceNote(recent.description), recentDeskDetails(recent.messages)].join(''))}
-        ${Array.isArray(slip.reply_sequence_previous)&&slip.reply_sequence_previous.length?deskRow('本组前序回复','已递给 · '+slip.reply_sequence_previous.length+' 条',slip.reply_sequence_previous.map(v=>deskText(v.content,'消息 '+v.message_id)).join('')):''}
+        ${Array.isArray(slip.reply_sequence_previous)&&slip.reply_sequence_previous.length?deskRow('本组前序回复','已递给 · '+slip.reply_sequence_previous.length+' 条',slip.reply_sequence_previous.map(v=>deskText(v.content,'消息 '+v.message_id)+(v.media_receipt?attachmentDeskDetails(v.media_receipt,{previous:true}):'')).join('')):''}
         ${deskRow(contextBudget.label || '上下文预算', budgetStatus, [
           paragraph('本轮估算 token：', contextBudget.estimated_tokens),
           paragraph('comfort ceiling：', contextBudget.comfort_ceiling),

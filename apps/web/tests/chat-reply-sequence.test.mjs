@@ -256,6 +256,66 @@ try{
   assert.equal(group[1].desk_slip.reply_sequence_previous[0].media_receipt.not_delivered[0].reason,'model_no_vision');
 }finally{globalThis.fetch=routeFetch;}
 
+ // Three independent messages: saved sticker, generated image, then text.
+ // Use real route/storage/tool adapters and only replace provider HTTP.
+ {
+  const {writeProfile}=await import('../functions/chat-store.js');
+  const {fetchModelCatalog}=await import('../functions/models/model-catalog.js');
+  const cv=await createConversation(routeDb,'mixed vision group','main');
+  const visionModel='openai/gpt-4.1-mini',imageModel='openai/gpt-image-1';
+  await writeProfile(routeDb,{current_chat_model:visionModel,current_image_model:imageModel});
+  await writeConversationState(routeDb,cv.id,{context_settings:{reply_sequence_enabled:true,sticker_send_enabled:true},turns:[{id:'mixed-turn',user:{variants:[{id:'mixed-user',content:'hello'}]}}]});
+  const imageBase64='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
+  const stickerBase64=Buffer.from(png).toString('base64');
+  const stickerUrl='data:image/png;base64,'+stickerBase64,imageUrl='data:image/png;base64,'+imageBase64;
+  const urls=payload=>payload.messages.flatMap(m=>Array.isArray(m.content)?m.content.filter(p=>p.type==='image_url').map(p=>p.image_url.url):[]);
+  const call=(id,name,args)=>({id,type:'function',function:{name,arguments:JSON.stringify(args)}});
+  let chatCalls=0,imageCalls=0;
+  const answer=data=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
+  try{
+    globalThis.fetch=async(url,options={})=>{
+      if(String(url).endsWith('/images/models'))return answer({data:[{id:imageModel,architecture:{output_modalities:['image']}}]});
+      if(String(url).endsWith('/images')){
+        imageCalls++;assert.deepEqual(JSON.parse(options.body),{model:imageModel,prompt:'a tiny blue square',n:1});
+        return answer({model:imageModel,data:[{b64_json:imageBase64}],usage:{cost:0.01}});
+      }
+      if(String(url).includes('/models?'))return answer({data:[{id:visionModel,name:'vision fixture',architecture:{input_modalities:['text','image'],output_modalities:['text']},pricing:{prompt:'0.1',completion:'0.2'},supported_parameters:['tools','tool_choice']}]});
+      assert.ok(String(url).includes('/chat/completions'),String(url));
+      const payload=JSON.parse(options.body);chatCalls++;
+      assert.equal(payload.model,visionModel);
+      if(chatCalls===1)assert.ok(payload.tools.some(t=>t.function?.name==='sticker_send'));
+      if(chatCalls===3){
+        assert.ok(payload.tools.some(t=>t.function?.name==='image_generate'));
+        assert.ok(urls(payload).includes(stickerUrl));
+      }
+      if(chatCalls===4)assert.ok(urls(payload).includes(imageUrl));
+      if(chatCalls===5){
+        const stored=(await readConversationState(routeDb,cv.id)).turns[0].assistant.variantsByUserVariant['0'];
+        assert.equal(stored.length,2);
+        assert.ok(urls(payload).includes(stickerUrl));assert.ok(urls(payload).includes(imageUrl));
+        assert.ok(payload.messages.some(m=>Array.isArray(m.content)&&m.content.some(p=>p.type==='text'&&p.text.includes('非人类新发言'))));
+      }
+      const choices=chatCalls===1?[call('mixed-sticker','sticker_send',{sticker_id:sticker.id}),call('mixed-next-a','continue_reply',{})]:
+        chatCalls===3?[call('mixed-image','image_generate',{prompt:'a tiny blue square'}),call('mixed-next-b','continue_reply',{})]:[];
+      return answer({model:visionModel,usage:{prompt_tokens:100,completion_tokens:20,total_tokens:120},choices:[choices.length?{finish_reason:'tool_calls',message:{content:null,tool_calls:choices}}:{finish_reason:'stop',message:{content:chatCalls===5?'after both originals':''}}]});
+    };
+    await fetchModelCatalog(routeEnv,true);
+    const request=new Request('https://coast.test/api/chat/reply-sequence',{method:'POST',headers:{Origin:'https://coast.test','Content-Type':'application/json'},body:JSON.stringify({conversation_id:cv.id,source_turn_id:'mixed-turn',user_variant_id:'mixed-user',sequence_id:'mixed-group',model:visionModel,image_tool_enabled:true,image_model_id:imageModel,settings:{streamingEnabled:false,contextBudget:6000},budget:{maxMessages:3,toolBudget:4,tokenBudget:48000}})});
+    const response=await routeChatApi(request,routeEnv),wire=await response.text();
+    assert.equal((wire.match(/event: reply_committed/g)||[]).length,3,wire.slice(-1500));
+    assert.equal(chatCalls,5);assert.equal(imageCalls,1);
+    const group=(await readConversationState(routeDb,cv.id)).turns[0].assistant.variantsByUserVariant['0'];
+    assert.deepEqual(group.map(v=>v.content),['','','after both originals']);
+    assert.equal(group[0].attachments.length,1);assert.equal(group[1].attachments.length,1);
+    for(const [index,bytes] of [[0,png],[1,Uint8Array.from(Buffer.from(imageBase64,'base64'))]]){
+      assert.deepEqual(new Uint8Array((await getChatAttachmentRecord(routeDb,cv.id,group[index].attachments[0].id)).data),bytes);
+      const receipt=group[2].desk_slip.reply_sequence_previous[index].media_receipt;
+      assert.equal(receipt.delivered_to_model,1);assert.equal(receipt.vision.images_delivered,1);
+      assert.equal(receipt.delivered[0].id,group[index].attachments[0].id);
+    }
+  }finally{globalThis.fetch=routeFetch;}
+ }
+
 {
   const cv=await createConversation(routeDb,'stale device budget','main');
   const ident={conversationId:cv.id,turnId:'limit-turn',userVariantId:'limit-user',sequenceId:'limit-group'};
