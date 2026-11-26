@@ -57,6 +57,7 @@ internal object ArchiveV2Local {
                 val bySnapshot=dogtalk.filter{it.module=="dogtalk_snapshots"}.associate{it.id to it.data}
                 for(c in LocalBackupArchive.capture(store,applicationId).conversations)for(t in c.history.turns)for(v in t.user.variants+t.assistant.variantsByUserVariant.values.flatten())v.dogtalkSnapshotId?.takeIf{it.isNotBlank()}?.let{LocalDogtalkStore.checkReference(c.conversation.id,t.id,it,bySnapshot)}
                 for(row in dogtalk)add(row.module,row.id,row.module,row.data,links=row.dependencies)
+                for(row in LocalStickerLibrary(store).archiveRows())add("vault",LocalSideRecords.identity("vault_stickers",row),"vault_stickers",row,links=listOf("chat/"+row.getValue("conversation_id").jsonPrimitive.content,"attachments/"+row.getValue("attachment_id").jsonPrimitive.content))
                 val side=LocalSideRecords(store)
                 for(row in side.rows()){
                     val media=if(row.digest==null)emptyList()else{
@@ -135,6 +136,14 @@ internal object ArchiveV2Local {
         val snapshots=dogtalk.filter{it.module=="dogtalk_snapshots"}.associate{it.id to it.data}
         require("appearance" !in selection||appearanceRoot!=null){"外观恢复缺少设备文件目录。"}
         val appearance=ArchiveV2Appearance.read(manifest,stage,selection)
+        val stickerRecords=if("vault" in selection)manifest.records.filter{it.module=="vault"&&it.id.startsWith("vault_stickers:")}else emptyList()
+        val stickers=stickerRecords.map{r->
+            val raw=Json.parseToJsonElement(stage.verify(objects.getValue(r.recordObject),1800000).readBytes().decodeToString(throwOnInvalidSequence=true)).jsonObject
+            require(raw.keys==setOf("kind","data")&&raw.getValue("kind").jsonPrimitive.content=="vault_stickers"&&r.mediaObjects.isEmpty())
+            val row=raw.getValue("data").jsonObject
+            require(r.id==LocalSideRecords.identity("vault_stickers",row)&&r.dependencies.toSet()==setOf("chat/"+row.getValue("conversation_id").jsonPrimitive.content,"attachments/"+row.getValue("attachment_id").jsonPrimitive.content))
+            row
+        }
         val side=ArchiveV2SideRecords.read(manifest,stage,selection,applicationId)
         val attachments=ArchiveV2Attachments.read(manifest,stage,selection)
         val attachmentMeta=attachments.associate{it.metadata.getValue("id").jsonPrimitive.content to it.metadata}
@@ -151,7 +160,12 @@ internal object ArchiveV2Local {
             val sideCounts=if(selection.any{it in LocalSideRecords.modules}){
                 val media=(LocalAttachmentStore(target).entries().map{it.metadata}+attachments.map{it.metadata}).distinctBy{it["id"]}
                 val soil=(LocalSoilStore(target).read().history+rows.filter{it.kind=="thinking_soil_history"}.map{it.data}).distinctBy{it["conversation_id"] to it["assistant_message_id"]}
-                ArchiveV2SideRecords.apply(side,selection,target,histories,parents?.second.orEmpty(),media,soil,write)
+                val counts=ArchiveV2SideRecords.apply(side,selection,target,histories,parents?.second.orEmpty(),media,soil,write)
+                if("vault" in selection){
+                    val stickerCount=LocalStickerLibrary(target).restoreRows(stickers,histories,parents?.second.orEmpty(),media,write)
+                    val count=counts.getValue("vault")
+                    counts+("vault" to count.copy(ready=count.ready+stickerCount.ready,existing=count.existing+stickerCount.existing))
+                }else counts
             }else emptyMap()
             val dogtalkCounts=if(selection.any{it in LocalDogtalkStore.modules})ArchiveV2Dogtalk.apply(dogtalk,selection,target,histories,parents?.second.orEmpty(),write)else emptyMap()
             val appearanceCounts=if("appearance" in selection)mapOf("appearance" to ArchiveV2Appearance.apply(appearance,target,requireNotNull(appearanceRoot),write))else emptyMap()

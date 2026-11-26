@@ -67,6 +67,7 @@ export async function collectArchiveV2({sink,applicationId,transport=archiveV2Tr
       available(module);
       for await(const row of pages(c=>transport.detailPage(kind,c))){
         const deps=linkChat(row);
+        if(kind==='vault_stickers')deps.push('attachments/'+row.attachment_id);
         if(kind.startsWith('library_')&&kind!=='library_books')deps.push('library/'+await detailId('library_books',{id:row.book_id}));
         if(kind==='daily_comments'||kind==='daily_likes')deps.push('daily/'+await detailId('daily_moments',{id:row.moment_id}));
         const key=await detailId(kind,row);

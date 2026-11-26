@@ -15,7 +15,8 @@ internal class LocalStickerLibrary(private val store:LocalPersistence){
     @Serializable data class Entry(
         val id:String,@SerialName("conversation_id") val conversationId:String,
         @SerialName("attachment_id") val attachmentId:String,val description:String,
-        val author:String,val enabled:Boolean=true,@SerialName("created_at") val createdAt:Long
+        val author:String,val enabled:Boolean=true,@SerialName("created_at") val createdAt:Long,
+        @SerialName("updated_at") val updatedAt:Long=createdAt
     )
     data class Delivery(val attachment:RemoteAttachment,val reused:Boolean)
     private val serializer=ListSerializer(Entry.serializer())
@@ -25,7 +26,7 @@ internal class LocalStickerLibrary(private val store:LocalPersistence){
         return if(raw.isBlank())emptyList()else json.decodeFromString(serializer,raw).also{rows->
             require(rows.map{it.id}.distinct().size==rows.size)
             require(rows.map{it.conversationId to it.attachmentId}.distinct().size==rows.size)
-            rows.forEach{require(ID.matches(it.id)&&ID.matches(it.conversationId)&&ID.matches(it.attachmentId)&&it.author in setOf("owner","assistant")&&it.createdAt>=0);description(it.description)}
+            rows.forEach{require(ID.matches(it.id)&&ID.matches(it.conversationId)&&ID.matches(it.attachmentId)&&it.author in setOf("owner","assistant")&&it.createdAt>=0&&it.updatedAt>=it.createdAt);require(description(it.description)==it.description)}
         }
     }
     private fun write(s:LocalPersistence,rows:List<Entry>){s.put(KEY,json.encodeToString(serializer,rows));require(entries(s)==rows)}
@@ -41,6 +42,34 @@ internal class LocalStickerLibrary(private val store:LocalPersistence){
         return row to bytes
     }
     fun listOwner():List<Entry> = store.readConsistent{entries(it)}
+    fun archiveRows():List<JsonObject>{
+        val live=RemoteCacheStore(store,strictReads=true).conversations().filter{it.deletedAt==null}.map{it.id}.toSet()
+        return entries(store).filter{it.conversationId in live}.map{e->
+            original(store,e.conversationId,e.attachmentId)
+            buildJsonObject{
+                put("id",e.id);put("conversation_id",e.conversationId);put("attachment_id",e.attachmentId);put("description",e.description)
+                put("author",e.author);put("enabled",if(e.enabled)1 else 0);put("created_at",e.createdAt);put("updated_at",e.updatedAt)
+            }
+        }
+    }
+    fun restoreRows(rows:List<JsonObject>,histories:Map<String,RemoteHistory>,conflicts:Set<String>,attachments:List<JsonObject>,write:Boolean):LocalRestoreCount{
+        val incoming=rows.map{r->
+            require(r.keys==setOf("id","conversation_id","attachment_id","description","author","enabled","created_at","updated_at"))
+            val enabled=r.getValue("enabled").jsonPrimitive.int;require(enabled in 0..1)
+            val e=json.decodeFromJsonElement(Entry.serializer(),JsonObject(r+("enabled" to JsonPrimitive(enabled==1))))
+            require(ID.matches(e.id)&&e.id.startsWith("sticker_")&&ID.matches(e.conversationId)&&ID.matches(e.attachmentId)&&e.author in setOf("owner","assistant")&&e.createdAt>=0&&e.updatedAt>=e.createdAt&&description(e.description)==e.description)
+            require(e.conversationId in histories&&e.conversationId !in conflicts)
+            require(attachments.any{it.str("id")==e.attachmentId&&it.str("conversation_id")==e.conversationId&&it.str("kind")=="image"&&it.str("mime") in MIMES}){"表情包缺少原始图片。"}
+            e
+        }
+        val old=entries(store);val byId=old.associateBy{it.id}
+        require(incoming.map{it.id}.distinct().size==incoming.size&&incoming.all{byId[it.id]==null||byId[it.id]==it}){"目标已有不同的表情包，不覆盖。"}
+        val fresh=incoming.filter{it.id !in byId}
+        val next=old+fresh
+        require(next.map{it.conversationId to it.attachmentId}.distinct().size==next.size){"素材已用另一编号登记。"}
+        if(write){incoming.forEach{original(store,it.conversationId,it.attachmentId)};write(store,next)}
+        return LocalRestoreCount(ready=fresh.size,existing=incoming.size-fresh.size)
+    }
     fun ownerPage(query:String="",cursor:Int=0):JsonObject=store.readConsistent{s->
         require(query.length<=100&&cursor in 0..100000)
         val rows=entries(s).filter{it.description.contains(query.trim(),ignoreCase=true)}.sortedWith(compareByDescending<Entry>{it.createdAt}.thenByDescending{it.id}).drop(cursor).take(41)
@@ -73,7 +102,7 @@ internal class LocalStickerLibrary(private val store:LocalPersistence){
     fun update(id:String,actor:String,desc:String?=null,enabled:Boolean?=null)=store.atomic{s->
         require(actor=="owner"&&ID.matches(id));val rows=entries(s)
         require(rows.any{it.id==id})
-        write(s,rows.map{if(it.id==id)it.copy(description=desc?.let(::description)?:it.description,enabled=enabled?:it.enabled)else it})
+        write(s,rows.map{if(it.id==id)it.copy(description=desc?.let(::description)?:it.description,enabled=enabled?:it.enabled,updatedAt=maxOf(it.updatedAt,System.currentTimeMillis()))else it})
     }
     fun remove(id:String,actor:String)=store.atomic{s->
         require(actor=="owner"&&ID.matches(id));write(s,entries(s).filterNot{it.id==id})

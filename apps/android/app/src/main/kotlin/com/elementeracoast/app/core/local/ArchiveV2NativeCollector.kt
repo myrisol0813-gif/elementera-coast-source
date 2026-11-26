@@ -103,6 +103,7 @@ object ArchiveV2NativeCollector {
                     val m=v.jsonPrimitive.content;available.add(m)
                     pages({api.archiveV2DetailPage(kind,it)}){row->
                         val deps=chatLinks(row).toMutableList()
+                        if(kind=="vault_stickers")deps.add("attachments/"+row.string("attachment_id"))
                         if(kind.startsWith("library_")&&kind!="library_books")deps.add("library/"+detailId("library_books",buildJsonObject { put("id",row.getValue("book_id")) }))
                         if(kind=="daily_comments"||kind=="daily_likes")deps.add("daily/"+detailId("daily_moments",buildJsonObject { put("id",row.getValue("moment_id")) }))
                         val id=detailId(kind,row)

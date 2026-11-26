@@ -195,3 +195,5 @@ export async function removeOwnerSticker(db,id,{actor}={}){
   const result=await query(db,'DELETE FROM coast_sticker_library WHERE id=?',[identifier(id)]).run();
   return {deleted:result.meta?.changes===1,original_preserved:true};
 }
+
+export async function verifyStickerArchiveOriginal(db,cid,aid){await verifiedOriginal(db,identifier(cid),identifier(aid));}
