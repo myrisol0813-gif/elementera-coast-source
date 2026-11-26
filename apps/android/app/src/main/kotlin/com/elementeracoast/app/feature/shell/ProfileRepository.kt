@@ -10,6 +10,7 @@ interface ProfileRepository {
     fun cachedModels(): RemoteModelCatalogResponse?
     suspend fun refreshProfile(): RemoteProfile
     suspend fun refreshModels(force: Boolean = false): RemoteModelCatalogResponse
+    suspend fun setCurrentImageModel(modelId: String): RemoteProfile = error("Image selection unavailable")
     suspend fun setCurrentChatModel(modelId: String): RemoteProfile
     suspend fun setAssistantAvatar(dataUrl: String): RemoteProfile
 }
@@ -23,6 +24,10 @@ class DefaultProfileRepository(
 
     override suspend fun refreshProfile(): RemoteProfile = api.getProfile().also(cache::putProfile)
     override suspend fun refreshModels(force: Boolean): RemoteModelCatalogResponse = api.listModels(force).also(cache::putModelCatalog)
+
+    override suspend fun setCurrentImageModel(modelId: String): RemoteProfile = updateProfile { current ->
+        current.copy(currentImageModel = modelId)
+    }
 
     override suspend fun setCurrentChatModel(modelId: String): RemoteProfile = updateProfile { current ->
         current.copy(currentChatModel = modelId)

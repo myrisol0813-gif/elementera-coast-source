@@ -40,5 +40,7 @@ data class CoastShellState(
     val streamingVariantIndex: Int? = null,
     val showModelPicker: Boolean = false,
     val snackbarMessage: String? = null,
-    val localMode: Boolean = false
+    val localMode: Boolean = false,
+    val currentImageModel: String = "",
+    val imageModels: List<String> = emptyList()
 )

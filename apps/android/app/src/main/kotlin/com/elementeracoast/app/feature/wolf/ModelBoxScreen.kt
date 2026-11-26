@@ -55,7 +55,10 @@ internal fun ModelBoxScreen(
     onChatGptProbe: (String) -> Unit,
     localMode: Boolean = false,
     localPage: LocalModelPage = LocalModelPage.Catalog,
-    onLocalPage: (LocalModelPage) -> Unit = {}
+    onLocalPage: (LocalModelPage) -> Unit = {},
+    imageModels: List<String> = emptyList(),
+    currentImage: String = "",
+    onSelectImage: (String) -> Unit = {}
 ) {
     var expandedModel by remember { mutableStateOf<String?>(null) }
     val grouped = remember(models, current) { groupedUnselectedModels(models, current) }
@@ -118,6 +121,25 @@ internal fun ModelBoxScreen(
             CurrentModelCard(current, if (!localMode) "" else if (current.startsWith("chatgpt-plan:")) "ChatGPT 套餐" else providerNames[localProviderId(current)].orEmpty())
         }
 
+        item {
+            Text("当前生图模型", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(6.dp))
+            CurrentModelCard(currentImage, "独立图片 API")
+            Text("与聊天模型独立；使用已配置 API 正常计费。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        item {
+            Text("图片模型目录", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            if (imageModels.isEmpty()) Text("暂无已核验的生图模型，请刷新目录。", style = MaterialTheme.typography.bodySmall)
+        }
+        items(imageModels.filter { query.isBlank() || it.contains(query, ignoreCase = true) }, key = { "image-model:" + it }) { model ->
+            Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .45f), RoundedCornerShape(18.dp)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(if (localMode) localRawModelId(model) else model, style = MaterialTheme.typography.bodyMedium)
+                    if (localMode) Text(providerNames[localProviderId(model)].orEmpty(), style = MaterialTheme.typography.bodySmall)
+                }
+                TextButton(onClick = { onSelectImage(model) }, enabled = model != currentImage) { Text(if (model == currentImage) "当前" else "设为当前") }
+            }
+        }
         if (localMode) {
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
