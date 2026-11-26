@@ -140,9 +140,25 @@ export async function fetchModelCatalog(env, force = false) {
   } catch {
     throw new ModelRequestError('models_parse_failed', 'Model catalog is invalid.', 502);
   }
-  let images=null;
-  if(openRouterKey(env))try{images=await discoverImageModels(fetch,openRouterKey(env));}catch{ /* chat catalog remains usable */ }
-  catalogCache = buildModelCatalog(raw,images);
+  catalogCache = buildModelCatalog(raw);
   catalogExpiresAt = now + CATALOG_TTL_MS;
   return catalogCache;
+}
+
+let imageCatalogCache=null;
+let imageCatalogExpiresAt=0;
+/** Only model-box requests refresh the independent image directory. Chat
+ * inference retains its original catalog request and capability lookup. */
+export async function fetchModelBoxCatalog(env,force=false){
+  const chat=await fetchModelCatalog(env,force);
+  if(force||!imageCatalogCache||imageCatalogExpiresAt<=Date.now()){
+    let images=null;
+    if(openRouterKey(env))try{images=await discoverImageModels(fetch,openRouterKey(env));}catch{ /* chat remains usable */ }
+    imageCatalogCache={images};
+    imageCatalogExpiresAt=Date.now()+(images===null?10000:CATALOG_TTL_MS);
+  }
+  const images=imageCatalogCache.images;
+  const all=Object.values(chat.groups).flat();
+  const image=sortModels((images||[]).map(item=>({...safeModel(all.find(m=>m.id===item.id)||{id:item.id,name:item.name,architecture:{output_modalities:['image']}},{is_free:item.free}),image_api_supported:true})));
+  return {...chat,groups:{...chat.groups,openai_image:image},defaults:{...chat.defaults,image:image[0]?.id||''},image_catalog_status:images===null?'unavailable':'verified'};
 }

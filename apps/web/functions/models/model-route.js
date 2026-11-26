@@ -1,11 +1,11 @@
 import { apiError, json } from '../http.js';
-import { fetchModelCatalog } from './model-catalog.js';
+import { fetchModelBoxCatalog } from './model-catalog.js';
 import { ModelRequestError } from './model-validation.js';
 
 export async function handleModels(request, env) {
   if (request.method !== 'GET') return apiError('method_not_allowed', 'Method not allowed.', 405);
   try {
-    return json(await fetchModelCatalog(env, new URL(request.url).searchParams.get('refresh') === '1'));
+    return json(await fetchModelBoxCatalog(env, new URL(request.url).searchParams.get('refresh') === '1'));
   } catch (error) {
     return modelErrorResponse(error);
   }
