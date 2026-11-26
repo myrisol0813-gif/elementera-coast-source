@@ -33,7 +33,7 @@ internal object OfflineV2HtmlArchive {
             else->""
         }
     }
-    fun write(source:File,output:OutputStream):List<String> {
+    fun write(source:File,output:OutputStream,device:JsonElement?=null):List<String> {
         val parent=requireNotNull(source.parentFile)
         val temp=java.nio.file.Files.createTempDirectory(parent.toPath(),"html-verified-").toFile()
         try {
@@ -166,8 +166,9 @@ internal object OfflineV2HtmlArchive {
                     val shown=if(module.module=="library")rows.filter{it.kind=="library_books"} else rows
                     "<section><h2>"+esc(labels[module.module]?:module.module)+"</h2><small>"+module.count+" 项 · "+esc(module.coverage)+"</small><ul>"+shown.joinToString(""){"<li><a href=\""+it.path+"\">"+esc(title(it))+"</a></li>"}+"</ul></section>"
                 }
+                if(device!=null)text("device.json",device.toString())
                 val meta=buildJsonObject{
-                    put("format","elementera-coast-offline-html");put("version",2);put("restore_supported",false);put("workspace",manifest.workspace);put("exported_at",manifest.exportedAt)
+                    put("format","elementera-coast-offline-html");put("version",2);put("restore_supported",false);put("workspace",manifest.workspace);put("exported_at",manifest.exportedAt);put("device_settings",device!=null)
                     put("source_coverage",Json.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(ArchiveV2Coverage.serializer()),manifest.modules))
                     put("warnings",JsonArray(warnings.distinct().map(::JsonPrimitive)))
                     put("excluded_modules",JsonArray(manifest.modules.filter{it.coverage=="unavailable"}.map{JsonPrimitive(it.module)}))
@@ -175,7 +176,7 @@ internal object OfflineV2HtmlArchive {
                     put("records",JsonArray(files.map{item->buildJsonObject{put("module",item.row.module);put("id",item.row.id);put("kind",item.kind);put("path",item.path);put("json",item.jsonPath);put("media",JsonArray(mediaByRecord[key(item)].orEmpty().map{JsonPrimitive(it.path)}))}}))
                 }
                 text("manifest.json",meta.toString());text("data.json",meta.toString())
-                text("index.html",page("离线归档","<h1>离线海岸</h1><p>由已校验的 V2 记录生成 · 只读，不是恢复包。</p><p>"+esc(manifest.exportedAt)+"</p><p>partial 表示源采集范围尚未声明完整；空记录与未采集不同。</p><p><a href=\"manifest.json\">归档清单</a></p>"+warnings.distinct().joinToString(""){"<p>"+esc(it)+"</p>"}+nav))
+                text("index.html",page("离线归档","<h1>离线海岸</h1><p>由已校验的 V2 记录生成 · 只读，不是恢复包。</p><p>"+esc(manifest.exportedAt)+"</p><p>partial 表示源采集范围尚未声明完整；空记录与未采集不同。</p><p><a href=\"manifest.json\">归档清单</a>"+(if(device!=null)" · <a href=\"device.json\">本机设置</a>" else "")+"</p>"+warnings.distinct().joinToString(""){"<p>"+esc(it)+"</p>"}+nav))
             }
             return warnings.distinct()
         }finally{temp.deleteRecursively()}

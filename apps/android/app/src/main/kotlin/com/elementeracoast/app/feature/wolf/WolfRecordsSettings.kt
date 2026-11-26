@@ -68,7 +68,7 @@ internal fun ChatRecordsScreen(
                 try {
                     withContext(Dispatchers.IO) {
                         context.contentResolver.openOutputStream(uri)?.use { output ->
-                            OfflineV2HtmlArchive.write(file,output)
+                            OfflineV2HtmlArchive.write(file,output,GlobalArchive.withNativeSettings(kotlinx.serialization.json.JsonObject(emptyMap()),nativeSettings,localMode))
                         }?:error("无法打开目标文件")
                     }
                 }finally{file.parentFile?.deleteRecursively()}
