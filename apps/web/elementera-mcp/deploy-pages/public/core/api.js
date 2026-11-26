@@ -5,6 +5,7 @@ export const API = Object.freeze({
   session: '/api/session',
   models: '/api/models',
   chat: '/api/chat',
+  imageGenerate: '/api/chat/image-generate',
   attachments: '/api/chat/attachments',
   messageMetadata: '/api/chat/message-metadata',
   landingLetter: '/api/chat/landing-letter',

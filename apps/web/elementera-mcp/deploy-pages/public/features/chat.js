@@ -334,6 +334,7 @@ export function createChat({ storage, toast, dogtalk }) {
     generate,
     sendLandingLetter,
     send,
+    sendImage,
   } = createChatGeneration({
     runtime,
     ui,
@@ -367,6 +368,7 @@ export function createChat({ storage, toast, dogtalk }) {
     generationDetail,
     generate,
     send,
+    sendImage,
     newConversation,
     openRoomType,
     refreshFromCoast,
