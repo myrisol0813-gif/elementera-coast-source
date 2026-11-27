@@ -172,6 +172,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
                 DreamSwitch("新增日历事项",execution.allowCalendarWrite,!busy){execution=execution.copy(allowCalendarWrite=it)}
                 DreamSwitch("自主语音（独立供应商费用）",execution.allowVoice,!busy){execution=execution.copy(allowVoice=it)}
                 DreamSwitch("自主生图（独立供应商费用）",execution.allowImage,!busy){execution=execution.copy(allowImage=it)}
+                DreamSwitch("允许将本次自主生图原件转交支持视觉的模型（计入推理预算）",execution.allowImageReadback,!busy){execution=execution.copy(allowImageReadback=it)}
                 Button(onClick={save("save")},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text("保存设置（不启用）")}
                 if(canArm){
                     DreamSwitch("确认按上述设置进行模型调用并产生相应费用",consent,!busy){consent=it}
