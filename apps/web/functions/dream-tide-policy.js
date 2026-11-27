@@ -1,0 +1,23 @@
+// Autonomous activity borrows ordinary model permissions, never a fictional
+// chat turn or the official MCP role. These are explicit, opt-in tool groups.
+// Tools requiring a live user turn, media target or destructive action stay out.
+export const DREAM_TOOL_GROUPS=Object.freeze({
+  allowWeb:['independent_web_search','independent_web_read'],
+  allowLibrary:['library_books','library_read','library_notes'],
+  allowMemory:['memory_search'],
+  allowCalendar:['calendar_list'],
+  allowCollection:['vault_search_index','vault_read_item'],
+  allowLibraryWrite:['library_write'],
+});
+export const DREAM_CONTEXT_FLAGS=Object.freeze(['includeCustom','includeUserPortrait','includeSelfPortrait','includeConversationCount','includeWeather','includeCalendar']);
+export const DREAM_TOOL_FLAGS=Object.freeze(Object.keys(DREAM_TOOL_GROUPS));
+export function dreamToolAllowed(config,name){
+  const e=config?.execution||{};
+  if(name==='dream_read_history')return e.readHistory===true;
+  if(name==='dream_write_note')return e.writeNote===true;
+  if(name==='dream_schedule_extra')return config.allowExtra===true&&e.extraPerDay>0;
+  return Object.entries(DREAM_TOOL_GROUPS).some(([flag,names])=>e[flag]===true&&names.includes(name));
+}
+export function dreamToolNames(config){
+  return Object.values(DREAM_TOOL_GROUPS).flat().filter(name=>dreamToolAllowed(config,name));
+}
