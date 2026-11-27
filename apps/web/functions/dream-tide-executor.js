@@ -12,6 +12,7 @@ import {localClock} from './dream-tide-schedule.js';
 import {dreamToolNames} from './dream-tide-policy.js';
 import {autonomousVoiceConfigured} from './voice-clips.js';
 import {autonomousImageModel,generateDreamImage} from './dream-tide-image.js';
+import {proposeDreamMemory} from './dream-tide-memory.js';
 import {resolveToolSelection,executeModelTool} from './tool-registry-core.js';
 import {estimateWireInputTokens,assertWireInputBudget} from './context-budget.js';
 
@@ -19,6 +20,7 @@ const tool=(name,description,properties,required)=>({type:'function',function:{n
 const integer={type:'integer'},string={type:'string'};
 const toolsFor=(cfg,extraAllowed)=>[
   ...(cfg.readHistory?[tool('dream_read_history','自行选读本窗口完整历史轮次，从零开始分页；since_previous 仅返回两次唤醒之间的对话。',{mode:{type:'string',enum:['window','since_previous']},start:integer,count:integer},['mode','start','count'])]:[]),
+  ...(cfg.allowMemoryCandidate?[tool('dream_memory_candidate','可选：提议待屋主确认的记忆或种子，不写入正式记忆。只写候选本身，不伪造聊天来源。',{title:{type:'string',maxLength:120},content:{type:'string',maxLength:2000},destination:{type:'string',enum:['memory','seed']}},['title','content','destination'])]:[]),
   ...(cfg.writeNote?[tool('dream_write_note','可选：写一封独立自主手记，屋主可以稍后回复。不必写，也不发送普通聊天消息。',{body:string},['body'])]:[]),
   ...(extraAllowed?[tool('dream_schedule_extra','可选：安排一次未来额外唤醒，时间为带时区的 ISO 8601 字符串。不会立即执行。',{at:string},['at'])]:[]),
 ];
@@ -167,6 +169,9 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
             if(name==='dream_read_history'&&exact(a,['mode','start','count'])){
               result=await readDreamHistory(db,cid,{...a,since:context.previous?.started_at??null,until:now,maxTurns:e.readTurns});
               activities.push({kind:'history_read',ok:!result.reason,count:result.turns.length});
+            }else if(name==='dream_memory_candidate'&&exact(a,['title','content','destination'])){
+              const value=await proposeDreamMemory(db,a,{...toolContext,autonomous_event:{step:index,index:callIndex}},clock());
+              result={ok:true,data:value,...(value.id?{record_id:value.id}:{})};activities.push({kind:name,ok:true});
             }else if(name==='dream_write_note'&&exact(a,['body'])){
               result={ok:await writeDreamNote(db,claim,a.body,clock())};activities.push({kind:'note',ok:result.ok});
             }else if(name==='dream_schedule_extra'&&exact(a,['at'])&&typeof a.at==='string'&&/(Z|[+-]\d{2}:\d{2})$/.test(a.at)&&extraAt===null){
