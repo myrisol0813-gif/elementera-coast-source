@@ -109,3 +109,27 @@ test('disabled modules never attach documents or expose unapproved common tools'
   }});
   assert.equal(out.status,'completed');
 });
+
+test('ordinary chat readback remains independent of scheduling and rechecks permission',async()=>{
+  const {env,db,cid,other,opts,rev}=await fixture();
+  const {resolveToolSelection,executeModelTool}=await import('../functions/tool-registry-core.js');
+  const {readDreamChatHistory}=await import('../functions/dream-tide-readback.js');
+  let calls=0;
+  const out=await executeDreamTide(env,cid,{...opts,invoke:async()=>++calls===1?response([toolCall('n','dream_write_note',{body:'readback-private-fixture'})]):response()});
+  assert.equal(out.status,'completed');
+  await disarmDreamTide(db,cid,rev);
+  const ctx={permission:'owner',surface:'main_chat',conversation_id:cid,dream_readback_enabled:true,env};
+  assert.ok(resolveToolSelection(ctx).modelVisibleTools.some(t=>t.function.name==='dream_readback'));
+  assert.ok(!resolveToolSelection({...ctx,dream_readback_enabled:false}).modelVisibleTools.some(t=>t.function.name==='dream_readback'));
+  await assert.rejects(()=>readDreamChatHistory(db,cid,{kind:'notes'}),/未授权/);
+  const history=await readConversationState(db,cid);
+  await writeConversationState(db,cid,{...history,context_settings:{...history.context_settings,dream_readback_enabled:true}});
+  const data=await executeModelTool(db,toolCall('r','dream_readback',{kind:'notes'}),ctx);
+  assert.equal(data.items[0].body,'readback-private-fixture');
+  assert.equal(data.reference_only,true);
+  await assert.rejects(()=>executeModelTool(db,toolCall('r2','dream_readback',{kind:'notes',conversation_id:other.id}),ctx));
+  await assert.rejects(()=>executeModelTool(db,toolCall('r3','dream_readback',{kind:'notes'}),{...ctx,conversation_id:other.id}),/未授权/);
+  await writeConversationState(db,cid,{...history,context_settings:{}});
+  await assert.rejects(()=>executeModelTool(db,toolCall('r4','dream_readback',{kind:'notes'}),ctx),/未授权/);
+  assert.equal(calls,2);
+});
