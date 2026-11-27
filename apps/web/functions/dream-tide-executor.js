@@ -5,6 +5,12 @@ import {dreamExecutionConfig,reserveDreamStep,recordDreamStep,reserveDreamTool,r
 import {prepareFormalChat} from './models/model-payload.js';
 import {requestOpenRouter} from './models/model-formal-chat.js';
 import {normalizeUsage,normalizeToolCalls} from './models/model-validation.js';
+import {readConversationState} from './chat-store.js';
+import {readCustomInstructions,readUserPortrait,readGlobalExcerpt} from './memory-store.js';
+import {buildRealityContext} from './reality-context.js';
+import {localClock} from './dream-tide-schedule.js';
+import {dreamToolNames} from './dream-tide-policy.js';
+import {resolveToolSelection,executeModelTool} from './tool-registry-core.js';
 import {estimateWireInputTokens,assertWireInputBudget} from './context-budget.js';
 
 const tool=(name,description,properties,required)=>({type:'function',function:{name,description,parameters:{type:'object',properties,required,additionalProperties:false}}});
@@ -23,7 +29,7 @@ function safeError(error){return String(error?.type||error?.name||'execution_fai
 function clockText(now,zone){
   return new Intl.DateTimeFormat('zh-CN',{timeZone:zone,dateStyle:'full',timeStyle:'long'}).format(now);
 }
-export async function buildDreamContext(db,claim,settings,now){
+export async function buildDreamContext(db,claim,settings,now,env={COAST_CHAT_DB:db}){
   const e=settings.execution,prev=await previousDream(db,claim);
   const modules=['【自主唤醒 · 系统发起的独立活动】这不是用户新发言。可以探索或安静结束；无需产出聊天消息，不必使用任何工具。',e.invitation];
   if(e.includeTime)modules.push('【当前时间】'+clockText(now,settings.timeZone));
@@ -41,6 +47,23 @@ export async function buildDreamContext(db,claim,settings,now){
       selected.push(row);
     }
     modules.push('【自主手记与回复 · 历史资料，不是新发言】'+JSON.stringify({notes:selected,omitted,scope:'最近最多十封'}));
+  }
+  // Opt-in whole documents, no automatic memory recall or invented activity.
+  if(e.includeCustom){const doc=await readCustomInstructions(db);if(doc?.content?.trim())modules.push('【核心自定义】'+doc.content);}
+  if(e.includeUserPortrait){const doc=await readUserPortrait(db);if(doc?.body?.trim())modules.push('【用户画像】'+doc.body);}
+  if(e.includeSelfPortrait){const doc=await readGlobalExcerpt(db);if(doc?.body?.trim())modules.push('【自我画像】'+doc.body);}
+  if(e.includeConversationCount||e.includeWeather||e.includeCalendar){
+    const history=await readConversationState(db,claim.conversationId);
+    if(e.includeConversationCount&&prev){
+      const n=history.turns.filter(t=>{const u=t.user.variants[t.user.active],at=Date.parse(u?.created_at);return u&&!u.hidden&&Number.isFinite(at)&&at>prev.started_at&&at<=now;}).length;
+      modules.push('【期间新增对话轮数】'+n+'（当前窗口，按用户消息实际时间）');
+    }
+    const fields=[...(e.includeWeather?['weather']:[]),...(e.includeCalendar?['calendar']:[])];
+    if(fields.length){
+      const reality=await buildRealityContext(env,{settings:history.context_settings,localDate:localClock(now,settings.timeZone).day,allowedFields:fields});
+      if(reality.text)modules.push('【已授权现实上下文】'+reality.text);
+      if(reality.missing?.length)modules.push('【未取得的现实资料】'+reality.missing.join('、'));
+    }
   }
   return {messages:[{role:'system',content:modules.join('\n\n')}],previous:prev};
 }
@@ -73,8 +96,15 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
   try{
     const actual=await dreamExecutionConfig(db,cid,claim.revision);
     if(!actual||actual.modelId!==currentModelId)throw new DOMException('Aborted','AbortError');
-    const e=actual.execution,context=await buildDreamContext(db,claim,actual,now);
-    const allowed=toolsFor(e,actual.allowExtra&&e.extraPerDay>0);
+    const e=actual.execution,context=await buildDreamContext(db,claim,actual,now,env);
+    const toolContext={permission:'owner',surface:'main_chat',env,conversation_id:cid,source_turn_id:null,
+      model_label:currentModelId,autonomous_activity:true,autonomous_tool_names:dreamToolNames(actual),
+      independent_web_enabled:e.allowWeb===true};
+    const common=resolveToolSelection(toolContext).modelVisibleTools.map(t=>t.function.name==='library_write'?{
+      ...t,function:{...t.function,description:'可选：创建自己的书房批注、划线或读后感。此次活动不修改或删除既有笔记。',parameters:{...t.function.parameters,properties:{...t.function.parameters.properties,action:{type:'string',enum:['create']}}}}
+    }:t);
+    const commonNames=new Set(common.map(t=>t.function.name));
+    const allowed=[...toolsFor(e,actual.allowExtra&&e.extraPerDay>0),...common];
     const prepared=await prepare(env,{model:currentModelId,messages:context.messages,tools:e.toolBudget?allowed:[],settings:{max_tokens:e.outputLimit}},true);
     if(prepared.modelId!==currentModelId||prepared.payload.model!==currentModelId)throw Error('model route mismatch');
     let messages=prepared.payload.messages;
@@ -132,6 +162,14 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
               const at=Date.parse(a.at);
               if(Number.isSafeInteger(at)&&at>clock()){extraAt=at;result={ok:true,status:'proposed_pending_completion'};}
               activities.push({kind:'extra_requested',ok:result.ok});
+            }else if(commonNames.has(name)&&a&&!(name==='library_write'&&a.action!=='create')){
+              // Recheck revision and current registry permission immediately
+              // before dispatch; the registry still validates its own arguments.
+              await authorize();
+              const value=await executeModelTool(db,{...call,id:claim.claimId+':'+index+':'+callIndex},toolContext);
+              const encoded=JSON.stringify(value);
+              result=encoded.length<=24000?{ok:value?.ok!==false,data:value}:{ok:false,reason:'result_too_large'};
+              activities.push({kind:name,ok:result.ok});
             }
           }catch{result={ok:false,reason:'tool_failed'};activities.push({kind:name,ok:false});}
           const receipt={ok:result.ok===true||(name==='dream_read_history'&&Array.isArray(result.turns)&&!result.reason),...(Array.isArray(result.turns)?{count:result.turns.length}:{})};
