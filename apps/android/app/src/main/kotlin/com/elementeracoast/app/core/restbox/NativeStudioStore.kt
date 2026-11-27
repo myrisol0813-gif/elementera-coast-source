@@ -37,13 +37,15 @@ class NativeStudioPolicy(private val catalogue: NativeSceneCatalogue, private va
     }
     fun decode(raw: String): NativeStudioState = validate(json.decodeFromString<NativeStudioState>(raw))
     fun encode(state: NativeStudioState): String = json.encodeToString(NativeStudioState.serializer(), validate(state))
-    fun export(state: NativeStudioState): String = json.encodeToString(NativeStudioArchive.serializer(),
-        NativeStudioArchive(layout = state.layout, household = state.household))
+    // V1 envelope remains compatible with older room-only and layout/household imports.
+    fun export(state: NativeStudioState): String = encode(state)
     fun import(raw: String, current: NativeStudioState): NativeStudioState {
         val doc = json.parseToJsonElement(raw).jsonObject
         require(doc["version"]?.jsonPrimitive?.intOrNull == 1)
         val layout = json.decodeFromJsonElement<NativeRoomLayout>(doc["layout"] ?: doc)
         val house = doc["household"]?.let { json.decodeFromJsonElement<RestHousehold>(it) } ?: current.household
+        val full = doc["layout"]!=null && doc["household"]!=null && doc.keys.any{it in setOf("room","pets","reducedMotion","poseChoices")}
+        if(full) return validate(json.decodeFromJsonElement<NativeStudioState>(doc))
         return validate(current.copy(layout = layout, household = house, poseChoices = emptyMap()))
     }
     fun items(state: NativeStudioState) = state.layout.rooms.getValue(state.room)
