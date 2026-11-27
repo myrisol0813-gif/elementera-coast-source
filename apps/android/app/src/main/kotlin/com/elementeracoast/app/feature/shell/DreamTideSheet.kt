@@ -76,7 +76,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
         finally{busy=false}
     }
     LaunchedEffect(cid,tab,offset){load()}
-    val canArm=!localMode&&response.executionAvailable&&response.schedulerConfigured
+    val canArm=response.executionAvailable&&response.schedulerConfigured
     fun save(action:String){
         if(busy||!loaded)return
         val e=if(action=="disarm")null else {
@@ -117,7 +117,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
             if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
             if(tab==0&&loaded){
                 Text(if(response.settings.enabled)if(response.settings.running)"活动中" else "已授权" else "未授权")
-                Text(if(localMode)"本机目前仅支持保存配置，尚未接入自动执行。不会访问云端。" else if(canArm)"服务端已配置调度，授权后才会请求模型。" else "服务端尚未开通调度，可先保存设置。",style=MaterialTheme.typography.bodySmall)
+                Text(if(localMode)if(canArm)"本机按系统后台调度尝试唤醒。仅向绑定供应商请求；强停、关机、断网或省电限制可能延迟或中断。" else "本机目前仅支持保存配置，尚未开放自动执行。不会访问云端。" else if(canArm)"服务端已配置调度，授权后才会请求模型。" else "服务端尚未开通调度，可先保存设置。",style=MaterialTheme.typography.bodySmall)
                 response.settings.extraAt?.let{Text("下一次额外预约："+stamp(it))}
                 if(response.settings.enabled)Button(onClick={save("disarm")},enabled=!busy){Text("关闭唤醒授权")}
                 DreamField("绑定模型 ID",model,{model=it.take(180)},!busy)
@@ -150,7 +150,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
                     Button(onClick={save("arm")},enabled=!busy&&consent,modifier=Modifier.fillMaxWidth()){Text("保存并授权唤醒")}
                 }
             }else if(tab==1){
-                if(localMode)Text("本机执行尚未接入。",style=MaterialTheme.typography.bodySmall)
+                if(localMode&&!canArm)Text("本机自动执行尚未开放；已归档的历史仍可阅读。",style=MaterialTheme.typography.bodySmall)
                 if(notePage.items.isEmpty()&&!busy)Text("还没有自主手记。")
                 Text("回复只保存文字，不立即唤醒模型。",style=MaterialTheme.typography.bodySmall)
                 notePage.items.forEach{note->key(cid,note.claimId){
@@ -177,7 +177,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
                     }
                 }}
             }else if(tab==2){
-                if(localMode)Text("本机执行尚未接入。",style=MaterialTheme.typography.bodySmall)
+                if(localMode&&!canArm)Text("本机自动执行尚未开放；已归档的历史仍可阅读。",style=MaterialTheme.typography.bodySmall)
                 if(activityPage.items.isEmpty()&&!busy)Text("还没有活动记录。")
                 activityPage.items.forEach{r->Surface(shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.45f)){
                     Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
