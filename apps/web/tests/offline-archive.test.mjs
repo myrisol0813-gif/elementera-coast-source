@@ -40,7 +40,10 @@ test('verified V2 reading copy keeps library anchors, original media and signatu
   const text=new TextDecoder().decode(await new Blob(parts).arrayBuffer());
   assert.equal(result.mediaCount,2);assert.deepEqual(result.warnings,[]);
   assert.match(text,/2\.html#p-1/);assert.match(text,/id="p-1"/);assert.match(text,/&lt;script&gt;/);
-  assert.match(text,/版本 2 · 连续回复 1 · 组 seq/);assert.match(text,/版本 2 · 连续回复 2 · 组 seq/);assert.match(text,/reply_sequence_previous/);assert.match(text,/second\n\nnext segment/);assert.doesNotMatch(text,/tideloom:split/);
+  assert.match(text,/版本 2 · 连续回复 1 · 组 seq/);assert.match(text,/版本 2 · 连续回复 2 · 组 seq/);assert.match(text,/reply_sequence_previous/);const pages=text.match(/<!doctype html>[\s\S]*?<\/html>/gi)||[];
+  const chatPage=pages.find(page=>page.includes('连续回复 2 · 组 seq'));
+  assert.ok(chatPage);assert.match(chatPage,/second\n\nnext segment/);assert.doesNotMatch(chatPage,/tideloom:split/);
+  assert.match(text,/tideloom:split/,'structured JSON retains the original presentation marker');
   assert.match(text,/归档署名/);assert.match(text,/media\/1\.png/);assert.match(text,/media\/2\.mp3/);
 });
 
