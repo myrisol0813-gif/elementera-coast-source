@@ -81,6 +81,17 @@ export function validateDreamArchive(v,cid){
 // Present originals must refer to a real historical tool reservation. A
 // missing original does not invalidate a historical receipt (e.g. deletion
 // or a selected-module export). An interrupted save may lack its receipt.
+export function validateDreamCandidateOrigin(archive,row){
+  if(row.source_type!=='dream_tide'&&!String(row.id).startsWith('pocket_dream_'))return;
+  check(row.source_type==='dream_tide','invalid autonomous candidate source');
+  const ref=JSON.parse(row.source_ref_json);
+  check(ref&&ref.source==='dream_tide'&&ref.conversation_id===row.conversation_id&&['memory','seed'].includes(ref.suggested_destination)&&!Object.hasOwn(ref,'turn_id'),'invalid autonomous candidate reference');
+  const event=archive?.tools?.find(e=>e.tool_name==='dream_memory_candidate'&&e.claim_id===ref.claim_id&&e.step_index===ref.step_index&&e.call_index===ref.call_index&&row.id==='pocket_dream_'+e.claim_id+'_'+e.step_index+'_'+e.call_index);
+  const run=archive?.runs?.find(r=>r.claim_id===event?.claim_id&&r.conversation_id===row.conversation_id);
+  check(event&&run&&ref.model_label===run.model_id,'autonomous candidate activity missing or mismatched');
+  const receipt=event.receipt_json==null?null:JSON.parse(event.receipt_json);
+  check(!receipt?.record_id||receipt.record_id===row.id,'autonomous candidate receipt differs');
+}
 export function validateDreamMediaOrigin(archive,row,kind){
   const prefix=kind==='voice'?'voice_dream_':'att_dream_';
   const independent=String(row.id).startsWith(prefix)||kind==='voice'&&row.source==='dream_tide';
