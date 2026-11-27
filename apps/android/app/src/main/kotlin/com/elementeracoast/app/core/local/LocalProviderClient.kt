@@ -181,7 +181,12 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
      * The caller persists its step claim before invoking this method. */
     internal suspend fun dreamRequest(p:LocalProviderConfig,model:String,messages:JsonArray,tools:JsonArray,output:Int):JsonObject {
         require(output in 1..65536&&model in p.models)
-        val oneShot=http.newBuilder().retryOnConnectionFailure(false).callTimeout(120,TimeUnit.SECONDS).build()
+        val sent=java.util.concurrent.atomic.AtomicBoolean(false)
+        val oneShot=http.newBuilder().retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false)
+            .addNetworkInterceptor{chain->
+                if(!sent.compareAndSet(false,true))throw IOException("autonomous request replay blocked")
+                chain.proceed(chain.request())
+            }.callTimeout(120,TimeUnit.SECONDS).build()
         return callbackFlow<JsonObject>{
             val active=java.util.concurrent.atomic.AtomicReference<okhttp3.Call?>()
             val job=launch(Dispatchers.IO){
