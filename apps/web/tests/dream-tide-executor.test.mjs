@@ -257,7 +257,7 @@ test('independent image preserves exact original, is not a chat attachment, and 
 
 
 test('autonomous media and activity receipts restore atomically without arming a new job',async()=>{
-  const {db,cid,env}=await fixture({allowImage:true,allowVoice:true,toolBudget:5});
+  const {db,cid,env}=await fixture({allowImage:true,allowVoice:true,allowMemoryCandidate:true,toolBudget:5});
   const {writeProfile}=await import('../functions/chat-store.js');
   const {claimDreamTide,settleDreamTide}=await import('../functions/dream-tide-ledger.js');
   const {reserveDreamStep,recordDreamStep,reserveDreamTool,recordDreamTool}=await import('../functions/dream-tide-records.js');
@@ -265,8 +265,8 @@ test('autonomous media and activity receipts restore atomically without arming a
   const {generateVoiceClip,voiceClipAudio}=await import('../functions/voice-clips.js');
   const {getChatAttachmentRecord}=await import('../functions/chat-attachments.js');
   const {readArchiveAttachment}=await import('../functions/coast-archive-v2-media.js');
-  const {readArchiveChat,readArchiveVoice}=await import('../functions/coast-archive-v2-records.js');
-  const {validateDreamMediaOrigin}=await import('../functions/dream-tide-archive.js');
+  const {readArchiveChat,readArchiveVoice,archiveRecordPage}=await import('../functions/coast-archive-v2-records.js');
+  const {validateDreamMediaOrigin,validateDreamCandidateOrigin}=await import('../functions/dream-tide-archive.js');
   const {MODULES,encodeRecordObject}=await import('../functions/coast-archive-v2-manifest.js');
   const {createArchiveSession,registerArchiveObject,putArchiveChunk}=await import('../functions/coast-archive-v2-stage.js');
   const {restoreArchiveChatGroup}=await import('../functions/coast-archive-v2-restore.js');
@@ -286,16 +286,29 @@ test('autonomous media and activity receipts restore atomically without arming a
   assert.ok(await reserveDreamTool(db,claim,0,1,'voice_create',due));
   const clip=await generateVoiceClip(db,cfg,{text:'fixture'},{...ctx,autonomous_event:{step:0,index:1}},async()=>new Response(audio));
   assert.ok(await recordDreamTool(db,claim,0,1,{ok:true,record_id:clip.id},due));
+  const {proposeDreamMemory}=await import('../functions/dream-tide-memory.js');
+  const {writeDreamNote}=await import('../functions/dream-tide-records.js');
+  const {restoreArchiveRecord}=await import('../functions/coast-archive-v2-restore-record.js');
+  assert.ok(await reserveDreamTool(db,claim,0,2,'dream_memory_candidate',due));
+  const proposal=await proposeDreamMemory(db,{title:'archive candidate',content:'candidate body',destination:'seed'},{...ctx,autonomous_event:{step:0,index:2}},due);
+  assert.ok(await recordDreamTool(db,claim,0,2,{ok:true,record_id:proposal.id},due));
+  assert.ok(await reserveDreamTool(db,claim,0,3,'dream_write_note',due));
+  assert.ok(await writeDreamNote(db,claim,'archive note',due));
+  assert.ok(await recordDreamTool(db,claim,0,3,{ok:true},due));
   assert.ok(await settleDreamTide(db,claim,'completed',due));
+  assert.ok(await replyDreamNote(db,cid,claim.claimId,'reply-archive','archive reply',due+1));
+  const candidate=(await archiveRecordPage(db,'memory_pockets')).items[0];
   const chat=await readArchiveChat(db,cid),image=await readArchiveAttachment(db,cid,picture.id),voice=await readArchiveVoice(db,clip.id);
   assert.throws(()=>validateDreamMediaOrigin(null,image.metadata,'image'),/activity missing/);
   assert.throws(()=>validateDreamMediaOrigin(chat.dream_tide,{...voice.metadata,turn_id:'turn-one'},'voice'),/invalid autonomous media origin/);
   const favorite=await saveTreasure(db,{kind:'image',conversation_id:cid,source_id:picture.id,notes:'activity drawing'});
   assert.equal(favorite.role,'assistant');assert.equal(favorite.message_id,null);
+  assert.throws(()=>validateDreamCandidateOrigin(null,candidate),/activity missing/);
+  assert.throws(()=>validateDreamCandidateOrigin(chat.dream_tide,{...candidate,source_ref_json:JSON.stringify({...JSON.parse(candidate.source_ref_json),step_index:99})}),/activity missing/);
   const records=[],objects=[];
-  for(const [module,id,kind,data,media] of [['chat',cid,'chat',chat,null],['attachments',picture.id,'attachment',image.metadata,image],['voice',clip.id,'voice',voice.metadata,voice]]){
+  for(const [module,id,kind,data,media] of [['chat',cid,'chat',chat,null],['attachments',picture.id,'attachment',image.metadata,image],['voice',clip.id,'voice',voice.metadata,voice],['memory_pockets',candidate.id,'memory_pockets',candidate,null]]){
     const o=await encodeRecordObject({kind,data});objects.push(o);if(media)objects.push(media);
-    records.push({module,id,record_object:o.descriptor.object_sha256,media_objects:media?[media.descriptor.object_sha256]:[],dependencies:media?['chat/'+cid]:[]});
+    records.push({module,id,record_object:o.descriptor.object_sha256,media_objects:media?[media.descriptor.object_sha256]:[],dependencies:module==='chat'?[]:['chat/'+cid]});
   }
   const manifest={format:'elementera-coast-archive',version:2,workspace:'backend',application_id:'com.elementeracoast.source',exported_at:new Date(due).toISOString(),modules:MODULES.map(module=>({module,coverage:records.some(r=>r.module===module)?'partial':'unavailable',count:records.filter(r=>r.module===module).length})),records,objects:objects.map(o=>o.descriptor)};
   const target=new D1Database(),session=await createArchiveSession(target);
@@ -312,6 +325,24 @@ test('autonomous media and activity receipts restore atomically without arming a
   assert.deepEqual(await readDreamActivity(target,cid,20,0,picture.id+'_forged'),[]);
   assert.deepEqual(await readDreamActivity(target,'other-window',20,0,clip.id),[]);
   assert.equal((await target.prepare('SELECT enabled FROM dream_tide_arms WHERE conversation_id=?').bind(cid).first()).enabled,0);
+  await restoreArchiveRecord(target,session.id,manifest,'memory_pockets',candidate.id,true);
+  assert.deepEqual((await archiveRecordPage(target,'memory_pockets')).items,[candidate]);
+  // Repackage the same persisted originals in the Native archive wire shape.
+  const current=await readArchiveChat(target,cid),iso=v=>v==null?null:new Date(v).toISOString();
+  const local=await encodeRecordObject({kind:'local_chat',data:{conversation:{...current.conversation,created_at:iso(current.conversation.created_at),updated_at:iso(current.conversation.updated_at),title_manual:!!current.conversation.title_manual,title_generated_at:iso(current.conversation.title_generated_at)},history:{...JSON.parse(current.history_json),conversation_id:cid,archive_storage_updated_at:current.history_updated_at},dream_tide:current.dream_tide}});
+  const oldRoot=records.find(r=>r.module==='chat').record_object;
+  const localObjects=[...objects.filter(o=>o.descriptor.object_sha256!==oldRoot),local];
+  const localManifest={...manifest,workspace:'local',records:records.map(r=>r.module==='chat'?{...r,record_object:local.descriptor.object_sha256}:r),objects:localObjects.map(o=>o.descriptor)};
+  const returned=new D1Database(),next=await createArchiveSession(returned);
+  for(const o of localObjects){await registerArchiveObject(returned,next.id,o.descriptor);for(let i=0;i<o.chunks.length;i++)await putArchiveChunk(returned,next.id,o.descriptor.object_sha256,i,o.chunks[i]);}
+  await restoreArchiveChatGroup(returned,next.id,localManifest,cid,true);
+  await restoreArchiveRecord(returned,next.id,localManifest,'memory_pockets',candidate.id,true);
+  assert.deepEqual((await readArchiveChat(returned,cid)).dream_tide,chat.dream_tide);
+  assert.deepEqual((await archiveRecordPage(returned,'memory_pockets')).items,[candidate]);
+  assert.deepEqual(new Uint8Array((await getChatAttachmentRecord(returned,cid,picture.id)).data),png);
+  assert.deepEqual(await voiceClipAudio(returned,clip.id),audio);
+  assert.equal((await readDreamNotes(returned,cid))[0].replies[0].body,'archive reply');
+  assert.equal((await returned.prepare('SELECT enabled FROM dream_tide_arms WHERE conversation_id=?').bind(cid).first()).enabled,0);
 });
 
 
