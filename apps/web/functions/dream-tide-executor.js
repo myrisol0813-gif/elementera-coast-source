@@ -173,7 +173,7 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
               const value=await executeModelTool(db,{...call,id:claim.claimId+':'+index+':'+callIndex},toolContext);
               if(name==='library_write'&&value?.note?.id)result.record_id=value.note.id;
               const encoded=JSON.stringify(value);
-              result=encoded.length<=24000?{ok:value?.ok!==false,data:value,...(result.record_id?{record_id:result.record_id}:{})}:{ok:false,reason:'result_too_large',...(result.record_id?{record_id:result.record_id}:{})};
+              result=encoded.length<=24000?{ok:value?.ok!==false,data:value,...(result.record_id?{record_id:result.record_id}:{})}:result.record_id?{ok:true,record_id:result.record_id,reason:'saved_result_body_omitted'}:{ok:false,reason:'result_too_large'};
               activities.push({kind:name,ok:result.ok});
             }
           }catch{result={ok:false,reason:'tool_failed'};activities.push({kind:name,ok:false});}
