@@ -8,10 +8,10 @@ const row=(label,body)=>'<label>'+h(label)+body+'</label>';
 const input=(id,value,type='text',extra='')=>'<input id="'+id+'" type="'+type+'" value="'+a(String(value??''))+'" '+extra+'>';
 const checkbox=(id,label,checked)=>'<label><input type="checkbox" id="'+id+'" '+(checked?'checked':'')+'> '+h(label)+'</label>';
 const button=(label,action,extra='')=>'<button type="button" class="feature-row" data-action="dream-tide:'+action+'" '+extra+'><span><strong>'+h(label)+'</strong></span></button>';
-const mediaLink=(cid,t)=>{
+const mediaLink=(cid,claim,t)=>{
   const id=t.receipt?.record_id;
-  const audio=t.tool_name==='voice_create'&&typeof id==='string'&&id.startsWith('voice_dream_');
-  const image=t.tool_name==='image_generate'&&typeof id==='string'&&id.startsWith('att_dream_');
+  const audio=t.tool_name==='voice_create'&&typeof id==='string'&&id==='voice_dream_'+claim+'_'+t.step_index+'_'+t.call_index;
+  const image=t.tool_name==='image_generate'&&typeof id==='string'&&id==='att_dream_'+claim+'_'+t.step_index+'_'+t.call_index;
   if(!audio&&!image)return '';
   const url=audio?'/api/voice/clips/'+encodeURIComponent(id)+'/audio':'/api/chat/attachments/'+encodeURIComponent(id)+'?conversation_id='+encodeURIComponent(cid)+'&inline=1';
   return '<p><a target="_blank" rel="noopener" href="'+a(url)+'">'+(audio?'查看原声':'查看原图')+'</a></p>';
@@ -72,7 +72,7 @@ export function createDreamTideViews({router,chat,toast}){
     const body=d.items.map(r=>section(stamp(r.started_at)+' · '+(r.kind==='daily'?'固定唤醒':'额外唤醒'),
       '<p>'+h(names[r.status]||r.status)+'</p><p class="feature-note">'+h(r.model_id)+'</p>'+
       '<p class="feature-note">总 token：'+h(r.result?.total_tokens??'未确认')+' · 供应商报告成本：'+h(r.result?.reported_cost==null?'未确认':'USD '+r.result.reported_cost)+'</p>'+
-      r.tools.map(t=>'<p class="feature-note">'+h((toolNames[t.tool_name]||t.tool_name)+' · '+(names[t.status]||t.status)+(Number.isInteger(t.receipt?.count)?' · '+t.receipt.count+' 轮':''))+'</p>'+mediaLink(cid,t)).join('')+
+      r.tools.map(t=>'<p class="feature-note">'+h((toolNames[t.tool_name]||t.tool_name)+' · '+(names[t.status]||t.status)+(Number.isInteger(t.receipt?.count)?' · '+t.receipt.count+' 轮':''))+'</p>'+mediaLink(cid,r.claim_id,t)).join('')+
       (r.result?.extra_scheduled?'<p class="feature-note">已保存额外预约。</p>':'')+
       (r.steps.some(s=>s.status==='claimed')?'<p class="feature-note">存在未确认请求，不会自动重放。</p>':''))).join('');
     return page('活动记录',(mediaId?'<p class="feature-note">作品来源 · '+h(mediaId)+'</p>':'')+(body||'<p class="feature-note">'+(mediaId?'未找到对应的活动记录。':'还没有活动记录。')+'</p>')+
