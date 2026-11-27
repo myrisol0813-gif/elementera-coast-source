@@ -105,10 +105,35 @@ class NativeStudioPolicy(private val catalogue: NativeSceneCatalogue, private va
     }
 }
 
+internal data class NativeStudioLoad(val raw:String?,val warning:String?=null,val migrated:Boolean=false)
+
 /** Native, device-local storage. Failed reads never overwrite the previous data. */
-internal class NativeStudioStore(context: Context) {
+internal class NativeStudioStore(private val context: Context) {
     private val prefs = context.getSharedPreferences("coast.native.rest.studio.v1", Context.MODE_PRIVATE)
     fun raw(): String? = prefs.getString("state", null)
-    fun save(raw: String) { prefs.edit().putString("state",raw).apply() }
-    fun preserve(raw: String) { prefs.edit().putString("recovery",raw).apply() }
+    /** Called off the UI thread before the first native scene is opened. */
+    fun load(policy:NativeStudioPolicy):NativeStudioLoad {
+        raw()?.let{return NativeStudioLoad(it)}
+        if(prefs.getBoolean("legacyChecked",false))return NativeStudioLoad(null)
+        val recovered=LegacyStudioRecovery.recover(context)
+        if(recovered.isFailure)return NativeStudioLoad(null,"旧版房间资料尚不能读取，自动保存已暂停；原始资料未改动。")
+        val raw=recovered.getOrNull()
+        if(raw==null){
+            require(prefs.edit().putBoolean("legacyChecked",true).commit())
+            return NativeStudioLoad(null)
+        }
+        return runCatching {
+            val encoded=policy.encode(policy.decode(raw))
+            require(prefs.edit().putString("state",encoded).putString("recovery",raw).putBoolean("legacyChecked",true).commit())
+            NativeStudioLoad(encoded,migrated=true)
+        }.getOrElse {
+            NativeStudioLoad(raw,"旧版房间存档校验失败，可先导出原件；自动保存已暂停。")
+        }
+    }
+    fun save(raw: String) {
+        require(prefs.edit().putString("state",raw).putBoolean("legacyChecked",true).commit()){"房间保存未确认"}
+    }
+    fun preserve(raw: String) {
+        require(prefs.edit().putString("recovery",raw).commit()){"旧房间备份保存未确认"}
+    }
 }
