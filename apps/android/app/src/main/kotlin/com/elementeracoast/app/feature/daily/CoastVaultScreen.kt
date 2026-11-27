@@ -869,11 +869,11 @@ private fun CoastVaultImage(
 }
 
 @Composable
-private fun CoastVaultAudio(
-    repository: SideRoomsRepository,
-    id: String,
-    onSnackbar: (String) -> Unit
-) {
+private fun CoastVaultAudio(repository: SideRoomsRepository,id: String,onSnackbar: (String) -> Unit) =
+    CoastMediaAudio(id,{repository.audio(id)},onSnackbar)
+
+@Composable
+internal fun CoastMediaAudio(id:String,loadBytes:suspend ()->ByteArray,onSnackbar:(String)->Unit) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var player by remember(id) { mutableStateOf<MediaPlayer?>(null) }
@@ -919,7 +919,7 @@ private fun CoastVaultAudio(
                             playing = true
                         }
                         else -> {
-                            val bytes = repository.audio(id)
+                            val bytes = loadBytes()
                             val local = File.createTempFile("coast-vault-", ".mp3", context.cacheDir)
                             local.writeBytes(bytes)
                             file = local
