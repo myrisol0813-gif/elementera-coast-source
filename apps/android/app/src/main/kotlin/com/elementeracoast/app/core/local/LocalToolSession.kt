@@ -23,7 +23,8 @@ internal class LocalToolSession private constructor(
     private val stickerSend:Boolean=false,
     private val stickerAdd:Boolean=false,
     private val sequenceId:String?=null,
-    private val groupMessageId:String?=null
+    private val groupMessageId:String?=null,
+    private val invitation:String=""
 ) {
     private data class Spec(val name:String,val key:String,val title:String,val description:String,val parameters:JsonObject)
     private fun schema(fields:Map<String,JsonObject> = emptyMap(),required:List<String> = emptyList())=buildJsonObject {
@@ -90,7 +91,20 @@ internal class LocalToolSession private constructor(
     val maxCalls=com.elementeracoast.app.core.network.TurnToolPolicy.stored(store)
     private var calls=0
     private var applyResult:()->Unit = {}
+    private var promptDelivered=false
+    private val prompt=invitation.trim().takeIf{specs.isNotEmpty()&&!it.isBlank()}.orEmpty()
+    private val promptBlock=if(prompt.isBlank())"" else "【工作台 / 工具回执】\n以下是本窗口关于工具使用的说明；实际可用工具、权限及预算仍以本轮授权为准。\n没有执行成功的动作不能说成已经完成。\n"+prompt
     private var estimated=base.contextBudget.estimatedTokens+estimate(tools.toString())
+    fun withWorkbench(messages:List<RemoteChatMessage>):List<RemoteChatMessage>{
+        if(promptBlock.isEmpty())return messages
+        // Never silently truncate user content to fit an optional invitation.
+        val addition=estimate(promptBlock)+4
+        if(!promptDelivered&&estimated.toLong()+addition>toolBudget)return messages
+        if(!promptDelivered){estimated+=addition;promptDelivered=true}
+        val first=messages.firstOrNull()
+        return if(first?.role=="system")listOf(first.copy(content=first.content+"\n\n"+promptBlock))+messages.drop(1)
+            else listOf(RemoteChatMessage("system",promptBlock))+messages
+    }
     // Comfort is a soft input-material budget; reserve a bounded tool continuation allowance.
     private val toolBudget=(maxOf(base.contextBudget.comfortCeiling,base.contextBudget.estimatedTokens).toLong()+estimate(tools.toString())+4096).coerceAtMost((wireLimit?:Int.MAX_VALUE).toLong()).toInt()
     init { require(estimated<=toolBudget){"工具定义及上下文超出模型目录估算容量；未发送。"} }
@@ -100,6 +114,7 @@ internal class LocalToolSession private constructor(
     private val original=base
     val receipt:RemoteDeskSlip get()=original.copy(crossWindow=cross,
         workbench=original.workbench.copy(status=if(calls==0)"已开放 · 未调用"else "已调用",modelVisibleTools=toolRows,
+            promptDelivered=promptDelivered,prompt=if(promptDelivered)prompt else "",
             usedCount=calls,toolResults=reports.toList()),
         contextBudget=original.contextBudget.copy(estimatedTokens=estimated,exceedsComfortCeiling=estimated>original.contextBudget.comfortCeiling,
             sourcesPreserved=(original.contextBudget.sourcesPreserved+listOf("workbench")+
@@ -422,7 +437,7 @@ internal class LocalToolSession private constructor(
             if(!cross&&!tools&&!write)return null
             val sourceTurn=h.turns.firstOrNull{it.id==turn}?:return null
             val mediaId=messageId?.takeIf{mid->(h.contextSettings.stickerAddEnabled||h.contextSettings.stickerSendEnabled)&&LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")&&sourceTurn.assistant.variantsByUserVariant[sourceTurn.user.active.toString()]?.any{it.id==mid&&!it.hidden&&it.finishReason in setOf("image_tool_ready","sticker_tool_ready")}==true}
-            return LocalToolSession(store,cid,turn,sourceTurn,cross,tools,write,modelId,base,wireLimit,web?.takeIf{request?.mode!="keyword"&&LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},voice?.takeIf{LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},image,mediaId,mediaId!=null&&tools&&write&&h.contextSettings.stickerSendEnabled,mediaId!=null&&write&&h.contextSettings.stickerAddEnabled,sequenceId,messageId)
+            return LocalToolSession(store,cid,turn,sourceTurn,cross,tools,write,modelId,base,wireLimit,web?.takeIf{request?.mode!="keyword"&&LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},voice?.takeIf{LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")},image,mediaId,mediaId!=null&&tools&&write&&h.contextSettings.stickerSendEnabled,mediaId!=null&&write&&h.contextSettings.stickerAddEnabled,sequenceId,messageId,(h.contextSettings.workbenchPrompt?:com.elementeracoast.app.core.model.DEFAULT_WORKBENCH_PROMPT).takeIf{LocalKnowledgeStore(store).surfaceFor(cid) in setOf("main_chat","radio")}.orEmpty())
         }
     }
 }

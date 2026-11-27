@@ -28,6 +28,22 @@ class LocalToolSessionTest {
         val c=k.context(listOf(RemoteChatMessage("user","现在的问题")),12000,"main_chat","current",crossWindow=req)
         return k.toolSession("current","turn-now",req,c.receipt)
     }
+    @Test fun windowWorkbenchInvitationFollowsActualToolsAndOverrides(){
+        val s=fixture();val cache=RemoteCacheStore(s);val history=cache.history("current")!!
+        val messages=listOf(RemoteChatMessage("system","system context"),RemoteChatMessage("user","hi"))
+        val default=open(s)!!
+        assertTrue(default.withWorkbench(messages).first().content.contains("希望你用得顺手，也用得开心。"))
+        assertTrue(default.receipt.workbench.promptDelivered)
+        cache.putHistory("current",history.copy(contextSettings=history.contextSettings.copy(workbenchPrompt="CUSTOM_INVITATION_713")))
+        val edited=open(s)!!
+        assertTrue(edited.withWorkbench(messages).first().content.contains("CUSTOM_INVITATION_713"))
+        assertEquals("CUSTOM_INVITATION_713",edited.receipt.workbench.prompt)
+        cache.putHistory("current",history.copy(contextSettings=history.contextSettings.copy(workbenchPrompt="")))
+        val blank=open(s)!!
+        assertEquals(messages,blank.withWorkbench(messages))
+        assertFalse(blank.receipt.workbench.promptDelivered)
+        assertEquals(edited.tools,blank.tools)
+    }
     private val select="""{"messages":[{"conversation_id":"old","message_id":"u-old"}]}"""
     @Test fun permissionSearchAndReadAreSeparateAndAuditIsRedacted(){
         val s=fixture();val tool=open(s)!!

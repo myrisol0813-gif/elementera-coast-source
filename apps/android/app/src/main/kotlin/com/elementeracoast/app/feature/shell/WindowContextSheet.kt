@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.elementeracoast.app.core.model.DEFAULT_WORKBENCH_PROMPT
 import com.elementeracoast.app.core.model.ConversationContextSettings
 import com.elementeracoast.app.core.model.RealityContextFields
 import com.elementeracoast.app.feature.chat.AndroidRealityContextSource
@@ -85,6 +86,7 @@ internal fun WindowContextSheet(
     var usageAccess by remember { mutableStateOf(AndroidRealityContextSource.hasUsageAccess(context)) }
     var stepsAccess by remember { mutableStateOf(AndroidRealityContextSource.hasActivityRecognitionPermission(context)) }
     var locationAccess by remember { mutableStateOf(AndroidRealityContextSource.hasCoarseLocationPermission(context)) }
+    var workbenchPrompt by rememberSaveable(conversationId, settings.workbenchPrompt) { mutableStateOf(settings.workbenchPrompt ?: DEFAULT_WORKBENCH_PROMPT) }
     var weatherCity by rememberSaveable(conversationId, settings.weatherCity) { mutableStateOf(settings.weatherCity) }
 
     fun refreshPermissions() {
@@ -199,6 +201,20 @@ internal fun WindowContextSheet(
                 SettingSwitchRow(title="允许添加表情包",note="登记自己在当前窗口生成的图片；本机还需写入权限。",checked=settings.stickerAddEnabled,enabled=usable,onCheckedChange={onSettingsChange(settings.copy(stickerAddEnabled=it))})
             }
             SoftSettingsCard {
+                Text("工作区",style=MaterialTheme.typography.titleSmall)
+                if (sequenceSupported) {
+                    OutlinedTextField(value=workbenchPrompt,onValueChange={workbenchPrompt=it.take(4000)},
+                        enabled=usable,modifier=Modifier.fillMaxWidth(),minLines=4,maxLines=8,
+                        label={Text("工具箱注入词")}, supportingText={Text("仅当前窗口生效；有可用工具时递入。留空不递入邀请词，不关闭工具。")})
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        Button(onClick={workbenchPrompt=DEFAULT_WORKBENCH_PROMPT;onSettingsChange(settings.copy(workbenchPrompt=null))},enabled=usable){
+                            Text("恢复默认")
+                        }
+                        Button(onClick={onSettingsChange(settings.copy(workbenchPrompt=workbenchPrompt))},enabled=usable&&workbenchPrompt!=(settings.workbenchPrompt?:DEFAULT_WORKBENCH_PROMPT)){
+                            Text("保存注入词")
+                        }
+                    }
+                }
                 if (com.elementeracoast.app.core.local.NativeWorkspace.isLocal) {
                     SettingSwitchRow(title = "跨窗口回忆", note = if(settings.crossWindowAuto) "由模型决定 · 持续生效" else "关闭 · 仍可手动递入旧消息",
                         checked = settings.crossWindowAuto, enabled = usable,

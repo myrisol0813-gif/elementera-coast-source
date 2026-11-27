@@ -101,7 +101,7 @@ internal class LocalDirectChatRepository(
                         settings=mapOf("toolCallLimit" to number("toolCallLimit",24).toString()),
                         crossWindow=request.crossWindow,imageToolEnabled=image!=null,imageModelId=request.imageModelId.takeIf{image!=null})
                     val nativeContext=com.elementeracoast.app.core.remote.RemoteNativeChatContext(
-                        ok=true,modelMessages=JsonArray(localMultimodalMessages(prepared.messages,prepared.imageParts)+previous.first),
+                        ok=true,modelMessages=JsonArray(localMultimodalMessages(session?.withWorkbench(prepared.messages)?:prepared.messages,prepared.imageParts)+previous.first),
                         tools=session?.tools?:JsonArray(emptyList()),deskSlip=session?.receipt?:prepared.receipt,
                         limitations=com.elementeracoast.app.core.remote.RemoteNativeToolLimits(session?.maxCalls?:com.elementeracoast.app.core.network.TurnToolPolicy.stored(store)))
                     native.stream(slug,nativeRequest,nativeContext,planReasoning(request.model),
