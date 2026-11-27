@@ -2,6 +2,8 @@ import {ensureChatSchema} from './chat-store.js';
 import {dreamTideCandidate} from './dream-tide-schedule.js';
 import {executeDreamTide} from './dream-tide-executor.js';
 import {recoverDreamTide} from './dream-tide-ledger.js';
+import {recoverSingleChatRuns} from './chat-single-run.js';
+import {recoverStaleReplyRuns} from './chat-reply-run.js';
 
 // Trusted scheduled handler only. Never called from a browser route or page
 // load. The exact armed model is used, never the global model as a fallback.
@@ -12,6 +14,7 @@ export async function runDreamTideTick(env,{now=Date.now(),signal,execute=execut
   const db=env.COAST_CHAT_DB;
   await ensureChatSchema(db);
   await recoverDreamTide(db,now);
+  await recoverSingleChatRuns(db,now);
   const rows=(await db.prepare(`SELECT a.*, COALESCE((SELECT MAX(r.started_at) FROM dream_tide_runs r WHERE r.conversation_id=a.conversation_id),0) AS last_run
     FROM dream_tide_arms a JOIN conversations c ON c.id=a.conversation_id
     WHERE a.enabled=1 AND c.user_id='owner' AND c.room_type='main' AND c.source='coast' AND c.conversation_kind='chat' AND c.deleted_at IS NULL
@@ -29,6 +32,10 @@ export async function runDreamTideTick(env,{now=Date.now(),signal,execute=execut
         state.lastDailyDay=candidate.day;candidate=dreamTideCandidate(cfg,state,now);
       }
       if(!candidate)continue;
+      // Busy windows do not consume the dispatch quota or starve other windows.
+      await recoverStaleReplyRuns(db,now,a.conversation_id);
+      const busy=await db.prepare("SELECT 1 FROM chat_single_runs WHERE conversation_id=? UNION ALL SELECT 1 FROM chat_reply_runs WHERE conversation_id=? AND status='running' LIMIT 1").bind(a.conversation_id,a.conversation_id).first();
+      if(busy)continue;
       if(candidate.kind==='extra'){
         const row=await db.prepare("SELECT COUNT(*) AS n FROM dream_tide_runs WHERE conversation_id=? AND local_day=? AND kind='extra'").bind(a.conversation_id,candidate.day).first();
         if(row.n>=cfg.execution.extraPerDay)continue;
