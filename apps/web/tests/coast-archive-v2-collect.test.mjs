@@ -96,3 +96,16 @@ test('portable browser settings are explicit, verified and do not include creden
  assert.throws(()=>restoreDeviceBasic(storage,{...parsed,replySequenceToolBudget:999}));
  assert.equal(state.runControl.replySequenceToolBudget,0);
 });
+
+test('studio is contained only in the portable device record and old device settings still decode',async()=>{
+ const {decodeDeviceBasic}=await import('../elementera-mcp/deploy-pages/public/core/archive-v2-device-settings.js');
+ const {studioFromEnvelope}=await import('../elementera-mcp/deploy-pages/public/rest-box/studio-archive.mjs');
+ const studio={version:1,layout:{version:1,rooms:{}},household:{version:1},room:'study',pets:false,reducedMotion:true,poseChoices:{}};
+ const f=await fixture(),m=await collectArchiveV2({...f,applicationId:'com.elementeracoast.source',deviceBasic:{toolCallLimit:41},restStudio:studio});
+ const files=entries(new Uint8Array(await new Blob(f.parts).arrayBuffer()));
+ const r=m.records.find(r=>r.module==='appearance'),env=JSON.parse(decoder.decode(files.get('objects/'+r.record_object)));
+ assert.deepEqual(studioFromEnvelope(r,env),studio);
+ assert.equal(decodeDeviceBasic(r,env).toolCallLimit,41);
+ assert.equal(m.records.filter(r=>r.module==='appearance').length,1);
+ for(const row of m.records.filter(r=>r.module!=='appearance'))assert.equal(JSON.parse(decoder.decode(files.get('objects/'+row.record_object))).data.rest_studio,undefined);
+});
