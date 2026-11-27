@@ -8,6 +8,7 @@ internal object LocalDreamToolPolicy{
         return when(name){
             "dream_read_history"->e.readHistory
             "dream_write_note"->e.writeNote
+            "dream_memory_candidate"->e.allowMemoryCandidate
             "dream_schedule_extra"->c.config.allowExtra&&e.extraPerDay>0
             "independent_web_search","independent_web_read"->e.allowWeb
             "library_books","library_read","library_notes"->e.allowLibrary
