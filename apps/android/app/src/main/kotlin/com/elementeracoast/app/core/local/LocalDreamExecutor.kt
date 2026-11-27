@@ -18,7 +18,8 @@ internal class LocalDreamExecutor(
     private val captureReality:suspend (com.elementeracoast.app.core.model.ConversationContextSettings)->RemoteRealityContext={RemoteRealityContext()},
     private val voice:LocalVoiceProvider?=null,
     private val imageProvider:((String)->LocalProviderConfig?)?=null,
-    private val modelBudget:suspend (LocalProviderConfig,String,Int)->LocalInputBudget?={_,_,_->null}
+    private val modelBudget:suspend (LocalProviderConfig,String,Int)->LocalInputBudget?={_,_,_->null},
+    private val imageFactory:(LocalPersistence,LocalDreamLedger.Claim,String,(String)->LocalProviderConfig?)->LocalDreamImage={s,c,id,resolver->LocalDreamImage(s,c,id,resolver)}
 ){
     private val ledger=LocalDreamLedger(store)
     private fun JsonObject.str(k:String)=(get(k) as? JsonPrimitive)?.contentOrNull.orEmpty()
@@ -137,7 +138,7 @@ internal class LocalDreamExecutor(
                     }
                     val commonNames=commonTools.map{it.getValue("function").jsonObject.str("name")}.toSet()
                     val selectedImage=RemoteCacheStore(store,strictReads=true).profile()?.currentImageModel.orEmpty()
-                    val dreamImage=if(e.allowImage&&e.imageLimit>0&&imageProvider!=null&&RemoteCacheStore(store,strictReads=true).history(cid)?.contextSettings?.localModelWriteEnabled==true)LocalDreamImage(store,c,selectedImage,imageProvider).takeIf{it.configured()}else null
+                    val dreamImage=if(e.allowImage&&e.imageLimit>0&&imageProvider!=null&&RemoteCacheStore(store,strictReads=true).history(cid)?.contextSettings?.localModelWriteEnabled==true)imageFactory(store,c,selectedImage,imageProvider).takeIf{it.configured()}else null
                     val allowed=tools(c)+commonTools+listOfNotNull(dreamImage?.let{tool("image_generate","可选：生成并保存独立活动图像，使用已授权生图供应商额度。只发送必要提示。若已单独授权且支持视觉，下一请求可收到系统转交原图；未收到像素不要假称看见。",mapOf("prompt" to "string"))})
                     val visionBudget=if(e.allowImageReadback&&dreamImage!=null)modelBudget(initial.first,initial.second,e.outputLimit)else null
                     val pendingImages=mutableListOf<DreamImageReadback>()
@@ -146,6 +147,7 @@ internal class LocalDreamExecutor(
                         ensureActive();permitted(c)
                         val exposed=if(calls>=e.toolBudget||step==e.toolBudget)emptyList()else allowed
                         val images=pendingImages.toList();pendingImages.clear()
+                        if(images.isNotEmpty()&&RemoteCacheStore(store,strictReads=true).history(cid)?.contextSettings?.localModelWriteEnabled!=true){reason="image_readback_permission_revoked";break}
                         val wireMessages=JsonArray(messages+images.map{it.message})
                         val estimate=LocalContextPolicy.estimate(JsonArray(messages).toString())+LocalContextPolicy.estimate(JsonArray(exposed).toString())+images.size*2048+LocalContextPolicy.estimate(images.joinToString(" "){it.id})
                         if(visionBudget?.wireLimit?.let{estimate>it}==true){reason="context_window_estimate_exceeded";break}
@@ -154,7 +156,7 @@ internal class LocalDreamExecutor(
                         val selected=resolve(modelId)
                         if(selected==null||selected.first!=initial.first||selected.second!=initial.second){reason="model_configuration_changed";break}
                         check(ledger.reserveStep(c,step,clock()))
-                        val raw=try{permitted(c);invoke(selected.first,selected.second,wireMessages,JsonArray(exposed),cap)}
+                        val raw=try{permitted(c);if(images.isNotEmpty()&&RemoteCacheStore(store,strictReads=true).history(cid)?.contextSettings?.localModelWriteEnabled!=true)throw CancellationException("image readback permission ended");invoke(selected.first,selected.second,wireMessages,JsonArray(exposed),cap)}
                         catch(ex:Exception){
                             known=false;costKnown=false
                             withContext(NonCancellable){ledger.recordStep(c,step,false,buildJsonObject{put("error_type","provider_unconfirmed");put("usage",JsonNull);put("cost",JsonNull);if(images.isNotEmpty())put("image_readback_unconfirmed",JsonArray(images.map{JsonPrimitive(it.id)}))},clock())}
