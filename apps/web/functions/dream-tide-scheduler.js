@@ -7,14 +7,15 @@ import {recoverStaleReplyRuns} from './chat-reply-run.js';
 
 // Trusted scheduled handler only. Never called from a browser route or page
 // load. The exact armed model is used, never the global model as a fallback.
-export async function runDreamTideTick(env,{now=Date.now(),signal,execute=executeDreamTide}={}){
+export async function runDreamTideTick(env,{now,clock=now===undefined?Date.now:()=>now,signal,execute=executeDreamTide}={}){
+  const started=now??clock();
   if(env.COAST_DREAM_TIDE_ENABLED!=='true'||env.COAST_DREAM_TIDE_SCHEDULER!=='true')return {status:'disabled',attempts:0};
   const cap=Number(env.COAST_DREAM_TIDE_MAX_RUNS_PER_TICK);
   if(!Number.isSafeInteger(cap)||cap<1||cap>100||!env.COAST_CHAT_DB)return {status:'invalid_deployment_config',attempts:0};
   const db=env.COAST_CHAT_DB;
   await ensureChatSchema(db);
-  await recoverDreamTide(db,now);
-  await recoverSingleChatRuns(db,now);
+  await recoverDreamTide(db,started);
+  await recoverSingleChatRuns(db,started);
   const rows=(await db.prepare(`SELECT a.*, COALESCE((SELECT MAX(r.started_at) FROM dream_tide_runs r WHERE r.conversation_id=a.conversation_id),0) AS last_run
     FROM dream_tide_arms a JOIN conversations c ON c.id=a.conversation_id
     WHERE a.enabled=1 AND c.user_id='owner' AND c.room_type='main' AND c.source='coast' AND c.conversation_kind='chat' AND c.deleted_at IS NULL
@@ -24,6 +25,7 @@ export async function runDreamTideTick(env,{now=Date.now(),signal,execute=execut
   for(const a of rows){
     if(signal?.aborted||attempts>=cap)break;
     try{
+      const now=clock();
       const cfg=JSON.parse(a.config_json);
       if(!cfg.execution||!/^[-\w.]+\/[\w.:-]+$/.test(a.model_id))continue;
       const state={armed:true,armedAt:a.armed_at,busy:false,extra:a.extra_id?{id:a.extra_id,at:a.extra_at}:null};
@@ -44,8 +46,12 @@ export async function runDreamTideTick(env,{now=Date.now(),signal,execute=execut
       // a configuration which changed while the candidates were being scanned.
       const latest=await db.prepare("SELECT revision,model_id FROM dream_tide_arms WHERE conversation_id=? AND enabled=1").bind(a.conversation_id).first();
       if(latest?.revision!==a.revision||latest.model_id!==a.model_id)continue;
+      const actualNow=clock();
+      // Re-evaluate if time crossed a quiet boundary or local date while earlier
+      // windows were running; the executor also rechecks the durable slot.
+      if(dreamTideCandidate(cfg,state,actualNow)?.key!==candidate.key)continue;
       attempts++;
-      const result=await execute(env,a.conversation_id,{now,currentModelId:a.model_id,expectedRevision:a.revision,busy:false,signal});
+      const result=await execute(env,a.conversation_id,{now:actualNow,clock,currentModelId:a.model_id,expectedRevision:a.revision,busy:false,signal});
       if(result.status==='completed')completed++;
     }catch{errors++;}
   }
