@@ -25,9 +25,9 @@ fn raster(svg: &str, w: u32, h: u32) -> Result<Vec<u8>, String> {
     let transform = tiny_skia::Transform::from_scale(w as f32 / s.width(), h as f32 / s.height());
     resvg::render(&tree, transform, &mut pixmap.as_mut());
     if !pixmap.data().chunks_exact(4).any(|p| p[3] != 0) {
-        return None;
+        return Err("SVG rendered fully transparent".into());
     }
-    pixmap.encode_png().ok()
+    pixmap.encode_png().map_err(|e| format!("PNG encode: {e}"))
 }
 
 #[no_mangle]
@@ -57,6 +57,18 @@ mod tests {
         assert!(raster(input, 20, 20).is_ok());
         assert!(raster(input, 0, 20).is_err());
         assert!(raster(input, 1537, 20).is_err());
+    }
+
+    #[test]
+    fn canonical_complex_svg_renders_on_host() {
+        for (label, svg) in [
+            ("window", include_str!("../../../web/elementera-mcp/deploy-pages/public/rest-box/art/v1/assets/living-window.svg")),
+            ("curtains", include_str!("../../../web/elementera-mcp/deploy-pages/public/rest-box/art/v1/assets/living-curtains.svg")),
+        ] {
+            if let Err(message) = raster(svg, 322, 302) {
+                panic!("{label}: {message}");
+            }
+        }
     }
 }
 
