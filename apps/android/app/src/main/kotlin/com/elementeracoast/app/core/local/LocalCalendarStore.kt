@@ -131,6 +131,12 @@ internal class LocalCalendarStore(private val persistence: LocalPersistence) {
                 }
                 for (field in listOf("conversation_id", "source_turn_id")) {
                     val item = row[field] ?: continue
+                    // Independent model activity has a real window and tool claim, but no chat turn.
+                    if (field == "source_turn_id" && item == JsonNull) {
+                        require(row["source"] in setOf(JsonPrimitive("chat_tool"), JsonPrimitive("coast_chat")) &&
+                            row["tool_call_id"]?.jsonPrimitive?.contentOrNull.orEmpty().startsWith("dream:"))
+                        continue
+                    }
                     require(item is JsonPrimitive && item.isString && item.content.matches(Regex("[A-Za-z0-9_.:-]{1,160}")))
                 }
                 require(row["source_turn_id"] == null || row["conversation_id"] != null) { "日历来源轮次缺少窗口 ID。" }

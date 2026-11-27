@@ -249,6 +249,7 @@ export async function bindChatAttachmentsToTurn(db, conversationId, turnId, ids 
   const targetTurnId = sanitizeId(turnId || '', 'turn');
   const cleanIds = normalizeAttachmentIds(ids);
   for (const id of cleanIds) {
+    if(id.startsWith('att_dream_'))throw new ChatAttachmentError('independent_origin','自主活动原件不能改绑聊天轮次。',409);
     await run(db, `UPDATE chat_attachments SET turn_id = ?, updated_at = ?
       WHERE id = ? AND conversation_id = ?`, [targetTurnId, nowMs(), id, targetConversationId]);
   }
@@ -260,7 +261,7 @@ export async function deleteChatAttachment(db, conversationId, attachmentId) {
   const id = sanitizeId(attachmentId || '', 'attachment');
   const existing = await first(db, 'SELECT id, turn_id FROM chat_attachments WHERE id = ? AND conversation_id = ?', [id, targetConversationId]);
   if (!existing) return { deleted: false };
-  if (existing.turn_id) {
+  if (existing.turn_id || id.startsWith('att_dream_')) {
     throw new ChatAttachmentError('attachment_already_sent', '已经随消息发送的附件不能从待发送区删除。', 409);
   }
   await run(db, 'DELETE FROM chat_attachment_chunks WHERE attachment_id = ?', [id]);

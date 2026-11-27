@@ -48,7 +48,7 @@ internal object OfflineV2HtmlArchive {
                 val data=record.getValue("data").jsonObject
                 // Keep only indices and small metadata in memory; full text is read
                 // from staged records again when generating individual pages.
-                Item(r,record.getValue("kind").jsonPrimitive.content,JsonObject(data.filterKeys { it !in setOf("history","history_json","body") }),i+1)
+                Item(r,record.getValue("kind").jsonPrimitive.content,JsonObject(data.filterKeys { it !in setOf("history","history_json","body","dream_tide") }),i+1)
             }
             fun full(item:Item):JsonObject {
                 val d=objects.getValue(item.row.recordObject)
@@ -121,6 +121,29 @@ internal object OfflineV2HtmlArchive {
                                             val label="分支 $k · 版本 $version"+if(sid.isNotBlank())" · 连续回复 "+((seq["index"]?.jsonPrimitive?.intOrNull?:0)+1)+" · 组 "+sid else ""
                                             append(variant(obj,"assistant",label))
                                         }
+                                    }
+                                    append("</section>")
+                                }
+                                data["dream_tide"]?.takeIf{it!=JsonNull}?.let{raw->
+                                    val d=raw.obj()
+                                    append("<section><h2>自主唤醒 · 历史归档</h2><p>仅供阅读，归档不包含唤醒授权。</p>")
+                                    d["settings"]?.takeIf{it!=JsonNull}?.let{append("<details><summary>唤醒设置（未授权草稿）</summary><pre>"+esc(it.toString())+"</pre></details>")}
+                                    append("<h3>自主手记</h3>")
+                                    for(n in d["notes"].arr().map{it.obj()}){
+                                        append("<article><small>"+esc(time(n.s("created_at")))+" · "+esc(n.s("model_id"))+"</small><p>"+esc(n.s("body"))+"</p>")
+                                        for(r in d["replies"].arr().map{it.obj()}.filter{it.s("claim_id")==n.s("claim_id")})
+                                            append("<p><small>回复 · "+esc(time(r.s("created_at")))+"</small>\n"+esc(r.s("body"))+"</p>")
+                                        append("</article>")
+                                    }
+                                    append("<h3>活动记录</h3>")
+                                    for(r in d["runs"].arr().map{it.obj()}){
+                                        val claim=r.s("claim_id")
+                                        val receipt=buildJsonObject{
+                                            put("result",r["result_json"]?:JsonNull)
+                                            put("steps",JsonArray(d["steps"].arr().filter{it.obj().s("claim_id")==claim}))
+                                            put("tools",JsonArray(d["tools"].arr().filter{it.obj().s("claim_id")==claim}))
+                                        }
+                                        append("<article><small>"+esc(time(r.s("started_at")))+" · "+esc(r.s("model_id"))+"</small><p>"+esc(if(r.s("kind")=="daily")"固定唤醒" else "额外唤醒")+" · "+esc(r.s("status"))+"</p><details><summary>历史回执</summary><pre>"+esc(receipt.toString())+"</pre></details></article>")
                                     }
                                     append("</section>")
                                 }

@@ -544,6 +544,9 @@ export function createChat({ storage, toast, dogtalk }) {
     setDeskController(controller) {
       runtime.desk = controller;
     },
+    setDreamTideController(controller) {
+      runtime.dreamTide = controller;
+    },
     setLettersController(controller) {
       runtime.letters = controller;
     },

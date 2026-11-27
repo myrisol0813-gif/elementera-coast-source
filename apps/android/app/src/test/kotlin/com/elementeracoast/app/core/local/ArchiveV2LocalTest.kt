@@ -188,4 +188,33 @@ class ArchiveV2LocalTest {
         }finally{root.deleteRecursively()}
     }
 
+    @Test fun autonomousWakeHistoryRoundTripsWithDisabledDraft(){
+        val root=Files.createTempDirectory("coast-wake-v2").toFile()
+        try{
+            val source=MemoryLocalPersistence();val target=MemoryLocalPersistence();val cid="wake-window"
+            val cache=RemoteCacheStore(source)
+            cache.putConversations(listOf(com.elementeracoast.app.core.remote.RemoteConversation(cid,"自主唤醒","main")))
+            cache.putHistory(cid,RemoteHistory(conversationId=cid))
+            val v=Json.parseToJsonElement("""{"version":1,"settings":{"modelId":"fixture/model","config":{"timeZone":"UTC","dailyTime":"09:00","execution":{"invitation":"原始邀请","tokenBudget":8000}}},"runs":[{"claim_id":"historic","conversation_id":"wake-window","slot_key":"daily:2026-11-27","local_day":"2026-11-27","kind":"daily","model_id":"fixture/model","status":"completed","started_at":100,"updated_at":120,"result_json":"{\"total_tokens\":120}"}],"steps":[{"claim_id":"historic","step_index":0,"status":"completed","receipt_json":"{\"usage\":{\"total_tokens\":120}}","started_at":100,"finished_at":110}],"tools":[{"claim_id":"historic","step_index":0,"call_index":0,"tool_name":"dream_write_note","status":"completed","receipt_json":"{\"ok\":true}","started_at":110,"finished_at":120}],"notes":[{"claim_id":"historic","conversation_id":"wake-window","model_id":"fixture/model","body":"原始手记","created_at":120}],"replies":[]}""").jsonObject
+            LocalDreamArchive(source).restore(cid,v,true)
+            assertTrue(LocalDreamArchive(source).reply(cid,"historic","reply-id","原始回复"))
+            val previous=LocalDreamArchive(source).export(cid)!!
+            val app="com.elementeracoast.source";val zip=File(root,"wake.zip")
+            val m=ArchiveV2Local.export(source,app,zip);val stage=ArchiveV2Stage(File(root,"stage"),"wake")
+            assertEquals(m,ArchiveV2ZipReader.stage(zip,stage))
+            ArchiveV2Local.restore(m,stage,setOf("chat"),app,target,false)
+            assertNull(LocalDreamArchive(target).export(cid))
+            ArchiveV2Local.restore(m,stage,setOf("chat"),app,target,true)
+            assertEquals(previous,LocalDreamArchive(target).export(cid))
+            val draft=Json.parseToJsonElement(target.get("local.dream.settings."+cid)).jsonObject
+            assertFalse(draft.getValue("enabled").jsonPrimitive.boolean)
+            assertEquals(JsonNull,draft["extraAt"])
+            assertNotEquals(Json.parseToJsonElement(source.get("local.dream.settings."+cid)).jsonObject["revision"],draft["revision"])
+            assertTrue(LocalDreamArchive(target).notes(cid,0).toString().contains("原始回复"))
+            assertTrue(LocalDreamArchive(target).activity(cid,0).toString().contains("total_tokens"))
+            val unsafe=JsonObject(v+("runs" to JsonArray(listOf(JsonObject(v.getValue("runs").jsonArray.single().jsonObject+("status" to JsonPrimitive("running")))))))
+            assertTrue(runCatching{LocalDreamArchive(MemoryLocalPersistence()).restore(cid,unsafe,true)}.isFailure)
+        }finally{root.deleteRecursively()}
+    }
+
 }

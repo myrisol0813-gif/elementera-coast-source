@@ -89,6 +89,7 @@ const CORE = Object.freeze([
   '/public/features/models/models-quick-picker.js',
   '/public/features/models/models-view.js',
   '/public/features/settings.js',
+  '/public/features/dream-tide.js',
   '/public/features/offline-archive.js',
   '/public/features/offline-v2-archive.js',
   '/public/features/settings-transfer.js',

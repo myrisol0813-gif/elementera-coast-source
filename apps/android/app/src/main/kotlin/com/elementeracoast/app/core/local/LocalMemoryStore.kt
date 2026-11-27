@@ -30,6 +30,39 @@ internal class LocalMemoryStore(private val store:LocalPersistence) {
     }
     fun pockets(cid:String):List<RemoteMemoryPocket> = snapshot().pockets.filter{it.str("conversation_id")==cid&&it["deleted_at"]==JsonNull&&it.str("status")=="pending"}
         .sortedByDescending{it.getValue("created_at").jsonPrimitive.long}.map(::pocket)
+    fun proposeDreamCandidate(claim:LocalDreamLedger.Claim,step:Int,index:Int,input:JsonObject,now:Long):JsonObject{
+        require(input.keys==setOf("title","content","destination"))
+        fun field(k:String)=input.getValue(k).jsonPrimitive.let{require(it.isString);it.content.trim()}
+        val title=field("title");val content=field("content");val destination=field("destination")
+        require(title.length in 1..120&&content.length in 1..2000&&destination in setOf("memory","seed"))
+        val cid=claim.cid;val callId=claim.id+":"+step+":"+index
+        val normalized=java.text.Normalizer.normalize(content,java.text.Normalizer.Form.NFKC).lowercase(java.util.Locale.SIMPLIFIED_CHINESE).replace(Regex("[\\s\\p{Z}]+")," ").trim()
+        val fingerprint="soil:"+ArchiveV2Chunks.digest((cid+"\u0000"+destination+"\u0000"+normalized).encodeToByteArray())
+        return store.atomic{s->
+            require(LocalDreamLedger(s).toolClaimed(claim,callId,"dream_memory_candidate")){"自主记忆候选权限已撤回。"}
+            val cache=RemoteCacheStore(s,strictReads=true)
+            require(cache.history(cid)?.contextSettings?.localModelWriteEnabled==true){"本机模型写权限未开启。"}
+            val memory=LocalMemoryStore(s);val old=memory.snapshot()
+            if(old.pockets.any{it.str("fingerprint")==fingerprint})return@atomic buildJsonObject{put("ok",true);put("status","duplicate_suppressed")}
+            val id="pocket_dream_"+claim.id+"_"+step+"_"+index
+            val reference=buildJsonObject{
+                put("conversation_id",cid);put("claim_id",claim.id);put("step_index",step);put("call_index",index)
+                put("model_label",claim.model);put("suggested_destination",destination);put("source","dream_tide")
+            }
+            val row=buildJsonObject{
+                put("id",id);put("conversation_id",cid);put("title",title);put("life_core",content);put("content",content)
+                put("usage_hint","");put("avoid_hint","");put("source_type","dream_tide");put("source_ref_json",reference.toString())
+                put("status","pending");put("recall_count",0);put("last_recalled_at",JsonNull);put("memory_tags_json","[]")
+                put("supersedes_entry_id",JsonNull);put("last_confirmed_at",JsonNull);put("revision_action","")
+                put("source_model",claim.model.take(120));put("source_window",cid);put("source_time",now);put("tag","");put("migration_status","")
+                put("created_at",now);put("updated_at",now);put("deleted_at",JsonNull)
+                put("source_text",content);put("suggested_title",title);put("suggested_life_core",content);put("suggested_usage_hint","");put("suggested_avoid_hint","")
+                put("candidate_id",id);put("source_refs_json","[]");put("source_excerpt","");put("fingerprint",fingerprint);put("resolved_entry_id",JsonNull)
+            }
+            memory.write(old.copy(pockets=old.pockets+row))
+            buildJsonObject{put("ok",true);put("id",id);put("status","pending")}
+        }
+    }
     fun save(id:String?,req:RemoteMemoryEntryWriteRequest):RemoteMemoryEntry{
         val v=snapshot()
         val old=id?.let{key->v.entries.firstOrNull{it.str("id")==key&&it["deleted_at"]==JsonNull}?:error("记忆不存在。")}
@@ -187,7 +220,7 @@ internal class LocalMemoryStore(private val store:LocalPersistence) {
             val tags=Json.parseToJsonElement(r.str("memory_tags_json")).jsonArray
             require(tags.size<=30&&tags.all{it is JsonPrimitive&&it.isString&&it.content.length<=80})
             if(pocket){
-                require(r.str("source_type") in setOf("turn","soil")&&r.str("status") in setOf("pending","confirmed","discarded","stone","archived"))
+                require(r.str("source_type") in setOf("turn","soil","dream_tide")&&r.str("status") in setOf("pending","confirmed","discarded","stone","archived"))
                 for((k,max) in mapOf("source_text" to 12000,"suggested_title" to 120,"suggested_life_core" to 2000,"suggested_usage_hint" to 1200,"suggested_avoid_hint" to 1200,"source_excerpt" to 1200,"source_refs_json" to 20000))text(k,max)
                 require(r.str("source_text").isNotBlank());id("candidate_id",true);id("resolved_entry_id",true)
                 if(r["fingerprint"]!=JsonNull)text("fingerprint",160)

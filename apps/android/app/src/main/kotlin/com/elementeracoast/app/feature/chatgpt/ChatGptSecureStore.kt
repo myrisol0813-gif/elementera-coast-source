@@ -57,18 +57,22 @@ class ChatGptSecureStore(context: Context, private val localMode: Boolean = fals
             )
         }.getOrElse {
             // Corrupt or invalidated credentials cannot be used, and are not logged.
-            preferences.edit().remove(CREDENTIALS).commit()
+            preferences.edit().remove(CREDENTIALS).remove(WAKE_CONNECTION_EPOCH).commit()
             null
         }
     }
 
-    fun save(value: ChatGptConnection) {
+    internal fun wakeConnectionEpoch():String?=preferences.getString(WAKE_CONNECTION_EPOCH,null)
+    internal fun invalidateWakeConnection(){check(preferences.edit().remove(WAKE_CONNECTION_EPOCH).commit())}
+
+    fun save(value: ChatGptConnection, newAuthorization:Boolean=false) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, key())
         val encrypted = cipher.iv + cipher.doFinal(json.encodeToString(value).toByteArray(Charsets.UTF_8))
-        check(preferences.edit()
-            .putString(CREDENTIALS, Base64.encodeToString(encrypted, Base64.NO_WRAP))
-            .commit())
+        check(preferences.edit().apply{
+            putString(CREDENTIALS, Base64.encodeToString(encrypted, Base64.NO_WRAP))
+            if(newAuthorization||wakeConnectionEpoch()==null)putString(WAKE_CONNECTION_EPOCH,UUID.randomUUID().toString())
+        }.commit())
     }
 
     fun preferredModel(): String? = preferences.getString(PREFERRED_MODEL, null)?.takeIf(String::isNotBlank)
@@ -81,7 +85,7 @@ class ChatGptSecureStore(context: Context, private val localMode: Boolean = fals
     }
 
     fun clear() {
-        check(preferences.edit().remove(CREDENTIALS).remove(PREFERRED_MODEL).commit())
+        check(preferences.edit().remove(CREDENTIALS).remove(PREFERRED_MODEL).remove(WAKE_CONNECTION_EPOCH).commit())
     }
 
     private fun key(): SecretKey {
@@ -102,6 +106,7 @@ class ChatGptSecureStore(context: Context, private val localMode: Boolean = fals
 
     companion object {
         private const val HOST_ID = "installation.host.id"
+        private const val WAKE_CONNECTION_EPOCH = "wake.connection.epoch.v1"
         private const val CREDENTIALS = "credentials.v1"
         private const val PREFERRED_MODEL = "chat.selected.model.v1"
         private const val ALIAS = "coast_chatgpt_tokens_aes_gcm_v1"

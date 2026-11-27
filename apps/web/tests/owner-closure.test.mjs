@@ -51,7 +51,7 @@ for (const forbiddenFeature of ['shell', 'chat', 'models', 'rooms', 'desk', 'dai
 const directOwners = {
   shell: 'shell.js', chat: 'chat.js', models: 'models.js', desk: 'desk.js',
   daily: 'daily.js', memory: 'memory.js', dogtalk: 'dogtalk.js',
-  tools: 'tools.js', toolroom: 'toolroom.js', letters: 'letters.js',
+  tools: 'tools.js', toolroom: 'toolroom.js', letters: 'letters.js', 'dream-tide':'dream-tide.js',
 };
 for (const [id, file] of Object.entries(directOwners)) {
   const source = await read(resolve(pages, `public/features/${file}`));

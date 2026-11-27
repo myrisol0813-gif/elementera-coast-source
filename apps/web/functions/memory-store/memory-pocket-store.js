@@ -95,7 +95,7 @@ export async function createPocket(db, value = {}) {
   const conversationId = sanitizeId(value.conversation_id, 'conversation');
   await getConversation(db, conversationId);
   const sourceType = String(value.source_type || 'turn');
-  if (!POCKET_SOURCE_TYPES.has(sourceType)) throw new MemoryStoreError('invalid_source_type', '待确认候选来源无效。');
+  if (sourceType === 'dream_tide' || !POCKET_SOURCE_TYPES.has(sourceType)) throw new MemoryStoreError('invalid_source_type', '待确认候选来源无效。');
   const sourceText = clip(value.source_text, MAX_SOURCE_TEXT);
   if (!sourceText) throw new MemoryStoreError('source_text_required', '没有可以进入待确认区的内容。');
   const reference = sourceRef(value.source_ref);

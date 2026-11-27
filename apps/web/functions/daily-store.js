@@ -1,3 +1,4 @@
+import {insertAutonomousRecord} from './dream-tide-write-fence.js';
 import { ensureDailySchema } from './daily-schema.js';
 import { validateCoastIdentity } from './coast-identity.js';
 
@@ -123,10 +124,12 @@ function normalizeMoment(value = {}, defaults = {}) {
 export async function createMoment(db, value = {}, defaults = {}) {
   await ensureDailySchema(db); const item = normalizeMoment(value, defaults);
   if (item.tool_call_id) { const existing = await first(db, 'SELECT id FROM daily_moments WHERE tool_call_id = ?', [item.tool_call_id]); if (existing) return getMoment(db, existing.id); }
-  await run(db, `INSERT INTO daily_moments (id, date, author, source, status, text, conversation_id, source_turn_id, tool_call_id, actor, surface, model_label, model_nickname, symbol, display_author, reason, published_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+  const sql=`INSERT INTO daily_moments (id, date, author, source, status, text, conversation_id, source_turn_id, tool_call_id, actor, surface, model_label, model_nickname, symbol, display_author, reason, published_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,values=[
     item.id, item.date, item.author, item.source, item.status, item.text, item.conversation_id, item.source_turn_id, item.tool_call_id, item.actor, item.surface,
     item.model_label, item.model_nickname, item.symbol, item.display_author, item.reason || null, item.published_at, item.created_at, item.updated_at,
-  ]);
+  ];
+  if(defaults.autonomous_claim)await insertAutonomousRecord(db,sql.replace(' VALUES (',' SELECT ').slice(0,-1),values,defaults,'allowDailyWrite','create_moment');
+  else await run(db,sql,values);
   return getMoment(db, item.id);
 }
 export async function patchMoment(db, id, value = {}) {
@@ -183,6 +186,7 @@ async function matchingDiaries(db, date, author) { return all(db, 'SELECT * FROM
 export async function createDiary(db, value = {}, defaults = {}) {
   await ensureDailySchema(db); const item = normalizeDiary(value, defaults);
   if (item.tool_call_id) { const existingByToolCall = await first(db, 'SELECT * FROM daily_diaries WHERE tool_call_id = ?', [item.tool_call_id]); if (existingByToolCall) return diaryFromRow(existingByToolCall); }
+  if(defaults.autonomous_claim&&value.conflict_mode!=='append')throw new DailyStoreError('tool_forbidden','自主活动只可追加日记。',403);
   const existing = await matchingDiaries(db, item.date, item.author); const mode = String(value.conflict_mode || '').trim();
   if (existing.length && !['append', 'replace'].includes(mode)) throw new DailyStoreError('diary_conflict', '同日同作者已有日记，请明确选择追加或替换。', 409, { existing_ids: existing.map((row) => row.id) });
   if (mode === 'replace' && existing.length) {
@@ -190,7 +194,9 @@ export async function createDiary(db, value = {}, defaults = {}) {
     await run(db, `UPDATE daily_diaries SET source = ?, weather = ?, mood = ?, tags_json = ?, text = ?, conversation_id = ?, source_turn_id = ?, tool_call_id = ?, actor = ?, surface = ?, model_label = ?, model_nickname = ?, symbol = ?, display_author = ?, updated_at = ? WHERE id = ?`, [item.source, item.weather, item.mood, JSON.stringify(item.tags), item.text, item.conversation_id, item.source_turn_id, item.tool_call_id, item.actor, item.surface, item.model_label, item.model_nickname, item.symbol, item.display_author, item.updated_at, target.id]);
     return diaryFromRow(await first(db, 'SELECT * FROM daily_diaries WHERE id = ?', [target.id]));
   }
-  await run(db, `INSERT INTO daily_diaries (id, date, author, source, weather, mood, tags_json, text, conversation_id, source_turn_id, tool_call_id, actor, surface, model_label, model_nickname, symbol, display_author, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [item.id, item.date, item.author, item.source, item.weather, item.mood, JSON.stringify(item.tags), item.text, item.conversation_id, item.source_turn_id, item.tool_call_id, item.actor, item.surface, item.model_label, item.model_nickname, item.symbol, item.display_author, item.created_at, item.updated_at]);
+  const sql=`INSERT INTO daily_diaries (id, date, author, source, weather, mood, tags_json, text, conversation_id, source_turn_id, tool_call_id, actor, surface, model_label, model_nickname, symbol, display_author, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,values=[item.id, item.date, item.author, item.source, item.weather, item.mood, JSON.stringify(item.tags), item.text, item.conversation_id, item.source_turn_id, item.tool_call_id, item.actor, item.surface, item.model_label, item.model_nickname, item.symbol, item.display_author, item.created_at, item.updated_at];
+  if(defaults.autonomous_claim)await insertAutonomousRecord(db,sql.replace(' VALUES (',' SELECT ').slice(0,-1),values,defaults,'allowDailyWrite','create_diary');
+  else await run(db,sql,values);
   return diaryFromRow(await first(db, 'SELECT * FROM daily_diaries WHERE id = ?', [item.id]));
 }
 export async function patchDiary(db, id, value = {}) {

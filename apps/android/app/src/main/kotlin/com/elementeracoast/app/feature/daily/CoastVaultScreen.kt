@@ -399,6 +399,8 @@ private fun CoastVaultCard(
     var showActions by remember(id) { mutableStateOf(false) }
     var showCancel by remember(id) { mutableStateOf(false) }
     var showInfo by remember(id) { mutableStateOf(false) }
+    var dreamOrigin by remember(id) { mutableStateOf<JsonObject?>(null) }
+    var dreamOriginLoading by remember(id) { mutableStateOf(false) }
     var showText by remember(id) { mutableStateOf(false) }
     var audioExpanded by remember(id) { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
@@ -488,6 +490,19 @@ private fun CoastVaultCard(
 
     fun openSource() {
         if (conversation.isBlank()) return
+        if(kind in setOf("audio","image")&&sourceId.matches(Regex("(att|voice)_dream_.+"))){
+            if(dreamOriginLoading)return
+            imageOpen=null
+            dreamOriginLoading=true
+            scope.launch{
+                try{
+                    val source=repository.vaultDreamOrigin(conversation,sourceId).vaultItems("items").singleOrNull()
+                    if(source==null)onSnackbar("未找到对应的自主活动记录。") else dreamOrigin=source
+                }catch(c:CancellationException){throw c}catch(e:Exception){onSnackbar("活动来源暂不可读取："+e.message)}
+                finally{dreamOriginLoading=false}
+            }
+            return
+        }
         val messageId = item.vaultText("message_id")
         val turnId = item.vaultText("turn_id")
         val role = when (item.vaultText("role")) {
@@ -710,6 +725,20 @@ private fun CoastVaultCard(
         },
         dismissButton = { TextButton(onClick = { showRename = false }) { Text("取消") } }
     )
+    dreamOrigin?.let{activity->AlertDialog(
+        onDismissRequest={dreamOrigin=null},title={Text("自主活动来源")},
+        text={Column(Modifier.heightIn(max=460.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){
+            val time=activity.vaultText("started_at").toLongOrNull()?.let{java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))}.orEmpty()
+            val status=when(activity.vaultText("status")){"completed"->"已结束";"running"->"活动中";"cancelled"->"已取消";"interrupted"->"已中断";else->"未完成"}
+            Text(time+" · "+status);Text(activity.vaultText("model_id"),style=MaterialTheme.typography.bodySmall)
+            Text("活动编号："+activity.vaultText("claim_id"),style=MaterialTheme.typography.bodySmall)
+            for(tool in activity.vaultItems("tools")){
+                val record=(tool["receipt"] as? JsonObject)?.vaultText("record_id").orEmpty()
+                val name=when(tool.vaultText("tool_name")){"voice_create"->"自主语音";"image_generate"->"自主生图";"dream_memory_candidate"->"提议记忆候选";"dream_write_note"->"写自主手记";else->tool.vaultText("tool_name")}
+                Text(name+" · "+when(tool.vaultText("status")){"completed"->"已完成";"failed"->"未完成";else->"结果未确认"}+if(record==sourceId)" · 当前作品" else "",style=MaterialTheme.typography.bodySmall)
+            }
+        }},confirmButton={TextButton(onClick={dreamOrigin=null}){Text("关闭")}})
+    }
     if (showInfo) AlertDialog(
         onDismissRequest = { showInfo = false },
         title = { Text("文件信息") },
@@ -840,11 +869,11 @@ private fun CoastVaultImage(
 }
 
 @Composable
-private fun CoastVaultAudio(
-    repository: SideRoomsRepository,
-    id: String,
-    onSnackbar: (String) -> Unit
-) {
+private fun CoastVaultAudio(repository: SideRoomsRepository,id: String,onSnackbar: (String) -> Unit) =
+    CoastMediaAudio(id,{repository.audio(id)},onSnackbar)
+
+@Composable
+internal fun CoastMediaAudio(id:String,loadBytes:suspend ()->ByteArray,onSnackbar:(String)->Unit) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var player by remember(id) { mutableStateOf<MediaPlayer?>(null) }
@@ -890,7 +919,7 @@ private fun CoastVaultAudio(
                             playing = true
                         }
                         else -> {
-                            val bytes = repository.audio(id)
+                            val bytes = loadBytes()
                             val local = File.createTempFile("coast-vault-", ".mp3", context.cacheDir)
                             local.writeBytes(bytes)
                             file = local

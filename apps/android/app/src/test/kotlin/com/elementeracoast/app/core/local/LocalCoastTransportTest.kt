@@ -134,4 +134,29 @@ class LocalCoastTransportTest {
         assertEquals(404,get("u1").first)
         assertEquals(404,get("missing").first)
     }
+    @Test fun autonomousWakeDraftIsWindowScopedAndNeverArmsLocally(){
+        val store=MemoryLocalPersistence();val a=client(store)
+        fun create()=call(a,"/api/chat/conversations","POST").second.getValue("conversation").jsonObject.getValue("id").jsonPrimitive.content
+        val cid=create();val other=create();val base="/api/chat/dream-tide"
+        val draft=buildJsonObject{
+            put("conversation_id",cid);put("revision",JsonNull);put("action","save");put("modelId","local:fixture")
+            putJsonObject("config"){
+                put("timeZone","UTC");put("dailyTime","09:00")
+                putJsonObject("execution"){put("invitation","自主活动");put("tokenBudget",8000)}
+            }
+        }
+        assertEquals(200,call(a,base,"POST",draft.toString()).first)
+        val reopened=client(store)
+        val saved=call(reopened,base+"?conversation_id="+cid).second.getValue("settings").jsonObject
+        assertFalse(saved.getValue("enabled").jsonPrimitive.boolean)
+        assertEquals("local:fixture",saved.getValue("modelId").jsonPrimitive.content)
+        assertFalse(call(reopened,base+"?conversation_id="+other).second.toString().contains("自主活动"))
+        assertEquals(409,call(reopened,base,"POST",draft.toString()).first)
+        val arm=JsonObject(draft+mapOf("revision" to saved.getValue("revision"),"action" to JsonPrimitive("arm"),"confirmExecution" to JsonPrimitive(true)))
+        assertEquals(409,call(reopened,base,"POST",arm.toString()).first)
+        assertEquals(0,call(reopened,base+"/activity?conversation_id="+cid).second.getValue("items").jsonArray.size)
+        assertEquals(200,call(reopened,"/api/chat/conversations/"+cid,"DELETE").first)
+        assertEquals("",store.get("local.dream.settings."+cid))
+    }
+
 }

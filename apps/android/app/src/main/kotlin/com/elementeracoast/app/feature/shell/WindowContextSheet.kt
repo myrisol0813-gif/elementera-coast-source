@@ -76,7 +76,8 @@ internal fun WindowContextSheet(
     onSettingsChange: (ConversationContextSettings) -> Unit,
     onSetThoughtSoilEnabled: (Boolean) -> Unit,
     onOpenIslandLetter: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    dreamApi: com.elementeracoast.app.core.network.CoastApiClient? = null
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -87,6 +88,11 @@ internal fun WindowContextSheet(
     var stepsAccess by remember { mutableStateOf(AndroidRealityContextSource.hasActivityRecognitionPermission(context)) }
     var locationAccess by remember { mutableStateOf(AndroidRealityContextSource.hasCoarseLocationPermission(context)) }
     var workbenchPrompt by rememberSaveable(conversationId, settings.workbenchPrompt) { mutableStateOf(settings.workbenchPrompt ?: DEFAULT_WORKBENCH_PROMPT) }
+    var showDream by remember(conversationId){mutableStateOf(false)}
+    if(showDream&&dreamApi!=null){
+        DreamTideSheet(conversationId,selectedModel,localMode,dreamApi,onDismiss={showDream=false})
+        return
+    }
     var weatherCity by rememberSaveable(conversationId, settings.weatherCity) { mutableStateOf(settings.weatherCity) }
 
     fun refreshPermissions() {
@@ -197,6 +203,7 @@ internal fun WindowContextSheet(
                 }
             }
             SoftSettingsCard {
+                if(roomType=="main")SettingSwitchRow(title="允许回读自主活动",note="普通聊天按需读取本窗口手记与活动摘要；不启动唤醒。本机还需开启模型工具。",checked=settings.dreamReadbackEnabled,enabled=usable,onCheckedChange={onSettingsChange(settings.copy(dreamReadbackEnabled=it))})
                 Text("表情包",style=MaterialTheme.typography.titleSmall)
                 StickerDisplaySizeBlock(settings,usable,onSettingsChange)
                 SettingSwitchRow(title="允许发送表情包",note="自主查找并发送已登记素材；本机还需开启模型工具与写入权限。",checked=settings.stickerSendEnabled,enabled=usable,onCheckedChange={onSettingsChange(settings.copy(stickerSendEnabled=it))})
@@ -242,6 +249,14 @@ internal fun WindowContextSheet(
                     enabled = usable,
                     onCheckedChange = onSetThoughtSoilEnabled
                 )
+            }
+
+            if(usable&&roomType=="main"&&dreamApi!=null){
+                SoftSettingsCard {
+                    Text("自主唤醒",style=MaterialTheme.typography.titleSmall)
+                    Text("仅本窗口 · 唤醒设置、自主手记与活动记录",style=MaterialTheme.typography.bodySmall)
+                    Button(onClick={showDream=true}){Text("打开自主唤醒")}
+                }
             }
 
             if (wantsUsagePermission || wantsStepsPermission || wantsLocationPermission) {

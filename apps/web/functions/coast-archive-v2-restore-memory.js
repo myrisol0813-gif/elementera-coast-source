@@ -1,6 +1,7 @@
 import { ensureMemorySchema } from './memory-store/memory-schema.js';
 import { MEMORY_OWNER_ID,ENTRY_TYPES,ENTRY_SCOPES,ENTRY_STATUSES,MEMORY_LEVELS,POCKET_SOURCE_TYPES,POCKET_STATUSES,MAX_TITLE,MAX_LIFE_CORE,MAX_ENTRY_CONTENT,MAX_HINT,MAX_SOURCE_TEXT,MAX_SOURCE_EXCERPT,MAX_SOURCE_MODEL,MAX_SOURCE_WINDOW } from './memory-store/memory-normalize.js';
 import { memColumns,pocketColumns } from './coast-archive-v2-records.js';
+import {readDreamArchive,validateDreamCandidateOrigin} from './dream-tide-archive.js';
 import { ensureChatSchema } from './chat-store.js';
 const check=(ok,msg)=>{if(!ok)throw Object.assign(Error(msg),{status:409});};
 const id=v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(v);
@@ -32,6 +33,7 @@ export async function prepareArchiveMemory(db,r,v,manifest){
    await ensureChatSchema(db);
    check(await db.prepare("SELECT id FROM conversations WHERE id=? AND user_id='owner' AND deleted_at IS NULL AND conversation_kind='chat'").bind(v.conversation_id).first(),'restore related owner chat first');
  }else check(r.dependencies.length===0,'invalid memory dependencies');
+ if(pocket&&(v.source_type==='dream_tide'||v.id.startsWith('pocket_dream_')))validateDreamCandidateOrigin(await readDreamArchive(db,v.conversation_id),v);
  await ensureMemorySchema(db);
  const existing=await db.prepare('SELECT user_id,'+names+' FROM '+table+' WHERE id=?').bind(v.id).first();
  check(!existing||existing.user_id===MEMORY_OWNER_ID&&fields.every(k=>existing[k]===v[k]),'target memory differs or is not owned; never overwrite');

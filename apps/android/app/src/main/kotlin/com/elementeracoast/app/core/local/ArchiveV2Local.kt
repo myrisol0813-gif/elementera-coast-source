@@ -27,6 +27,10 @@ internal object ArchiveV2Local {
         val attachmentRows=originals.entries()
         val metadata=attachmentRows.associate{it.metadata.getValue("id").jsonPrimitive.content to it.metadata}
         for(c in LocalBackupArchive.capture(store,applicationId).conversations)for(t in c.history.turns)for(v in t.user.variants+t.assistant.variantsByUserVariant.values.flatten())for(a in v.attachments)LocalAttachmentStore.checkReference(c.conversation.id,t.id,a,metadata)
+        val dreamArchive=LocalDreamArchive(store)
+        for(row in attachmentRows)if(row.metadata.getValue("id").jsonPrimitive.content.startsWith("att_dream_"))dreamArchive.validateMediaOrigin(dreamArchive.export(row.metadata.getValue("conversation_id").jsonPrimitive.content),row.metadata,"image")
+        for(row in LocalSideRecords(store).rows().filter{it.kind=="voice"&&it.data["source"]==JsonPrimitive("dream_tide")})dreamArchive.validateMediaOrigin(dreamArchive.export(row.data.getValue("conversation_id").jsonPrimitive.content),row.data,"voice")
+        for(row in LocalMemoryStore(store).snapshot().pockets.filter{it["deleted_at"]==JsonNull&&(it["source_type"]==JsonPrimitive("dream_tide")||it.getValue("id").jsonPrimitive.content.startsWith("pocket_dream_"))})dreamArchive.validateCandidateOrigin(dreamArchive.export(row.getValue("conversation_id").jsonPrimitive.content),row)
         val records=mutableListOf<ArchiveV2Record>();val objects=linkedMapOf<String,ArchiveV2Object>()
         try {
             ArchiveV2ZipWriter(output.outputStream()).use { writer->
@@ -41,7 +45,11 @@ internal object ArchiveV2Local {
                 fun list(module:String,field:String,kind:String,id:(JsonObject)->String) {
                     for(row in payload.getValue(field).jsonArray.map { it.jsonObject })add(module,id(row),kind,row)
                 }
-                list("chat","conversations","local_chat"){it.getValue("conversation").jsonObject.getValue("id").jsonPrimitive.content}
+                for(row in payload.getValue("conversations").jsonArray.map{it.jsonObject}){
+                    val cid=row.getValue("conversation").jsonObject.getValue("id").jsonPrimitive.content
+                    val dream=LocalDreamArchive(store).export(cid)
+                    add("chat",cid,"local_chat",if(dream==null)row else JsonObject(row+("dream_tide" to dream)))
+                }
                 list("calendar","calendar","local_calendar"){it.getValue("id").jsonPrimitive.content}
                 list("daily","moments","local_moment"){"moment:"+it.getValue("id").jsonPrimitive.content}
                 list("daily","diaries","local_diary"){"diary:"+it.getValue("id").jsonPrimitive.content}
@@ -106,7 +114,7 @@ internal object ArchiveV2Local {
                 require(r.dependencies==if(parent==null)emptyList() else listOf("chat/"+parent))
             }else require(r.dependencies.isEmpty())
             when(kind){
-                "local_chat"->{require(r.module=="chat"&&id(data.getValue("conversation"))==r.id);chat.add(data)}
+                "local_chat"->{require(r.module=="chat"&&id(data.getValue("conversation"))==r.id);chat.add(JsonObject(data.filterKeys{it!="dream_tide"}))}
                 "local_calendar"->{
                     require(r.module=="calendar"&&id(data)==r.id)
                     calendar.add(data)
@@ -131,6 +139,14 @@ internal object ArchiveV2Local {
         require(selection.all { name->manifest.modules.any { it.module==name&&it.coverage!="unavailable" } })
         val objects=manifest.objects.associateBy{it.objectSha256}
         require(manifest.records.filter{it.module in selection}.sumOf{objects.getValue(it.recordObject).size}<=CoastTransferCodec.MAX_BYTES){"本机恢复事务最多64 MiB。"}
+        val dreams=if("chat" in selection)manifest.records.filter{it.module=="chat"}.mapNotNull{r->
+            val raw=Json.parseToJsonElement(stage.verify(objects.getValue(r.recordObject),CoastTransferCodec.MAX_BYTES.toLong()).readBytes().decodeToString(throwOnInvalidSequence=true)).jsonObject
+            val data=raw.getValue("data").jsonObject
+            data["dream_tide"]?.takeIf{it!=JsonNull}?.let{
+                require(data.getValue("conversation").jsonObject.getValue("room_type").jsonPrimitive.content=="main")
+                r.id to it.jsonObject
+            }
+        }else emptyList()
         val extra=selection.intersect(ArchiveV2Knowledge.modules)
         val base=selection-extra-setOf("attachments","appearance")-LocalSideRecords.modules-LocalDogtalkStore.modules
         val dogtalk=ArchiveV2Dogtalk.read(manifest,stage,selection,applicationId)
@@ -154,9 +170,27 @@ internal object ArchiveV2Local {
             val parents=bytes?.let{LocalTransferRestore.plannedParents(it,applicationId,base,target,attachmentMeta,snapshots)}
             val cache=RemoteCacheStore(target,strictReads=true)
             val existing=cache.conversations().map{it.id}.toSet()
-            require(existing.none{LocalReplyRunStore(target).active(it)}){"本机有窗口正在连续回复，请结束本组后再恢复归档。"}
+            require(existing.none{LocalReplyRunStore(target).active(it)||LocalDreamLedger(target).active(it)}){"本机有窗口正在连续回复，请结束本组后再恢复归档。"}
             val histories=if(extra.any{it in LocalSoilStore.modules}||"attachments" in selection||selection.any{it in LocalSideRecords.modules||it in LocalDogtalkStore.modules})bytes?.let{LocalTransferRestore.plannedHistories(it,applicationId,base,target,attachmentMeta,snapshots)}?:existing.associateWith{requireNotNull(cache.history(it))} else emptyMap()
             val report=bytes?.let{if(write)LocalTransferRestore.restoreStaged(it,applicationId,base,target,attachmentMeta,snapshots) else LocalTransferRestore.preview(it,applicationId,base,target,attachmentMeta,snapshots)}
+            for((cid,value) in dreams){
+                require(cid in (parents?.first?:existing)&&cid !in parents?.second.orEmpty()){"自主唤醒所属窗口存在冲突，未恢复。"}
+                LocalDreamArchive(target).restore(cid,value,write)
+            }
+            val dreamArchive=LocalDreamArchive(target)
+            val dreamByCid=dreams.toMap()
+            for(item in attachments.filter{it.metadata.getValue("id").jsonPrimitive.content.startsWith("att_dream_")}){
+                val cid=item.metadata.getValue("conversation_id").jsonPrimitive.content
+                dreamArchive.validateMediaOrigin(dreamByCid[cid]?:dreamArchive.export(cid),item.metadata,"image")
+            }
+            for(row in side.map{it.row}.filter{it.kind=="voice"&&it.data["source"]==JsonPrimitive("dream_tide")}){
+                val cid=row.data.getValue("conversation_id").jsonPrimitive.content
+                dreamArchive.validateMediaOrigin(dreamByCid[cid]?:dreamArchive.export(cid),row.data,"voice")
+            }
+            for(row in rows.filter{it.module=="memory_pockets"&&(it.data["source_type"]==JsonPrimitive("dream_tide")||it.id.startsWith("pocket_dream_"))}){
+                val cid=row.data.getValue("conversation_id").jsonPrimitive.content
+                dreamArchive.validateCandidateOrigin(dreamByCid[cid]?:dreamArchive.export(cid),row.data)
+            }
             val extras=ArchiveV2Knowledge.apply(rows,extra,target,write,parents?.first?:existing,parents?.second.orEmpty(),histories)
             val files=if("attachments" in selection)mapOf("attachments" to ArchiveV2Attachments.apply(attachments,target,histories,parents?.second.orEmpty(),write))else emptyMap()
             val sideCounts=if(selection.any{it in LocalSideRecords.modules}){

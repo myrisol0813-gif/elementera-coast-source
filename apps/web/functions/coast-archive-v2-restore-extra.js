@@ -10,6 +10,7 @@ function base64(bytes){let s='';for(let i=0;i<bytes.length;i+=0x8000)s+=String.f
 export async function prepareArchiveVoice(db,row,descriptor,source,{conversationId,turns,variantTurns}){
   const names=['id','conversation_id','turn_id','message_id','source','model_label','voice_id','text','audio_bytes','created_at'];
   check(columns(row,names)&&id(row.id)&&row.conversation_id===conversationId&&(row.turn_id==null||turns.has(row.turn_id))&&(row.message_id==null||variantTurns.has(row.message_id)&&(!row.turn_id||variantTurns.get(row.message_id)===row.turn_id)),'voice reference missing');
+  check(!(row.id.startsWith('voice_dream_')||row.source==='dream_tide')||row.id.startsWith('voice_dream_')&&row.source==='dream_tide'&&row.turn_id===null&&row.message_id===null,'invalid autonomous voice origin');
   check(typeof row.source==='string'&&row.source.length<=160&&typeof row.voice_id==='string'&&row.voice_id.length<=180&&typeof row.text==='string'&&row.text.length<=VOICE_LIMITS.text_chars&&stamp(row.created_at)&&row.audio_bytes===descriptor.size&&descriptor.size>0&&descriptor.size<=VOICE_LIMITS.audio_bytes,'invalid voice metadata');
   await ensureVoiceSchema(db);
   check(!await db.prepare('SELECT id FROM coast_voice_clips WHERE id=?').bind(row.id).first(),'voice already exists');

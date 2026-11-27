@@ -30,7 +30,7 @@ internal object ArchiveV2CloudToLocal {
             when(r.module){
                 "daily"->dailyRows.add(ArchiveV2Daily.Row(r,raw.string("kind"),data))
                 "chat"->{
-                    verifyKeys(data,setOf("conversation","history_json","history_updated_at"))
+                    verifyKeys(JsonObject(data.filterKeys{it!="dream_tide"}),setOf("conversation","history_json","history_updated_at"))
                     val c=data.getValue("conversation").jsonObject
                     verifyKeys(c,setOf("id","title","room_type","created_at","updated_at","deleted_at","title_manual","title_generated_at","title_model_id","source","source_window_id"))
                     require(c.string("id")==r.id&&c["deleted_at"]==JsonNull)
@@ -75,6 +75,9 @@ internal object ArchiveV2CloudToLocal {
                     val row=buildJsonObject {
                         for(k in listOf("id","day","kind","title","body","recurrence","author","source","created_at","updated_at"))put(k,data.getValue(k))
                         for(k in listOf("model_label","tool_call_id","conversation_id","source_turn_id"))data.getValue(k).takeIf { it!=JsonNull }?.let { put(k,it) }
+                        // Keep explicit no-chat-turn provenance for independent activity.
+                        if(data["source_turn_id"]==JsonNull&&data["source"] in setOf(JsonPrimitive("chat_tool"),JsonPrimitive("coast_chat"))&&
+                            data["tool_call_id"]?.jsonPrimitive?.contentOrNull.orEmpty().startsWith("dream:"))put("source_turn_id",JsonNull)
                         put("occurrence_day",data.getValue("day"))
                         if(data["anniversary_mode"]!=JsonNull)putJsonObject("anniversary"){
                             put("startDay",data.getValue("anniversary_start_day"));put("mode",data.getValue("anniversary_mode"));put("targetDays",data.getValue("anniversary_target_days"));put("pinned",pin==1)

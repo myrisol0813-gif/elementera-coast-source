@@ -50,7 +50,8 @@ data class CoastBackendGraph(
     val dogtalk: DogtalkRepository,
     val crossWindow: CrossWindowRepository,
     val archive: GlobalArchiveRepository,
-    val officialChat: ChatRepository? = null
+    val officialChat: ChatRepository? = null,
+    val dreamApi: CoastApiClient? = null
 ) {
     companion object {
         fun production(
@@ -85,7 +86,8 @@ data class CoastBackendGraph(
                 dogtalk = DefaultDogtalkRepository(config, http),
                 crossWindow = DefaultCrossWindowRepository(config, http),
                 archive = DefaultGlobalArchiveRepository(api),
-                officialChat = chatGptPlan?.let { NativeChatGptTurnRepository(api, chatRepository, it, reasoning,toolLimit=toolLimit) }
+                officialChat = chatGptPlan?.let { NativeChatGptTurnRepository(api, chatRepository, it, reasoning,toolLimit=toolLimit) },
+                dreamApi = api
             )
         }
     }

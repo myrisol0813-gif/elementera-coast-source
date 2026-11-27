@@ -53,7 +53,7 @@ export async function collectArchiveV2({sink,applicationId,transport=archiveV2Tr
     for(const module of caps.record_modules){
       available(module);
       for await(const row of pages(c=>transport.recordPage(module,c))){
-        if(module==='chat'){const {conversation,history_json,history_updated_at}=await transport.chat(row.id);await record(module,row.id,'chat',{conversation,history_json,history_updated_at});}
+        if(module==='chat'){const {conversation,history_json,history_updated_at,dream_tide}=await transport.chat(row.id);await record(module,row.id,'chat',{conversation,history_json,history_updated_at,...(dream_tide?{dream_tide}:{})});}
         else if(module==='voice'){const {metadata,descriptor}=await transport.voice(row.id);await record(module,row.id,'voice',metadata,linkChat(metadata),mediaReader(descriptor,i=>transport.voiceChunk(row.id,descriptor,i)));}
         else await record(module,row.id,module,row,linkChat(row));
       }

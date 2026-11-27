@@ -43,19 +43,38 @@ class ChatGptPlanRepository(
     private val http: OkHttpClient = OkHttpClient()
 ) {
     private val json = Json { ignoreUnknownKeys = true }
-    private val mutex = Mutex()
+    // Sign-in and refresh for the same protected session must not race even across repositories.
+    private val mutex = sessionMutex
+    private companion object { val sessionMutex=Mutex() }
     @Volatile private var latestModels = emptyList<ChatGptAccountModel>()
+    @Volatile private var catalogIdentity:Pair<String,String>?=null
 
     fun reasoningEffortsFor(slug: String): List<String> =
         latestModels.firstOrNull { it.slug == slug }?.reasoningEfforts.orEmpty()
 
     fun currentAccount(): ChatGptConnection? = store.load()
+    internal fun wakeConnectionEpoch():String?=store.wakeConnectionEpoch()
     fun preferredModel(): String? = store.preferredModel()
     fun selectModel(slug: String?) = store.selectModel(slug)
 
     /** Only the local Native inference adapter receives this token, never Coast Cloudflare. */
     internal suspend fun accessTokenForInference(): String = mutex.withLock {
         withContext(Dispatchers.IO) { activeCredentials().accessToken }
+    }
+
+    /** Only for the isolated plan-wake transport. A fresh account catalog must
+     * have been read on this repository; credential refresh cannot change identity. */
+    internal suspend fun accessTokenForDream(grant:NativeDreamPlanProtocol.Grant,window:String,revision:String,modelId:String):String=mutex.withLock{
+        withContext(Dispatchers.IO){
+            val current=currentAccount()
+            val advertised=if(current!=null&&catalogIdentity==(current.subject to current.clientId))latestModels.map{it.slug}.toSet()else emptySet()
+            if(!NativeDreamPlanProtocol.permitted(grant,window,revision,currentAccount(),modelId,advertised))
+                throw NativeDreamPlanFailure("plan_authorization_unavailable")
+            val account=activeCredentials()
+            if(!NativeDreamPlanProtocol.permitted(grant,window,revision,account,modelId,advertised))
+                throw NativeDreamPlanFailure("plan_authorization_unavailable")
+            account.accessToken
+        }
     }
 
     suspend fun connect(openBrowser: (String) -> Unit): ChatGptConnection = mutex.withLock {
@@ -131,7 +150,7 @@ class ChatGptPlanRepository(
                 expiresAtEpochSeconds = System.currentTimeMillis() / 1000 +
                     (response["expires_in"]?.jsonPrimitive?.longOrNull ?: 3600L)
             )
-            withContext(Dispatchers.IO) { store.save(value) }
+            withContext(Dispatchers.IO) { store.save(value,newAuthorization=true) }
             value
         } catch (_: SocketTimeoutException) {
             throw IllegalStateException("ChatGPT 授权超时，请回海岸重试。")
@@ -141,7 +160,9 @@ class ChatGptPlanRepository(
     }
 
     suspend fun models(): List<ChatGptAccountModel> = mutex.withLock {
-        val access = withContext(Dispatchers.IO) { activeCredentials().accessToken }
+        catalogIdentity=null
+        val credentials = withContext(Dispatchers.IO) { activeCredentials() }
+        val access=credentials.accessToken
         withContext(Dispatchers.IO) {
             val request = Request.Builder()
                 .url("https://api.openai.com/v1/models")
@@ -160,6 +181,7 @@ class ChatGptPlanRepository(
                 )
             }
             latestModels = models
+            catalogIdentity=credentials.subject to credentials.clientId
             models
         }
     }
@@ -248,6 +270,7 @@ class ChatGptPlanRepository(
 
     suspend fun disconnect(): Boolean = mutex.withLock {
         val current = store.load() ?: return@withLock true
+        store.invalidateWakeConnection()
         val revoked = withContext(Dispatchers.IO) {
             runCatching {
                 val discovery = http.newCall(Request.Builder()
@@ -291,7 +314,7 @@ class ChatGptPlanRepository(
             scopes = scopes,
             expiresAtEpochSeconds = System.currentTimeMillis() / 1000 +
                 (renewed["expires_in"]?.jsonPrimitive?.longOrNull ?: 3600L)
-        ).also(store::save)
+        ).also{store.save(it)}
     }
 
     private fun postToken(body: FormBody): JsonObject =

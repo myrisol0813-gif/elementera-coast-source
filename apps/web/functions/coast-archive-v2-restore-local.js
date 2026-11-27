@@ -22,6 +22,7 @@ export async function restoreArchiveLocalRecord(db,session,manifest,module,recor
  await stageVerifiedObject(d,readStagedArchiveChunks(db,session,d.object_sha256),async bytes=>{b.set(bytes,at);at+=bytes.length;},{maxBytes:1800000});
  const raw=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(b));
  check(raw&&Object.keys(raw).length===2&&Object.hasOwn(specs,raw.kind)&&raw.data&&typeof raw.data==='object'&&!Array.isArray(raw.data),'invalid local record');
+ if(raw.kind==='local_chat'&&raw.data.dream_tide!=null)return restoreArchiveChatGroup(db,session,manifest,recordId,confirm);
  const [target,field]=specs[raw.kind],v=raw.data;
  check(target===module,'local module mismatch');
  const expected=raw.kind==='local_chat'?v.conversation?.id:raw.kind==='local_moment'?'moment:'+v.id:raw.kind==='local_diary'?'diary:'+v.id:raw.kind==='local_daily_profile'?'profile':raw.kind==='local_model_profile'?'owner':v.id;

@@ -26,7 +26,7 @@ export async function writeOfflineV2(source,sink,{ownerLabel='屋主',device=nul
     for(const [i,row] of manifest.records.entries()){
       const {kind,data}=await load(row);
       // Full history and long document bodies are loaded one record at a time.
-      const {history,history_json,body,...meta}=data;
+      const {history,history_json,body,dream_tide,...meta}=data;
       items.push({row,kind,data:meta,index:i+1,path:'records/'+(i+1)+'.html',json:'records/'+(i+1)+'.json'});
     }
     const indexed=new Map(items.map(x=>[key(x),x])),byKind=k=>items.filter(x=>x.kind===k);
@@ -51,6 +51,13 @@ export async function writeOfflineV2(source,sink,{ownerLabel='屋主',device=nul
         const conv=data.conversation||{},history=data.history||(typeof data.history_json==='string'?JSON.parse(data.history_json):data.history_json)||{};
         const article=(v,role,label)=>'<article class="'+role+'"><small>'+esc(v.display_author||(role==='user'?ownerLabel:'模型伙伴'))+' · '+esc(label)+' · '+esc(v.id||'')+' · '+esc(time(v.created_at))+'</small><p>'+esc(role==='assistant'?plainReplyText(v.content):v.content)+'</p>'+(v.attachments||[]).map(a=>{const m=attachments.get(conv.id+':'+a.id);if(m)return mediaHtml(m);warnings.push('聊天附件未匹配：'+a.id);return '<p>原件未归档：'+esc(a.name||a.id)+'</p>';}).join('')+(v.desk_slip?'<details><summary>历史桌面</summary><pre>'+esc(JSON.stringify(v.desk_slip))+'</pre></details>':'')+(v.usage||v.model_echo?'<details><summary>模型回波与用量</summary><pre>'+esc(JSON.stringify({usage:v.usage,model_echo:v.model_echo}))+'</pre></details>':'')+'</article>';
         body=(history.turns||[]).map((t,j)=>'<section><h2>第 '+(j+1)+' 轮</h2>'+(t.user?.variants||[]).map((v,i)=>article(v,'user','用户变体 '+(i+1))).join('')+Object.entries(t.assistant?.variantsByUserVariant||{}).map(([k,vs])=>(()=>{const groups=new Map();return vs.map((v,i)=>{const seq=v.reply_sequence;const key=seq?.id?'group:'+seq.id:'single:'+i;if(!groups.has(key))groups.set(key,groups.size+1);const label='分支 '+k+' · 版本 '+groups.get(key)+(seq?.id?' · 连续回复 '+(Number(seq.index)+1)+' · 组 '+seq.id:'');return article(v,'assistant',label);}).join('');})()).join('')+'</section>').join('');
+        if(data.dream_tide){
+          const d=data.dream_tide;
+          body+='<section><h2>自主唤醒 · 历史归档</h2><p>仅供阅读，归档不包含唤醒授权。</p>';
+          if(d.settings)body+='<details><summary>唤醒设置（未授权草稿）</summary><pre>'+esc(JSON.stringify(d.settings,null,2))+'</pre></details>';
+          body+='<h3>自主手记</h3>'+(d.notes||[]).map(n=>'<article><small>'+esc(time(n.created_at))+' · '+esc(n.model_id)+'</small><p>'+esc(n.body)+'</p>'+(d.replies||[]).filter(r=>r.claim_id===n.claim_id).map(r=>'<p><small>回复 · '+esc(time(r.created_at))+'</small>\n'+esc(r.body)+'</p>').join('')+'</article>').join('');
+          body+='<h3>活动记录</h3>'+(d.runs||[]).map(r=>'<article><small>'+esc(time(r.started_at))+' · '+esc(r.model_id)+'</small><p>'+esc(r.kind==='daily'?'固定唤醒':'额外唤醒')+' · '+esc(r.status)+'</p><details><summary>历史回执</summary><pre>'+esc(JSON.stringify({result:r.result_json,steps:(d.steps||[]).filter(s=>s.claim_id===r.claim_id),tools:(d.tools||[]).filter(t=>t.claim_id===r.claim_id)},null,2))+'</pre></details></article>').join('')+'</section>';
+        }
         const voice=(voiceLinks.get(conv.id)||[]).flatMap(v=>byRecord.get(key(v))||[]);if(voice.length)body+='<section><h2>本窗口语音</h2>'+voice.map(m=>mediaHtml(m)).join('')+'</section>';
       }else if(x.kind==='library_books'){
         const cover=covers.get(data.id),m=cover&&byRecord.get(key(cover))?.[0],chs=chapters.get(data.id)||[],ns=notes.get(data.id)||[];

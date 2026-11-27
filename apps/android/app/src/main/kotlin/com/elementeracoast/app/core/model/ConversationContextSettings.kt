@@ -49,7 +49,9 @@ data class ConversationContextSettings(
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     @SerialName("segmented_bubbles") val segmentedBubbles: Boolean = false,
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
-    @SerialName("sticker_display_size") val stickerDisplaySize: Int = 144
+    @SerialName("sticker_display_size") val stickerDisplaySize: Int = 144,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("dream_readback_enabled") val dreamReadbackEnabled: Boolean = false
 ) {
     fun normalized(): ConversationContextSettings = copy(
         realityFields = realityFields.filter(RealityContextFields.all::contains).distinct(),

@@ -1,6 +1,8 @@
+import {isDreamTidePath,routeDreamTide} from './dream-tide-api.js';
 import { attachImageTool } from './chat-image-tool.js';
 import { attachStickerTools } from './chat-sticker-tool.js';
 import { prepareReplyGroupDogtalk } from './dogtalk-store.js';
+import { acquireSingleChatRun, maintainSingleChatRun, recoverSingleChatRuns } from './chat-single-run.js';
 import { canonicalReplyContext, executeDurableReplyRun, isReplyRunActive, recoverStaleReplyRuns, reserveReplyMedia } from './chat-reply-run.js';
 import {
   apiError,
@@ -31,7 +33,7 @@ import {
 import { estimateContextTokens as estimateTokens } from './context-comfort-range.js';
 import { executeRegisteredTool } from './tool-registry.js';
 import { encodeSseEvent } from './stream-format.js';
-import { prepareNativeChatGpt, executeNativeChatGptTool, saveNativeChatGptEcho, routeNativeReplySequence } from './native-chatgpt-chat.js';
+import { prepareNativeChatGpt, executeNativeChatGptTool, saveNativeChatGptEcho, routeNativeReplySequence, routeNativeSingleChatRun } from './native-chatgpt-chat.js';
 import {
   ModelRequestError,
   modelErrorResponse,
@@ -396,17 +398,17 @@ function safeFailureMetadata(model, settings, { stream = false, error = null, ab
   };
 }
 
-function streamFormalChat(request, env, input, assembled, metadataContext, dogtalkSubmission = null, attachmentReceipt = null, modelMessages = null) {
+function streamFormalChat(lease, env, input, assembled, metadataContext, dogtalkSubmission = null, attachmentReceipt = null, modelMessages = null) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       let metadataCaptured = false;
       let serverTools = null;
+      try {
       const pendingSlip = withRuntimeDeskSlip(pendingCrossWindowDeskSlip(assembled), { attachments: attachmentReceipt });
       if (pendingSlip?.cross_window?.mode !== 'off' || attachmentReceipt) {
         controller.enqueue(encoder.encode(encodeSseEvent('desk_slip', pendingSlip)));
       }
-      try {
         for await (const item of performFormalChatStream(env, {
           model: input.model,
           messages: modelMessages || assembled.modelMessages,
@@ -415,7 +417,7 @@ function streamFormalChat(request, env, input, assembled, metadataContext, dogta
           web_search_query: input.web_search_query,
         }, {
           allowSystem: assembled.modelMessages[0]?.role === 'system',
-          signal: request.signal,
+          signal: lease.signal,
           executeTool: assembled.executeTool,
           takePrivateContinuation: assembled.takePrivateContinuation,
           hasGeneratedImage: assembled.hasGeneratedImage,
@@ -454,9 +456,11 @@ function streamFormalChat(request, env, input, assembled, metadataContext, dogta
           controller.enqueue(encoder.encode(encodeSseEvent('error', safeStreamError(error, failedSlip?.cross_window))));
         }
       } finally {
-        controller.close();
+        await lease.close();
+        try{controller.close();}catch{}
       }
     },
+    cancel(){lease.abort();},
   });
   return new Response(stream, {
     headers: {
@@ -611,6 +615,12 @@ async function formalChat(request, env) {
   if (!lastUser || messages.at(-1)?.role !== 'user') {
     throw new ChatStoreError('invalid_request', '当前用户消息必须位于请求末尾。', 400);
   }
+  await recoverSingleChatRuns(env.COAST_CHAT_DB);
+  const claim=await acquireSingleChatRun(env.COAST_CHAT_DB,conversationId);
+  if(!claim)throw new ChatStoreError('window_execution_busy','当前窗口已有生成任务，请先结束原任务。',409);
+  const lease=maintainSingleChatRun(env.COAST_CHAT_DB,claim,request.signal);
+  let transferred=false;
+  try {
   let dogtalkSubmission = null;
   if (value.dogtalk && typeof value.dogtalk === 'object' && !Array.isArray(value.dogtalk)) {
     if (!sourceTurnId) {
@@ -643,8 +653,8 @@ async function formalChat(request, env) {
     initialFurniture: dogtalkSubmission ? ['收好一张私人草稿纸条'] : [],
     crossWindow: value.cross_window,
   });
-  assembled=await attachImageTool(env,assembled,{conversationId,turnId:sourceTurnId,messageId,roomType:conversation.room_type,chatModel:value.model,enabled:value.image_tool_enabled===true,expectedImageModel:value.image_model_id??null,signal:request.signal});
-  assembled=await attachStickerTools(env,assembled,{conversationId,turnId:sourceTurnId,messageId,roomType:conversation.room_type,signal:request.signal});
+  assembled=await attachImageTool(env,assembled,{conversationId,turnId:sourceTurnId,messageId,roomType:conversation.room_type,chatModel:value.model,enabled:value.image_tool_enabled===true,expectedImageModel:value.image_model_id??null,signal:lease.signal});
+  assembled=await attachStickerTools(env,assembled,{conversationId,turnId:sourceTurnId,messageId,roomType:conversation.room_type,signal:lease.signal});
   const attachmentIds = (Array.isArray(value.attachment_ids) ? value.attachment_ids : [])
     .map((item) => String(item || '').trim())
     .filter(Boolean)
@@ -662,11 +672,13 @@ async function formalChat(request, env) {
     ? applyChatAttachmentsToMessages(assembled.modelMessages, resolvedAttachments)
     : assembled.modelMessages;
   if (value.stream === true) {
-    return streamFormalChat(request, env, {
+    const response=streamFormalChat(lease, env, {
       model: value.model,
       settings: requestSettings,
       web_search_query: lastUser.content,
     }, assembled, { conversationId, messageId }, dogtalkSubmission, attachmentReceipt, modelMessages);
+    transferred=true;
+    return response;
   }
   let result;
   try {
@@ -682,6 +694,7 @@ async function formalChat(request, env) {
       takePrivateContinuation: assembled.takePrivateContinuation,
       hasGeneratedImage: assembled.hasGeneratedImage,
       captureMetadata: true,
+      signal: lease.signal,
     });
   } catch (error) {
     await saveModelEcho(env, conversationId, messageId, safeFailureMetadata(value.model, requestSettings, { error }));
@@ -715,6 +728,9 @@ async function formalChat(request, env) {
       serverTools: result.server_tools,
     }),
   });
+  } finally {
+    if(!transferred)await lease.close();
+  }
 }
 
 function normalizeRecentTurns(value) {
@@ -856,13 +872,15 @@ async function landingLetter(request, env) {
 }
 
 export function isChatApiPath(pathname) {
-  return pathname === FORMAL_CHAT_PATH
+  return isDreamTidePath(pathname)
+    || pathname === FORMAL_CHAT_PATH
     || pathname === REPLY_SEQUENCE_PATH
     || pathname === ATTACHMENTS_PATH
     || pathname.startsWith(`${ATTACHMENTS_PATH}/`)
     || pathname === LANDING_LETTER_PATH
     || pathname === MODEL_METADATA_PATH
     || pathname === '/api/chat/image-generate'
+    || pathname === '/api/chat/native-single-run'
     || pathname === '/api/chat/native-reply-sequence'
     || pathname === '/api/chat/native-context'
     || pathname === '/api/chat/native-tool'
@@ -879,6 +897,7 @@ export async function routeChatApi(request, env) {
   if (!hasChatDatabase(env)) return apiError('chat_db_not_configured', '主聊天 D1 存储未配置。', 503);
   const pathname = new URL(request.url).pathname;
   try {
+    if(isDreamTidePath(pathname))return await routeDreamTide(request,env);
     if (pathname === FORMAL_CHAT_PATH) return await formalChat(request, env);
     if (pathname === REPLY_SEQUENCE_PATH) return await replySequenceChat(request, env);
     if (pathname === '/api/chat/image-generate') {
@@ -889,6 +908,7 @@ export async function routeChatApi(request, env) {
     if (pathname === ATTACHMENTS_PATH || pathname.startsWith(`${ATTACHMENTS_PATH}/`)) return await attachments(request, env, pathname);
     if (pathname === LANDING_LETTER_PATH) return await landingLetter(request, env);
     if (pathname === MODEL_METADATA_PATH) return await modelMetadataApi(request, env);
+    if (pathname === '/api/chat/native-single-run') return await routeNativeSingleChatRun(request,env);
     if (pathname === '/api/chat/native-reply-sequence') return await routeNativeReplySequence(request, env);
     if (pathname === '/api/chat/native-context') return await prepareNativeChatGpt(request, env);
     if (pathname === '/api/chat/native-tool') return await executeNativeChatGptTool(request, env);

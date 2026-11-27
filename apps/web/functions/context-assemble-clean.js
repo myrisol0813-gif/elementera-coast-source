@@ -191,7 +191,7 @@ export async function assembleCleanContext(env, {
     ? normalizeCrossWindowRequest(crossWindow || {})
     : { mode: 'off', sources: [] };
   const independentWebEnabled = exposeTools && permission === 'owner' && WEB_SEARCH_SURFACES.has(surface) && crossWindowRequest.mode !== 'keyword' && env.COAST_INDEPENDENT_WEB_ENABLED === 'true' && Boolean(env.TAVILY_API_KEY?.trim());
-  const selection = exposeTools ? resolveToolSelection({ permission, surface, authScope, visitorId, env, independent_web_enabled: independentWebEnabled, cross_window_mode: crossWindowRequest.mode, global_excerpt_write_enabled: globalExcerpt?.write_enabled === true, user_portrait_write_enabled: userPortrait?.write_enabled === true && isThinkingSoilEnabled(papers.soil) }) : { backendTools: [], modelVisibleToolRecords: [], modelVisibleTools: [] };
+  const selection = exposeTools ? resolveToolSelection({ permission, surface, authScope, visitorId, env, dream_readback_enabled:contextSettings.dream_readback_enabled===true, independent_web_enabled: independentWebEnabled, cross_window_mode: crossWindowRequest.mode, global_excerpt_write_enabled: globalExcerpt?.write_enabled === true, user_portrait_write_enabled: userPortrait?.write_enabled === true && isThinkingSoilEnabled(papers.soil) }) : { backendTools: [], modelVisibleToolRecords: [], modelVisibleTools: [] };
   const webSearchEnabled = Boolean(!independentWebEnabled && exposeTools && exposeOpenRouterSearch && permission === 'owner' && WEB_SEARCH_SURFACES.has(surface)
     && crossWindowRequest.mode !== 'keyword');
   const modelVisibleToolRecords = webSearchEnabled
@@ -266,6 +266,7 @@ export async function assembleCleanContext(env, {
       const result = await executeModelTool(env.COAST_CHAT_DB, toolCall, {
         env, permission, surface, visitorId, room_scope: roomId || surface, authScope, actor: surface === 'official_mcp' ? 'official_mcp' : 'api_model_partner',
         conversation_id: conversationId, source_turn_id: sourceTurnId, local_date: localDate, model_label: model, user_query: query,
+        dream_readback_enabled:contextSettings.dream_readback_enabled===true,
         independent_web_enabled: independentWebEnabled,
         cross_window_mode: crossWindowRequest.mode,
         global_excerpt_write_enabled: globalExcerpt?.write_enabled === true,
@@ -275,7 +276,7 @@ export async function assembleCleanContext(env, {
         on_cross_window_read: onCrossWindowRead,
         on_tool_used: onToolUsed, on_tool_run: onToolRun,
       });
-      const normalized = result && typeof result === 'object' ? result : { ok: true, result: result ?? null }; toolResults.push({ name, delivered: true, content: JSON.stringify(normalized).slice(0, 12000) }); return result;
+      const normalized = result && typeof result === 'object' ? result : { ok: true, result: result ?? null }; toolResults.push({ name, delivered: true, content: name==='dream_readback'?JSON.stringify({ok:normalized.ok!==false,count:normalized.items?.length??0,kind:normalized.kind}):JSON.stringify(normalized).slice(0, 12000) }); return result;
     } catch (error) {
       if (['cross_window_read_recent', 'cross_window_search', 'cross_window_keyword_search', 'cross_window_read_messages'].includes(name)) {
         modelCrossWindowError = String(error?.message || '跨窗口读取失败。').slice(0, 300);

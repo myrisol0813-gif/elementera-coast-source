@@ -115,6 +115,7 @@ export function createChatWindowSettings({
           </section>
 
           <section class="window-context-card">
+            ${activeConversation()?.room_type==='main'?switchRow({title:'允许回读自主活动',note:'普通聊天可按需阅读本窗口自主手记与活动摘要；不启动唤醒。',checked:settings.dream_readback_enabled,enabled:!locked,action:!locked?'chat:window-dream-readback':''}):''}
             <div class="window-context-copy" style="padding:12px">
               <strong>工作区 · 工具箱注入词</strong>
               <textarea aria-label="工具箱注入词" data-workbench-prompt maxlength="4000" rows="7" style="width:100%;box-sizing:border-box;font:inherit;resize:vertical" ${mediaLocked?'disabled':''}>${escapeHtml(settings.workbench_prompt??DEFAULT_WORKBENCH_PROMPT)}</textarea>
@@ -134,6 +135,11 @@ export function createChatWindowSettings({
             ${switchRow({title:'真实连续回复',note:plan?'网页不能直接调用设备上的 GPT 套餐；请选择普通 API 模型。':'模型可主动追加独立回复；达到额度或缺少用量时停止。',checked:settings.reply_sequence_enabled,enabled:!replyLocked,action:!replyLocked?'chat:window-reply-toggle':''})}
             ${REPLY_BUDGET_FIELDS.map(field=>replyBudgetRow(settings,field,mediaLocked)).join('')}
             <button class="window-context-link" type="button" data-action="chat:window-reply-budget-save" ${mediaLocked?'disabled':''}><span><strong>保存本窗口预算</strong><small>留空的项目继承基本设置。</small></span><span>›</span></button>
+          </section>
+          <section class="window-context-card">
+            <button class="window-context-link" type="button" data-action="chat:window-dream-tide" ${locked||activeConversation()?.room_type!=='main'?'disabled':''}>
+              <span><strong>自主唤醒</strong><small>仅本窗口 · 唤醒设置、自主手记与活动记录</small></span><span>›</span>
+            </button>
           </section>
           <section class="window-context-card window-context-note">
             <strong>PWA 与 Native 的边界</strong>
@@ -182,6 +188,12 @@ export function createChatWindowSettings({
     if (name === 'window-soil-open') {
       close();
       return runtime.memory?.handleAction?.('soil-open', { dataset: { conversationId: runtime.currentId } });
+    }
+    if (name === 'window-dream-tide') {
+      if(isUnavailableConversation()||activeConversation()?.room_type!=='main'||!runtime.currentId)return;
+      const cid=runtime.currentId;
+      close();
+      return runtime.dreamTide?.open(cid);
     }
     if (name === 'window-letter-open') {
       close();
@@ -232,6 +244,10 @@ export function createChatWindowSettings({
     }
     if (name === 'window-reality-master') {
       return writeSettings({ ...settings, reality_enabled: !settings.reality_enabled });
+    }
+    if(name==='window-dream-readback'){
+      if(isUnavailableConversation()||activeConversation()?.room_type!=='main')return;
+      return writeSettings({...settings,dream_readback_enabled:!settings.dream_readback_enabled});
     }
     if(name==='window-sticker-send')return writeSettings({...settings,sticker_send_enabled:!settings.sticker_send_enabled});
     if(name==='window-sticker-add')return writeSettings({...settings,sticker_add_enabled:!settings.sticker_add_enabled});

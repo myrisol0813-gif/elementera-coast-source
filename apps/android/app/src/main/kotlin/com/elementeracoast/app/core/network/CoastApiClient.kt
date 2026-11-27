@@ -397,6 +397,62 @@ class CoastApiClient(
         return jsonRequest(Request.Builder().url(config.url("/api/chat/history?conversation_id=${encodeQuery(conversationId)}")).put(jsonBody(payload)).apply{deleteRevision?.let{header("X-Coast-Delete-Revision",it)}}.build(), RemoteHistoryResponse.serializer()).history
     }
 
+    private suspend fun nativeSingleAction(conversationId:String, action:String, claimId:String?=null):JsonObject {
+        require(config.localTransport==null) { "本机模式不访问云端任务账本。" }
+        val payload=buildJsonObject{
+            put("conversation_id",conversationId);put("action",action)
+            claimId?.let{put("claim_id",it)}
+        }
+        return jsonRequestElement(Request.Builder().url(config.url("/api/chat/native-single-run"))
+            .post(jsonBody(payload.toString())).build()).jsonObject
+    }
+
+    internal suspend fun startNativeSingleChat(conversationId:String):String? {
+        if(config.localTransport!=null)return null
+        val result=try{nativeSingleAction(conversationId,"start")}catch(error:CoastApiException){
+            // Backward compatibility with pre-ledger deployments only.
+            if(error.status==404 && error.type!="conversation_not_found")return null
+            throw error
+        }
+        return result["claim_id"]?.jsonPrimitive?.contentOrNull?.takeIf{it.isNotBlank()}
+            ?:throw CoastApiException(CoastApiErrorKind.Stream,"native_single_claim_missing","普通聊天执行预约未确认。")
+    }
+    internal suspend fun heartbeatNativeSingleChat(conversationId:String,claimId:String):Boolean =
+        nativeSingleAction(conversationId,"heartbeat",claimId)["ok"]?.jsonPrimitive?.contentOrNull=="true"
+    internal suspend fun releaseNativeSingleChat(conversationId:String,claimId:String):Boolean =
+        nativeSingleAction(conversationId,"release",claimId)["ok"]?.jsonPrimitive?.contentOrNull=="true"
+
+    suspend fun dreamSettings(cid:String):com.elementeracoast.app.core.remote.DreamSettingsResponse =
+        jsonRequest(Request.Builder().url(config.url("/api/chat/dream-tide?conversation_id=${encodeQuery(cid)}")).get().build(),com.elementeracoast.app.core.remote.DreamSettingsResponse.serializer())
+
+    suspend fun saveDreamSettings(value:com.elementeracoast.app.core.remote.DreamSettingsRequest):com.elementeracoast.app.core.remote.DreamSettingsResponse {
+        val wire=Json(json){encodeDefaults=true;explicitNulls=true}
+        val payload=wire.encodeToString(com.elementeracoast.app.core.remote.DreamSettingsRequest.serializer(),value)
+        return jsonRequest(Request.Builder().url(config.url("/api/chat/dream-tide")).post(jsonBody(payload)).build(),com.elementeracoast.app.core.remote.DreamSettingsResponse.serializer())
+    }
+    suspend fun dreamNotes(cid:String,offset:Int=0):com.elementeracoast.app.core.remote.DreamNotesResponse =
+        jsonRequest(Request.Builder().url(config.url("/api/chat/dream-tide/notes?conversation_id=${encodeQuery(cid)}&offset=$offset")).get().build(),com.elementeracoast.app.core.remote.DreamNotesResponse.serializer())
+    suspend fun dreamMediaBytes(cid:String,id:String):ByteArray {
+        require(id.matches(Regex("(att|voice)_dream_[A-Za-z0-9_.:-]{1,149}")))
+        val audio=id.startsWith("voice_dream_")
+        val limit=if(audio)4*1024*1024 else 8*1024*1024
+        val path=if(audio)"/api/voice/clips/"+encodePath(id)+"/audio" else "/api/chat/attachments/"+encodePath(id)+"?conversation_id="+encodeQuery(cid)+"&inline=1"
+        return execute(Request.Builder().url(config.url(path)).get().build()){response->
+            if(!response.isSuccessful)throw responseError(response)
+            val body=requireNotNull(response.body);require(body.contentLength()<=limit)
+            val output=java.io.ByteArrayOutputStream();val buffer=ByteArray(8192)
+            body.byteStream().use{input->while(true){val n=input.read(buffer);if(n<0)break;require(output.size()+n<=limit){"原件超过预览大小上限。"};output.write(buffer,0,n)}}
+            output.toByteArray().also{require(it.isNotEmpty()){"原件为空。"}}
+        }
+    }
+    suspend fun dreamActivity(cid:String,offset:Int=0):com.elementeracoast.app.core.remote.DreamActivityResponse =
+        jsonRequest(Request.Builder().url(config.url("/api/chat/dream-tide/activity?conversation_id=${encodeQuery(cid)}&offset=$offset")).get().build(),com.elementeracoast.app.core.remote.DreamActivityResponse.serializer())
+    suspend fun replyDreamNote(cid:String,claim:String,replyId:String,body:String) {
+        val payload=buildJsonObject{put("conversation_id",cid);put("claim_id",claim);put("reply_id",replyId);put("body",body)}
+        val response=jsonRequestElement(Request.Builder().url(config.url("/api/chat/dream-tide/reply")).post(jsonBody(payload.toString())).build()).jsonObject
+        if(response["ok"]?.jsonPrimitive?.contentOrNull!="true")throw CoastApiException(CoastApiErrorKind.Request,"dream_reply_unconfirmed","回复保存未确认。")
+    }
+
     /** Authenticated context assembly; ChatGPT bearer tokens stay on this device. */
     suspend fun prepareNativeChatGpt(value: RemoteChatRequest): RemoteNativeChatContext {
         val payload = json.encodeToString(RemoteChatRequest.serializer(), value)

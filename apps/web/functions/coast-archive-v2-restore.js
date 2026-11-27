@@ -1,3 +1,4 @@
+import {prepareDreamArchive,validateDreamMediaOrigin} from './dream-tide-archive.js';
 import { validatedChat } from './coast-transfer-store.js';
 import { prepareArchiveVoice,prepareArchiveSoil } from './coast-archive-v2-restore-extra.js';
 import { ensureChatSchema, normalizeState } from './chat-store.js';
@@ -37,7 +38,7 @@ export async function prepareArchiveChatGroup(db,sessionId,manifest,conversation
   let canonical=entry.data;
   if(manifest.workspace==='local'){
     check(entry.kind==='local_chat','invalid local chat record kind');
-    const {c,state,storageUpdatedAt}=validatedChat(entry.data,{verifiedMediaGroup:true});
+    const {c,state,storageUpdatedAt}=validatedChat(Object.fromEntries(Object.entries(entry.data).filter(([k])=>k!=='dream_tide')),{verifiedMediaGroup:true});
     const ms=v=>typeof v==='number'?v:Date.parse(v);
     canonical={conversation:{id:c.id,title:c.title,room_type:c.room_type,created_at:ms(c.created_at),updated_at:ms(c.updated_at),deleted_at:null,title_manual:c.title_manual?1:0,title_generated_at:c.title_generated_at==null?null:ms(c.title_generated_at),title_model_id:c.title_model_id??null,source:c.source||'coast',source_window_id:c.source_window_id??null},history_json:JSON.stringify(state),history_updated_at:storageUpdatedAt};
   }else check(entry.kind==='chat','invalid backend chat record kind');
@@ -65,6 +66,10 @@ export async function prepareArchiveChatGroup(db,sessionId,manifest,conversation
     db.prepare("INSERT INTO conversations (id,user_id,title,created_at,updated_at,deleted_at,title_manual,title_generated_at,title_model_id,conversation_kind,room_type,source,source_window_id) VALUES (?,'owner',?,?,?,NULL,?,?,?,'chat',?,?,?)").bind(c.id,c.title,c.created_at,c.updated_at,c.title_manual,c.title_generated_at??null,c.title_model_id??null,c.room_type,c.source,c.source_window_id??null),
     db.prepare('INSERT INTO conversation_states (conversation_id,state_json,updated_at) VALUES (?,?,?)').bind(c.id,raw,updated)
   ];
+  if(entry.data.dream_tide!=null){
+    check(c.room_type==='main'&&c.source==='coast','invalid autonomous wake parent');
+    statements.push(...await prepareDreamArchive(db,c.id,entry.data.dream_tide));
+  }
   const conversationIds=new Set([c.id]),foundAttachments=new Set(),parents=[],snapshots=[];let voices=0,soils=0;
   for(const r of group.filter(r=>r!==root)){
     const {kind,data}=await read(r);
@@ -72,10 +77,13 @@ export async function prepareArchiveChatGroup(db,sessionId,manifest,conversation
     if(r.module==='attachments'){
       check(kind==='attachment'&&r.media_objects.length===1&&(data.turn_id==null||turns.has(data.turn_id)),'invalid attachment group');
       const ref=attachmentRefs.get(data.id);
-      check(!ref||(ref.size===data.size&&ref.type===data.kind&&ref.name===data.name&&ref.mime===data.mime&&(data.turn_id==null||[...attachmentTurns.get(data.id)].every(t=>t===data.turn_id))),'attachment metadata differs from history');
+      validateDreamMediaOrigin(entry.data.dream_tide,data,'image');
+      check(!data.id.startsWith('att_dream_')||!ref&&data.turn_id==null&&data.kind==='image','autonomous original cannot reference chat');
+       check(!ref||(ref.size===data.size&&ref.type===data.kind&&ref.name===data.name&&ref.mime===data.mime&&(data.turn_id==null||[...attachmentTurns.get(data.id)].every(t=>t===data.turn_id))),'attachment metadata differs from history');
       const d=objects.get(r.media_objects[0]);statements.push(...await prepareArchiveAttachment(db,data,d,readStagedArchiveChunks(db,sessionId,d.object_sha256),{conversationIds}));foundAttachments.add(data.id);
     }else if(r.module==='voice'){
       check(kind==='voice'&&r.media_objects.length===1,'invalid voice record');
+      validateDreamMediaOrigin(entry.data.dream_tide,data,'voice');
       const d=objects.get(r.media_objects[0]);
       statements.push(...await prepareArchiveVoice(db,data,d,readStagedArchiveChunks(db,sessionId,d.object_sha256),{conversationId:c.id,turns,variantTurns}));voices++;
     }else if(['thinking_soil','thinking_soil_history'].includes(r.module)){

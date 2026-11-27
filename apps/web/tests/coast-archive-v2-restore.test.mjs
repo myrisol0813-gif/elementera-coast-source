@@ -181,3 +181,42 @@ test('reply group with real sticker original and individual desk receipts round 
  }
  await transfer(src,dst,'local');await transfer(dst,returned,'backend');
 });
+
+test('autonomous wake configuration and historical receipts round trip without restoring authority or appointments',async()=>{
+ const db=new D1Database(),target=new D1Database(),c=await createConversation(db,'Wake archive','main');
+ const {armDreamTide,claimDreamTide,readDreamSettings,setDreamTideExtra,dreamTideClaimAuthorized}=await import('../functions/dream-tide-ledger.js');
+ const {reserveDreamStep,recordDreamStep,reserveDreamTool,recordDreamTool,writeDreamNote,replyDreamNote,finishDreamActivity,readDreamNotes,readDreamActivity}=await import('../functions/dream-tide-records.js');
+ const at=Date.parse('2026-11-27T09:00:00Z'),model='fixture/model';
+ const cfg={timeZone:'UTC',dailyTime:'09:00',allowExtra:true,execution:{tokenBudget:8000,outputLimit:500,toolBudget:2,readTurns:3,invitation:'自主活动',writeNote:true,extraPerDay:1}};
+ const revision=await armDreamTide(db,c.id,cfg,model,at-86400000);
+ const claim=await claimDreamTide(db,c.id,{now:at,currentModelId:model,busy:false});
+ assert.ok(claim);
+ await assert.rejects(()=>readArchiveChat(db,c.id),/正在自主唤醒/);
+ assert.equal(await reserveDreamStep(db,claim,0,at),true);
+ assert.equal(await recordDreamStep(db,claim,0,'completed',{usage:{total_tokens:120},cost:0.002},at),true);
+ assert.equal(await reserveDreamTool(db,claim,0,0,'dream_write_note',at),true);
+ assert.equal(await writeDreamNote(db,claim,'原始手记',at),true);
+ assert.equal(await recordDreamTool(db,claim,0,0,{ok:true},at),true);
+ assert.equal((await finishDreamActivity(db,claim,'completed',{total_tokens:120,reported_cost:0.002,proposed_extra_at:at+3600000},at)).finished,true);
+ assert.equal(await replyDreamNote(db,c.id,claim.claimId,'reply-id','原始回复',at+1),true);
+ assert.equal((await readDreamSettings(db,c.id)).extraAt,at+3600000);
+ const chat=await readArchiveChat(db,c.id),v=chat.dream_tide;
+ assert.equal(v.settings.modelId,model);assert.equal(v.runs.length,1);assert.equal(v.steps.length,1);assert.equal(v.tools.length,1);
+ assert.ok(!JSON.stringify(v).includes(revision));assert.equal(Object.hasOwn(v.settings,'enabled'),false);
+ assert.equal(Object.hasOwn(v.settings,'extraAt'),false);
+ const object=await encodeRecordObject({kind:'chat',data:chat});
+ const records=[{module:'chat',id:c.id,record_object:object.descriptor.object_sha256,media_objects:[],dependencies:[]}];
+ const manifest={format:'elementera-coast-archive',version:2,workspace:'backend',application_id:'com.elementeracoast.source',exported_at:new Date(at).toISOString(),modules:MODULES.map(module=>({module,coverage:module==='chat'?'partial':'unavailable',count:module==='chat'?1:0})),records,objects:[object.descriptor]};
+ const session=await createArchiveSession(target);
+ await registerArchiveObject(target,session.id,object.descriptor);for(let i=0;i<object.chunks.length;i++)await putArchiveChunk(target,session.id,object.descriptor.object_sha256,i,object.chunks[i]);
+ assert.equal((await restoreArchiveChatGroup(target,session.id,manifest,c.id,false)).committed,false);
+ await assert.rejects(()=>readArchiveChat(target,c.id));
+ await restoreArchiveChatGroup(target,session.id,manifest,c.id,true);
+ const restored=await readDreamSettings(target,c.id);
+ assert.equal(restored.enabled,false);assert.equal(restored.extraAt,null);assert.equal(restored.armedAt,null);assert.notEqual(restored.revision,revision);
+ assert.equal(await dreamTideClaimAuthorized(target,claim),false);
+ assert.equal(await claimDreamTide(target,c.id,{now:at+86400000,currentModelId:model,busy:false}),null);
+ assert.deepEqual(await readDreamNotes(target,c.id),await readDreamNotes(db,c.id));
+ assert.deepEqual(await readDreamActivity(target,c.id),await readDreamActivity(db,c.id));
+ assert.deepEqual((await readArchiveChat(target,c.id)).dream_tide,v);
+});

@@ -1,0 +1,434 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {D1Database} from './d1-helper.mjs';
+import {createConversation,writeConversationState,readConversationState} from '../functions/chat-store.js';
+import {armDreamTide,disarmDreamTide} from '../functions/dream-tide-ledger.js';
+import {executeDreamTide} from '../functions/dream-tide-executor.js';
+import {readDreamActivity,readDreamNotes,replyDreamNote,readDreamHistory} from '../functions/dream-tide-records.js';
+const t=Date.parse,armAt=t('2026-11-26T00:00:00Z'),due=t('2026-11-27T01:00:00Z'),model='fixture/model';
+const execution={tokenBudget:8000,outputLimit:500,toolBudget:4,readTurns:5,invitation:'自由探索，不必写小笺。',readHistory:true,writeNote:true,includeTime:true,includePrevious:true,includeReplies:true,extraPerDay:2};
+async function fixture(overrides={}){
+  const db=new D1Database(),cv=await createConversation(db,'dream','main'),other=await createConversation(db,'other','main');
+  const cid=cv.id;
+  await writeConversationState(db,cid,{turns:[{id:'turn-one',user:{variants:[{id:'u-one',content:'window-original',created_at:new Date(armAt).toISOString()}]},assistant:{variantsByUserVariant:{0:[{id:'a-one',content:'answer-original',created_at:new Date(armAt+1).toISOString()}]}}}]});
+  await writeConversationState(db,other.id,{turns:[{id:'secret',user:{variants:[{id:'u-secret',content:'other-window-secret'}]}}]});
+  const rev=await armDreamTide(db,cid,{timeZone:'Asia/Shanghai',dailyTime:'09:00',allowExtra:true,execution:{...execution,...overrides}},model,armAt);
+  const env={COAST_CHAT_DB:db,COAST_DREAM_TIDE_ENABLED:'true'};
+  const prepare=async(env,input)=>({modelId:input.model,payload:{model:input.model,messages:input.messages,tools:input.tools,max_tokens:input.settings.max_tokens}});
+  const opts={currentModelId:model,busy:false,now:due,clock:()=>due,prepare};
+  return {db,cid,other,rev,env,opts};
+}
+const usage={prompt_tokens:100,completion_tokens:20,total_tokens:120,cost:0.002};
+const toolCall=(id,name,args)=>({id,type:'function',function:{name,arguments:JSON.stringify(args)}});
+const response=(calls=[],u=usage)=>({model,usage:u,choices:[{finish_reason:calls.length?'tool_calls':'stop',message:{content:'',tool_calls:calls}}]});
+test('explicit gating and quiet completion with no fabricated human turn',async()=>{
+  const {env,db,cid,opts}=await fixture();let called=0;
+  const invoke=async(env,payload)=>{called++;assert.equal(payload.messages[0].role,'system');assert.equal(payload.messages.length,1);assert.ok(!JSON.stringify(payload).includes('window-original'));return response();};
+  assert.equal((await executeDreamTide({...env,COAST_DREAM_TIDE_ENABLED:'false'},cid,{...opts,invoke})).status,'disabled_or_busy');
+  assert.equal(called,0);
+  const out=await executeDreamTide(env,cid,{...opts,invoke});assert.equal(out.status,'completed');assert.equal(out.total_tokens,120);
+  assert.equal(called,1);assert.equal((await readDreamNotes(db,cid)).length,0);
+  assert.equal((await readDreamActivity(db,cid))[0].steps.length,1);
+  assert.equal((await readConversationState(db,cid)).turns.length,1);
+  assert.equal((await executeDreamTide(env,cid,{...opts,invoke})).status,'not_due');assert.equal(called,1);
+});
+test('model reads scoped originals, writes optional note, human reply never wakes; actual usage recorded',async()=>{
+  const {env,db,cid,other,opts}=await fixture();let n=0;
+  const invoke=async(env,payload)=>{
+    n++;assert.ok(!JSON.stringify(payload).includes('other-window-secret'));
+    if(n===1)return response([toolCall('r','dream_read_history',{mode:'window',start:0,count:1})]);
+    if(n===2){assert.ok(JSON.stringify(payload.messages).includes('answer-original'));return response([toolCall('n','dream_write_note',{body:'一张小笺'}),toolCall('s','dream_schedule_extra',{at:new Date(due+3600000).toISOString()})]);}
+    return response();
+  };
+  const out=await executeDreamTide(env,cid,{...opts,invoke});assert.equal(out.status,'completed');assert.equal(out.extraScheduled,true);assert.equal(out.tool_calls,3);assert.equal(out.total_tokens,360);assert.equal(n,3);
+  const activity=(await readDreamActivity(db,cid))[0];assert.equal(activity.result.extra_scheduled,true);assert.deepEqual(activity.tools.map(x=>[x.tool_name,x.status]),[['dream_read_history','completed'],['dream_write_note','completed'],['dream_schedule_extra','completed']]);
+  assert.ok(!JSON.stringify(activity.tools).includes('window-original'));assert.ok(!JSON.stringify(activity.tools).includes('一张小笺'));
+  const notes=await readDreamNotes(db,cid);assert.equal(notes[0].body,'一张小笺');
+  assert.equal(await replyDreamNote(db,other.id,out.claimId,'wrong','wrong',due+1),false);
+  assert.equal(await replyDreamNote(db,cid,out.claimId,'reply','回笺',due+1),true);
+  assert.equal(await replyDreamNote(db,cid,out.claimId,'reply','回笺',due+1),false);
+  assert.equal((await readDreamNotes(db,cid))[0].replies[0].body,'回笺');assert.equal(n,3);
+  const later=await executeDreamTide(env,cid,{...opts,now:due+3600000,clock:()=>due+3600000,invoke:async(env,payload)=>{assert.ok(JSON.stringify(payload.messages).includes('回笺'));return response();}});
+  assert.equal(later.status,'completed');assert.equal((await readDreamActivity(db,cid)).length,2);
+});
+test('uncertain usage or revoked authorization never runs requested tools or retries',async()=>{
+  const {env,db,cid,rev,opts}=await fixture();let n=0;
+  const out=await executeDreamTide(env,cid,{...opts,invoke:async()=>{n++;return response([toolCall('n','dream_write_note',{body:'not saved'})],null);}});
+  assert.equal(out.status,'failed');assert.equal(out.total_tokens,null);assert.equal(n,1);assert.equal((await readDreamNotes(db,cid)).length,0);
+  const tomorrow=due+86400000;
+  const cancelled=await executeDreamTide(env,cid,{...opts,now:tomorrow,clock:()=>tomorrow,invoke:async()=>{await disarmDreamTide(db,cid,rev);return response([toolCall('n2','dream_write_note',{body:'revoked'})]);}});
+  assert.equal(cancelled.status,'cancelled');assert.equal((await readDreamNotes(db,cid)).length,0);
+});
+test('since previous selection only includes messages in time interval',async()=>{
+  const {db,cid}=await fixture();
+  assert.equal((await readDreamHistory(db,cid,{mode:'since_previous',since:null})).reason,'no_previous_wake');
+  const range=await readDreamHistory(db,cid,{mode:'since_previous',since:armAt,until:due,maxTurns:3,count:1});
+  assert.deepEqual(range.turns[0].messages.map(m=>m.content),['answer-original']);
+});
+
+test('explicit autonomous modules and ordinary registered reading, independent library creation, no fake turn or leaked receipt',async()=>{
+  const {env,db,cid,opts,rev}=await fixture({allowLibrary:true,allowLibraryWrite:true,allowMemory:false,allowCalendar:true,includeCustom:true,includeSteps:true,toolBudget:4,tokenBudget:22000});
+  const {writeCustomInstructions}=await import('../functions/memory-store.js');
+  const {createLibraryBook,listLibraryNotes,writeLibraryNote}=await import('../functions/tidal-library.js');
+  const {claimDreamTide}=await import('../functions/dream-tide-ledger.js');
+  await writeCustomInstructions(db,{content:'explicit-custom-fixture'});
+  const book=await createLibraryBook(db,{title:'fixture-book',format:'txt',chapters:[{title:'Chapter',body:'original page fixture'}]});
+  let n=0;
+  const out=await executeDreamTide(env,cid,{...opts,invoke:async(_,payload)=>{
+    n++;const wire=JSON.stringify(payload.messages);
+    if(n===1){
+      assert.ok(wire.includes('explicit-custom-fixture'));assert.ok(wire.includes('未取得设备'));
+      const names=payload.tools.map(t=>t.function.name);
+      assert.ok(names.includes('library_read')&&names.includes('library_write')&&names.includes('calendar_list'));
+      assert.ok(!names.includes('memory_search')&&!names.includes('independent_web_search')&&!names.includes('read_mystic_dogtalk'));
+      return response([toolCall('r','library_read',{book_id:book.id,chapter_index:0})]);
+    }
+    if(n===2){assert.ok(wire.includes('original page fixture'));return response([toolCall('w','library_write',{action:'create',book_id:book.id,kind:'reflection',body:'independent note fixture'})]);}
+    return response();
+  }});
+  assert.equal(out.status,'completed');assert.equal(n,3);
+  const notes=await listLibraryNotes(db,{book_id:book.id});
+  assert.equal(notes.length,1);assert.equal(notes[0].author,'assistant');assert.equal(notes[0].source_turn_id,null);
+  const activity=(await readDreamActivity(db,cid))[0];
+  assert.equal(activity.tools[1].receipt.record_id,notes[0].id);
+  assert.ok(!JSON.stringify(activity.tools).includes('independent note fixture'));assert.ok(!JSON.stringify(activity.tools).includes('original page fixture'));
+  assert.equal((await readConversationState(db,cid)).turns.length,1);
+  const claim=await claimDreamTide(db,cid,{now:due+86400000,currentModelId:model,busy:false});
+  assert.ok(claim);await disarmDreamTide(db,cid,rev);
+  await assert.rejects(()=>writeLibraryNote(db,{book_id:book.id,kind:'reflection',body:'revoked note'},{author:'assistant',conversation_id:cid,autonomous_claim:claim}),/权限已撤回/);
+  assert.equal((await listLibraryNotes(db,{book_id:book.id})).length,1);
+});
+test('disabled modules never attach documents or expose unapproved common tools',async()=>{
+  const {env,db,cid,opts}=await fixture({includeCustom:false,allowLibrary:false,allowMemory:false});
+  const {writeCustomInstructions}=await import('../functions/memory-store.js');
+  await writeCustomInstructions(db,{content:'must-not-inject'});
+  const out=await executeDreamTide(env,cid,{...opts,invoke:async(_,payload)=>{
+    assert.ok(!JSON.stringify(payload).includes('must-not-inject'));
+    assert.ok(!payload.tools.some(t=>['memory_search','library_read','library_write'].includes(t.function.name)));
+    return response();
+  }});
+  assert.equal(out.status,'completed');
+});
+
+test('ordinary chat readback remains independent of scheduling and rechecks permission',async()=>{
+  const {env,db,cid,other,opts,rev}=await fixture();
+  const {resolveToolSelection,executeModelTool}=await import('../functions/tool-registry-core.js');
+  const {readDreamChatHistory}=await import('../functions/dream-tide-readback.js');
+  let calls=0;
+  const out=await executeDreamTide(env,cid,{...opts,invoke:async()=>++calls===1?response([toolCall('n','dream_write_note',{body:'readback-private-fixture'})]):response()});
+  assert.equal(out.status,'completed');
+  await disarmDreamTide(db,cid,rev);
+  const ctx={permission:'owner',surface:'main_chat',conversation_id:cid,dream_readback_enabled:true,env};
+  assert.ok(resolveToolSelection(ctx).modelVisibleTools.some(t=>t.function.name==='dream_readback'));
+  assert.ok(!resolveToolSelection({...ctx,dream_readback_enabled:false}).modelVisibleTools.some(t=>t.function.name==='dream_readback'));
+  await assert.rejects(()=>readDreamChatHistory(db,cid,{kind:'notes'}),/未授权/);
+  const history=await readConversationState(db,cid);
+  await writeConversationState(db,cid,{...history,context_settings:{...history.context_settings,dream_readback_enabled:true}});
+  const data=await executeModelTool(db,toolCall('r','dream_readback',{kind:'notes'}),ctx);
+  assert.equal(data.items[0].body,'readback-private-fixture');
+  assert.equal(data.reference_only,true);
+  await assert.rejects(()=>executeModelTool(db,toolCall('r2','dream_readback',{kind:'notes',conversation_id:other.id}),ctx));
+  await assert.rejects(()=>executeModelTool(db,toolCall('r3','dream_readback',{kind:'notes'}),{...ctx,conversation_id:other.id}),/未授权/);
+  await writeConversationState(db,cid,{...history,context_settings:{}});
+  await assert.rejects(()=>executeModelTool(db,toolCall('r4','dream_readback',{kind:'notes'}),ctx),/未授权/);
+  assert.equal(calls,2);
+});
+
+test('autonomous daily and calendar writes are append-only, attributed and fenced',async()=>{
+  const {env,db,cid,opts,rev}=await fixture({allowDailyWrite:true,allowCalendarWrite:true,tokenBudget:24000,toolBudget:5});
+  const {listMoments,listDiaries,createDiary}=await import('../functions/daily-store.js');
+  const {listCalendarEntries}=await import('../functions/calendar-store.js');
+  const {claimDreamTide}=await import('../functions/dream-tide-ledger.js');
+  const {apiModelPartnerIdentity}=await import('../functions/coast-identity.js');
+  let calls=0;
+  const out=await executeDreamTide(env,cid,{...opts,invoke:async(_,payload)=>{
+    calls++;
+    if(calls===1){
+      const names=payload.tools.map(t=>t.function.name);
+      assert.ok(names.includes('create_diary')&&names.includes('create_moment')&&names.includes('calendar_create'));
+      assert.ok(!names.includes('calendar_delete')&&!names.includes('moment_comment'));
+      return response([toolCall('d','create_diary',{text:'fixture diary',date:'2026-11-27'}),toolCall('m','create_moment',{text:'fixture moment',date:'2026-11-27'}),toolCall('c','calendar_create',{title:'fixture calendar',day:'2026-11-28',kind:'note'})]);
+    }
+    return response();
+  }});
+  assert.equal(out.status,'completed');assert.equal(calls,2);
+  const diaries=await listDiaries(db,{date:'2026-11-27'}),moments=await listMoments(db,{date:'2026-11-27'}),calendar=await listCalendarEntries(db,{month:'2026-11'});
+  assert.equal(diaries.length,1);assert.equal(moments.length,1);assert.equal(calendar.length,1);
+  assert.equal(diaries[0].source_turn_id,null);assert.equal(moments[0].source_turn_id,null);assert.equal(calendar[0].source_turn_id,null);
+  assert.equal(diaries[0].author,'api');assert.equal(diaries[0].model_label,model);
+  assert.match(diaries[0].tool_call_id,/^dream:/);
+  const receipts=(await readDreamActivity(db,cid))[0].tools;
+  assert.deepEqual(receipts.map(t=>t.receipt.record_id),[diaries[0].id,moments[0].id,calendar[0].id]);
+  const claim=await claimDreamTide(db,cid,{now:due+86400000,currentModelId:model,busy:false});assert.ok(claim);
+  await disarmDreamTide(db,cid,rev);
+  await assert.rejects(()=>createDiary(db,{text:'revoked',date:'2026-11-27',conflict_mode:'append'},
+    {author:'api',source:'chat_tool',conversation_id:cid,source_turn_id:null,identity:apiModelPartnerIdentity({model_label:model}),autonomous_claim:claim,autonomous_event:{step:0,index:0}}),/权限已撤回/);
+  assert.equal((await listDiaries(db,{date:'2026-11-27'})).length,1);
+});
+
+
+test('autonomous voice preserves audio originals, rejects revoked and duplicate claims',async()=>{
+  const {db,cid,env,rev}=await fixture({allowVoice:true,voiceLimit:2,toolBudget:5});
+  const {claimDreamTide}=await import('../functions/dream-tide-ledger.js');
+  const {reserveDreamStep,recordDreamStep,reserveDreamTool}=await import('../functions/dream-tide-records.js');
+  const {generateVoiceClip,voiceClipAudio,listVoiceClips}=await import('../functions/voice-clips.js');
+  const {listMediaLibrary}=await import('../functions/coast-vault-media.js');
+  const claim=await claimDreamTide(db,cid,{now:due,currentModelId:model,busy:false});
+  assert.ok(claim);
+  assert.ok(await reserveDreamStep(db,claim,0,due));
+  assert.ok(await recordDreamStep(db,claim,0,'completed',{},due));
+  assert.ok(await reserveDreamTool(db,claim,0,0,'voice_create',due));
+  const cfg={...env,COAST_DREAM_MEDIA_ENABLED:'true',ELEVENLABS_API_KEY:'test-only',ELEVENLABS_VOICE_ID:'fixture_voice'};
+  const ctx={autonomous_activity:true,autonomous_claim:claim,autonomous_event:{step:0,index:0},conversation_id:cid,model_label:model};
+  const original=new Uint8Array(180005).map((_,i)=>i%251);
+  let generated=0;
+  const fake=async()=>{generated++;return new Response(original,{headers:{'content-type':'audio/mpeg'}});};
+  await assert.rejects(()=>generateVoiceClip(db,env,{text:'fixture'},ctx,fake),/未授权/);
+  assert.equal(generated,0);
+  const clip=await generateVoiceClip(db,cfg,{text:'fixture'},ctx,fake);
+  assert.equal(clip.source,'dream_tide');assert.equal(clip.turn_id,null);assert.equal(clip.message_id,null);
+  assert.equal(clip.id,'voice_dream_'+claim.claimId+'_0_0');
+  assert.deepEqual(await voiceClipAudio(db,clip.id),original);
+  const library=await listMediaLibrary(db,{kind:'audio'});
+  assert.equal(library.items[0].id,clip.id);assert.equal(library.items[0].name,'自主活动语音');
+  assert.equal(library.items[0].origin_status,'unlinked');
+  await assert.rejects(()=>generateVoiceClip(db,cfg,{text:'fixture'},ctx,fake),/不重复生成/);
+  assert.equal(generated,1);
+  assert.ok(await reserveDreamTool(db,claim,0,1,'voice_create',due));
+  await assert.rejects(()=>generateVoiceClip(db,cfg,{text:'second'},{...ctx,autonomous_event:{step:0,index:1}},async()=>{
+    await disarmDreamTide(db,cid,rev);
+    return new Response(original);
+  }),/权限已撤回/);
+  assert.equal((await listVoiceClips(db,cid)).length,1);
+  const count=await db.prepare('SELECT COUNT(*) AS n FROM coast_voice_chunks').first();
+  assert.equal(count.n,2);
+  assert.equal((await readConversationState(db,cid)).turns.length,1);
+});
+test('autonomous voice is not exposed without the separate deployment gate',async()=>{
+  const {env,db,cid,opts}=await fixture({allowVoice:true});
+  const out=await executeDreamTide(env,cid,{...opts,invoke:async(_,payload)=>{
+    assert.ok(!payload.tools.some(t=>t.function.name==='voice_create'));
+    return response();
+  }});
+  assert.equal(out.status,'completed');
+});
+
+
+test('independent image preserves exact original, is not a chat attachment, and fences revocation',async()=>{
+  const {db,cid,env,rev}=await fixture({allowImage:true,imageLimit:2,toolBudget:5});
+  const {writeProfile}=await import('../functions/chat-store.js');
+  const {claimDreamTide}=await import('../functions/dream-tide-ledger.js');
+  const {reserveDreamStep,recordDreamStep,reserveDreamTool}=await import('../functions/dream-tide-records.js');
+  const {generateDreamImage}=await import('../functions/dream-tide-image.js');
+  const {getChatAttachmentRecord,bindChatAttachmentsToTurn,deleteChatAttachment}=await import('../functions/chat-attachments.js');
+  const {readArchiveAttachment,prepareArchiveAttachment}=await import('../functions/coast-archive-v2-media.js');
+  const {listMediaLibrary}=await import('../functions/coast-vault-media.js');
+  const imageModel='fixture/paid';
+  await writeProfile(db,{current_image_model:imageModel,model_box:{image:[imageModel]}});
+  const claim=await claimDreamTide(db,cid,{now:due,currentModelId:model,busy:false});
+  assert.ok(claim);
+  assert.ok(await reserveDreamStep(db,claim,0,due));
+  assert.ok(await recordDreamStep(db,claim,0,'completed',{},due));
+  assert.ok(await reserveDreamTool(db,claim,0,0,'image_generate',due));
+  const cfg={...env,COAST_DREAM_MEDIA_ENABLED:'true',OPENROUTER_API_KEY:'fixture-only'};
+  const ctx={autonomous_activity:true,autonomous_claim:claim,autonomous_event:{step:0,index:0},conversation_id:cid};
+  const original=new Uint8Array(1500005);original.set([137,80,78,71,13,10,26,10]);
+  const fake={bytes:original,mime:'image/png',provider:'openrouter',requested_model:imageModel,reported_model:imageModel,cost_usd:null};
+  let calls=0;
+  const options={expectedModel:imageModel,discover:async()=>[{id:imageModel}],generate:async()=>{calls++;return fake;}};
+  await assert.rejects(()=>generateDreamImage(db,env,{prompt:'fixture'},ctx,options));
+  assert.equal(calls,0);
+  const result=await generateDreamImage(db,cfg,{prompt:'fixture'},ctx,options);
+  assert.equal(result.id,'att_dream_'+claim.claimId+'_0_0');
+  const row=await getChatAttachmentRecord(db,cid,result.id);
+  assert.equal(row.turn_id,null);assert.deepEqual(new Uint8Array(row.data),original);
+  const media=(await listMediaLibrary(db,{kind:'image'})).items[0];
+  assert.equal(media.id,result.id);assert.equal(media.origin_status,'unlinked');assert.equal(media.role,'assistant');
+  await assert.rejects(()=>bindChatAttachmentsToTurn(db,cid,'turn-one',[result.id]),/不能改绑/);
+  await assert.rejects(()=>deleteChatAttachment(db,cid,result.id));
+  await assert.rejects(()=>generateDreamImage(db,cfg,{prompt:'repeat'},ctx,options));
+  assert.equal(calls,1);
+  await assert.rejects(()=>readArchiveAttachment(db,cid,result.id),/正在自主唤醒/);
+  assert.ok(await reserveDreamTool(db,claim,0,1,'image_generate',due));
+  await assert.rejects(()=>generateDreamImage(db,cfg,{prompt:'revoked'},{...ctx,autonomous_event:{step:0,index:1}},{...options,generate:async()=>{await disarmDreamTide(db,cid,rev);return fake;}}),/权限已撤回/);
+  assert.equal((await listMediaLibrary(db,{kind:'image'})).items.length,1);
+  assert.equal((await readConversationState(db,cid)).turns.length,1);
+});
+
+
+test('autonomous media and activity receipts restore atomically without arming a new job',async()=>{
+  const {db,cid,env}=await fixture({allowImage:true,allowVoice:true,allowMemoryCandidate:true,toolBudget:5});
+  const {writeProfile}=await import('../functions/chat-store.js');
+  const {claimDreamTide,settleDreamTide}=await import('../functions/dream-tide-ledger.js');
+  const {reserveDreamStep,recordDreamStep,reserveDreamTool,recordDreamTool}=await import('../functions/dream-tide-records.js');
+  const {generateDreamImage}=await import('../functions/dream-tide-image.js');
+  const {generateVoiceClip,voiceClipAudio}=await import('../functions/voice-clips.js');
+  const {getChatAttachmentRecord}=await import('../functions/chat-attachments.js');
+  const {readArchiveAttachment}=await import('../functions/coast-archive-v2-media.js');
+  const {readArchiveChat,readArchiveVoice,archiveRecordPage}=await import('../functions/coast-archive-v2-records.js');
+  const {validateDreamMediaOrigin,validateDreamCandidateOrigin}=await import('../functions/dream-tide-archive.js');
+  const {MODULES,encodeRecordObject}=await import('../functions/coast-archive-v2-manifest.js');
+  const {createArchiveSession,registerArchiveObject,putArchiveChunk}=await import('../functions/coast-archive-v2-stage.js');
+  const {restoreArchiveChatGroup}=await import('../functions/coast-archive-v2-restore.js');
+  const {saveTreasure}=await import('../functions/coast-vault-treasures.js');
+  const imageModel='fixture/paid';
+  await writeProfile(db,{current_image_model:imageModel,model_box:{image:[imageModel]}});
+  const claim=await claimDreamTide(db,cid,{now:due,currentModelId:model,busy:false});
+  assert.ok(claim);assert.ok(await reserveDreamStep(db,claim,0,due));
+  assert.ok(await recordDreamStep(db,claim,0,'completed',{},due));
+  const cfg={...env,COAST_DREAM_MEDIA_ENABLED:'true',OPENROUTER_API_KEY:'fixture-only',ELEVENLABS_API_KEY:'fixture-only',ELEVENLABS_VOICE_ID:'fixture_voice'};
+  const ctx={autonomous_activity:true,autonomous_claim:claim,autonomous_event:{step:0,index:0},conversation_id:cid,model_label:model};
+  const png=new Uint8Array(24);png.set([137,80,78,71,13,10,26,10]);
+  const audio=new Uint8Array([73,68,51,4,0,0,0,0,0,0,1,2]);
+  assert.ok(await reserveDreamTool(db,claim,0,0,'image_generate',due));
+  const picture=await generateDreamImage(db,cfg,{prompt:'fixture'},ctx,{expectedModel:imageModel,discover:async()=>[{id:imageModel}],generate:async()=>({bytes:png,mime:'image/png',provider:'openrouter',requested_model:imageModel})});
+  assert.ok(await recordDreamTool(db,claim,0,0,{ok:true,record_id:picture.id},due));
+  assert.ok(await reserveDreamTool(db,claim,0,1,'voice_create',due));
+  const clip=await generateVoiceClip(db,cfg,{text:'fixture'},{...ctx,autonomous_event:{step:0,index:1}},async()=>new Response(audio));
+  assert.ok(await recordDreamTool(db,claim,0,1,{ok:true,record_id:clip.id},due));
+  const {proposeDreamMemory}=await import('../functions/dream-tide-memory.js');
+  const {writeDreamNote}=await import('../functions/dream-tide-records.js');
+  const {restoreArchiveRecord}=await import('../functions/coast-archive-v2-restore-record.js');
+  assert.ok(await reserveDreamTool(db,claim,0,2,'dream_memory_candidate',due));
+  const proposal=await proposeDreamMemory(db,{title:'archive candidate',content:'candidate body',destination:'seed'},{...ctx,autonomous_event:{step:0,index:2}},due);
+  assert.ok(await recordDreamTool(db,claim,0,2,{ok:true,record_id:proposal.id},due));
+  assert.ok(await reserveDreamTool(db,claim,0,3,'dream_write_note',due));
+  assert.ok(await writeDreamNote(db,claim,'archive note',due));
+  assert.ok(await recordDreamTool(db,claim,0,3,{ok:true},due));
+  assert.ok(await settleDreamTide(db,claim,'completed',due));
+  assert.ok(await replyDreamNote(db,cid,claim.claimId,'reply-archive','archive reply',due+1));
+  const candidate=(await archiveRecordPage(db,'memory_pockets')).items[0];
+  const chat=await readArchiveChat(db,cid),image=await readArchiveAttachment(db,cid,picture.id),voice=await readArchiveVoice(db,clip.id);
+  assert.throws(()=>validateDreamMediaOrigin(null,image.metadata,'image'),/activity missing/);
+  assert.throws(()=>validateDreamMediaOrigin(chat.dream_tide,{...voice.metadata,turn_id:'turn-one'},'voice'),/invalid autonomous media origin/);
+  const favorite=await saveTreasure(db,{kind:'image',conversation_id:cid,source_id:picture.id,notes:'activity drawing'});
+  assert.equal(favorite.role,'assistant');assert.equal(favorite.message_id,null);
+  assert.throws(()=>validateDreamCandidateOrigin(null,candidate),/activity missing/);
+  assert.throws(()=>validateDreamCandidateOrigin(chat.dream_tide,{...candidate,source_ref_json:JSON.stringify({...JSON.parse(candidate.source_ref_json),step_index:99})}),/activity missing/);
+  const {archiveDetailPage}=await import('../functions/coast-archive-v2-details.js');
+  const {digestBytes}=await import('../functions/coast-archive-v2-chunks.js');
+  const favorites=(await archiveDetailPage(db,'vault_treasures')).items;
+  const records=[],objects=[];
+  for(const [module,id,kind,data,media] of [['chat',cid,'chat',chat,null],['attachments',picture.id,'attachment',image.metadata,image],['voice',clip.id,'voice',voice.metadata,voice],['memory_pockets',candidate.id,'memory_pockets',candidate,null]]){
+    const o=await encodeRecordObject({kind,data});objects.push(o);if(media)objects.push(media);
+    records.push({module,id,record_object:o.descriptor.object_sha256,media_objects:media?[media.descriptor.object_sha256]:[],dependencies:module==='chat'?[]:['chat/'+cid]});
+  }
+  for(const data of favorites){
+    const o=await encodeRecordObject({kind:'vault_treasures',data});objects.push(o);
+    records.push({module:'vault',id:'vault_treasures:'+await digestBytes(new TextEncoder().encode(JSON.stringify([data.id]))),record_object:o.descriptor.object_sha256,media_objects:[],dependencies:['chat/'+cid,'attachments/'+picture.id]});
+  }
+  const manifest={format:'elementera-coast-archive',version:2,workspace:'backend',application_id:'com.elementeracoast.source',exported_at:new Date(due).toISOString(),modules:MODULES.map(module=>({module,coverage:records.some(r=>r.module===module)?'partial':'unavailable',count:records.filter(r=>r.module===module).length})),records,objects:objects.map(o=>o.descriptor)};
+  const target=new D1Database(),session=await createArchiveSession(target);
+  for(const o of objects){await registerArchiveObject(target,session.id,o.descriptor);for(let i=0;i<o.chunks.length;i++)await putArchiveChunk(target,session.id,o.descriptor.object_sha256,i,o.chunks[i]);}
+  const preview=await restoreArchiveChatGroup(target,session.id,manifest,cid,false);
+  assert.equal(preview.committed,false);await assert.rejects(()=>readArchiveChat(target,cid));
+  const restored=await restoreArchiveChatGroup(target,session.id,manifest,cid,true);
+  assert.equal(restored.committed,true);assert.equal(restored.attachments,1);assert.equal(restored.voices,1);
+  assert.deepEqual(new Uint8Array((await getChatAttachmentRecord(target,cid,picture.id)).data),png);
+  assert.deepEqual(await voiceClipAudio(target,clip.id),audio);
+  assert.deepEqual((await readArchiveChat(target,cid)).dream_tide,chat.dream_tide);
+  assert.equal((await readConversationState(target,cid)).turns.length,1);
+  for(const id of [picture.id,clip.id])assert.equal((await readDreamActivity(target,cid,20,0,id))[0].claim_id,claim.claimId);
+  assert.deepEqual(await readDreamActivity(target,cid,20,0,picture.id+'_forged'),[]);
+  assert.deepEqual(await readDreamActivity(target,'other-window',20,0,clip.id),[]);
+  assert.equal((await target.prepare('SELECT enabled FROM dream_tide_arms WHERE conversation_id=?').bind(cid).first()).enabled,0);
+  await restoreArchiveRecord(target,session.id,manifest,'memory_pockets',candidate.id,true);
+  assert.deepEqual((await archiveRecordPage(target,'memory_pockets')).items,[candidate]);
+  for(const record of records.filter(r=>r.module==='vault'))await restoreArchiveRecord(target,session.id,manifest,'vault',record.id,true);
+  assert.deepEqual((await archiveDetailPage(target,'vault_treasures')).items,favorites);
+  // Repackage the same persisted originals in the Native archive wire shape.
+  const current=await readArchiveChat(target,cid),iso=v=>v==null?null:new Date(v).toISOString();
+  const local=await encodeRecordObject({kind:'local_chat',data:{conversation:{...current.conversation,created_at:iso(current.conversation.created_at),updated_at:iso(current.conversation.updated_at),title_manual:!!current.conversation.title_manual,title_generated_at:iso(current.conversation.title_generated_at)},history:{...JSON.parse(current.history_json),conversation_id:cid,archive_storage_updated_at:current.history_updated_at},dream_tide:current.dream_tide}});
+  const oldRoot=records.find(r=>r.module==='chat').record_object;
+  const localObjects=[...objects.filter(o=>o.descriptor.object_sha256!==oldRoot),local];
+  const localManifest={...manifest,workspace:'local',records:records.map(r=>r.module==='chat'?{...r,record_object:local.descriptor.object_sha256}:r),objects:localObjects.map(o=>o.descriptor)};
+  const returned=new D1Database(),next=await createArchiveSession(returned);
+  for(const o of localObjects){await registerArchiveObject(returned,next.id,o.descriptor);for(let i=0;i<o.chunks.length;i++)await putArchiveChunk(returned,next.id,o.descriptor.object_sha256,i,o.chunks[i]);}
+  await restoreArchiveChatGroup(returned,next.id,localManifest,cid,true);
+  await restoreArchiveRecord(returned,next.id,localManifest,'memory_pockets',candidate.id,true);
+  assert.deepEqual((await readArchiveChat(returned,cid)).dream_tide,chat.dream_tide);
+  assert.deepEqual((await archiveRecordPage(returned,'memory_pockets')).items,[candidate]);
+  for(const record of records.filter(r=>r.module==='vault'))await restoreArchiveRecord(returned,next.id,localManifest,'vault',record.id,true);
+  assert.deepEqual((await archiveDetailPage(returned,'vault_treasures')).items,favorites);
+  assert.deepEqual(new Uint8Array((await getChatAttachmentRecord(returned,cid,picture.id)).data),png);
+  assert.deepEqual(await voiceClipAudio(returned,clip.id),audio);
+  assert.equal((await readDreamNotes(returned,cid))[0].replies[0].body,'archive reply');
+  assert.equal((await returned.prepare('SELECT enabled FROM dream_tide_arms WHERE conversation_id=?').bind(cid).first()).enabled,0);
+});
+
+
+test('owner media limits are independent, zero disables the tool, claimed attempts consume the quota',async()=>{
+  const {db,cid}=await fixture({allowVoice:true,allowImage:true,voiceLimit:2,imageLimit:0,toolBudget:5});
+  const {claimDreamTide}=await import('../functions/dream-tide-ledger.js');
+  const {reserveDreamStep,recordDreamStep,reserveDreamTool}=await import('../functions/dream-tide-records.js');
+  const claim=await claimDreamTide(db,cid,{now:due,currentModelId:model,busy:false});
+  assert.ok(claim);assert.ok(await reserveDreamStep(db,claim,0,due));
+  assert.ok(await recordDreamStep(db,claim,0,'completed',{},due));
+  assert.equal(await reserveDreamTool(db,claim,0,0,'image_generate',due),false);
+  assert.ok(await reserveDreamTool(db,claim,0,1,'voice_create',due));
+  assert.ok(await reserveDreamTool(db,claim,0,2,'voice_create',due));
+  assert.equal(await reserveDreamTool(db,claim,0,3,'voice_create',due),false);
+  assert.ok(await reserveDreamTool(db,claim,0,4,'dream_write_note',due));
+});
+
+
+test('autonomous memory proposal enters pending only, suppresses duplicates and cannot forge source',async()=>{
+  const {db,cid,env,opts,rev}=await fixture({allowMemoryCandidate:true,toolBudget:5,tokenBudget:24000});
+  const {listPockets,resolvePocket,createPocket}=await import('../functions/memory-store/memory-pocket-store.js');
+  const {claimDreamTide}=await import('../functions/dream-tide-ledger.js');
+  const {reserveDreamStep,recordDreamStep,reserveDreamTool}=await import('../functions/dream-tide-records.js');
+  const {proposeDreamMemory}=await import('../functions/dream-tide-memory.js');
+  const input={title:'一颗候选',content:'fixture memory candidate',destination:'memory'};
+  let requests=0;
+  const result=await executeDreamTide(env,cid,{...opts,invoke:async(_,payload)=>{
+    requests++;
+    if(requests===1){assert.ok(payload.tools.some(t=>t.function.name==='dream_memory_candidate'));return response([toolCall('m1','dream_memory_candidate',input),toolCall('m2','dream_memory_candidate',input)]);}
+    return response();
+  }});
+  assert.equal(result.status,'completed');
+  const pockets=await listPockets(db,{conversation_id:cid});
+  assert.equal(pockets.length,1);assert.equal(pockets[0].source_type,'dream_tide');assert.equal(pockets[0].source_ref.claim_id,result.claimId);
+  assert.equal(pockets[0].suggested_destination,'memory');assert.equal(pockets[0].source_ref.turn_id,undefined);
+  assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM memory_entries').first()).n,0);
+  assert.equal((await readDreamActivity(db,cid))[0].tools[0].receipt.record_id,pockets[0].id);
+  await assert.rejects(()=>createPocket(db,{conversation_id:cid,source_type:'dream_tide',source_text:'forged'}));
+  await resolvePocket(db,pockets[0].id,{action:'discard'});
+  const claim=await claimDreamTide(db,cid,{now:due+86400000,currentModelId:model,busy:false});
+  assert.ok(claim);assert.ok(await reserveDreamStep(db,claim,0,due+86400000));
+  assert.ok(await recordDreamStep(db,claim,0,'completed',{},due+86400000));
+  assert.ok(await reserveDreamTool(db,claim,0,0,'dream_memory_candidate',due+86400000));
+  const context={autonomous_activity:true,autonomous_claim:claim,conversation_id:cid,model_label:model,autonomous_event:{step:0,index:0}};
+  assert.equal((await proposeDreamMemory(db,input,context)).status,'duplicate_suppressed');
+  assert.equal((await listPockets(db,{conversation_id:cid})).length,0);
+  await disarmDreamTide(db,cid,rev);
+  await assert.rejects(()=>proposeDreamMemory(db,{...input,content:'revoked'},context),/权限已撤回/);
+  assert.equal((await readConversationState(db,cid)).turns.length,1);
+});
+
+
+test('autonomous pixels are opt-in, vision-gated, one-shot, budgeted and absent from durable receipts',async()=>{
+  const {writeProfile}=await import('../functions/chat-store.js');
+  const {generateDreamImage}=await import('../functions/dream-tide-image.js');
+  const imageModel='fixture/paid',bytes=new Uint8Array(24);bytes.set([137,80,78,71,13,10,26,10]);
+  for(const [permission,vision,budget,expected] of [[true,true,24000,true],[false,true,24000,false],[true,false,24000,false],[true,null,24000,false],[true,true,1800,false]]){
+    const {db,cid,env,opts}=await fixture({allowImage:true,allowImageReadback:permission,tokenBudget:budget});
+    await writeProfile(db,{current_image_model:imageModel,model_box:{image:[imageModel]}});
+    let calls=0,seen=0;
+    const out=await executeDreamTide({...env,COAST_DREAM_MEDIA_ENABLED:'true',OPENROUTER_API_KEY:'fixture-only'},cid,{
+      ...opts,modelEntry:()=>vision===null?null:{architecture:{input_modalities:vision?['text','image']:['text']},context_length:100000},
+      generateImage:(db,env,a,ctx,o)=>generateDreamImage(db,env,a,ctx,{...o,discover:async()=>[{id:imageModel}],generate:async()=>({bytes,mime:'image/png',provider:'openrouter',requested_model:imageModel})}),
+      invoke:async(_,payload)=>{
+        calls++;const imageParts=payload.messages.flatMap(m=>Array.isArray(m.content)?m.content.filter(p=>p.type==='image_url'):[]);
+        if(calls===1)return response([toolCall('i','image_generate',{prompt:'fixture'})]);
+        if(imageParts.length){seen++;assert.equal(imageParts.length,1);assert.deepEqual(new Uint8Array(Buffer.from(imageParts[0].image_url.url.split(',')[1],'base64')),bytes);}
+        if(calls===2)return response([toolCall('n','dream_write_note',{body:'fixture note'})]);
+        return response();
+      }});
+    assert.equal(seen,expected?1:0);
+    if(budget===24000)assert.equal(out.status,'completed');
+    const activity=(await readDreamActivity(db,cid))[0];
+    assert.equal(activity.steps.some(s=>s.receipt?.image_readback_accepted?.length),expected);
+    assert.ok(!JSON.stringify(activity).includes('data:image/'));
+    assert.equal((await readConversationState(db,cid)).turns.length,1);
+  }
+});
