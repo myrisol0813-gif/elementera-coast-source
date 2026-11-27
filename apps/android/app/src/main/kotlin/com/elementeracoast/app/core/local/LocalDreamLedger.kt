@@ -82,10 +82,19 @@ internal class LocalDreamLedger(private val store:LocalPersistence){
     // Caller must own the process generation gate, including recovery. A
     // process-dead reservation becomes interrupted and consumes its slot.
     fun recover(cid:String,now:Long)=store.readConsistent{s->
-        val a=LocalDreamArchive(s);val h=a.runtimeHistory(cid);val r=active(h)?:return@readConsistent false
-        val row=JsonObject(r+mapOf("status" to JsonPrimitive("interrupted"),"updated_at" to JsonPrimitive(maxOf(now,r["started_at"]!!.jsonPrimitive.long)),
-            "result_json" to JsonPrimitive("{\"reason\":\"process_interrupted\",\"total_tokens\":null,\"reported_cost\":null,\"extra_scheduled\":false}")))
-        a.writeRuntimeHistory(cid,JsonObject(h+("runs" to JsonArray(h.rows("runs").map{if(it==r)row else it}))));true
+        val initial=active(LocalDreamArchive(s).runtimeHistory(cid))?:return@readConsistent false
+        s.atomic{staged->
+            val a=LocalDreamArchive(staged);val h=a.runtimeHistory(cid);val r=active(h)?:return@atomic false
+            if(r.str("claim_id")!=initial.str("claim_id"))return@atomic false
+            val result=buildJsonObject{put("reason","process_interrupted");put("total_tokens",JsonNull);put("reported_cost",JsonNull);put("extra_scheduled",false)}
+            val row=JsonObject(r+mapOf("status" to JsonPrimitive("interrupted"),"updated_at" to JsonPrimitive(maxOf(now,r["started_at"]!!.jsonPrimitive.long)),
+                "result_json" to JsonPrimitive(result.toString())))
+            a.writeRuntimeHistory(cid,JsonObject(h+("runs" to JsonArray(h.rows("runs").map{if(it==r)row else it}))))
+            val current=draft(staged,cid)
+            if(r.str("kind")=="extra"&&r.str("slot_key")=="extra:"+current.extraId)
+                save(staged,cid,current.copy(extraId=null,extraAt=null))
+            true
+        }
     }
     fun claim(cid:String,expectedRevision:String,expectedModel:String,now:Long):Claim?=store.readConsistent{s->
         if(!live(s,cid)||LocalReplyRunStore(s).active(cid))return@readConsistent null
