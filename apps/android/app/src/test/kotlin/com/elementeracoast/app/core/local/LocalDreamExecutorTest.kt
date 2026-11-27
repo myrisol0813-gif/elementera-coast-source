@@ -386,4 +386,43 @@ class LocalDreamExecutorTest {
         assertEquals(1,memory.snapshot().pockets.size)
     }
 
+
+    @Test fun autonomousImagePixelsAreOneShotOptInAndBudgeted()=runBlocking{
+        for((permission,vision,budget) in listOf(Triple(true,true,24000),Triple(false,true,24000),Triple(true,false,24000),Triple(true,null,24000),Triple(true,true,1800))){
+            val (store,initial)=fixture();val cache=RemoteCacheStore(store);val ledger=LocalDreamLedger(store)
+            val history=cache.history(cid)!!
+            cache.putHistory(cid,history.copy(contextSettings=history.contextSettings.copy(localModelWriteEnabled=true)))
+            val config=cfg.copy(execution=cfg.execution!!.copy(allowImage=true,allowImageReadback=permission,tokenBudget=budget))
+            val settings=ledger.configure(cid,DreamSettingsRequest(cid,initial.revision,"arm",config,model,true),true,at-86400000)!!
+            val imageConfig=LocalProviderConfig("image-fixture","fixture","https://openrouter.ai/api/v1","fixture-only",listOf("fixture/paid"))
+            cache.putProfile(RemoteProfile(currentImageModel=imageConfig.modelId("fixture/paid")))
+            val bytes=ByteArray(24);byteArrayOf(137.toByte(),80,78,71,13,10,26,10).copyInto(bytes)
+            var requests=0;var seen=0
+            val engine=LocalDreamExecutor(store,{provider to "fixture/model"},{_,_,messages,_,_->
+                requests++
+                val parts=messages.flatMap{m->(m.jsonObject["content"] as? JsonArray).orEmpty()}.filter{it.jsonObject["type"]==JsonPrimitive("image_url")}
+                if(parts.isNotEmpty()){
+                    seen++;assertEquals(1,parts.size)
+                    val url=parts.single().jsonObject.getValue("image_url").jsonObject.getValue("url").jsonPrimitive.content
+                    assertArrayEquals(bytes,java.util.Base64.getDecoder().decode(url.substringAfter(',')))
+                }
+                when(requests){
+                    1->response(call("i","image_generate",buildJsonObject{put("prompt","fixture")}))
+                    2->response(call("n","dream_write_note",buildJsonObject{put("body","fixture note")}))
+                    else->response()
+                }
+            },clock={at},imageProvider={imageConfig},modelBudget={_,_,_->LocalInputBudget(18000,null,100000,"fixture",vision)},
+                imageFactory={s,c,id,resolver->LocalDreamImage(s,c,id,resolver,
+                    discover={listOf(LocalImageProvider.Model("fixture/paid","fixture",false))},
+                    generate={_,_->LocalImageProvider.Generated(bytes,"image/png","openrouter","fixture/paid",null,null,"fixture")})})
+            val status=engine.run(cid,settings.revision!!,model,at)
+            if(budget==24000)assertEquals("completed",status)
+            val expected=permission&&vision==true&&budget==24000
+            assertEquals(if(expected)1 else 0,seen)
+            val archive=LocalDreamArchive(store).export(cid)!!.toString()
+            assertEquals(expected,archive.contains("image_readback_accepted"))
+            assertFalse(archive.contains("data:image/"));assertEquals(1,cache.history(cid)!!.turns.size)
+        }
+    }
+
 }
