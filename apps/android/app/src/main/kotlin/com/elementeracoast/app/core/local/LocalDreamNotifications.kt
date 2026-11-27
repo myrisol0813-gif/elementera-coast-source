@@ -78,7 +78,9 @@ internal object LocalDreamNotifications {
             .setContentTitle(title).setContentText(text).setContentIntent(open).setAutoCancel(true)
             .setOnlyAlertOnce(true).setVisibility(Notification.VISIBILITY_PRIVATE).setPublicVersion(public)
             .setCategory(Notification.CATEGORY_MESSAGE).build()
-        manager(c).notify("coast-dream:$cid:$claim:$kind",4218,notification)
+        val tag="coast-dream:$cid:$claim:$kind"
+        if(kind=="test")manager(c).cancel(tag,4218)
+        manager(c).notify(tag,4218,notification)
         true
     }.getOrDefault(false)
 }

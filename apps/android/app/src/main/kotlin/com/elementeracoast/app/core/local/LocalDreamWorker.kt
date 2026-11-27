@@ -11,9 +11,20 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 
 internal object RemoteCacheRecovery{
-    fun recoverWakeClaims(store:LocalPersistence){
+    fun recoverWakeClaims(store:LocalPersistence,context:Context?=null){
         val ledger=LocalDreamLedger(store)
-        RemoteCacheStore(store,strictReads=true).conversations().forEach{ledger.recover(it.id,System.currentTimeMillis())}
+        val now=System.currentTimeMillis()
+        RemoteCacheStore(store,strictReads=true).conversations().forEach{recoverOne(store,ledger,it.id,now,context)}
+    }
+    fun recoverOne(store:LocalPersistence,ledger:LocalDreamLedger,cid:String,now:Long,context:Context?){
+        if(!ledger.recover(cid,now)||context==null)return
+        // A notice is optional; a persisted interruption must never be rolled back.
+        runCatching{
+            val last=LocalDreamArchive(store).runtimeHistory(cid)["runs"]!!.jsonArray.map{it.jsonObject}
+                .filter{it["status"]?.jsonPrimitive?.contentOrNull=="interrupted"}
+                .maxByOrNull{it.getValue("updated_at").jsonPrimitive.long}
+            last?.get("claim_id")?.jsonPrimitive?.contentOrNull?.let{LocalDreamNotifications.post(context,cid,it,"failure")}
+        }
     }
 }
 
@@ -39,14 +50,7 @@ class LocalDreamWorker(context:Context,params:WorkerParameters):CoroutineWorker(
             val windows=RemoteCacheStore(store,strictReads=true).conversations().filter{it.roomType=="main"&&it.source=="coast"&&it.deletedAt==null}
             val now=System.currentTimeMillis()
             // No previous in-flight wake can be alive while this lease is held.
-            windows.forEach{w->
-                if(ledger.recover(w.id,now)){
-                    val last=LocalDreamArchive(store).runtimeHistory(w.id)["runs"]!!.jsonArray.map{it.jsonObject}
-                        .filter{it["status"]?.jsonPrimitive?.contentOrNull=="interrupted"}
-                        .maxByOrNull{it.getValue("updated_at").jsonPrimitive.long}
-                    last?.get("claim_id")?.jsonPrimitive?.contentOrNull?.let{claim->LocalDreamNotifications.post(applicationContext,w.id,claim,"failure")}
-                }
-            }
+            windows.forEach{RemoteCacheRecovery.recoverOne(store,ledger,it.id,now,applicationContext)}
             val eligible=windows.mapNotNull{w->
                 val a=ledger.settings(w.id)
                 val history=LocalDreamArchive(store).runtimeHistory(w.id)["runs"]!!.jsonArray.map{it.jsonObject}

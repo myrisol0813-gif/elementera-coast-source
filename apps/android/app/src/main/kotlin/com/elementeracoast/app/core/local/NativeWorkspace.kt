@@ -33,7 +33,7 @@ object NativeWorkspace {
             store.semanticIndex = LocalSemanticIndex(File(context.noBackupFilesDir, "coast-embedding-index-v1"), { LocalMemoryStore(store).snapshot().entries }, { CoastEmbedding(context.applicationContext) }).also { it.requestRefresh() }
             localStore = store
             // Fresh process: no previous live coroutine can own these claims.
-            RemoteCacheRecovery.recoverWakeClaims(store)
+            RemoteCacheRecovery.recoverWakeClaims(store,context.applicationContext)
             current = LocalCoastTransport(store,LocalIndependentWeb(context.applicationContext),LocalVoiceProvider(context.applicationContext)) { LocalProviderStore(context).catalog() }.also{transport->transport.imageConfig={selected->LocalProviderStore(context.applicationContext).resolveImageProvider(selected)};transport.dreamCanArm={selected->com.elementeracoast.app.BuildConfig.LOCAL_DREAM_EXECUTION_ENABLED&&LocalProviderStore(context.applicationContext).resolve(selected)!=null};transport.dreamChanged={LocalDreamWorker.sync(context.applicationContext)};if(com.elementeracoast.app.BuildConfig.LOCAL_DREAM_PLAN_EXECUTION_ENABLED)transport.dreamPlan=com.elementeracoast.app.feature.chatgpt.NativeDreamPlanRoute(store,com.elementeracoast.app.feature.chatgpt.ChatGptPlanRepository(com.elementeracoast.app.feature.chatgpt.ChatGptSecureStore(context.applicationContext,true)))}
         } else {
             (localStore as? FileLocalPersistence)?.semanticIndex?.close()
