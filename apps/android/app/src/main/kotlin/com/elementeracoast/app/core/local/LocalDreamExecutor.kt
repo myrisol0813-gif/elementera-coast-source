@@ -117,7 +117,7 @@ internal class LocalDreamExecutor(
         if(!workspaceActive())return "disabled"
         val isPlan=NativeDreamPlanProtocol.slug(modelId)!=null
         val plan=if(isPlan)preparePlan(cid,revision,modelId)?:return "model_unavailable" else null
-        val initial=if(isPlan)null else resolve(modelId)?:return "model_unavailable"
+        val initial=if(isPlan)null else (resolve(modelId)?:return "model_unavailable")
         if(plan!=null&&!plan.authorized())return "model_unavailable"
         val c=ledger.claim(cid,revision,modelId,now)?:return "not_due"
         val e=requireNotNull(c.config.execution);var status="failed";var reason="incomplete"
@@ -277,6 +277,7 @@ internal class LocalDreamExecutor(
             put("total_tokens",if(known)JsonPrimitive(total)else JsonNull);put("reported_cost",if(costKnown)JsonPrimitive(cost)else JsonNull)
             proposed?.let{put("proposed_extra_at",it)};put("accounting",if(isPlan)"ChatGPT plan usage; soft token budget; no USD inference cost reported; separate media cost not included" else "chat provider reported; separate media cost not included; input estimate is not a hard billing guarantee")
         }
+        if(status=="completed"&&plan!=null&&!plan.authorized()){status="cancelled";proposed=null}
         val saved=withContext(NonCancellable){ledger.finish(c,status,result,proposed,clock())}
         cancelled?.let{throw it}
         return if(saved)status else "unconfirmed"
