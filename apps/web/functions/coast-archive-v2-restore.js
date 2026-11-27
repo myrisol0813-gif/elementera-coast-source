@@ -77,7 +77,8 @@ export async function prepareArchiveChatGroup(db,sessionId,manifest,conversation
     if(r.module==='attachments'){
       check(kind==='attachment'&&r.media_objects.length===1&&(data.turn_id==null||turns.has(data.turn_id)),'invalid attachment group');
       const ref=attachmentRefs.get(data.id);
-      check(!ref||(ref.size===data.size&&ref.type===data.kind&&ref.name===data.name&&ref.mime===data.mime&&(data.turn_id==null||[...attachmentTurns.get(data.id)].every(t=>t===data.turn_id))),'attachment metadata differs from history');
+      check(!data.id.startsWith('att_dream_')||!ref&&data.turn_id==null&&data.kind==='image','autonomous original cannot reference chat');
+       check(!ref||(ref.size===data.size&&ref.type===data.kind&&ref.name===data.name&&ref.mime===data.mime&&(data.turn_id==null||[...attachmentTurns.get(data.id)].every(t=>t===data.turn_id))),'attachment metadata differs from history');
       const d=objects.get(r.media_objects[0]);statements.push(...await prepareArchiveAttachment(db,data,d,readStagedArchiveChunks(db,sessionId,d.object_sha256),{conversationIds}));foundAttachments.add(data.id);
     }else if(r.module==='voice'){
       check(kind==='voice'&&r.media_objects.length===1,'invalid voice record');
