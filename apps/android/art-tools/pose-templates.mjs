@@ -53,6 +53,50 @@ function inSvg(source,body,fn){
     return fn(svg);
   } finally {outer.remove()}
 }
+function authoredMatrix(e){
+  const style=getComputedStyle(e), value=style.transform;
+  if(!value||value==='none')return 'matrix(1 0 0 1 0 0)';
+  if(!value.startsWith('matrix('))throw Error('unsupported authored 3D transform');
+  const origin=style.transformOrigin.split(/\s+/).map(parseFloat),m=new DOMMatrix(value);
+  const [x=0,y=0]=origin;
+  return 'matrix('+[m.a,m.b,m.c,m.d,m.e+x-m.a*x-m.c*y,m.f+y-m.b*x-m.d*y].join(' ')+')';
+}
+// Capture the actual authored animation rather than re-inventing wag/blink/breath paths.
+// CSS tracks keep their own periods; native time sampling combines them.
+function captureMotion(svg){
+  const tracks=[],animated=svg.getAnimations({subtree:true});
+  for(const a of animated){a.pause();a.currentTime=0}
+  const seen=new Set();
+  for(const a of animated){
+    const target=a.effect?.target, id=target?.getAttribute('id'), timing=a.effect?.getTiming();
+    if(!id||!timing||typeof timing.duration!=='number'||timing.duration<=0)continue;
+    const frames=a.effect.getKeyframes();
+    const props=['transform','opacity'].filter(p=>frames.some(f=>Object.hasOwn(f,p)));
+    for(const prop of props){
+      const key=id+'|'+prop;if(seen.has(key))continue;seen.add(key);
+      const values=[], steps=24;
+      for(let i=0;i<steps;i++){
+        a.currentTime=timing.delay+timing.duration*i/steps;
+        values.push(prop==='transform'?authoredMatrix(target):getComputedStyle(target).opacity);
+      }
+      a.currentTime=0;
+      tracks.push({targetId:id,attribute:prop,durationMs:timing.duration,delayMs:timing.delay,
+        alternate:timing.direction==='alternate'||timing.direction==='alternate-reverse',frames:values});
+    }
+  }
+  for(const anim of svg.querySelectorAll('animate,animateTransform')){
+    const id=anim.parentElement?.getAttribute('id'), attr=anim.getAttribute('attributeName'),dur=anim.getAttribute('dur')??'';
+    const values=(anim.getAttribute('values')??'').split(';').filter(Boolean);
+    const match=dur.match(/^([0-9.]+)(ms|s)$/);
+    if(!id||!match||!values.length||!['d','transform'].includes(attr))continue;
+    const type=anim.localName==='animateTransform'?anim.getAttribute('type'):null;
+    if(type&&!['translate','rotate','scale'].includes(type))continue;
+    tracks.push({targetId:id,attribute:attr,durationMs:Number(match[1])*(match[2]==='s'?1000:1),delayMs:0,alternate:false,
+      frames:type?values.map(v=>type+'('+v+')'):values});
+  }
+  return tracks;
+}
+
 export async function compilePoseTemplate(art,creature,state,job) {
   const body=art.creatures[job.id], def=art.appearance[job.id];
   const source=await art.read(body.file);
@@ -68,6 +112,7 @@ export async function compilePoseTemplate(art,creature,state,job) {
     if(horn)horn.setAttribute('data-coast-toggle','horn');
     return xml.serializeToString(svg);
   });
+  const motion=inSvg(make({}, {reducedMotion:false}),body,captureMotion);
   const mounts={};
   function add(key,patch,kind,opts={}){
     const variant=make(patch,opts);
@@ -93,5 +138,5 @@ export async function compilePoseTemplate(art,creature,state,job) {
   if(mount&&job.action!=='sleep')for(const prop of art.props.props){
     add('prop:'+prop.id,{},'prop',{prop,mount,propSource:await art.read(prop.file)});
   }
-  return {version:1,bodyId:body.id,palette:job.palette,action:job.action,viewBox:body.viewBox,slots,accessoryMarker,svg:base,mounts};
+  return {version:1,bodyId:body.id,palette:job.palette,action:job.action,viewBox:body.viewBox,slots,accessoryMarker,svg:base,mounts,motion};
 }
