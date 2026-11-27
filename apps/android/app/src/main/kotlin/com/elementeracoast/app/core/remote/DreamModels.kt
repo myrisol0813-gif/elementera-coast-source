@@ -13,7 +13,11 @@ data class DreamExecutionConfig(
     val tokenBudget:Int=8000,val outputLimit:Int=1000,val toolBudget:Int=4,val readTurns:Int=10,
     val extraPerDay:Int=0,val invitation:String="",
     val includeTime:Boolean=false,val includePrevious:Boolean=false,val includeReplies:Boolean=false,
-    val readHistory:Boolean=false,val writeNote:Boolean=false
+    val readHistory:Boolean=false,val writeNote:Boolean=false,
+    val includeCustom:Boolean=false,val includeUserPortrait:Boolean=false,val includeSelfPortrait:Boolean=false,
+    val includeConversationCount:Boolean=false,val includeWeather:Boolean=false,val includeCalendar:Boolean=false,
+    val allowWeb:Boolean=false,val allowLibrary:Boolean=false,val allowMemory:Boolean=false,val allowCalendar:Boolean=false,
+    val allowCollection:Boolean=false,val allowLibraryWrite:Boolean=false
 )
 
 @Serializable
