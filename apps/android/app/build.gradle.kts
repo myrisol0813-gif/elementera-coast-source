@@ -199,6 +199,7 @@ val compileRestNativeSprites by tasks.registering(Exec::class) {
     val originalArt = rootProject.file("../web/elementera-mcp/deploy-pages/public/rest-box")
     inputs.dir(originalArt)
     inputs.file(toolsDir.resolve("compile.mjs"))
+    inputs.file(toolsDir.resolve("pose-templates.mjs"))
     inputs.file(toolsDir.resolve("package.json"))
     outputs.dir(restNativeSprites)
     workingDir(toolsDir)
