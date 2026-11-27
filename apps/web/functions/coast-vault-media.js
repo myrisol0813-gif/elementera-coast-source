@@ -25,7 +25,7 @@ function source(row) {
     id: row.id, kind: row.kind, source_type: row.kind === 'audio' ? 'voice_clip' : 'chat_attachment',
     conversation_id: row.conversation_id, turn_id: row.turn_id,
     message_id: row.message_id || null,
-    role: row.kind === 'audio' ? 'assistant' : row.role || null,
+    role: row.kind === 'audio' || row.id.startsWith('att_dream_') ? 'assistant' : row.role || null,
     origin_status: row.kind === 'audio' ? (row.message_id ? 'linked' : row.name === '自主活动语音' ? 'unlinked' : 'turn_only') : row.origin_status || 'unlinked',
     name: row.name, display_name: row.display_name || '', mime: row.mime, size: Number(row.size) || 0,
     source_text: row.source_text || null, created_at: Number(row.created_at) || 0,
