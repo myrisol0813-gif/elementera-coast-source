@@ -2,6 +2,7 @@ package com.elementeracoast.app.feature.wolf
 
 import com.elementeracoast.app.BuildConfig
 import com.elementeracoast.app.core.local.*
+import com.elementeracoast.app.core.restbox.NativeStudioArchiveV2
 import com.elementeracoast.app.core.network.CoastApiClient
 import android.content.Context
 import java.io.File
@@ -20,12 +21,13 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
     suspend fun export(progress:(Int,Long)->Unit):Pair<File,ArchiveV2Manifest> = withContext(Dispatchers.IO) {
         val dir=folder();val file=File(dir,"archive.zip")
         try {
+            val studio=NativeStudioArchiveV2(context).capture()
             val manifest=if(local) {
                 require(NativeWorkspace.isLocal)
-                ArchiveV2Local.export(NativeWorkspace.persistence(context),BuildConfig.APPLICATION_ID,file,context.filesDir)
+                ArchiveV2Local.export(NativeWorkspace.persistence(context),BuildConfig.APPLICATION_ID,file,context.filesDir,studio)
             }else {
                 require(!NativeWorkspace.isLocal)
-                ArchiveV2NativeCollector.collectCloud(api,file,BuildConfig.APPLICATION_ID,progress,ArchiveV2Appearance.basic(SharedPreferencesLocalPersistence(context)))
+                ArchiveV2NativeCollector.collectCloud(api,file,BuildConfig.APPLICATION_ID,progress,ArchiveV2Appearance.basic(SharedPreferencesLocalPersistence(context)),studio)
             }
             file to manifest
         }catch(e:Throwable){dir.deleteRecursively();throw e}
@@ -58,6 +60,15 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
             put("committed",confirm)
             report.counts.forEach { (key,value)->putJsonObject(key){put("ready",value.ready);put("existing",value.existing);put("conflicts",value.conflicts);if(value.archivedOnly>0)put("archived_only",value.archivedOnly)} }
         }
+    }
+    suspend fun studioChoice(input:Imported):Boolean=withContext(Dispatchers.IO){
+        ArchiveV2Appearance.readStudio(input.manifest,input.stage)?.let{NativeStudioArchiveV2(context).verified(it);true}?:false
+    }
+    suspend fun restoreStudio(input:Imported,confirm:Boolean):JsonObject=withContext(Dispatchers.IO){
+        require(local==NativeWorkspace.isLocal)
+        val value=requireNotNull(ArchiveV2Appearance.readStudio(input.manifest,input.stage))
+        val report=NativeStudioArchiveV2(context).restore(value,confirm)
+        buildJsonObject{put("scope","device_studio");put("ready",report.ready);put("existing",report.existing);put("conflicts",report.conflicts);put("committed",confirm)}
     }
     fun cloudChats(m:ArchiveV2Manifest):List<String> =
         if(!local&&m.workspace=="backend"&&m.applicationId==BuildConfig.APPLICATION_ID) m.records.filter { it.module=="chat" }.map { it.id } else emptyList()
@@ -103,6 +114,7 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
                 }
             }
             if(ArchiveV2Appearance.readDeviceBasic(m,input.stage)!=null)add(Choice("appearance",ArchiveV2Appearance.DEVICE_ID,"仅当前设备基本设置（不上传）"))
+            if(studioChoice(input))add(Choice("device_studio","rest-studio","造物间 · 仅当前设备（不上传）"))
         }
     }
     suspend fun restoreDeviceBasic(input:Imported,confirm:Boolean):JsonObject=withContext(Dispatchers.IO){
@@ -111,7 +123,10 @@ internal class ArchiveV2Operations(private val api:CoastApiClient, private val c
         val report=ArchiveV2Appearance.applyBasic(values,SharedPreferencesLocalPersistence(context),confirm)
         buildJsonObject{put("scope","device_basic_settings");put("ready",report.ready);put("existing",report.existing);put("conflicts",report.conflicts);put("committed",confirm)}
     }
-    fun cloudManifest(input:Imported,choice:Choice):ArchiveV2Manifest=ArchiveV2Manifests.forRestore(input.manifest,choice.kind,choice.id)
+    fun cloudManifest(input:Imported,choice:Choice):ArchiveV2Manifest {
+        require(choice.kind !in setOf("appearance","device_studio"))
+        return ArchiveV2Manifests.forRestore(input.manifest,choice.kind,choice.id)
+    }
     suspend fun createSession():String {
         require(!local)
         return api.archiveV2CreateSession().getValue("session").jsonObject.getValue("id").jsonPrimitive.content
