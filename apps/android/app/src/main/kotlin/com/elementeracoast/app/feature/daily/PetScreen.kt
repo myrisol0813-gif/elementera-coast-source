@@ -76,6 +76,7 @@ private fun NativeStudioPage(r: StudioResources) {
     var panel by remember { mutableStateOf("room") }
     var role by remember { mutableStateOf("model") }
     var action by remember { mutableStateOf("idle") }
+    var prop by remember { mutableStateOf<String?>(null) }
     var menu by remember { mutableStateOf(false) }
     var confirmation by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -129,10 +130,16 @@ private fun NativeStudioPage(r: StudioResources) {
                 add(r.atlas.furnitureKey(a,layer.part,emptyMap()))
                 add(r.atlas.furnitureKey(a,layer.part,layer.item.colors))
             }
-            is NativeSceneLayer.Occupant -> add(r.atlas.creatureKey(if(layer.role=="model")state.household.model else state.household.human,layer.anchor.action))
+            is NativeSceneLayer.Occupant -> {
+                val a=if(layer.role=="model")state.household.model else state.household.human
+                add(r.atlas.baseCreatureKey(a,layer.anchor.action));add(r.atlas.creatureKey(a,layer.anchor.action))
+            }
         }
         if(editing && panel=="room")r.cat.assets.values.filter{it.family==family}.forEach { add(r.atlas.furnitureKey(it,NativePaintPart.WHOLE,emptyMap())) }
-        if(panel=="appearance")add(r.atlas.creatureKey(if(role=="model")state.household.model else state.household.human,action))
+        if(panel=="appearance") {
+            val a=if(role=="model")state.household.model else state.household.human
+            add(r.atlas.baseCreatureKey(a,action));add(r.atlas.creatureKey(a,action,prop))
+        }
     }
     val bitmaps by produceState<Map<String,android.graphics.Bitmap>>(emptyMap(),r.atlas,keys) {
         value=withContext(Dispatchers.IO){r.atlas.load(keys)}
@@ -141,7 +148,7 @@ private fun NativeStudioPage(r: StudioResources) {
     val unsupported = items.count { item -> item.visible && r.cat.assets[item.assetId]?.let {
         !r.atlas.has(r.atlas.furnitureKey(it,NativePaintPart.WHOLE,item.colors))
     } != false }
-    val incompleteAppearance = r.atlas.customized(state.household.model) || (state.household.humanEnabled && r.atlas.customized(state.household.human))
+    val incompleteAppearance = keys.any{it.startsWith("cc|") && it !in bitmaps}
     val missing = keys.count { r.atlas.has(it) && it !in bitmaps }
     val selectedItem=items.firstOrNull{it.id==selected}
     val chosenAsset=selectedItem?.let{r.cat.assets[it.assetId]}
@@ -250,17 +257,48 @@ private fun NativeStudioPage(r: StudioResources) {
             }
             val a=if(role=="model")state.household.model else state.household.human
             val def=r.appearance.bodies.getValue(a.bodyId)
-            val bitmap=bitmaps[r.atlas.creatureKey(a,action)]
+            val bitmap=bitmaps[r.atlas.creatureKey(a,action,prop)]?:bitmaps[r.atlas.baseCreatureKey(a,action)]
             Box(Modifier.fillMaxWidth().height(220.dp),contentAlignment=Alignment.Center) {
                 if(bitmap!=null)Image(bitmap.asImageBitmap(),contentDescription=r.names[a.bodyId],modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Fit)
             }
             StudioSection {
                 if(role=="human")Row(verticalAlignment=Alignment.CenterVertically){Text("启用我的动物",Modifier.weight(1f));Switch(checked=state.household.humanEnabled,onCheckedChange={change(state.copy(household=state.household.copy(humanEnabled=it)))})}
-                NativeStudioChoice("动物",a.bodyId,r.names.entries.map{it.key to it.value}) { body-> changeAppearance(RestAppearancePolicy.chooseBody(r.appearance,a,body)) }
+                NativeStudioChoice("动物",a.bodyId,r.names.entries.map{it.key to it.value}) { body-> prop=null;changeAppearance(RestAppearancePolicy.chooseBody(r.appearance,a,body)) }
                 NativeStudioChoice("配色",a.palette,def.palettes.keys.map{it to it}){palette->changeAppearance(a.copy(palette=palette,colors=emptyMap()))}
-                NativeStudioChoice("动作",action,actionNames.entries.map{it.key to it.value}){action=it}
-                Text("当前为原稿的静态姿态预览。自由配色、配件与原始动画仍待原生迁移。",style=MaterialTheme.typography.bodySmall)
-                if(r.atlas.customized(a))Text("已有自定义设置仍保留，尚未完整呈现。",color=MaterialTheme.colorScheme.error)
+                NativeStudioChoice("动作",action,actionNames.entries.map{it.key to it.value}){action=it;if(it=="sleep")prop=null}
+                val props=remember(a.bodyId,a.palette,action){r.atlas.propOptions(a,action)}
+                if(props.isNotEmpty())NativeStudioChoice("手持道具",prop.orEmpty(),listOf("" to "不拿道具")+props.map{it to (mapOf("book" to "书","flower" to "花","cookie" to "饼干","tea" to "茶","letter" to "信")[it]?:it)}){prop=it.takeIf{v->v.isNotEmpty()}}
+                if(incompleteAppearance)Text("正在绘制自定义形象，失败时保留原稿与设置。",color=MaterialTheme.colorScheme.error)
+                Text("姿态预览使用原稿；连续动画另行验收。",style=MaterialTheme.typography.bodySmall)
+            }
+            StudioSection {
+                Text("身体配色",style=MaterialTheme.typography.titleSmall)
+                val colors=RestAppearancePolicy.colors(r.appearance,a)
+                val colorNames=mapOf("fur" to "毛色","body" to "身体","inner" to "耳内","ear" to "耳朵","tail" to "尾巴","tip" to "尾尖","paw" to "爪爪","hand" to "手手","eye" to "眼睛","blush" to "腮红","belly" to "腹毛","pad" to "肉垫","mark" to "花纹","cheek" to "脸颊","chest" to "胸毛","ink" to "五官","head" to "脑袋","wing" to "翅膀","cap" to "头冠","beak" to "鸟嘴","feet" to "脚","fin" to "鱼鳍","coil" to "盘身","gold" to "金色部件","cream" to "浅色花纹","mask" to "面纹","ring" to "尾环")
+                for((slot,color) in colors)NativeStudioColor(colorNames[slot]?:slot,color){v->changeAppearance(a.copy(colors=a.colors+(slot to v)))}
+                TextButton(onClick={changeAppearance(a.copy(colors=emptyMap()))}){Text("恢复此配色原色")}
+            }
+            StudioSection {
+                Text("配饰",style=MaterialTheme.typography.titleSmall)
+                NativeStudioChoice("眼镜",a.glasses,listOf("none" to "无","round" to "圆框","square" to "方框","sun" to "墨镜","mono" to "单片")){changeAppearance(a.copy(glasses=it))}
+                if(a.glasses!="none")NativeStudioColor("镜框颜色",a.glassesColor){changeAppearance(a.copy(glassesColor=it))}
+                if(def.neck){
+                    NativeStudioChoice("颈饰",a.neck,listOf("none" to "无","tie" to "领带","bow" to "领结","scarf" to "围巾")){changeAppearance(a.copy(neck=it))}
+                    if(a.neck!="none")NativeStudioColor("颈饰颜色",a.neckColor){changeAppearance(a.copy(neckColor=it))}
+                }
+                NativeStudioChoice("徽章",a.badge,listOf("none" to "无","gpt" to "GPT","claude" to "Claude","deepseek" to "DeepSeek","gemini" to "Gemini","grok" to "Grok")){changeAppearance(a.copy(badge=it))}
+                if(a.badge!="none"){
+                    NativeStudioChoice("徽章位置",a.badgePlace,listOf("head" to "头上","chest" to "胸口／侧身")){changeAppearance(a.copy(badgePlace=it,badgeX=0.0,badgeY=0.0,badgeSize=100.0))}
+                    NativeStudioChoice("徽章颜色",a.badgeMode,listOf("original" to "原色","custom" to "自定义")){changeAppearance(a.copy(badgeMode=it))}
+                    if(a.badgeMode=="custom")NativeStudioColor("自定义颜色",a.badgeColor){changeAppearance(a.copy(badgeColor=it))}
+                    NativeStudioAdjust("左右",a.badgeX,-80f..80f){changeAppearance(a.copy(badgeX=it))}
+                    NativeStudioAdjust("上下",a.badgeY,-80f..80f){changeAppearance(a.copy(badgeY=it))}
+                    NativeStudioAdjust("大小",a.badgeSize,30f..200f){changeAppearance(a.copy(badgeSize=it))}
+                    TextButton(onClick={changeAppearance(a.copy(badgeX=0.0,badgeY=0.0,badgeSize=100.0))}){Text("复原徽章位置")}
+                }
+                if(def.horn)NativeStudioSwitch("蛇角",a.horn){changeAppearance(a.copy(horn=it))}
+                if(def.sleepHat)NativeStudioSwitch("睡帽",a.hat){changeAppearance(a.copy(hat=it))}
+                if(def.horn)NativeStudioSwitch("吐信",a.tongue){changeAppearance(a.copy(tongue=it))}
             }
         }
         Text("${roomNames[state.room]} · ${items.size} 件家具",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -338,4 +376,17 @@ private fun NativeStudioColor(label:String,value:String,onChoose:(String)->Unit)
         },confirmButton={TextButton(enabled=valid,onClick={onChoose(text.lowercase());open=false}){Text("应用")}},
             dismissButton={TextButton(onClick={open=false}){Text("取消")}})
     }
+}
+
+@Composable
+private fun NativeStudioSwitch(label:String,checked:Boolean,onChange:(Boolean)->Unit){
+    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+        Text(label,Modifier.weight(1f));Switch(checked=checked,onCheckedChange=onChange)
+    }
+}
+@Composable
+private fun NativeStudioAdjust(label:String,value:Double,range:ClosedFloatingPointRange<Float>,onChange:(Double)->Unit){
+    var draft by remember(value){mutableFloatStateOf(value.toFloat().coerceIn(range.start,range.endInclusive))}
+    Text("$label · ${draft.toInt()}",style=MaterialTheme.typography.bodySmall)
+    Slider(value=draft,onValueChange={draft=it},onValueChangeFinished={onChange(draft.toDouble())},valueRange=range)
 }
