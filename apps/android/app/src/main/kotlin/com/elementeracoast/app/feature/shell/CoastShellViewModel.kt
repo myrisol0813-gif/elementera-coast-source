@@ -90,6 +90,7 @@ class CoastShellViewModel(
     val dogtalk: DogtalkRepository get() = backend.dogtalk
     val crossWindowRepository: CrossWindowRepository get() = backend.crossWindow
     val archive: GlobalArchiveRepository get() = backend.archive
+    val dreamApi get() = backend.dreamApi
     private var generationJob: Job? = null
     private class GenerationRun(var ownerId: String) {
         var lease: AutoCloseable? = null
