@@ -23,7 +23,7 @@ function refresh(){
   const colors=$('colors');colors.replaceChildren();
   if(a) {
     const names={upper:'鞋面',sole:'鞋底',primary:'主体',secondary:'次要'};
-    for(const [k,v] of Object.entries(a.slots)){const label=document.createElement('label');label.className='palette';label.textContent=names[k]??k;const input=document.createElement('input');input.type='color';input.value=item.colors[k]??v.base;input.addEventListener('change',()=>edit({type:'color',id:item.id,values:{[k]:input.value}}));label.append(input);colors.append(label)}
+    for(const [k,v] of Object.entries(a.slots)){const label=document.createElement('label');label.className='palette';label.textContent=v.label??names[k]??k;const input=document.createElement('input');input.type='color';input.value=item.colors[k]??v.base;input.addEventListener('change',()=>edit({type:'color',id:item.id,values:{[k]:input.value}}));label.append(input);colors.append(label)}
     for(const p of a.presets)colors.append(btn(p.name,()=>edit({type:'color',id:item.id,values:p.values})));
     if(Object.keys(a.slots).length)colors.append(btn('恢复原色',()=>edit({type:'original',id:item.id})));
   }

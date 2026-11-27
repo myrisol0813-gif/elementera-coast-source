@@ -24,6 +24,8 @@ export async function loadArt({base=new URL('./art/v1/',import.meta.url),fetcher
 }
 
 // Only bundled assets, never arbitrary imported SVG. Images isolate internal IDs and CSS.
+export function shiftInk(original,base,target){if(base.toLowerCase()===target.toLowerCase())return original;return '#'+[1,3,5].map(i=>Math.max(0,Math.min(255,parseInt(original.slice(i,i+2),16)+parseInt(target.slice(i,i+2),16)-parseInt(base.slice(i,i+2),16))).toString(16).padStart(2,'0')).join('')}
+
 export function prepareSvg(source,asset={},colors={},part='whole'){
   if(!['whole','back','front'].includes(part))throw Error('unknown paint layer');
   const doc=new DOMParser().parseFromString(source,'image/svg+xml'),svg=doc.documentElement;
@@ -31,9 +33,10 @@ export function prepareSvg(source,asset={},colors={},part='whole'){
   for(const e of svg.querySelectorAll('*'))for(const a of [...e.attributes]){
     if(/^on/i.test(a.name)||((a.localName==='href'||a.localName==='src')&&!a.value.startsWith('#')))throw Error('external SVG action');
   }
-  const changes=new Map();
+  const changes=new Map();const coordinated=new Map();const patternChanges=new Map();
   for(const [key,val] of Object.entries(colors)){
     const slot=asset.slots?.[key];if(!slot||!hex(val))throw Error('unknown palette slot');
+    if(slot.members){for(const c of slot.members)coordinated.set(c.toLowerCase(),shiftInk(c,slot.base,val));for(const [id,cs] of Object.entries(slot.patterns??{})){if(!patternChanges.has(id))patternChanges.set(id,new Map());for(const c of cs)patternChanges.get(id).set(c.toLowerCase(),shiftInk(c,slot.base,val));}continue;}
     if(slot.selector){
       const root=doc.getElementById(slot.selector.groupId);
       if(!root||!['fill','stroke'].includes(slot.selector.attribute))throw Error('palette group missing');
@@ -50,6 +53,9 @@ export function prepareSvg(source,asset={},colors={},part='whole'){
       }
     }
   }
+  const apply=(node,map)=>{for(const attr of ['fill','stroke','stop-color']){const old=node.getAttribute(attr)?.toLowerCase();if(map.has(old))node.setAttribute(attr,map.get(old))}};
+  if(coordinated.size)for(const node of svg.querySelectorAll('[data-part], [data-part] *'))apply(node,coordinated);
+  for(const [id,map] of patternChanges){const p=doc.getElementById(id);if(!p||p.localName!=='pattern')throw Error('missing palette pattern');for(const node of [p,...p.querySelectorAll('*')])apply(node,map)}
   if(changes.size)for(const node of [svg,...svg.querySelectorAll('*')])for(const attr of ['fill','stroke','stop-color']){
     const old=node.getAttribute(attr)?.toLowerCase();if(changes.has(old))node.setAttribute(attr,changes.get(old));
   }
