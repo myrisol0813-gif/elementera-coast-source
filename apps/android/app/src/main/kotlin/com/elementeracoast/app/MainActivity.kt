@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
                         state = state,
                         chatGpt = chatGpt,
                         services = vm.local,
+                        dreamApi = vm.dreamApi,
                         daily = vm.daily,
                         memory = vm.memory,
                         dogtalk = vm.dogtalk,
