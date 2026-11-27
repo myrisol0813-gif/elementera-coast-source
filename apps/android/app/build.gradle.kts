@@ -208,3 +208,20 @@ android.sourceSets.getByName("main").assets.srcDir(restNativeSprites)
 tasks.matching { it.name in setOf("preBuild", "preDebugBuild", "preReleaseBuild") }.configureEach {
     dependsOn(compileRestNativeSprites)
 }
+
+ // Native custom art rasterizer. Build all existing APK ABIs; no runtime web engine.
+val restNativeJni = layout.buildDirectory.dir("generated/rest-native-jni")
+val compileRestNativeJni by tasks.registering(Exec::class) {
+    val crate = rootProject.file("native-art")
+    inputs.file(crate.resolve("Cargo.toml"))
+    inputs.dir(crate.resolve("src"))
+    outputs.dir(restNativeJni)
+    workingDir(crate)
+    environment("CARGO_TARGET_DIR", layout.buildDirectory.dir("native-art-target").get().asFile.absolutePath)
+    commandLine("cargo", "ndk", "-t", "arm64-v8a", "-t", "armeabi-v7a", "-t", "x86", "-t", "x86_64",
+        "-p", "26", "-o", restNativeJni.get().asFile.absolutePath, "build", "--release")
+}
+android.sourceSets.getByName("main").jniLibs.srcDir(restNativeJni)
+tasks.matching { it.name in setOf("preBuild", "preDebugBuild", "preReleaseBuild") }.configureEach {
+    dependsOn(compileRestNativeJni)
+}
