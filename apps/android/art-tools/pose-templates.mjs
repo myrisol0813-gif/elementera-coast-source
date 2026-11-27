@@ -66,11 +66,11 @@ function authoredMatrix(e){
 // CSS tracks keep their own periods; native time sampling combines them.
 function captureMotion(svg,{indexed=false}={}){
   const tracks=[],animated=svg.getAnimations({subtree:true}),elements=[svg,...svg.querySelectorAll('*')];
-  const idFor=e=>e?.getAttribute('id')||(anonymous&&e?'@'+elements.indexOf(e):null);
+  const idFor=e=>indexed&&e?'@'+elements.indexOf(e):e?.getAttribute('id');
   for(const a of animated){a.pause();a.currentTime=0}
-  const seen=new Set(),elements=[svg,...svg.querySelectorAll('*')];
+  const seen=new Set();
   for(const a of animated){
-    const target=a.effect?.target, id=indexed&&target?'@'+elements.indexOf(target):target?.getAttribute('id'), timing=a.effect?.getTiming();
+    const target=a.effect?.target, id=idFor(target), timing=a.effect?.getTiming();
     if(!id||!timing||typeof timing.duration!=='number'||timing.duration<=0)continue;
     const frames=a.effect.getKeyframes();
     a.effect.updateTiming({delay:0});
