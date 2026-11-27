@@ -327,3 +327,37 @@ test('owner media limits are independent, zero disables the tool, claimed attemp
   assert.equal(await reserveDreamTool(db,claim,0,3,'voice_create',due),false);
   assert.ok(await reserveDreamTool(db,claim,0,4,'dream_write_note',due));
 });
+
+
+test('autonomous memory proposal enters pending only, suppresses duplicates and cannot forge source',async()=>{
+  const {db,cid,env,opts,rev}=await fixture({allowMemoryCandidate:true,toolBudget:5,tokenBudget:24000});
+  const {listPockets,resolvePocket,createPocket}=await import('../functions/memory-store/memory-pocket-store.js');
+  const {claimDreamTide}=await import('../functions/dream-tide-ledger.js');
+  const {reserveDreamStep,recordDreamStep,reserveDreamTool}=await import('../functions/dream-tide-records.js');
+  const {proposeDreamMemory}=await import('../functions/dream-tide-memory.js');
+  const input={title:'一颗候选',content:'fixture memory candidate',destination:'memory'};
+  let requests=0;
+  const result=await executeDreamTide(env,cid,{...opts,invoke:async(_,payload)=>{
+    requests++;
+    if(requests===1){assert.ok(payload.tools.some(t=>t.function.name==='dream_memory_candidate'));return response([toolCall('m1','dream_memory_candidate',input),toolCall('m2','dream_memory_candidate',input)]);}
+    return response();
+  }});
+  assert.equal(result.status,'completed');
+  const pockets=await listPockets(db,{conversation_id:cid});
+  assert.equal(pockets.length,1);assert.equal(pockets[0].source_type,'dream_tide');assert.equal(pockets[0].source_ref.claim_id,result.claimId);
+  assert.equal(pockets[0].suggested_destination,'memory');assert.equal(pockets[0].source_ref.turn_id,undefined);
+  assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM memory_entries').first()).n,0);
+  assert.equal((await readDreamActivity(db,cid))[0].tools[0].receipt.record_id,pockets[0].id);
+  await assert.rejects(()=>createPocket(db,{conversation_id:cid,source_type:'dream_tide',source_text:'forged'}));
+  await resolvePocket(db,pockets[0].id,{action:'discard'});
+  const claim=await claimDreamTide(db,cid,{now:due+86400000,currentModelId:model,busy:false});
+  assert.ok(claim);assert.ok(await reserveDreamStep(db,claim,0,due+86400000));
+  assert.ok(await recordDreamStep(db,claim,0,'completed',{},due+86400000));
+  assert.ok(await reserveDreamTool(db,claim,0,0,'dream_memory_candidate',due+86400000));
+  const context={autonomous_activity:true,autonomous_claim:claim,conversation_id:cid,model_label:model,autonomous_event:{step:0,index:0}};
+  assert.equal((await proposeDreamMemory(db,input,context)).status,'duplicate_suppressed');
+  assert.equal((await listPockets(db,{conversation_id:cid})).length,0);
+  await disarmDreamTide(db,cid,rev);
+  await assert.rejects(()=>proposeDreamMemory(db,{...input,content:'revoked'},context),/权限已撤回/);
+  assert.equal((await readConversationState(db,cid)).turns.length,1);
+});
