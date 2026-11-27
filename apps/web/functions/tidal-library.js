@@ -221,13 +221,26 @@ export async function writeLibraryNote(db,input,ctx={}) {
     } else quote=paragraph;
   }
   const id=`note_${crypto.randomUUID()}`,now=Date.now();
-  await run(db,`INSERT INTO coast_library_notes
-    (id,book_id,chapter_index,paragraph_index,quote,kind,body,author,source,conversation_id,source_turn_id,created_at,updated_at,start_offset,end_offset)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,[
-    id,input.book_id,chapter_index,paragraph_index,quote,kind,body,actor(ctx),
+  const values=[id,input.book_id,chapter_index,paragraph_index,quote,kind,body,actor(ctx),
     ctx.surface==='official_mcp'?'official_mcp':ctx.author==='owner'?'manual':'coast_chat',
-    ctx.conversation_id||null,ctx.source_turn_id||null,now,now,start_offset,end_offset,
-  ]);
+    ctx.conversation_id||null,ctx.source_turn_id||null,now,now,start_offset,end_offset];
+  const claim=ctx.autonomous_claim;
+  if(claim){
+    // The final INSERT, not just the previous permission check, is fenced
+    // by the current activity revision. No fabricated chat source turn.
+    const result=await db.prepare(`INSERT INTO coast_library_notes
+      (id,book_id,chapter_index,paragraph_index,quote,kind,body,author,source,conversation_id,source_turn_id,created_at,updated_at,start_offset,end_offset)
+      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS(
+        SELECT 1 FROM dream_tide_runs r JOIN dream_tide_arms a ON a.conversation_id=r.conversation_id
+        JOIN conversations c ON c.id=r.conversation_id
+        WHERE r.claim_id=? AND r.conversation_id=? AND r.arm_revision=? AND r.status='running'
+        AND a.enabled=1 AND a.revision=r.arm_revision AND json_extract(a.config_json,'$.execution.allowLibraryWrite')=1
+        AND c.user_id='owner' AND c.deleted_at IS NULL AND c.room_type='main' AND c.source='coast' AND c.conversation_kind='chat'
+      )`).bind(...values,claim.claimId,ctx.conversation_id,claim.revision).run();
+    if(result.meta.changes!==1)throw new LibraryError('permission_revoked','自主活动的书房写入权限已撤回。',403);
+  }else await run(db,`INSERT INTO coast_library_notes
+    (id,book_id,chapter_index,paragraph_index,quote,kind,body,author,source,conversation_id,source_turn_id,created_at,updated_at,start_offset,end_offset)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,values);
   return first(db,'SELECT * FROM coast_library_notes WHERE id = ?',[id]);
 }
 export async function editLibraryNote(db,id,patch,ctx={}) {
