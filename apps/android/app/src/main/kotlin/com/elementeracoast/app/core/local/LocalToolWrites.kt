@@ -9,7 +9,7 @@ import kotlinx.serialization.json.*
 internal class LocalToolFailure(val code:String,message:String):IllegalArgumentException(message)
 
 /** Model writes use canonical local stores and retain their source; never impersonate the owner. */
-internal class LocalToolWrites(private val s:LocalPersistence,private val cid:String,private val turn:String,
+internal class LocalToolWrites(private val s:LocalPersistence,private val cid:String,private val turn:String?,
     private val model:String,private val auditId:String) {
     private val cache=RemoteCacheStore(s,strictReads=true)
     private val room=cache.conversations().first{it.id==cid}.roomType
@@ -26,6 +26,7 @@ internal class LocalToolWrites(private val s:LocalPersistence,private val cid:St
     private fun result(id:String)=buildJsonObject{put("ok",true);put("id",id);put("saved",true)}
     fun execute(name:String,input:JsonObject):JsonObject {
         require(label.isNotBlank())
+        if(turn==null)require(name=="library_write"&&input["action"]?.jsonPrimitive?.content=="create")
         return when(name){
             "create_moment"->{
                 val m=RemoteDailyMoment(id=id,date=input.date(),author=actor,source="chat_tool",
@@ -115,7 +116,7 @@ internal class LocalToolWrites(private val s:LocalPersistence,private val cid:St
                 if(kind !in setOf("append","rewrite","refine"))throw LocalToolFailure("invalid_arguments","请选择 append、rewrite 或 refine。")
                 if(LocalSoilStore(s).current(cid)?.get("auto_refresh_enabled")?.jsonPrimitive?.int!=1)
                     throw LocalToolFailure("permission_revoked","当前窗口未开启自动整理。")
-                val candidate=LocalPortraitStore(s).propose(if(name=="user_portrait_propose")"user_portrait" else "self_portrait",body,kind,reason,cid,turn,label)
+                val candidate=LocalPortraitStore(s).propose(if(name=="user_portrait_propose")"user_portrait" else "self_portrait",body,kind,reason,cid,requireNotNull(turn),label)
                 result(candidate)
             }
             "memory_write_candidate"->{
