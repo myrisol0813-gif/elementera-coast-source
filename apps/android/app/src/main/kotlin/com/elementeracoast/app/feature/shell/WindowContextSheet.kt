@@ -75,7 +75,8 @@ internal fun WindowContextSheet(
     onSettingsChange: (ConversationContextSettings) -> Unit,
     onSetThoughtSoilEnabled: (Boolean) -> Unit,
     onOpenIslandLetter: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    dreamApi: com.elementeracoast.app.core.network.CoastApiClient? = null
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -85,6 +86,11 @@ internal fun WindowContextSheet(
     var usageAccess by remember { mutableStateOf(AndroidRealityContextSource.hasUsageAccess(context)) }
     var stepsAccess by remember { mutableStateOf(AndroidRealityContextSource.hasActivityRecognitionPermission(context)) }
     var locationAccess by remember { mutableStateOf(AndroidRealityContextSource.hasCoarseLocationPermission(context)) }
+    var showDream by remember(conversationId){mutableStateOf(false)}
+    if(showDream&&dreamApi!=null){
+        DreamTideSheet(conversationId,selectedModel,localMode,dreamApi,onDismiss={showDream=false})
+        return
+    }
     var weatherCity by rememberSaveable(conversationId, settings.weatherCity) { mutableStateOf(settings.weatherCity) }
 
     fun refreshPermissions() {
@@ -224,6 +230,14 @@ internal fun WindowContextSheet(
                     enabled = usable,
                     onCheckedChange = onSetThoughtSoilEnabled
                 )
+            }
+
+            if(usable&&roomType=="main"&&dreamApi!=null){
+                SoftSettingsCard {
+                    Text("自主唤醒",style=MaterialTheme.typography.titleSmall)
+                    Text("仅本窗口 · 唤醒设置、自主手记与活动记录",style=MaterialTheme.typography.bodySmall)
+                    Button(onClick={showDream=true}){Text("打开自主唤醒")}
+                }
             }
 
             if (wantsUsagePermission || wantsStepsPermission || wantsLocationPermission) {
