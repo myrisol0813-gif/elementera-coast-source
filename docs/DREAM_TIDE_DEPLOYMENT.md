@@ -166,3 +166,21 @@ audio player and a bounded sampled image preview on the same workspace
 transport. Missing originals are not regenerated. This is owner-facing
 navigation, not automatic model vision readback. Interrupted saves without a
 settled receipt can still be traced from the original to its activity.
+
+## Optional autonomous image readback
+
+The independent allowImageReadback flag defaults false. A successful image
+save is not delivery. Only the current activity's newly saved original may
+be read back, only into the same exact chat route, when the provider catalog
+explicitly reports image input support. Native also checks current window
+write permission before continuation. The next request receives a labelled
+system-transferred image envelope (wire user role, never stored as a human
+message). At most 8 MiB total original bytes per continuation, estimated
+2048 tokens per image, cumulative token and reported context budget checked;
+no repeated pixel injection in later requests. Durable step receipts include
+only original IDs and accepted/unconfirmed response status, not base64,
+prompt, or claims of visual comprehension. Insufficient budget stops the
+continuation without regenerating or removing saved originals. Old drafts
+default off; archive import still disables wake. Offline fixtures cover
+explicit opt-in, known/unknown vision, budget, exact original pixels, and
+one-shot transport. Real provider compatibility requires later acceptance.
