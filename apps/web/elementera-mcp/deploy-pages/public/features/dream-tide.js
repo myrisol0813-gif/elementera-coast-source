@@ -1,7 +1,7 @@
 import {escapeHtml as h,escapeAttribute as a,q} from '../core/dom.js';
 import {requestJson} from '../core/api.js';
 const BASE='/api/chat/dream-tide';
-const modules=[['includeTime','当前时间'],['includePrevious','上次活动与间隔'],['includeReplies','自主手记与回复'],['readHistory','允许自主选读窗口历史'],['writeNote','允许写自主手记'],['includeCustom','核心自定义'],['includeUserPortrait','用户画像'],['includeSelfPortrait','自我画像'],['includeConversationCount','期间新增对话轮数'],['includeWeather','天气（需窗口现实权限）'],['includeCalendar','未来日历（需窗口现实权限）'],['includeSteps','步数（目前仅本机 Android 可取得）'],['includeAppUsage','应用使用情况（目前仅本机 Android 可取得）'],['allowWeb','独立联网（已配置供应商）'],['allowLibrary','书房阅读'],['allowMemory','按需检索正式记忆'],['allowCalendar','查阅日历'],['allowCollection','查阅收藏'],['allowLibraryWrite','创建自己的书房笔记']];
+const modules=[['includeTime','当前时间'],['includePrevious','上次活动与间隔'],['includeReplies','自主手记与回复'],['readHistory','允许自主选读窗口历史'],['writeNote','允许写自主手记'],['includeCustom','核心自定义'],['includeUserPortrait','用户画像'],['includeSelfPortrait','自我画像'],['includeConversationCount','期间新增对话轮数'],['includeWeather','天气（需窗口现实权限）'],['includeCalendar','未来日历（需窗口现实权限）'],['includeSteps','步数（目前仅本机 Android 可取得）'],['includeAppUsage','应用使用情况（目前仅本机 Android 可取得）'],['allowWeb','独立联网（已配置供应商）'],['allowLibrary','书房阅读'],['allowMemory','按需检索正式记忆'],['allowCalendar','查阅日历'],['allowCollection','查阅收藏'],['allowLibraryWrite','创建自己的书房笔记'],['allowDailyWrite','新增自己的日记与动态'],['allowCalendarWrite','新增日历事项']];
 const names={running:'活动中',completed:'已结束',failed:'未完成',cancelled:'已取消',interrupted:'已中断',claimed:'已认领，结果未确认'};
 const toolNames={dream_read_history:'阅读历史',dream_write_note:'写自主手记',dream_schedule_extra:'提议额外唤醒'};
 const row=(label,body)=>'<label>'+h(label)+body+'</label>';
