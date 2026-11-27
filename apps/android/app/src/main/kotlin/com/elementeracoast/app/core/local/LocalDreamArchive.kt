@@ -44,6 +44,7 @@ internal class LocalDreamArchive(private val store:LocalPersistence){
     }
     fun export(cid:String):JsonObject?{
         val history=history(cid)
+        require(history.rows("runs").none{it.str("status")=="running"}){"窗口正在自主唤醒，请结束活动后再归档。"}
         val draft=store.get(draftKey(cid)).takeIf{it.isNotBlank()}?.let{json.decodeFromString(DreamSettings.serializer(),it)}
         val settings=if(draft?.config!=null&&draft.modelId!=null)buildJsonObject{
             put("modelId",draft.modelId);put("config",json.encodeToJsonElement(DreamConfig.serializer(),draft.config))
