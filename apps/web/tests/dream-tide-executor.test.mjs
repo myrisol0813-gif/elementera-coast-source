@@ -65,3 +65,47 @@ test('since previous selection only includes messages in time interval',async()=
   const range=await readDreamHistory(db,cid,{mode:'since_previous',since:armAt,until:due,maxTurns:3,count:1});
   assert.deepEqual(range.turns[0].messages.map(m=>m.content),['answer-original']);
 });
+
+test('explicit autonomous modules and ordinary registered reading, independent library creation, no fake turn or leaked receipt',async()=>{
+  const {env,db,cid,opts,rev}=await fixture({allowLibrary:true,allowLibraryWrite:true,allowMemory:false,allowCalendar:true,includeCustom:true,includeSteps:true,toolBudget:4,tokenBudget:22000});
+  const {writeCustomInstructions}=await import('../functions/memory-store.js');
+  const {createLibraryBook,listLibraryNotes,writeLibraryNote}=await import('../functions/tidal-library.js');
+  const {claimDreamTide}=await import('../functions/dream-tide-ledger.js');
+  await writeCustomInstructions(db,{content:'explicit-custom-fixture'});
+  const book=await createLibraryBook(db,{title:'fixture-book',format:'txt',chapters:[{title:'Chapter',body:'original page fixture'}]});
+  let n=0;
+  const out=await executeDreamTide(env,cid,{...opts,invoke:async(_,payload)=>{
+    n++;const wire=JSON.stringify(payload.messages);
+    if(n===1){
+      assert.ok(wire.includes('explicit-custom-fixture'));assert.ok(wire.includes('未取得设备'));
+      const names=payload.tools.map(t=>t.function.name);
+      assert.ok(names.includes('library_read')&&names.includes('library_write')&&names.includes('calendar_list'));
+      assert.ok(!names.includes('memory_search')&&!names.includes('independent_web_search')&&!names.includes('read_mystic_dogtalk'));
+      return response([toolCall('r','library_read',{book_id:book.id,chapter_index:0})]);
+    }
+    if(n===2){assert.ok(wire.includes('original page fixture'));return response([toolCall('w','library_write',{action:'create',book_id:book.id,kind:'reflection',body:'independent note fixture'})]);}
+    return response();
+  }});
+  assert.equal(out.status,'completed');assert.equal(n,3);
+  const notes=await listLibraryNotes(db,{book_id:book.id});
+  assert.equal(notes.length,1);assert.equal(notes[0].author,'assistant');assert.equal(notes[0].source_turn_id,null);
+  const activity=(await readDreamActivity(db,cid))[0];
+  assert.equal(activity.tools[1].receipt.record_id,notes[0].id);
+  assert.ok(!JSON.stringify(activity.tools).includes('independent note fixture'));assert.ok(!JSON.stringify(activity.tools).includes('original page fixture'));
+  assert.equal((await readConversationState(db,cid)).turns.length,1);
+  const claim=await claimDreamTide(db,cid,{now:due+86400000,currentModelId:model,busy:false});
+  assert.ok(claim);await disarmDreamTide(db,cid,rev);
+  await assert.rejects(()=>writeLibraryNote(db,{book_id:book.id,kind:'reflection',body:'revoked note'},{author:'assistant',conversation_id:cid,autonomous_claim:claim}),/权限已撤回/);
+  assert.equal((await listLibraryNotes(db,{book_id:book.id})).length,1);
+});
+test('disabled modules never attach documents or expose unapproved common tools',async()=>{
+  const {env,db,cid,opts}=await fixture({includeCustom:false,allowLibrary:false,allowMemory:false});
+  const {writeCustomInstructions}=await import('../functions/memory-store.js');
+  await writeCustomInstructions(db,{content:'must-not-inject'});
+  const out=await executeDreamTide(env,cid,{...opts,invoke:async(_,payload)=>{
+    assert.ok(!JSON.stringify(payload).includes('must-not-inject'));
+    assert.ok(!payload.tools.some(t=>['memory_search','library_read','library_write'].includes(t.function.name)));
+    return response();
+  }});
+  assert.equal(out.status,'completed');
+});
