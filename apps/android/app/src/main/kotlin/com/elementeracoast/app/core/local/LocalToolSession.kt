@@ -154,7 +154,7 @@ internal class LocalToolSession private constructor(
         val start=System.currentTimeMillis()
         if(name.startsWith("sticker_"))return executeSticker(spec,arguments,start)
         if(name=="image_generate")return executeImage(spec,arguments,start)
-        if(name=="voice_create")return executeVoice(spec,arguments,start)
+        if(name=="voice_create")return executeVoice(spec,arguments,start,callId)
         if(name in WRITE_NAMES)return executeWrite(spec,arguments,start,callId)
         var success=false
         var output=buildJsonObject{put("ok",false);put("message","工具没有执行。")}
@@ -257,7 +257,7 @@ internal class LocalToolSession private constructor(
         return RemoteNativeToolResult(ok=success,output=output.toString(),deskSlip=receipt,furnitureRuns=listOf(RemoteFurnitureRun(id=id,toolKey=spec.key,label=spec.title,status=if(success)"success"else "error")))
     }
     private var voiceAttempted=false
-    private fun executeVoice(spec:Spec,arguments:String,start:Long):RemoteNativeToolResult {
+    private fun executeVoice(spec:Spec,arguments:String,start:Long,callId:String):RemoteNativeToolResult {
         val auditId=UUID.randomUUID().toString()
         val output=try{
             require(arguments.length<=6000)
@@ -265,15 +265,18 @@ internal class LocalToolSession private constructor(
             val text=input.getValue("text").jsonPrimitive.let{require(it.isString);it.content.trim()}
             require(text.length in 1..2400)
             val provider=voice?:error("语音未配置。")
-            fun allowed(s:LocalPersistence)=allowedNow(s,spec)&&LocalSideRecords(s).clips(cid).none{it["turn_id"]?.jsonPrimitive?.contentOrNull==turn&&it["source"]?.jsonPrimitive?.contentOrNull=="coast_chat"}
+            val independentId=autonomousClaim?.let{"voice_dream_"+callId.replace(':','_')}
+            fun allowed(s:LocalPersistence)=allowedNow(s,spec)&&if(autonomousClaim!=null){
+                LocalDreamLedger(s).toolClaimed(autonomousClaim,callId,"voice_create")&&LocalSideRecords(s).clips(cid).none{it["id"]?.jsonPrimitive?.contentOrNull==independentId}
+            }else LocalSideRecords(s).clips(cid).none{it["turn_id"]?.jsonPrimitive?.contentOrNull==turn&&it["source"]?.jsonPrimitive?.contentOrNull=="coast_chat"}
             if(voiceAttempted||!store.readConsistent{allowed(it)}||!provider.configured())throw LocalToolFailure("permission_revoked","本轮已有语音尝试或授权已关闭。")
             if(estimated+estimate(arguments)+512>toolBudget)throw LocalToolFailure("budget_exceeded","本轮工具预算不足，未发起语音生成。")
             voiceAttempted=true
             val audio=provider.generate(text)
             store.atomic{s->
                 if(!allowed(s)||!provider.configured())throw LocalToolFailure("permission_revoked","原窗口或语音授权已变化；未保存。")
-                val row=saveLocalVoice(s,cid,turn,null,"coast_chat",modelId,audio)
-                val value=buildJsonObject{put("ok",true);put("id",row.getValue("id"));put("provider","elevenlabs");put("voice_id",audio.voiceId);put("audio_bytes",audio.bytes.size);put("saved",true);put("turn_id",turn)}
+                val row=if(independentId!=null)saveLocalVoice(s,cid,null,null,"dream_tide",modelId,audio,independentId) else saveLocalVoice(s,cid,turn,null,"coast_chat",modelId,audio)
+                val value=buildJsonObject{put("ok",true);put("id",row.getValue("id"));put("provider","elevenlabs");put("voice_id",audio.voiceId);put("audio_bytes",audio.bytes.size);put("saved",true);put("turn_id",if(autonomousClaim!=null)JsonNull else JsonPrimitive(turn))}
                 if(estimated+estimate(arguments)+estimate(value.toString())+32>toolBudget)throw LocalToolFailure("budget_exceeded","本轮工具预算不足，未保存。")
                 auditWrite(s,auditId,spec.key,start,true)
                 value
@@ -424,15 +427,15 @@ internal class LocalToolSession private constructor(
     companion object {
         const val MAX_CALLS=com.elementeracoast.app.core.network.TurnToolPolicy.MAX_CALLS
         private val WRITE_NAMES=setOf("image_generate","voice_create","create_moment","create_diary","moment_comment","moment_like","calendar_create","library_write","memory_write_candidate","global_excerpt_propose","user_portrait_propose")
-        fun openAutonomous(store:LocalPersistence,claim:LocalDreamLedger.Claim,web:LocalIndependentWeb?=null):LocalToolSession?{
+        fun openAutonomous(store:LocalPersistence,claim:LocalDreamLedger.Claim,web:LocalIndependentWeb?=null,voice:LocalVoiceProvider?=null):LocalToolSession?{
             val h=RemoteCacheStore(store,strictReads=true).history(claim.cid)?:return null
             val e=requireNotNull(claim.config.execution)
             val read=h.contextSettings.localModelToolsEnabled
-            val write=h.contextSettings.localModelWriteEnabled&&(e.allowLibraryWrite||e.allowDailyWrite||e.allowCalendarWrite)
+            val write=h.contextSettings.localModelWriteEnabled&&(e.allowLibraryWrite||e.allowDailyWrite||e.allowCalendarWrite||e.allowVoice)
             if(!read&&!write)return null
             val session=LocalToolSession(store,claim.cid,"",null,false,read,write,claim.model,
                 RemoteDeskSlip(contextBudget=RemoteDeskContextBudget(comfortCeiling=e.tokenBudget)),web=web,
-                autonomousClaim=claim)
+                voice=voice,autonomousClaim=claim)
             return session.takeIf{it.completionsTools.isNotEmpty()}
         }
         fun open(store:LocalPersistence,cid:String,turn:String,request:RemoteCrossWindowRequest?,base:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null,web:LocalIndependentWeb?=null,voice:LocalVoiceProvider?=null,image:LocalImageTool?=null,messageId:String?=null,sequenceId:String?=null):LocalToolSession?{
