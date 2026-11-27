@@ -70,3 +70,39 @@ test('trusted scheduler only dispatches due armed windows, obeys deployment cap 
   assert.equal(calls[0].window,cid);assert.equal(calls[0].opts.expectedRevision,saved.revision);assert.equal(calls[0].opts.currentModelId,modelId);
   assert.equal((await runDreamTideTick(env,{now:due+1,execute})).attempts,0);
 });
+
+test('a long scheduled activity cannot start another window using a stale time',async()=>{
+  const {db,cid,env}=await fixture();
+  const next=await createConversation(db,'quiet-after-first','main');
+  const quietConfig={...config,quietHours:{start:'09:01',end:'10:00'}};
+  // Stable lexicographic dispatch order is intentionally irrelevant: both
+  // windows become quiet before the first activity returns.
+  for(const id of [cid,next.id])await configureDreamTide(db,id,quietConfig,modelId,{enable:true,now:due-86400000});
+  let live=due;
+  const calls=[];
+  const execute=async(_env,window,opts)=>{
+    calls.push(window);
+    const claim=await claimDreamTide(db,window,opts);assert.ok(claim);
+    live=due+120000;
+    assert.equal(opts.clock(),live);
+    assert.ok(await settleDreamTide(db,claim,'completed',opts.clock()));
+    return {status:'completed'};
+  };
+  const tick=await runDreamTideTick(env,{clock:()=>live,execute});
+  assert.equal(tick.completed,1);assert.equal(tick.attempts,1);assert.equal(calls.length,1);
+  const deferred=calls[0]===cid?next.id:cid;
+  assert.equal((await runDreamTideTick(env,{clock:()=>live,execute})).attempts,0);
+  const remaining=await db.prepare("SELECT COUNT(*) AS n FROM dream_tide_runs WHERE conversation_id=?").bind(deferred).first();
+  assert.equal(remaining.n,0);
+});
+test('scheduled Worker uses live time rather than a frozen explicit now',async()=>{
+  const {readFile}=await import('node:fs/promises');
+  const source=await readFile(new URL('../workers/dream-tide-worker.js',import.meta.url),'utf8');
+  assert.match(source,/runDreamTideTick\(env\)/);
+  const {default:worker}=await import('../workers/dream-tide-worker.js');
+  assert.equal(worker.fetch().status,404);
+  let pending;
+  await worker.scheduled({}, {}, {waitUntil(p){pending=p;}});
+  assert.ok(pending instanceof Promise);
+  await pending;
+});
