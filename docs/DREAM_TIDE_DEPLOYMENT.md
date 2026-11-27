@@ -220,13 +220,32 @@ stops the session; no automatic billing-route fallback, retry or claim of
 USD cost. Pixels are transient and reasoning items never enter the archive.
 Shared in-process credential mutex serializes refresh across repositories.
 
-The scheduler is NOT wired to this transport. A selected plan model is
-still draft-only in Native settings. Before enabling, implement and verify
-a local-only grant tied to the particular account connection and window
-revision, explicit soft-budget consent, grant revocation on disconnect or
-account change, catalog refresh, durable claim/step integration, per-window
-quota pause and usage settings link. Do not upload OAuth tokens or copy
-live authorization across archives. Confirm eligibility for unattended
-local scheduling with the integration's terms and test the actual account
-with explicit user consent. API-key wake remains unchanged. No paid or
-plan-funded provider call was made by the development fixtures.
+The Native scheduler and common activity executor are now wired behind a
+separate, default-false COAST_LOCAL_DREAM_PLAN_EXECUTION_ENABLED build
+property, in addition to the ordinary local execution gate. The distributed
+default still permits only plan drafts; never enable the gate merely because
+unit tests pass. A local nonportable grant is bound to the window revision,
+exact model slug, account/client/host and connection epoch (hashed identity),
+with an explicitly accepted soft budget and independently chosen 1–129
+request cap. The last permitted request has no tools. Each request and tool
+uses the existing durable claim and reservation, no alternate API billing
+route. Fresh sign-in and disconnection invalidate the connection epoch;
+revoking or editing the window invalidates its grant. A quota error,
+unavailable usage or terminal authorization restriction pauses old grants
+for that connection, including other windows; explicit reauthorization of
+one window does not restore the others. Status and usage link
+https://chatgpt.com/settings/usage are shown in the Native settings sheet.
+The catalog is refreshed before each autonomous activity. Unknown plan
+vision metadata means the saved image remains in the library, without pixel
+readback on this route. No OAuth token, grant, opaque reasoning or raw
+request is included in portable archives. Grant restoration is prohibited.
+
+The official docs support eligible Responses calls for open-source and
+locally hosted apps, including user-consented plan use and offline token
+refresh. They do not explicitly certify this app's unattended scheduling
+or remotely hosted edition. Keep the production gate off until eligibility
+and terms for the intended unattended use have been confirmed and a
+user-authorized actual-account test has passed. No live provider calls
+were made by development fixtures. The cloud route still rejects plan
+models; a native online-workspace foreground plan login is not a server
+background authorization. API-key wake remains separate.
