@@ -87,6 +87,12 @@ internal class NativeRestSprites(private val assets: AssetManager) {
         poseCache.get(path)?.let{return it}
         return assets.open(root+path).bufferedReader().use{creatureSvg.decode(it.readText())}.also{poseCache.put(path,it)}
     }
+    fun motionFrame(a:RestAppearance,action:String,prop:String?,elapsedMs:Long,maxDimension:Int):Bitmap? = runCatching {
+        val t=template(a,action)?:return null
+        if(t.motion.isEmpty())return null
+        val p=creatureSvg.prepare(t,a,prop,elapsedMs,maxDimension)
+        NativeSvgRaster.render(p.svg,p.width,p.height)
+    }.getOrNull()
     private fun getCustomCreature(key:String):Bitmap? {
         cache.get(key)?.let{return it}
         val req=customCreature(key)?:return null
@@ -108,12 +114,13 @@ internal class NativeRestSpriteSnapshot(
     private val atlas: NativeRestSprites,
     private val bitmaps: Map<String,Bitmap>,
     private val house: RestHousehold,
+    private val moving: Map<String,Bitmap> = emptyMap(),
 ) : NativeRestImages {
     override fun environment(path: String) = bitmaps[atlas.environmentKey(path)]
     override fun furniture(asset: NativeFurnitureAsset, part: NativePaintPart, colors: Map<String,String>) =
         bitmaps[atlas.furnitureKey(asset,part,colors)] ?: bitmaps[atlas.furnitureKey(asset,part,emptyMap())]
     override fun occupant(role: String, action: String):Bitmap? {
         val a=if(role=="model")house.model else house.human
-        return bitmaps[atlas.creatureKey(a,action)]?:bitmaps[atlas.baseCreatureKey(a,action)]
+        return moving[role]?:bitmaps[atlas.creatureKey(a,action)]?:bitmaps[atlas.baseCreatureKey(a,action)]
     }
 }
