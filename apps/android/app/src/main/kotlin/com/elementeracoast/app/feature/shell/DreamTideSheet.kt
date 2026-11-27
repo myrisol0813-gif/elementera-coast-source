@@ -216,7 +216,8 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
                             val name=t.field("tool_name").orEmpty()
                             Text(toolName(name)+" · "+status(t.field("status").orEmpty()),style=MaterialTheme.typography.bodySmall)
                             val id=(t as? JsonObject)?.get("receipt").field("record_id")
-                            if(id!=null&&((name=="voice_create"&&id.startsWith("voice_dream_"))||(name=="image_generate"&&id.startsWith("att_dream_"))))TextButton(onClick={previewId=id}){Text(if(name=="voice_create")"查看原声" else "查看原图")}
+                            val suffix=r.claimId+"_"+t.field("step_index")+"_"+t.field("call_index")
+                            if(id!=null&&((name=="voice_create"&&id=="voice_dream_"+suffix)||(name=="image_generate"&&id=="att_dream_"+suffix)))TextButton(onClick={previewId=id}){Text(if(name=="voice_create")"查看原声" else "查看原图")}
                         }
                         if(r.result.field("extra_scheduled")=="true")Text("已保存额外预约。",style=MaterialTheme.typography.bodySmall)
                         if(r.steps.any{it.field("status")=="claimed"})Text("存在未确认请求，不会自动重放。",style=MaterialTheme.typography.bodySmall)
@@ -262,7 +263,7 @@ private fun DreamMediaPreview(api:CoastApiClient,cid:String,id:String,onDismiss:
                 var sample=1
                 while(maxOf(bounds.outWidth,bounds.outHeight)/sample>2048)sample*=2
                 android.graphics.BitmapFactory.decodeByteArray(bytes,0,bytes.size,android.graphics.BitmapFactory.Options().apply{inSampleSize=sample})
-                    ?:error("图像原件无法解码。")
+                    ?:throw IllegalArgumentException("图像原件无法解码。")
             }
         }catch(c:CancellationException){throw c}catch(e:Exception){error=e.message?:"原件已删除或暂不可访问。"}
     }
