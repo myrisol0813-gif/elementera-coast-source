@@ -333,4 +333,18 @@ class LocalDreamExecutorTest {
         }finally{dir.deleteRecursively()}
     }
 
+
+    @Test fun mediaReservationBudgetsAreIndependentAndZeroDisables(){
+        val (store,initial)=fixture();val ledger=LocalDreamLedger(store)
+        val config=cfg.copy(execution=cfg.execution!!.copy(allowVoice=true,allowImage=true,voiceLimit=2,imageLimit=0))
+        val settings=ledger.configure(cid,DreamSettingsRequest(cid,initial.revision,"arm",config,model,true),true,at-86400000)!!
+        val claim=ledger.claim(cid,settings.revision!!,model,at)!!
+        assertTrue(ledger.reserveStep(claim,0,at));assertTrue(ledger.recordStep(claim,0,true,buildJsonObject{},at))
+        assertFalse(ledger.reserveTool(claim,0,0,"image_generate",at))
+        assertTrue(ledger.reserveTool(claim,0,1,"voice_create",at))
+        assertTrue(ledger.reserveTool(claim,0,2,"voice_create",at))
+        assertFalse(ledger.reserveTool(claim,0,3,"voice_create",at))
+        assertTrue(ledger.reserveTool(claim,0,4,"dream_write_note",at))
+    }
+
 }
