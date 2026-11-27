@@ -531,7 +531,8 @@ const REGISTRY = Object.freeze([
       invoking: '正在书边留下笔迹…', invoked: '书边笔记已处理',
     }),
     handler: async (db,input,context) => {
-      const scope={author:'assistant',surface:context.surface,conversation_id:context.conversation_id||null,source_turn_id:context.source_turn_id||null};
+      const scope={author:'assistant',surface:context.surface,conversation_id:context.conversation_id||null,source_turn_id:context.source_turn_id||null,autonomous_claim:context.autonomous_activity===true?context.autonomous_claim:null};
+      if(context.autonomous_activity===true&&(!scope.autonomous_claim||input.action!=='create'))throw new ToolRegistryError('tool_forbidden','自主活动仅能创建已授权的书房笔记。',403);
       if(input.action==='create') return { note: await writeLibraryNote(db,input,scope) };
       if(input.action==='edit') return { note: await editLibraryNote(db,input.id,{body:input.body},scope) };
       if(input.action==='delete') return deleteLibraryNote(db,input.id,scope);
