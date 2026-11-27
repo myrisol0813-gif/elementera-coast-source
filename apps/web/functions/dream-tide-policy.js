@@ -20,6 +20,7 @@ export function dreamToolAllowed(config,name){
   if(name==='dream_read_history')return e.readHistory===true;
   if(name==='dream_write_note')return e.writeNote===true;
   if(name==='dream_schedule_extra')return config.allowExtra===true&&e.extraPerDay>0;
+  if(name==='voice_create'&&(e.voiceLimit??1)===0||name==='image_generate'&&(e.imageLimit??1)===0)return false;
   return Object.entries(DREAM_TOOL_GROUPS).some(([flag,names])=>e[flag]===true&&names.includes(name));
 }
 export function dreamToolNames(config){
