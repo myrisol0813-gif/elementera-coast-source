@@ -7,9 +7,34 @@ const labels={living:'客厅',study:'书房',bedroom:'卧室',extras:'新家具'
 const btn=(label,fn,pressed)=>{const b=document.createElement('button');b.type='button';b.textContent=label;if(pressed!==undefined)b.setAttribute('aria-pressed',String(pressed));b.addEventListener('click',fn);return b};
 let art,cat,state,renderer,household,creatureEditor,room='living',family='living',editing=false,selected=null,pets=false,drag=null,reducedMotion=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches??false,poseChoices={};
 function message(s,error=false){$('status').textContent=s;$('status').classList.toggle('error',error)}
+const studioKey='rest-box.studio.v1';
+let storageWarning='',restoreFailed=false;
+function saveStudio(){
+ if(restoreFailed)return;
+ try{localStorage.setItem(studioKey,JSON.stringify({version:1,layout:state,household,room,pets,reducedMotion,poseChoices}));storageWarning='';}
+ catch(_){storageWarning=' · 本机保存失败，请导出备份';}
+}
+function restoreStudio(){
+ try{const raw=JSON.parse(localStorage.getItem(studioKey)??'null');if(!raw)return;
+  if(raw.version!==1)throw Error('不支持的造物间存档版本');
+  const layout=restoreLayout(raw.layout,cat),appearance=restoreHousehold(raw.household,art.appearance);
+  state=layout;household=appearance;
+  if(Object.hasOwn(cat.rooms,raw.room))room=raw.room;
+  if(typeof raw.pets==='boolean')pets=raw.pets;
+  if(typeof raw.reducedMotion==='boolean')reducedMotion=raw.reducedMotion;
+  if(raw.poseChoices&&typeof raw.poseChoices==='object'){
+   for(const id of Object.keys(cat.rooms)){
+    const src=raw.poseChoices[id];if(!src||typeof src!=='object')continue;
+    const allowed=new Set(['','none',...roomPreviewSlots(state,cat,id).map(s=>s.key)]);
+    poseChoices[id]=Object.fromEntries(['model','human'].filter(role=>allowed.has(src[role])).map(role=>[role,src[role]]));
+   }
+  }
+ }catch(_){restoreFailed=true;storageWarning=' · 旧存档读取失败，已停止覆盖，请先导出备份或导入有效存档';}
+}
+function savedStatus(){message(labels[room]+' · '+state.rooms[room].length+' 件家具'+storageWarning,Boolean(storageWarning))}
 function chosen(){return state.rooms[room].find(i=>i.id===selected)}
 function uid(){return 'i-'+crypto.randomUUID()}
-function edit(op){try{state=editLayout(state,cat,room,op);if(op.type==='delete'||op.type==='reset')selected=null;if(op.type==='copy')selected=op.newId;if(op.type==='add')selected=op.id;refresh()}catch(e){message(e.message,true)}}
+function edit(op){try{state=editLayout(state,cat,room,op);if(op.type==='delete'||op.type==='reset')selected=null;if(op.type==='copy')selected=op.newId;if(op.type==='add')selected=op.id;saveStudio();refresh()}catch(e){message(e.message,true)}}
 function occupancy(){return pets?previewOccupants(state,cat,room,household,poseChoices[room]??{}):[]}
 function slotPicker(){
   const root=$('poseSlots');root.hidden=!pets;root.replaceChildren();if(!pets)return;
@@ -19,12 +44,12 @@ function slotPicker(){
     const label=document.createElement('label');label.textContent=role==='model'?'模型动物 ':'我的动物 ';
     const select=document.createElement('select');const opts=[['','自动选择'],['none','不展示'],...slots.map(s=>[s.key,s.name+' · '+(s.action==='sleep'?'睡觉':'坐坐')+' · '+s.anchorId])];
     for(const [value,name] of opts){const option=document.createElement('option');option.value=value;option.textContent=name;select.append(option)}
-    select.value=(poseChoices[room]??{})[role]??'';select.onchange=()=>{poseChoices[room]={...poseChoices[room],[role]:select.value};slotPicker();draw()};label.append(select);root.append(label);
+    select.value=(poseChoices[room]??{})[role]??'';select.onchange=()=>{poseChoices[room]={...poseChoices[room],[role]:select.value};saveStudio();savedStatus();slotPicker();draw()};label.append(select);root.append(label);
   }
 }
 async function draw(){try{await renderer.render(state,room,{occupants:occupancy(),selected,editing,household,reducedMotion})}catch(e){message(e.message,true)}}
 function refresh(){
-  $('rooms').replaceChildren(...Object.keys(cat.rooms).map(id=>btn(labels[id],()=>{room=id;selected=null;refresh()},room===id)));
+  $('rooms').replaceChildren(...Object.keys(cat.rooms).map(id=>btn(labels[id],()=>{room=id;selected=null;saveStudio();refresh()},room===id)));
   $('editor').hidden=!editing;$('edit').textContent=editing?'完成':'布置房间';$('scene').classList.toggle('editing',editing);
   $('pets').setAttribute('aria-pressed',String(pets));$('motion').setAttribute('aria-pressed',String(reducedMotion));slotPicker();
   const item=chosen(),a=item&&cat.assets[item.assetId];$('selected').textContent=a?.name??(item?'素材缺失':'未选中家具');
@@ -40,14 +65,14 @@ function refresh(){
   }
   $('families').replaceChildren(...Object.keys(labels).map(id=>btn(labels[id],()=>{family=id;refresh()},family===id)));
   $('catalog').replaceChildren(...Object.values(cat.assets).filter(a=>a.family===family).map(a=>{const b=btn(a.name+(a.provisional?'（待核原稿）':''),()=>edit({type:'add',assetId:a.id,id:uid()}));const img=document.createElement('img');img.src=new URL('art/v1/'+a.file,import.meta.url).href;img.alt='';img.loading='lazy';b.prepend(img);return b}));
-  message(labels[room]+' · '+state.rooms[room].length+' 件家具');draw();
+  savedStatus();draw();
 }
 try{
- art=await loadArt();cat=art.catalogue;state=newLayout(cat);household=newHousehold(art.appearance);renderer=createRoomRenderer($('scene'),art);
- creatureEditor=mountCreatureEditor($('creatureEditor'),art,()=>household,next=>{household=next;slotPicker();draw()});
+ art=await loadArt();cat=art.catalogue;state=newLayout(cat);household=newHousehold(art.appearance);restoreStudio();renderer=createRoomRenderer($('scene'),art);
+ creatureEditor=mountCreatureEditor($('creatureEditor'),art,()=>household,next=>{household=next;saveStudio();savedStatus();slotPicker();draw()});
  $('appearance').onclick=()=>{const show=$('creatureEditor').hidden;$('creatureEditor').hidden=!show;if(show)creatureEditor.refresh();};
  $('edit').onclick=()=>{editing=!editing;selected=null;refresh()};
- $('pets').onclick=()=>{pets=!pets;refresh()};$('motion').onclick=()=>{reducedMotion=!reducedMotion;refresh()};
+ $('pets').onclick=()=>{pets=!pets;saveStudio();refresh()};$('motion').onclick=()=>{reducedMotion=!reducedMotion;saveStudio();refresh()};
  $('reset').onclick=()=>{if(confirm('恢复当前房间默认布局？'))edit({type:'reset'})};
  $('scale').onchange=e=>{if(chosen())edit({type:'scale',id:selected,scale:Number(e.target.value)})};
  for(const b of document.querySelectorAll('[data-op]'))b.onclick=()=>{if(chosen()&&(b.dataset.op!=='delete'||confirm('移除这件家具？')))edit({type:b.dataset.op,id:selected,newId:uid()})};
@@ -58,6 +83,6 @@ try{
  $('scene').addEventListener('pointerup',e=>{if(drag?.pointer!==e.pointerId)return;const d=drag;drag=null;if(d.room===room)edit({type:'move',id:d.id,x:d.x,y:d.y})});
  $('scene').addEventListener('pointercancel',()=>{drag=null;refresh()});
  $('export').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify({version:1,layout:state,household},null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='rest-box-layout.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
- $('import').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>1000000)throw Error('布局文件过大');const raw=JSON.parse(await f.text());const next=restoreLayout(raw.layout??raw,cat),nextHouse=raw.household?restoreHousehold(raw.household,art.appearance):household;state=next;household=nextHouse;selected=null;creatureEditor.refresh();refresh()}catch(e){message(e.message,true)}finally{e.target.value=''}};
+ $('import').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>1000000)throw Error('布局文件过大');const raw=JSON.parse(await f.text());const next=restoreLayout(raw.layout??raw,cat),nextHouse=raw.household?restoreHousehold(raw.household,art.appearance):household;state=next;household=nextHouse;selected=null;poseChoices={};if(restoreFailed&&confirm('是否用导入的有效存档替换无法读取的旧存档？'))restoreFailed=false;saveStudio();creatureEditor.refresh();refresh()}catch(e){message(e.message,true)}finally{e.target.value=''}};
  refresh();
 }catch(e){message('资源加载失败：'+e.message,true)}
