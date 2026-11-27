@@ -43,7 +43,7 @@ internal class NativeDreamPlanSession(
         val remaining=tokenBudget.toLong()-used-estimate
         if(remaining<1){ended=true;throw NativeDreamPlanFailure("plan_soft_budget_exhausted")}
         val allowed=tools.map{it.jsonObject.getValue("function").jsonObject.str("name")}.toSet()
-        val body=NativeDreamPlanProtocol.body(grant.model,instructions+"\\n本次建议输出不超过 "+minOf(remaining,outputHint.toLong())+" token。",base+pixels,tools,remaining)
+        val body=NativeDreamPlanProtocol.body(grant.model,instructions+"\n本次建议输出不超过 "+minOf(remaining,outputHint.toLong())+" token。",base+pixels,tools,remaining)
         if(!authorize()||!reserve()){ended=true;throw NativeDreamPlanFailure("plan_authorization_unavailable")}
         requests++
         // Once reserved, failure is terminal. Previous successful receipts and
