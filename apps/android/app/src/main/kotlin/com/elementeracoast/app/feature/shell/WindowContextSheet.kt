@@ -200,6 +200,7 @@ internal fun WindowContextSheet(
                 }
             }
             SoftSettingsCard {
+                if(roomType=="main")SettingSwitchRow(title="允许回读自主活动",note="普通聊天按需读取本窗口手记与活动摘要；不启动唤醒。本机还需开启模型工具。",checked=settings.dreamReadbackEnabled,enabled=usable,onCheckedChange={onSettingsChange(settings.copy(dreamReadbackEnabled=it))})
                 Text("表情包",style=MaterialTheme.typography.titleSmall)
                 SettingSwitchRow(title="允许发送表情包",note="自主查找并发送已登记素材；本机还需开启模型工具与写入权限。",checked=settings.stickerSendEnabled,enabled=usable,onCheckedChange={onSettingsChange(settings.copy(stickerSendEnabled=it))})
                 SettingSwitchRow(title="允许添加表情包",note="登记自己在当前窗口生成的图片；本机还需写入权限。",checked=settings.stickerAddEnabled,enabled=usable,onCheckedChange={onSettingsChange(settings.copy(stickerAddEnabled=it))})
