@@ -87,8 +87,7 @@ voice/media costs are not included in reported chat-provider token costs.
 Android uses the separately configured on-device ElevenLabs credential and
 existing original-byte store. It requires both the ordinary local model-write
 permission and the window's autonomous voice permission, an active claim and
-reserved tool event. Normal build execution remains disabled. Both the native and online executors permit one voice attempt per activity,
-within the general tool budget. No real speech provider is called by the fixture tests. Neither path
+reserved tool event. Normal build execution remains disabled. Both executors default to one voice attempt per activity, configurable by the owner within the general tool budget. No real speech provider is called by the fixture tests. Neither path
 should promise a hard monetary cap or refund on cancellation.
 
 ## Independent image — disabled until acceptance
@@ -98,7 +97,7 @@ the media deployment gate and configured, selected OpenRouter image model;
 native needs the existing local model-write switch and configured on-device
 OpenRouter image model. Both snapshot the selection, validate the catalog before
 generation, reserve the activity tool, refuse saves after revocation and
-attempt at most one image per activity. Original bytes are in the existing
+default to one image attempt per activity (owner-configurable). Original bytes are in the existing
 attachment store, with att_dream_<claim>_<step>_<index> IDs, null turn_id,
 activity tool receipt and no artificial human/assistant turn. Readback checks
 original bytes but does not send image pixels to the autonomous chat model.
@@ -120,3 +119,11 @@ receipt. Favorites of independent images keep assistant authorship and no
 message ID. New fixture tests cover native ZIP restore and cloud staged
 restore of images, audio and activity history, with the restored arm disabled.
 Cross-workspace end-to-end fixture and actual-device acceptance remain separate.
+
+## Owner media budgets
+
+Both window settings expose voiceLimit and imageLimit (integer 0–128,
+default 1 for old drafts). Each is subject to its separate authorization and
+the total tool budget. Zero disables the tool. The ledger counts reservations,
+not just successful outputs, so failed or interrupted attempts consume their
+allowance. This is not a currency cap. Normal chat media limits are unchanged.
