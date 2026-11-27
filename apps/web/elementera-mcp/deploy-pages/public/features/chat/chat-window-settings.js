@@ -121,6 +121,11 @@ export function createChatWindowSettings({
             ${REPLY_BUDGET_FIELDS.map(field=>replyBudgetRow(settings,field,mediaLocked)).join('')}
             <button class="window-context-link" type="button" data-action="chat:window-reply-budget-save" ${mediaLocked?'disabled':''}><span><strong>保存本窗口预算</strong><small>留空的项目继承基本设置。</small></span><span>›</span></button>
           </section>
+          <section class="window-context-card">
+            <button class="window-context-link" type="button" data-action="chat:window-dream-tide" ${locked||activeConversation()?.room_type!=='main'?'disabled':''}>
+              <span><strong>梦醒潮</strong><small>仅本窗口 · 梦醒设置、小笺与潮痕</small></span><span>›</span>
+            </button>
+          </section>
           <section class="window-context-card window-context-note">
             <strong>PWA 与 Native 的边界</strong>
             <p>PWA 只递入日期、时间和未来 7 天日历，保持轻量，不在聊天前等待天气或设备信息。完整现实上下文仍由 Native 提供。</p>
@@ -168,6 +173,12 @@ export function createChatWindowSettings({
     if (name === 'window-soil-open') {
       close();
       return runtime.memory?.handleAction?.('soil-open', { dataset: { conversationId: runtime.currentId } });
+    }
+    if (name === 'window-dream-tide') {
+      if(isUnavailableConversation()||activeConversation()?.room_type!=='main'||!runtime.currentId)return;
+      const cid=runtime.currentId;
+      close();
+      return runtime.dreamTide?.open(cid);
     }
     if (name === 'window-letter-open') {
       close();
