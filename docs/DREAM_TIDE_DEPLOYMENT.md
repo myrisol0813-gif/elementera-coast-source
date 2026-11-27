@@ -200,3 +200,33 @@ favorites through their existing dependency-aware record restore. No import
 arms the schedule or replays providers. The combined fixtures exercise both
 workspace wire shapes and byte preservation; they are not a live network or
 device round-trip test. Retain same-edition constraints and conflict refusal.
+
+## Native ChatGPT plan transport — isolated preparation, not enabled
+
+Official SIWC preview permits eligible Responses requests using an explicitly
+consented account's plan allowance. See https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations and https://developers.openai.com/siwc/token-sharing-open-source/errors-and-recovery .
+The native plan model route is chatgpt-plan:<catalog slug>, separate from
+local API-key providers. The new protocol and single-shot SSE transport
+require current account/client registration, the exact window and grant
+revision, both direct-use scopes, a matching account model catalog, an
+explicit soft-budget acceptance and a bounded request count. It uses the
+public HTTPS Responses endpoint, store:false and stream:true, namespaced
+Coast function definitions, explicit developer invitation and stateless
+continuation with exact call IDs. Unsupported background, max_output_tokens,
+max_tool_calls and previous_response_id fields are absent. The in-memory
+session checks estimated input, remaining reported usage and durable
+reservation callback before transmission. Unknown usage or failed request
+stops the session; no automatic billing-route fallback, retry or claim of
+USD cost. Pixels are transient and reasoning items never enter the archive.
+Shared in-process credential mutex serializes refresh across repositories.
+
+The scheduler is NOT wired to this transport. A selected plan model is
+still draft-only in Native settings. Before enabling, implement and verify
+a local-only grant tied to the particular account connection and window
+revision, explicit soft-budget consent, grant revocation on disconnect or
+account change, catalog refresh, durable claim/step integration, per-window
+quota pause and usage settings link. Do not upload OAuth tokens or copy
+live authorization across archives. Confirm eligibility for unattended
+local scheduling with the integration's terms and test the actual account
+with explicit user consent. API-key wake remains unchanged. No paid or
+plan-funded provider call was made by the development fixtures.
