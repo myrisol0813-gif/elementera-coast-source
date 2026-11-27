@@ -1,5 +1,5 @@
 import {ensureChatSchema} from './chat-store.js';
-import {dreamTideCandidate} from './dream-tide-schedule.js';
+import {dreamTideCandidate,localClock} from './dream-tide-schedule.js';
 
 // Internal D1 ledger; not reachable from a route or scheduler yet.
 // Only an authenticated owner action may call armDreamTide/disarmDreamTide.
@@ -57,11 +57,20 @@ export async function disarmDreamTide(db,cid,revision){
   // still be in flight. The executor must observe revocation and settle.
   return changed(await stmt(db,"UPDATE dream_tide_arms SET enabled=0,extra_id=NULL,extra_at=NULL WHERE conversation_id=? AND revision=? AND enabled=1",cid,revision).run());
 }
+async function expireExtra(db,arm,now){
+  if(!arm?.extra_id||!time(arm.extra_at)||arm.extra_at>=now)return false;
+  const zone=JSON.parse(arm.config_json).timeZone;
+  if(localClock(arm.extra_at,zone).day>=localClock(now,zone).day)return false;
+  return changed(await stmt(db,`UPDATE dream_tide_arms SET extra_id=NULL,extra_at=NULL WHERE conversation_id=? AND revision=? AND extra_id=? AND extra_at=?
+    AND NOT EXISTS(SELECT 1 FROM dream_tide_runs WHERE conversation_id=? AND status='running')`,
+    arm.conversation_id,arm.revision,arm.extra_id,arm.extra_at,arm.conversation_id).run());
+}
 export async function setDreamTideExtra(db,cid,revision,extraId,at,now=Date.now()){
   if(!id(cid)||!id(revision)||!id(extraId)||!time(at)||!time(now)||at<=now)return false;
   await schema(db);
   const row=await stmt(db,"SELECT * FROM dream_tide_arms WHERE conversation_id=? AND revision=? AND enabled=1",cid,revision).first();
   if(!row||!JSON.parse(row.config_json).allowExtra)return false;
+  await expireExtra(db,row,now);
   // First version has one pending extra appointment. It is never silently replaced.
   return changed(await stmt(db,`UPDATE dream_tide_arms SET extra_id=?,extra_at=? WHERE conversation_id=? AND revision=? AND enabled=1
     AND extra_id IS NULL AND NOT EXISTS(SELECT 1 FROM dream_tide_runs WHERE conversation_id=? AND slot_key=?)`,
@@ -70,7 +79,8 @@ export async function setDreamTideExtra(db,cid,revision,extraId,at,now=Date.now(
 export async function claimDreamTide(db,cid,{now=Date.now(),currentModelId,busy=true}={}){
   if(!id(cid)||!time(now)||busy!==false)return null;
   await schema(db);
-  const arm=await stmt(db,"SELECT * FROM dream_tide_arms WHERE conversation_id=? AND enabled=1",cid).first();
+  let arm=await stmt(db,"SELECT * FROM dream_tide_arms WHERE conversation_id=? AND enabled=1",cid).first();
+  if(await expireExtra(db,arm,now))arm=await stmt(db,"SELECT * FROM dream_tide_arms WHERE conversation_id=? AND enabled=1",cid).first();
   if(!arm||currentModelId!==arm.model_id)return null;
   const config=JSON.parse(arm.config_json);
   const state={armed:true,armedAt:arm.armed_at,busy:false,
