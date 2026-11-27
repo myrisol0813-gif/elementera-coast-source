@@ -73,8 +73,9 @@ other write/media tools still require their own provenance and acceptance. No sc
 
 The online voice path additionally requires COAST_DREAM_MEDIA_ENABLED=true,
 a configured ElevenLabs provider, and per-window execution.allowVoice=true.
-Leave the deployment gate unset: the user-facing permission switch, native
-local parity and full archive/restore acceptance are not finished. This code
+Leave the deployment gate unset until acceptance: the per-window permission
+switch and native voice execution are now wired, but native CI, actual-device
+behavior and full archive/restore acceptance are not confirmed. This code
 does not enable a deployment or perform a provider call in CI. The existing
 voice store holds the real bytes with source=dream_tide, stable activity-derived
 clip ID and null chat turn/message IDs. A single D1 batch fences metadata
@@ -82,3 +83,11 @@ and chunks against the still-authorized tool claim. A saved claim is not
 generated again. Revocation during a provider call can still incur provider
 charges even when saving is refused; do not automatically retry. Separate
 voice/media costs are not included in reported chat-provider token costs.
+
+Android uses the separately configured on-device ElevenLabs credential and
+existing original-byte store. It requires both the ordinary local model-write
+permission and the window's autonomous voice permission, an active claim and
+reserved tool event. Normal build execution remains disabled. The current native
+session permits one voice attempt per activity; online is bounded by its tool
+budget. No real speech provider is called by the fixture tests. Neither path
+should promise a hard monetary cap or refund on cancellation.
