@@ -15,7 +15,7 @@ export const FEATURE_GUIDES = Object.freeze({
   ],
   "window": [
     "这个窗口",
-    "主聊天右上角 ···：打开当前窗口设置。现实上下文只递入启用且成功取得的日期、时间和未来七天日历；完整设备信息由 Android 提供。短句模式适用于闲聊，与连续回复独立。连续回复、表情包权限、纸条、自主唤醒与新居信入口也在这里。"
+    "主聊天右上角 ···：打开当前窗口设置。现实上下文只递入启用且成功取得的日期、时间和未来七天日历；完整设备信息由 Android 提供。短句模式适用于闲聊，与连续回复独立。连续回复、表情包权限、纸条、自主唤醒与新居信入口也在这里。\n自主唤醒：在当前窗口设置中打开，绑定模型、时区和每日固定时间，可允许额外预约，设置独立预算及工具权限。保存设置不等于授权；只有明确同意调用费用并保存授权后才会尝试运行。自主手记可查看与回复，活动记录可核对实际结果。撤回授权可停止后续调度。Android 本机依赖系统后台调度，强停、关机、断网及省电可能中断或延迟；在线需部署调度服务，未开通时仅保存配置。套餐需独立授权，token 为软预算；生图和语音可能另收费。网页端不执行设备套餐调用。"
   ],
   "soil": [
     "整理当前对话的纸条",
@@ -55,7 +55,7 @@ export const FEATURE_GUIDES = Object.freeze({
   ],
   "worldbook": [
     "世界书 / 词典",
-    "词典页面右上角「词条」：新建人物、地点、专有名词或设定；设置关键词、适用范围和常驻状态。在测试框试一句，检查是否命中。"
+    "词典页面右上角「词条」：新建人物、地点、专有名词或设定；设置关键词、适用范围和常驻状态。在测试框试一句，检查是否命中。编辑页可停用词条，也可确认后永久删除所选词条。"
   ],
   "daily": [
     "小组件",
@@ -71,7 +71,7 @@ export const FEATURE_GUIDES = Object.freeze({
   ],
   "calendar": [
     "日历与纪念日",
-    "日历：添加日程、随记及纪念日，选择起始日期和计算方式。开启侧栏展示后可从侧栏查看与编辑。"
+    "日历：添加日程、随记及纪念日，选择起始日期和计算方式。开启侧栏展示后可从侧栏查看与编辑。点击全部记录可跨月份查看。"
   ],
   "vault": [
     "文件库",
@@ -79,11 +79,11 @@ export const FEATURE_GUIDES = Object.freeze({
   ],
   "library": [
     "书房",
-    "书房：导入 EPUB / TXT，点击书籍阅读，保存进度、划线、批注及读后感。暂不支持 PDF。删除书籍会一并删除关联笔记。模型操作需相应工具支持及授权。"
+    "书房：导入 EPUB / TXT，点击书籍先查看阅读档案与笔迹，再继续阅读或打开目录，保存进度、划线、批注及读后感。暂不支持 PDF。删除书籍会一并删除关联笔记。模型操作需相应工具支持及授权。"
   ],
   "models": [
     "模型箱",
-    "屋主设置 → 模型箱：选择当前聊天模型。PWA 使用已部署后端提供的模型；Android 本机另支持套餐通道及自有供应商。费用与额度以供应商为准。"
+    "屋主设置 → 模型箱：分别查看聊天、生图、语音配置；生图目录可分类搜索。PWA 使用已部署后端提供的模型；Android 本机另支持套餐通道及自有供应商。费用与额度以供应商为准。"
   ],
   "tools": [
     "模型工作台 / MCP 工具",
@@ -170,8 +170,8 @@ export const FEATURE_GUIDES = Object.freeze({
     "小组件 → 文件库 → 收藏：查找主动保存的文字、纸条、图片、语音及附件，添加备注或返回来源。取消收藏不删除原件。"
   ],
   "pets": [
-    "宠物系统",
-    "小组件 → 宠物系统：当前仍在准备，尚无可用的养成操作。"
+    "休憩箱",
+    "小组件 → 休憩箱：目前只保留空页入口，无可用的养成或布置操作。旧造物间资料请保留原始备份。"
   ]
 });
 export const GUIDE_TARGETS = Object.freeze({
@@ -333,7 +333,7 @@ export async function openGuideTarget(key, { router, chat, memory, daily, dogtal
   }
   if (target.startsWith('daily:')) return daily.handleAction(target.slice(6), arg);
   if (target === 'vault:treasures') return router.open('vault-home', { mode: 'treasures' });
-  if (target === 'pets') return router.open('daily-placeholder', { title: '宠物系统' });
+  if (target === 'pets') return router.open('daily-placeholder', { title: '休憩箱' });
   return router.open(target);
 }
 export function manualMarkup() {
