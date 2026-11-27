@@ -11,7 +11,7 @@ const time=v=>Number.isSafeInteger(v)&&v>=0;
 const clock=v=>typeof v==='string'&&/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(v);
 const terminal=new Set(['completed','failed','cancelled','interrupted']);
 const schema=ensureChatSchema;
-function normalizeConfig(config){
+export function normalizeDreamConfig(config){
   if(!config||!clock(config.dailyTime)||typeof config.timeZone!=='string'||!config.timeZone)throw new TypeError('invalid dream tide configuration');
   new Intl.DateTimeFormat('en',{timeZone:config.timeZone}).format(0);
   let quietHours=null;
@@ -35,7 +35,7 @@ function normalizeConfig(config){
 const liveWindow="SELECT 1 FROM conversations WHERE id=? AND user_id='owner' AND room_type='main' AND source='coast' AND conversation_kind='chat' AND deleted_at IS NULL";
 export async function armDreamTide(db,cid,config,modelId,now=Date.now()){
   if(!id(cid)||!time(now)||typeof modelId!=='string'||!modelId.trim()||modelId.length>180)throw new TypeError('invalid arm identity');
-  const cfg=normalizeConfig(config), revision=crypto.randomUUID();
+  const cfg=normalizeDreamConfig(config), revision=crypto.randomUUID();
   await schema(db);
   // Reconfiguration must wait until the existing claim settles.
   const result=await stmt(db,`INSERT INTO dream_tide_arms(conversation_id,revision,enabled,config_json,armed_at,model_id)
@@ -60,7 +60,7 @@ export async function readDreamSettings(db,cid){
 export async function configureDreamTide(db,cid,config,modelId,{expectedRevision=null,enable=false,now=Date.now()}={}){
   if(!id(cid)||!time(now)||typeof modelId!=='string'||!modelId.trim()||modelId.length>180||
     (expectedRevision!==null&&!id(expectedRevision)))throw new TypeError('invalid dream configuration identity');
-  const cfg=normalizeConfig(config),revision=crypto.randomUUID();
+  const cfg=normalizeDreamConfig(config),revision=crypto.randomUUID();
   if(enable&&!cfg.execution)throw new TypeError('explicit execution consent required');
   await schema(db);
   const noRun="NOT EXISTS(SELECT 1 FROM dream_tide_runs WHERE conversation_id=? AND status='running')";
