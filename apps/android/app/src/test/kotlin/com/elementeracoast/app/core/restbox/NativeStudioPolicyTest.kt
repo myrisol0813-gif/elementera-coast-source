@@ -73,4 +73,17 @@ class NativeStudioPolicyTest {
         assertEquals(original.household,policy.import(old,original).household)
         assertThrows(IllegalArgumentException::class.java){policy.import("""{"rooms":{}}""",original)}
     }
+
+    @Test fun restrictedSvgSerializerPreservesNamespacesAndEscapedText(){
+        val raw="""<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10"><defs><path id="p" d="M0 0L9 9"/></defs><use xlink:href="#p"/><text aria-label="a &amp; b &quot;c&quot;">小狼 &lt;3 &amp; 蛇</text><style><![CDATA[.x { fill: red; }]]></style></svg>"""
+        val doc=NativeSvgXml.parse(raw)
+        val restored=NativeSvgXml.parse(NativeSvgXml.serialize(doc))
+        assertEquals("http://www.w3.org/2000/svg",restored.documentElement.namespaceURI)
+        val use=restored.getElementsByTagName("use").item(0) as org.w3c.dom.Element
+        assertEquals("#p",use.getAttributeNS("http://www.w3.org/1999/xlink","href"))
+        val text=restored.getElementsByTagName("text").item(0) as org.w3c.dom.Element
+        assertEquals("a & b \"c\"",text.getAttribute("aria-label"))
+        assertEquals("小狼 <3 & 蛇",text.textContent)
+        assertEquals(".x { fill: red; }",restored.getElementsByTagName("style").item(0).textContent)
+    }
 }
