@@ -75,7 +75,7 @@ internal class LocalDreamArchive(private val store:LocalPersistence){
         val name=if(kind=="voice")"voice_create" else "image_generate"
         val parent=requireNotNull(archive){"自主媒体所属活动缺失。"}
         val event=parent.rows("tools").firstOrNull{it.str("tool_name")==name&&mediaId==prefix+it.str("claim_id")+"_"+it.str("step_index")+"_"+it.str("call_index")}
-        require(event!=null&&archive.rows("runs").any{it.str("claim_id")==event.str("claim_id")&&it.str("conversation_id")==row.str("conversation_id")}){"自主媒体所属活动缺失。"}
+        require(event!=null&&parent.rows("runs").any{it.str("claim_id")==event.str("claim_id")&&it.str("conversation_id")==row.str("conversation_id")}){"自主媒体所属活动缺失。"}
         val recorded=event["receipt_json"]?.jsonPrimitive?.contentOrNull?.let{json.parseToJsonElement(it).jsonObject["record_id"]?.jsonPrimitive?.contentOrNull}
         require(recorded==null||recorded==mediaId){"自主媒体回执不一致。"}
     }
