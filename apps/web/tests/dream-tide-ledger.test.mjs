@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {D1Database} from './d1-helper.mjs';
 import {createConversation} from '../functions/chat-store.js';
-import {armDreamTide,disarmDreamTide,setDreamTideExtra,claimDreamTide,dreamTideClaimAuthorized,heartbeatDreamTide,settleDreamTide,recoverDreamTide} from '../functions/dream-tide-ledger.js';
+import {normalizeDreamConfig,armDreamTide,disarmDreamTide,setDreamTideExtra,claimDreamTide,dreamTideClaimAuthorized,heartbeatDreamTide,settleDreamTide,recoverDreamTide} from '../functions/dream-tide-ledger.js';
 const t=Date.parse, armedAt=t('2026-11-26T00:00:00Z'), due=t('2026-11-27T01:00:00Z');
 const config={timeZone:'Asia/Shanghai',dailyTime:'09:00',allowExtra:true};
 const model='fixture/model';
@@ -105,4 +105,11 @@ test('ordinary, grouped and dream admissions exclude each other atomically',asyn
   assert.equal(await releaseSingleChatRun(db,claim),false);
   assert.equal(await recoverSingleChatRuns(db,due+200,100),1);
   assert.equal(await heartbeatSingleChatRun(db,next,due+201),false);
+});
+
+test('owner-defined larger execution budgets are accepted without truncation',()=>{
+  const execution={tokenBudget:2000000,outputLimit:100000,toolBudget:200,readTurns:500,extraPerDay:200,voiceLimit:200,imageLimit:200,invitation:'fixture'};
+  const normalized=normalizeDreamConfig({...config,execution}).execution;
+  for(const [key,value] of Object.entries(execution))assert.equal(normalized[key],value);
+  assert.throws(()=>normalizeDreamConfig({...config,execution:{...execution,outputLimit:2147483647}}));
 });

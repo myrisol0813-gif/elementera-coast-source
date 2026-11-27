@@ -126,9 +126,10 @@
 
 .feature-card {
   overflow: hidden;
-  border: 0;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
   border-radius: 15px;
-  background: var(--surface-soft);
+  background: var(--surface);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--text) 5%, transparent);
 }
 
 .feature-prose {

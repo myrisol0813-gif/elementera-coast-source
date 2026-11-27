@@ -42,15 +42,15 @@ export function createDreamTideViews({router,chat,toast}){
       row('时区（IANA）',input('dreamZone',zone))+row('每日固定时间',input('dreamTime',c.dailyTime||'09:00','time'))+
       checkbox('dreamQuiet','安静时段',!!c.quietHours)+row('开始',input('dreamQuietStart',c.quietHours?.start||'23:00','time'))+
       row('结束',input('dreamQuietEnd',c.quietHours?.end||'07:00','time'))+checkbox('dreamExtra','允许模型自主预约额外唤醒',c.allowExtra)+
-      row('每日额外唤醒次数上限',input('dreamExtraLimit',e.extraPerDay??0,'number','min="0" max="128" step="1"'))+'</div>')
-      +section('独立预算与邀请','<div class="form-stack">'+row('单次累计 token 预算',input('dreamTokens',e.tokenBudget??8000,'number','min="1" max="1000000" step="1"'))+
-      row('每次请求输出上限',input('dreamOutput',e.outputLimit??1000,'number','min="1" max="65536" step="1"'))+
-      row('单次工具调用上限',input('dreamTools',e.toolBudget??4,'number','min="0" max="128" step="1"'))+
-      row('每次阅读最大轮数',input('dreamReadTurns',e.readTurns??10,'number','min="1" max="400" step="1"'))+
-       row('每次活动语音尝试上限',input('dreamVoiceLimit',e.voiceLimit??1,'number','min="0" max="128" step="1"'))+
-       row('每次活动生图尝试上限',input('dreamImageLimit',e.imageLimit??1,'number','min="0" max="128" step="1"'))+
+      row('每日额外唤醒次数上限',input('dreamExtraLimit',e.extraPerDay??0,'number','min="0" max="2147483646" step="1"'))+'</div>')
+      +section('独立预算与邀请','<div class="form-stack">'+row('单次累计 token 预算',input('dreamTokens',e.tokenBudget??8000,'number','min="1" max="2147483646" step="1"'))+
+      row('每次请求输出上限',input('dreamOutput',e.outputLimit??1000,'number','min="1" max="2147483646" step="1"'))+
+      row('单次工具调用上限',input('dreamTools',e.toolBudget??4,'number','min="0" max="2147483646" step="1"'))+
+      row('每次阅读最大轮数',input('dreamReadTurns',e.readTurns??10,'number','min="1" max="2147483646" step="1"'))+
+       row('每次活动语音尝试上限',input('dreamVoiceLimit',e.voiceLimit??1,'number','min="0" max="2147483646" step="1"'))+
+       row('每次活动生图尝试上限',input('dreamImageLimit',e.imageLimit??1,'number','min="0" max="2147483646" step="1"'))+
       row('唤醒邀请词','<textarea id="dreamInvitation" maxlength="16000" rows="7">'+h(e.invitation||'')+'</textarea>')+
-      '<p class="feature-note">邀请词由你书写。模型可以什么也不做。输入 token 为估算，实际收费以供应商为准。</p></div>')
+      '<p class="feature-note">预算为自填整数，范围 1–2147483646；次数允许 0 表示禁止该项。输出仍受累计剩余预算、供应商与上下文约束。单次历史读取正文最多 60000 字符，请按需分页。邀请词最多 16000 字符。模型可以什么也不做。实际收费以供应商为准。</p></div>')
       +section('注入与工具','<div class="form-stack">'+modules.map(([key,label])=>checkbox('dream-'+key,label,e[key]===true)).join('')+'</div>')
       +section('保存与授权','<p class="feature-note">保存为草稿会保持或恢复暂停状态，不会发起请求。授权绑定本窗口及指定模型。</p>'+
       button('保存设置（不启用）','save')+checkbox('dreamConsent','我确认允许按上述设置进行模型调用并产生相应费用',false)+
@@ -71,6 +71,7 @@ export function createDreamTideViews({router,chat,toast}){
     const d=await requestJson(query('/activity',cid,mediaId?0:activityOffset)+(mediaId?'&media_id='+encodeURIComponent(mediaId):''));
     const body=d.items.map(r=>section(stamp(r.started_at)+' · '+(r.kind==='daily'?'固定唤醒':'额外唤醒'),
       '<p>'+h(names[r.status]||r.status)+'</p><p class="feature-note">'+h(r.model_id)+'</p>'+
+      (r.result?.reason?'<p class="feature-note">活动回执：'+h(r.result.reason)+'</p>':'')+
       '<p class="feature-note">总 token：'+h(r.result?.total_tokens??'未确认')+' · 供应商报告成本：'+h(r.result?.reported_cost==null?'未确认':'USD '+r.result.reported_cost)+'</p>'+
       r.tools.map(t=>'<p class="feature-note">'+h((toolNames[t.tool_name]||t.tool_name)+' · '+(names[t.status]||t.status)+(Number.isInteger(t.receipt?.count)?' · '+t.receipt.count+' 轮':''))+'</p>'+mediaLink(cid,r.claim_id,t)).join('')+
       (r.result?.extra_scheduled?'<p class="feature-note">已保存额外预约。</p>':'')+
@@ -81,7 +82,7 @@ export function createDreamTideViews({router,chat,toast}){
   });
   const value=id=>q('#'+id)?.value??'';
   const checked=id=>q('#'+id)?.checked===true;
-  const number=id=>{const v=value(id);if(!v.trim()||!Number.isSafeInteger(Number(v)))throw Error('请填写完整整数预算。');return Number(v);};
+  const number=id=>{const v=value(id),field=q('#'+id),label=field?.closest('label')?.textContent?.trim()||id,min=Number(field?.min||0),n=Number(v);if(!v.trim()||!Number.isSafeInteger(n)||n<min||n>2147483646)throw Error(label+'：请输入 '+min+'–2147483646 的整数。');return n;};
   async function handle(name,target){
     const cid=pinned();
     if(!cid||cid!==current())return toast('窗口已切换，请从当前窗口重新打开自主唤醒。');
