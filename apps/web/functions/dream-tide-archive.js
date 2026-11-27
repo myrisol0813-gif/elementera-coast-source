@@ -24,13 +24,18 @@ function jsonText(v){
 }
 export async function readDreamArchive(db,cid){
   await ensureChatSchema(db);
-  const queries=[stmt(db,"SELECT model_id,config_json FROM dream_tide_arms WHERE conversation_id=?",cid)];
+  // One read statement gives a consistent snapshot even in adapters whose
+  // batch implementation only returns mutation metadata.
+  const selects=["(SELECT json_object('model_id',model_id,'config_json',config_json) FROM dream_tide_arms WHERE conversation_id=(SELECT cid FROM target)) AS arm"];
   for(const key of lists){
-    const [table,cols]=specs[key];
-    queries.push(stmt(db,`SELECT ${cols} FROM ${table} WHERE ${['steps','tools'].includes(key)?'claim_id IN (SELECT claim_id FROM dream_tide_runs WHERE conversation_id=?)':'conversation_id=?'} ORDER BY ${key==='runs'?'started_at,claim_id':key==='steps'?'claim_id,step_index':key==='tools'?'claim_id,step_index,call_index':key==='notes'?'created_at,claim_id':'created_at,id'}`,cid));
+    const [table,cols]=specs[key],fields=cols.split(',');
+    const where=['steps','tools'].includes(key)?'claim_id IN (SELECT claim_id FROM dream_tide_runs WHERE conversation_id=(SELECT cid FROM target))':'conversation_id=(SELECT cid FROM target)';
+    const order=key==='runs'?'started_at,claim_id':key==='steps'?'claim_id,step_index':key==='tools'?'claim_id,step_index,call_index':key==='notes'?'created_at,claim_id':'created_at,id';
+    const object="json_object("+fields.map(f=>"'"+f+"',"+f).join(',')+")";
+    selects.push(`(SELECT json_group_array(${object}) FROM (SELECT ${cols} FROM ${table} WHERE ${where} ORDER BY ${order})) AS ${key}`);
   }
-  const [a,...rs]=await db.batch(queries);
-  const arm=a.results?.[0],rows=Object.fromEntries(lists.map((key,i)=>[key,rs[i].results||[]]));
+  const snapshot=await stmt(db,'WITH target(cid) AS (VALUES (?)) SELECT '+selects.join(','),cid).first();
+  const arm=snapshot.arm?JSON.parse(snapshot.arm):null,rows=Object.fromEntries(lists.map(k=>[k,JSON.parse(snapshot[k]||'[]')]));
   check(!rows.runs.some(r=>r.status==='running'),'窗口正在自主唤醒，请结束活动后再归档。');
   if(!arm&&!lists.some(k=>rows[k].length))return null;
   // Revision, enabled, live claim authorization, and pending appointments are
