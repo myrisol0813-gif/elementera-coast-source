@@ -15,6 +15,8 @@ internal object LocalDreamToolPolicy{
             "calendar_list"->e.allowCalendar
             "vault_search","vault_read"->e.allowCollection
             "library_write"->e.allowLibraryWrite
+            "create_moment","create_diary"->e.allowDailyWrite
+            "calendar_create"->e.allowCalendarWrite
             else->false
         }
     }
