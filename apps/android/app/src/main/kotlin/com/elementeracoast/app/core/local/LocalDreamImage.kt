@@ -7,7 +7,7 @@ import kotlinx.serialization.json.*
 internal class LocalDreamImage(
     private val store:LocalPersistence,private val claim:LocalDreamLedger.Claim,
     private val selected:String,private val resolve:(String)->LocalProviderConfig?,
-    private val discover:(String)->List<LocalImageProvider.Model>={LocalImageProvider().discover(it)},
+    private val discover:(String)->List<LocalImageProvider.Model> = {LocalImageProvider().discover(it)},
     private val generate:(LocalImageProvider.Config,JsonObject)->LocalImageProvider.Generated={c,p->LocalImageProvider().generate(c,p)}
 ){
     private var attempted=false
