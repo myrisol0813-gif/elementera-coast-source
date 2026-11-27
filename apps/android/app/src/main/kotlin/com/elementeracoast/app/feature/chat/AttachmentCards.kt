@@ -94,7 +94,8 @@ internal fun MessageAttachmentList(
     conversationId: String,
     attachments: List<ChatAttachment>,
     previewSource: AttachmentPreviewRemoteDataSource,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    stickerSize: Int = 144
 ) {
     if (attachments.isEmpty()) return
     Column(
@@ -104,7 +105,7 @@ internal fun MessageAttachmentList(
     ) {
         attachments.forEach { attachment ->
             if (attachment.type == "image") {
-                InlineMessageImage(conversationId, attachment, previewSource)
+                InlineMessageImage(conversationId, attachment, previewSource, stickerSize)
             } else {
                 AttachmentCard(
                     conversationId = conversationId,
@@ -121,7 +122,8 @@ internal fun MessageAttachmentList(
 private fun InlineMessageImage(
     conversationId: String,
     attachment: ChatAttachment,
-    previewSource: AttachmentPreviewRemoteDataSource
+    previewSource: AttachmentPreviewRemoteDataSource,
+    stickerSize: Int
 ) {
     val state = attachmentPreview(conversationId, attachment, previewSource)
     val preview = state?.getOrNull()
@@ -132,7 +134,7 @@ private fun InlineMessageImage(
             bitmap = preview,
             contentDescription = attachment.name,
             modifier = Modifier
-                .width(238.dp)
+                .width(if(attachment.isSticker)stickerSize.coerceIn(64,256).dp else 238.dp)
                 .aspectRatio(aspect)
                 .clip(RoundedCornerShape(18.dp)),
             contentScale = ContentScale.Fit

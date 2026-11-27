@@ -185,6 +185,7 @@ internal fun WindowContextSheet(
             }
 
             SoftSettingsCard {
+                SettingSwitchRow(title="分隔气泡",note="模型自主选择在同一次回复中分隔气泡；不增加生成次数。",checked=settings.segmentedBubbles,enabled=usable&&sequenceSupported,onCheckedChange={onSettingsChange(settings.copy(segmentedBubbles=it))})
                 SettingSwitchRow(title="真实连续回复",note=when{
                     roomType !in setOf("main","radio")->"当前窗口不执行连续回复。"
                     localMode->"模型可主动追加独立回复。套餐 token 为软预算，单次可能超额；未报告用量则停止追加。"
@@ -197,6 +198,7 @@ internal fun WindowContextSheet(
             }
             SoftSettingsCard {
                 Text("表情包",style=MaterialTheme.typography.titleSmall)
+                StickerDisplaySizeBlock(settings,usable,onSettingsChange)
                 SettingSwitchRow(title="允许发送表情包",note="自主查找并发送已登记素材；本机还需开启模型工具与写入权限。",checked=settings.stickerSendEnabled,enabled=usable,onCheckedChange={onSettingsChange(settings.copy(stickerSendEnabled=it))})
                 SettingSwitchRow(title="允许添加表情包",note="登记自己在当前窗口生成的图片；本机还需写入权限。",checked=settings.stickerAddEnabled,enabled=usable,onCheckedChange={onSettingsChange(settings.copy(stickerAddEnabled=it))})
             }
@@ -398,5 +400,16 @@ private fun ReplySequenceBudgetRow(title:String,rangeLabel:String,value:String,r
             singleLine=true,enabled=enabled,isError=value.isNotBlank()&&value.toIntOrNull()?.let{it in range}!=true,
             placeholder={Text("继承")},
             keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Number))
+    }
+}
+
+@Composable
+private fun StickerDisplaySizeBlock(settings:ConversationContextSettings,enabled:Boolean,onSave:(ConversationContextSettings)->Unit){
+    var size by remember(settings.stickerDisplaySize){mutableStateOf(settings.stickerDisplaySize.toString())}
+    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+        OutlinedTextField(value=size,onValueChange={size=it.filter(Char::isDigit).take(3)},enabled=enabled,
+            modifier=Modifier.weight(1f),singleLine=true,label={Text("显示尺寸 (dp)")},supportingText={Text("64—256，仅表情包")})
+        Button(onClick={onSave(settings.copy(stickerDisplaySize=size.toInt()))},
+            enabled=enabled&&size.toIntOrNull()?.let{it in 64..256&&it!=settings.stickerDisplaySize}==true){Text("保存")}
     }
 }

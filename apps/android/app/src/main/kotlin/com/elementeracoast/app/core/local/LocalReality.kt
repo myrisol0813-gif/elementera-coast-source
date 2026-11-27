@@ -43,7 +43,10 @@ internal fun localReality(
         enabled=true,selected=clean.realityFields,delivered=items.isNotEmpty(),deliveredItems=items,missing=missing,context=text)
 }
 internal fun localResponseMode(settings:ConversationContextSettings):RemoteDeskResponseMode {
-    if(!settings.shortReplyMode)return RemoteDeskResponseMode()
-    val text="当前对话开启了短句模式。优先自然、简短地接话；若用户的问题需要解释或自然进入深入讨论，不必为了短而截断内容。"
-    return RemoteDeskResponseMode(status="短句模式",shortReplyMode=true,delivered=true,context=text)
+    val text=listOfNotNull(
+        "当前对话开启了短句模式。优先自然、简短地接话；若用户的问题需要解释或自然进入深入讨论，不必为了短而截断内容。".takeIf{settings.shortReplyMode},
+        "当前窗口开启了分隔气泡。你可以自主决定是否将同一次回复分成几个紧邻的气泡。需要分隔时，只在完整段落之间单独一行输出 <!--tideloom:split-->，前后保留换行；不要在代码块、引用、列表、公式或其他完整结构内使用。无需固定数量，不分隔也可以。这个标记只是显示断点，不会触发新的模型请求。".takeIf{settings.segmentedBubbles}
+    ).joinToString("\n\n")
+    if(text.isBlank())return RemoteDeskResponseMode()
+    return RemoteDeskResponseMode(status=listOfNotNull("短句模式".takeIf{settings.shortReplyMode},"分隔气泡".takeIf{settings.segmentedBubbles}).joinToString(" · "),shortReplyMode=settings.shortReplyMode,delivered=true,context=text,segmentedBubbles=settings.segmentedBubbles)
 }

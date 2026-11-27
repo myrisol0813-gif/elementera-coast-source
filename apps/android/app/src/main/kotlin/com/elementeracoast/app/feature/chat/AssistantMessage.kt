@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.elementeracoast.app.core.model.ChatMessage
+import com.elementeracoast.app.core.model.ReplySegments
 import com.elementeracoast.app.core.model.MessageAction
 import com.elementeracoast.app.core.model.ThoughtSoilSnapshot
 import com.elementeracoast.app.ui.theme.CoastChatTokens
@@ -89,31 +91,39 @@ internal fun AssistantMessage(
         }
         Spacer(Modifier.height(8.dp))
         Column(modifier = Modifier.fillMaxWidth()) {
-            if (message.text.isNotBlank() || isStreamingTail || !message.errorDetail.isNullOrBlank()) SnowLetterSurface(
-                modifier = Modifier.fillMaxWidth(),
-                role = SnowLetterSurfaceRole.AssistantBubble,
-                fallbackColor = MaterialTheme.colorScheme.surface.copy(alpha = .34f),
-                fallbackShape = RoundedCornerShape(18.dp)
-            ) {
-                Column(modifier = Modifier.padding(snowLetterInnerPadding(SnowLetterSurfaceRole.AssistantBubble))) {
-                    Text(
-                        text = remember(message.text,isStreamingTail) { renderChatMarkdown(when {
-                            message.text.isEmpty() && isStreamingTail -> "•••"
-                            isStreamingTail -> message.text + " ▍"
-                            else -> message.text
-                        }) },
-                        color = MaterialTheme.colorScheme.onSurface,
-                        style = coastReadingMessageStyle(CoastChatTokens.ChatBodyLineHeight)
-                    )
-                    message.errorDetail?.takeIf(String::isNotBlank)?.let { detail ->
-                        Spacer(Modifier.height(5.dp))
-                        Text(detail, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            val segments = remember(message.text,isStreamingTail) { ReplySegments.split(message.text,isStreamingTail) }
+            if (message.text.isNotBlank() || isStreamingTail || !message.errorDetail.isNullOrBlank()) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp),modifier=Modifier.fillMaxWidth()) {
+                    segments.forEachIndexed { index, segment ->
+                        val last=index==segments.lastIndex
+                        SnowLetterSurface(
+                            modifier = Modifier.fillMaxWidth(),
+                            role = SnowLetterSurfaceRole.AssistantBubble,
+                            fallbackColor = MaterialTheme.colorScheme.surface.copy(alpha = .34f),
+                            fallbackShape = RoundedCornerShape(18.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(snowLetterInnerPadding(SnowLetterSurfaceRole.AssistantBubble))) {
+                                Text(
+                                    text = remember(segment,isStreamingTail,last) { renderChatMarkdown(when {
+                                        segment.isEmpty() && isStreamingTail && last -> "•••"
+                                        isStreamingTail && last -> segment + " ▍"
+                                        else -> segment
+                                    }) },
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    style = coastReadingMessageStyle(CoastChatTokens.ChatBodyLineHeight)
+                                )
+                                if(last)message.errorDetail?.takeIf(String::isNotBlank)?.let { detail ->
+                                    Spacer(Modifier.height(5.dp))
+                                    Text(detail, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
                     }
                 }
             }
             if(message.attachments.isNotEmpty()){
                 Spacer(Modifier.height(if (message.text.isNotBlank() || isStreamingTail || !message.errorDetail.isNullOrBlank()) 6.dp else 0.dp))
-                MessageAttachmentList(conversationId=conversationId,attachments=message.attachments,previewSource=attachmentPreviewSource)
+                MessageAttachmentList(conversationId=conversationId,attachments=message.attachments,previewSource=attachmentPreviewSource,stickerSize=message.stickerDisplaySize)
             }
             Spacer(Modifier.height(CoastChatTokens.MessageActionTopGap))
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {

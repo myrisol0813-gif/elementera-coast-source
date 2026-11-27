@@ -212,7 +212,7 @@ fun ChatWindow(
                 attachmentPreviewSource = attachmentPreviewSource,
                 onAvatarClick = { avatarDialogOpen = true },
                 onCopy = { message ->
-                    clipboard.setText(AnnotatedString(message.text))
+                    clipboard.setText(AnnotatedString(if(message.role==com.elementeracoast.app.core.model.MessageRole.Assistant)com.elementeracoast.app.core.model.ReplySegments.plain(message.text) else message.text))
                     onMessageAction(MessageAction.Copy(message.id))
                     onPlaceholder("已复制")
                 },

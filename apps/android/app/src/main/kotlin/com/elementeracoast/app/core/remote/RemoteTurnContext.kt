@@ -247,7 +247,8 @@ data class RemoteDeskResponseMode(
     val status: String = "普通",
     @SerialName("short_reply_mode") val shortReplyMode: Boolean = false,
     val delivered: Boolean = false,
-    val context: String = ""
+    val context: String = "",
+    @SerialName("segmented_bubbles") val segmentedBubbles: Boolean = false
 )
 
 @Serializable

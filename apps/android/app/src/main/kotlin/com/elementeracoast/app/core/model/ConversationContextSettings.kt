@@ -45,11 +45,16 @@ data class ConversationContextSettings(
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     @SerialName("reply_sequence_token_budget") val replySequenceTokenBudget: Int? = null,
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
-    @SerialName("workbench_prompt") val workbenchPrompt: String? = null
+    @SerialName("workbench_prompt") val workbenchPrompt: String? = null,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("segmented_bubbles") val segmentedBubbles: Boolean = false,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("sticker_display_size") val stickerDisplaySize: Int = 144
 ) {
     fun normalized(): ConversationContextSettings = copy(
         realityFields = realityFields.filter(RealityContextFields.all::contains).distinct(),
         workbenchPrompt = workbenchPrompt?.take(4000),
+        stickerDisplaySize = stickerDisplaySize.takeIf { it in 64..256 } ?: 144,
         replySequenceMaxMessages = replySequenceMaxMessages?.takeIf { it in 1..20 },
         replySequenceToolBudget = replySequenceToolBudget?.takeIf { it in 0..128 },
         replySequenceTokenBudget = replySequenceTokenBudget?.takeIf { it in 1..1000000 },
