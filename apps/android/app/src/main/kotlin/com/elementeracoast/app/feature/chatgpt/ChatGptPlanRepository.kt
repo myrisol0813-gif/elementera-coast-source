@@ -53,6 +53,7 @@ class ChatGptPlanRepository(
         latestModels.firstOrNull { it.slug == slug }?.reasoningEfforts.orEmpty()
 
     fun currentAccount(): ChatGptConnection? = store.load()
+    internal fun wakeConnectionEpoch():String?=store.wakeConnectionEpoch()
     fun preferredModel(): String? = store.preferredModel()
     fun selectModel(slug: String?) = store.selectModel(slug)
 
@@ -149,7 +150,7 @@ class ChatGptPlanRepository(
                 expiresAtEpochSeconds = System.currentTimeMillis() / 1000 +
                     (response["expires_in"]?.jsonPrimitive?.longOrNull ?: 3600L)
             )
-            withContext(Dispatchers.IO) { store.save(value) }
+            withContext(Dispatchers.IO) { store.save(value,newAuthorization=true) }
             value
         } catch (_: SocketTimeoutException) {
             throw IllegalStateException("ChatGPT 授权超时，请回海岸重试。")
