@@ -135,7 +135,7 @@ internal class LocalDreamExecutor(
                     }
                     val commonNames=commonTools.map{it.getValue("function").jsonObject.str("name")}.toSet()
                     val selectedImage=RemoteCacheStore(store,strictReads=true).profile()?.currentImageModel.orEmpty()
-                    val dreamImage=if(e.allowImage&&imageProvider!=null&&RemoteCacheStore(store,strictReads=true).history(cid)?.contextSettings?.localModelWriteEnabled==true)LocalDreamImage(store,c,selectedImage,imageProvider).takeIf{it.configured()}else null
+                    val dreamImage=if(e.allowImage&&e.imageLimit>0&&imageProvider!=null&&RemoteCacheStore(store,strictReads=true).history(cid)?.contextSettings?.localModelWriteEnabled==true)LocalDreamImage(store,c,selectedImage,imageProvider).takeIf{it.configured()}else null
                     val allowed=tools(c)+commonTools+listOfNotNull(dreamImage?.let{tool("image_generate","可选：生成并保存独立活动图像，使用已授权生图供应商额度。只发送必要提示，不返回像素。",mapOf("prompt" to "string"))})
                     for(step in 0..e.toolBudget){
                         ensureActive();permitted(c)
