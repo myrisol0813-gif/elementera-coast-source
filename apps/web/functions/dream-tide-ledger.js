@@ -78,7 +78,7 @@ export async function disarmDreamTide(db,cid,revision){
   await schema(db);
   // Do not release a running claim here: an uncertain provider request may
   // still be in flight. The executor must observe revocation and settle.
-  return changed(await stmt(db,"UPDATE dream_tide_arms SET enabled=0,extra_id=NULL,extra_at=NULL WHERE conversation_id=? AND revision=? AND enabled=1",cid,revision).run());
+  return changed(await stmt(db,"UPDATE dream_tide_arms SET revision=?,enabled=0,extra_id=NULL,extra_at=NULL WHERE conversation_id=? AND revision=? AND enabled=1",crypto.randomUUID(),cid,revision).run());
 }
 async function expireExtra(db,arm,now){
   if(!arm?.extra_id||!time(arm.extra_at)||arm.extra_at>=now)return false;
