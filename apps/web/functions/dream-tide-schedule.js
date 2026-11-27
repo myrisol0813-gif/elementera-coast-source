@@ -1,6 +1,6 @@
 // Pure eligibility policy. No timers, provider calls or restored jobs are started here.
 // The executor must revalidate permissions, model, budgets and acquire a durable claim.
-function localClock(at, zone) {
+export function localClock(at, zone) {
   if (!Number.isSafeInteger(at)) throw new TypeError('invalid epoch milliseconds');
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',
