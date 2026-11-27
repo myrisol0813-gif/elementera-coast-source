@@ -221,6 +221,13 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
                             if(id!=null&&((name=="voice_create"&&id=="voice_dream_"+suffix)||(name=="image_generate"&&id=="att_dream_"+suffix)))TextButton(onClick={previewId=id}){Text(if(name=="voice_create")"查看原声" else "查看原图")}
                         }
                         if(r.result.field("extra_scheduled")=="true")Text("已保存额外预约。",style=MaterialTheme.typography.bodySmall)
+                        r.steps.forEach{s->
+                            val receipt=(s as? JsonObject)?.get("receipt") as? JsonObject
+                            val accepted=receipt?.get("image_readback_accepted") as? JsonArray
+                            val uncertain=receipt?.get("image_readback_unconfirmed") as? JsonArray
+                            if(accepted!=null)Text("图像回读请求已获得响应 · "+accepted.size+" 张",style=MaterialTheme.typography.bodySmall)
+                            if(uncertain!=null)Text("图像回读请求结果未确认 · "+uncertain.size+" 张",style=MaterialTheme.typography.bodySmall)
+                        }
                         if(r.steps.any{it.field("status")=="claimed"})Text("存在未确认请求，不会自动重放。",style=MaterialTheme.typography.bodySmall)
                     }
                 }}
