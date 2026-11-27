@@ -422,6 +422,24 @@ class CoastApiClient(
     internal suspend fun releaseNativeSingleChat(conversationId:String,claimId:String):Boolean =
         nativeSingleAction(conversationId,"release",claimId)["ok"]?.jsonPrimitive?.contentOrNull=="true"
 
+    suspend fun dreamSettings(cid:String):com.elementeracoast.app.core.remote.DreamSettingsResponse =
+        jsonRequest(Request.Builder().url(config.url("/api/chat/dream-tide?conversation_id=${encodeQuery(cid)}")).get().build(),com.elementeracoast.app.core.remote.DreamSettingsResponse.serializer())
+
+    suspend fun saveDreamSettings(value:com.elementeracoast.app.core.remote.DreamSettingsRequest):com.elementeracoast.app.core.remote.DreamSettingsResponse {
+        val wire=Json(json){encodeDefaults=true;explicitNulls=true}
+        val payload=wire.encodeToString(com.elementeracoast.app.core.remote.DreamSettingsRequest.serializer(),value)
+        return jsonRequest(Request.Builder().url(config.url("/api/chat/dream-tide")).post(jsonBody(payload)).build(),com.elementeracoast.app.core.remote.DreamSettingsResponse.serializer())
+    }
+    suspend fun dreamNotes(cid:String,offset:Int=0):com.elementeracoast.app.core.remote.DreamNotesResponse =
+        jsonRequest(Request.Builder().url(config.url("/api/chat/dream-tide/notes?conversation_id=${encodeQuery(cid)}&offset=$offset")).get().build(),com.elementeracoast.app.core.remote.DreamNotesResponse.serializer())
+    suspend fun dreamActivity(cid:String,offset:Int=0):com.elementeracoast.app.core.remote.DreamActivityResponse =
+        jsonRequest(Request.Builder().url(config.url("/api/chat/dream-tide/activity?conversation_id=${encodeQuery(cid)}&offset=$offset")).get().build(),com.elementeracoast.app.core.remote.DreamActivityResponse.serializer())
+    suspend fun replyDreamNote(cid:String,claim:String,replyId:String,body:String) {
+        val payload=buildJsonObject{put("conversation_id",cid);put("claim_id",claim);put("reply_id",replyId);put("body",body)}
+        val response=jsonRequestElement(Request.Builder().url(config.url("/api/chat/dream-tide/reply")).post(jsonBody(payload.toString())).build()).jsonObject
+        if(response["ok"]?.jsonPrimitive?.contentOrNull!="true")throw CoastApiException(CoastApiErrorKind.Request,"dream_reply_unconfirmed","回复保存未确认。")
+    }
+
     /** Authenticated context assembly; ChatGPT bearer tokens stay on this device. */
     suspend fun prepareNativeChatGpt(value: RemoteChatRequest): RemoteNativeChatContext {
         val payload = json.encodeToString(RemoteChatRequest.serializer(), value)
