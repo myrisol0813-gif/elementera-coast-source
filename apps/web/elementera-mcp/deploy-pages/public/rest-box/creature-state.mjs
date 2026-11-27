@@ -7,7 +7,7 @@ const own=(o,k)=>!!o&&Object.hasOwn(o,k);
 function check(ok,why){if(!ok)throw Error(why)}
 export function newAppearance(defs,bodyId){
   check(own(defs,bodyId),'unknown creature');
-  return {bodyId,palette:defs[bodyId].defaultPalette,colors:{},glasses:'none',neck:'none',glassesColor:'#b69b65',neckColor:'#768ba6',horn:true,hat:true,tongue:true};
+  return {bodyId,palette:defs[bodyId].defaultPalette,colors:{},glasses:'none',neck:'none',glassesColor:'#b69b65',neckColor:'#768ba6',horn:true,hat:true,tongue:true,badge:'none',badgeMode:'original',badgePlace:'chest',badgeColor:'#caa05f',badgeX:0,badgeY:0,badgeSize:100};
 }
 export function normalizeAppearance(defs,input){
   const base=newAppearance(defs,input?.bodyId),def=defs[base.bodyId];
@@ -20,7 +20,10 @@ export function normalizeAppearance(defs,input){
   const glassesColor=input.glassesColor??base.glassesColor,neckColor=input.neckColor??base.neckColor;
   check(hex(glassesColor)&&hex(neckColor),'invalid accessory color');
   for(const k of ['horn','hat','tongue'])check(input[k]===undefined||typeof input[k]==='boolean','invalid accessory flag');
-  return {...base,palette,colors,glasses,neck,glassesColor,neckColor,horn:input.horn??true,hat:input.hat??true,tongue:input.tongue??true};
+  const badge=input.badge??'none',badgeMode=input.badgeMode??'original',badgePlace=input.badgePlace??'chest',badgeColor=input.badgeColor??'#caa05f',badgeX=input.badgeX??0,badgeY=input.badgeY??0,badgeSize=input.badgeSize??100;
+  check(['none','gpt','claude','deepseek','gemini','grok'].includes(badge)&&['original','custom'].includes(badgeMode)&&['head','chest'].includes(badgePlace)&&hex(badgeColor),'invalid badge');
+  check([badgeX,badgeY].every(v=>Number.isFinite(v)&&Math.abs(v)<=100)&&Number.isFinite(badgeSize)&&badgeSize>=30&&badgeSize<=200,'invalid badge adjustment');
+  return {...base,palette,colors,glasses,neck,glassesColor,neckColor,horn:input.horn??true,hat:input.hat??true,tongue:input.tongue??true,badge,badgeMode,badgePlace,badgeColor,badgeX,badgeY,badgeSize};
 }
 export function newHousehold(defs){return {version:1,model:newAppearance(defs,'wolf'),human:newAppearance(defs,'cat'),humanEnabled:false}}
 export function editAppearance(state,defs,role,patch){

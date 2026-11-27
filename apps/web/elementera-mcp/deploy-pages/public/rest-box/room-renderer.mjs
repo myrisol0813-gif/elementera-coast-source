@@ -19,8 +19,8 @@ export async function loadArt({base=new URL('./art/v1/',import.meta.url),fetcher
   };
   const json=async p=>JSON.parse(await read(p));
   const idx=await json('index.json');
-  const [rooms,extras,presets,creatures,appearance,accessories,props]=await Promise.all([Promise.all(idx.rooms.map(r=>json(r.manifest))),Promise.all(idx.extras.map(json)),json(idx.colorPresets),json(idx.creatures),json(idx.appearance),json(idx.accessories),json(idx.propMounts)]);
-  return {catalogue:buildCatalogue(rooms,extras,presets),creatures:Object.fromEntries(creatures.bodies.map(b=>[b.id,b])),appearance:appearance.bodies,accessories,props,read};
+  const [rooms,extras,presets,creatures,appearance,accessories,props,badges]=await Promise.all([Promise.all(idx.rooms.map(r=>json(r.manifest))),Promise.all(idx.extras.map(json)),json(idx.colorPresets),json(idx.creatures),json(idx.appearance),json(idx.accessories),json(idx.propMounts),json(idx.badges)]);
+  return {catalogue:buildCatalogue(rooms,extras,presets),creatures:Object.fromEntries(creatures.bodies.map(b=>[b.id,b])),appearance:appearance.bodies,accessories,props,badges,read};
 }
 
 // Only bundled assets, never arbitrary imported SVG. Images isolate internal IDs and CSS.

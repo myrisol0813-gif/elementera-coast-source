@@ -20,6 +20,13 @@ data class RestAppearance(
     val horn: Boolean = true,
     val hat: Boolean = true,
     val tongue: Boolean = true,
+    val badge: String = "none",
+    val badgeMode: String = "original",
+    val badgePlace: String = "chest",
+    val badgeColor: String = "#caa05f",
+    val badgeX: Double = 0.0,
+    val badgeY: Double = 0.0,
+    val badgeSize: Double = 100.0,
 )
 
 @Serializable
@@ -67,6 +74,9 @@ object RestAppearancePolicy {
         require(value.glasses in glasses && value.neck in necks)
         require(def.neck || value.neck == "none")
         require(hex.matches(value.glassesColor) && hex.matches(value.neckColor))
+        require(value.badge in setOf("none", "gpt", "claude", "deepseek", "gemini", "grok"))
+        require(value.badgeMode in setOf("original", "custom") && value.badgePlace in setOf("head", "chest") && hex.matches(value.badgeColor))
+        require(value.badgeX in -100.0..100.0 && value.badgeY in -100.0..100.0 && value.badgeSize in 30.0..200.0)
         return value.copy(colors = value.colors.mapValues { it.value.lowercase() })
     }
 

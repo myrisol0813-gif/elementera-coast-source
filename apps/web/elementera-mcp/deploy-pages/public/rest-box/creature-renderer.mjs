@@ -41,6 +41,19 @@ function mountNeck(doc,body,def,appearance,action,accessories){
 function animate(doc,node,attr,values,duration){
   if(!node)return;const el=doc.createElementNS(NS,'animate');for(const [k,v] of Object.entries({attributeName:attr,values:values.join(';'),dur:duration+'s',repeatCount:'indefinite',keyTimes:'0;0.25;0.5;0.75;1'}))el.setAttribute(k,v);node.append(el);
 }
+function badgeShape(k,c,mode,badgePaths){if(!Object.hasOwn(badgePaths,k))return '';const d=badgePaths[k];if(mode!=='original')return `<path d="${d}" fill="${c}" fill-rule="evenodd"/>`;if(k==='gpt')return `<path d="${d.split('Z')[0]}Z" fill="#ffffff"/><path d="${d}" fill="#171719" fill-rule="evenodd"/>`;if(k==='gemini')return `<defs><linearGradient id="gemBase" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#34a853"/><stop offset=".42" stop-color="#4285f4"/><stop offset="1" stop-color="#4285f4"/></linearGradient><radialGradient id="gemRed" cx="50%" cy="0%" r="64%"><stop stop-color="#ea4335"/><stop offset="1" stop-color="#ea4335" stop-opacity="0"/></radialGradient><radialGradient id="gemYellow" cx="0%" cy="50%" r="53%"><stop stop-color="#fbbc04"/><stop offset="1" stop-color="#fbbc04" stop-opacity="0"/></radialGradient></defs><path d="${d}" fill="url(#gemBase)"/><path d="${d}" fill="url(#gemRed)"/><path d="${d}" fill="url(#gemYellow)"/>`;if(k==='grok')return `<circle r="16" fill="#171719"/><path d="${d}" fill="#ffffff"/>`;return `<path d="${d}" fill="${k==='claude'?'#d97757':'#4d6bfe'}" fill-rule="evenodd"/>`;}
+
+function mountBadge(doc,body,appearance,action,badges){
+  if(appearance.badge==='none'||!badges)return;const cfg=body.config,$=id=>doc.getElementById(id),head=$(cfg.head),pet=$(cfg.pet),sleep=action==='sleep',onHead=appearance.badgePlace==='head';
+  let parent=pet,before=null,anchor=cfg.badge;
+  if(onHead){parent=head;before=$('hat');anchor=body.id==='stoatA'?[178,105,1.6]:cfg.kind==='fish'?[150,65,.62]:cfg.kind==='snake'?[160,67,.62]:cfg.kind==='bird'?[160,65,.62]:cfg.kind==='stoat'?[160,87,.58]:[160,89,.65]}
+  else if(cfg.kind==='bird'){parent=sleep?$('sleepBody'):$('standingBody');before=sleep?null:$('wingL');if(sleep)anchor=cfg.sleepB}
+  else if(cfg.kind==='snake'){parent=sleep?head:pet;before=sleep?$('eyes'):head;if(sleep)anchor=cfg.sleepB}
+  else if(cfg.kind==='fish')before=$('fin');else before=$('hands');
+  if(!parent||!anchor)return;const [x,y,sz]=anchor;
+  const g=group(doc,parent,before,{transform:'translate('+(x+appearance.badgeX)+' '+(y+appearance.badgeY)+') scale('+((sz||1)*appearance.badgeSize/100)+')'});
+  appendMarkup(doc,g,badgeShape(appearance.badge,appearance.badgeColor,appearance.badgeMode,Object.fromEntries(badges.items.map(b=>[b.id,b.path]))));
+}
 function mountProp(doc,body,action,prop,mount,source){
   if(!prop||!mount||action==='sleep')return;
   const $=id=>doc.getElementById(id);
@@ -56,7 +69,7 @@ function mountProp(doc,body,action,prop,mount,source){
   for(const n of [...parsed.documentElement.querySelectorAll('*')])for(const a of [...n.attributes])if(/^on/i.test(a.name)||((a.localName==='href'||a.localName==='src')&&!a.value.startsWith('#')))throw Error('invalid prop reference');
   for(const n of [...parsed.documentElement.children])g.append(doc.importNode(n,true));
 }
-export function creatureSvg(source,body,defs,accessories,input,action='idle',{reducedMotion=false,prop=null,mount=null,propSource=null}={}){
+export function creatureSvg(source,body,defs,accessories,input,action='idle',{reducedMotion=false,prop=null,mount=null,propSource=null,badges=null}={}){
   if(!ACTIONS.includes(action))throw Error('unsupported action');
   const appearance=normalizeAppearance(defs,input),def=defs[appearance.bodyId];
   if(body.id!==appearance.bodyId)throw Error('body mismatch');
@@ -80,7 +93,7 @@ export function creatureSvg(source,body,defs,accessories,input,action='idle',{re
   if(appearance.glasses!=='none'){
     const parent=$(cfg.head);if(parent){const g=group(doc,parent,$('hat'),{transform:'translate('+cfg.x+' '+cfg.y+') scale('+(cfg.gs||1)+')',color:appearance.glassesColor,stroke:appearance.glassesColor,'stroke-width':2.7,'stroke-linecap':'round',fill:'none'});appendMarkup(doc,g,accessories.glasses[appearance.glasses])}
   }
-  mountNeck(doc,body,def,appearance,action,accessories);
+  mountNeck(doc,body,def,appearance,action,accessories);mountBadge(doc,body,appearance,action,badges);
   if(prop&&mount&&propSource)mountProp(doc,body,action,prop,mount,propSource);
   if(reducedMotion){const style=doc.createElementNS(NS,'style');style.textContent='*{animation:none!important;transition:none!important}';svg.append(style)}
   return new XMLSerializer().serializeToString(svg);
@@ -91,7 +104,7 @@ export function createCreatureRenderer(art){
     const body=art.creatures[input.bodyId];if(!body)throw Error('unknown body');
     const prop=art.props?.props.find(p=>p.id===opts.prop)??null,mount=art.props?.mounts[input.bodyId]??null;
     const key=JSON.stringify([input,action,!!opts.reducedMotion,prop?.id??null]);
-    if(!cache.has(key)){const task=Promise.all([art.read(body.file),prop&&mount?art.read(prop.file):null]).then(([s,propSource])=>uri(creatureSvg(s,body,art.appearance,art.accessories,input,action,{...opts,prop,mount,propSource})));cache.set(key,task);task.catch(()=>{if(cache.get(key)===task)cache.delete(key)});if(cache.size>96)cache.delete(cache.keys().next().value)}
+    if(!cache.has(key)){const task=Promise.all([art.read(body.file),prop&&mount?art.read(prop.file):null]).then(([s,propSource])=>uri(creatureSvg(s,body,art.appearance,art.accessories,input,action,{...opts,prop,mount,propSource,badges:art.badges})));cache.set(key,task);task.catch(()=>{if(cache.get(key)===task)cache.delete(key)});if(cache.size>96)cache.delete(cache.keys().next().value)}
     return cache.get(key)
   }
 }

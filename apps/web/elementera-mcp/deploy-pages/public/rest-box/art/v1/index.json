@@ -53,5 +53,6 @@
   },
   "status": "isolated Web room and creature runtime; production navigation, persistence and Native pending",
   "appearance": "creatures/appearance.json",
-  "propMounts": "props/mounts.json"
+  "propMounts": "props/mounts.json",
+  "badges": "accessories/badges.json"
 }
