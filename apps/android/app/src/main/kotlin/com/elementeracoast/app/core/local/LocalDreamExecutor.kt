@@ -159,7 +159,7 @@ internal class LocalDreamExecutor(
                     for(step in 0..e.toolBudget){
                         ensureActive();checkAuthorization()
                         if(planSession!=null&&!planSession.canContinue()){reason="plan_step_or_soft_budget_limit";break}
-                        val exposed=if(calls>=e.toolBudget||step==e.toolBudget)emptyList()else allowed
+                        val exposed=if(calls>=e.toolBudget||step==e.toolBudget||plan!=null&&step+1>=plan.grant.requestLimit)emptyList()else allowed
                         val images=pendingImages.toList();pendingImages.clear()
                         if(images.isNotEmpty()&&RemoteCacheStore(store,strictReads=true).history(cid)?.contextSettings?.localModelWriteEnabled!=true){reason="image_readback_permission_revoked";break}
                         val wireMessages=JsonArray(messages+images.map{it.message})
