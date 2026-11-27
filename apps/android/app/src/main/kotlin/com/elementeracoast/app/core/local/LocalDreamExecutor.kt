@@ -169,6 +169,12 @@ internal class LocalDreamExecutor(
             }
         }catch(ex:CancellationException){status="cancelled";reason="cancelled";cancelled=ex}
         catch(_:Exception){status="failed";reason="execution_failed"}
+        // A response may have failed parsing after transmission. Any still
+        // claimed step has unconfirmed billing, even if earlier usage was known.
+        val uncertain=withContext(NonCancellable){LocalDreamArchive(store).runtimeHistory(cid).arr("steps").any{
+            val row=it.jsonObject;row.str("claim_id")==c.id&&row.str("status")=="claimed"
+        }}
+        if(uncertain){known=false;costKnown=false}
         val result=buildJsonObject{
             put("reason",reason);put("activities",JsonArray(activities));put("tool_calls",calls)
             put("total_tokens",if(known)JsonPrimitive(total)else JsonNull);put("reported_cost",if(costKnown)JsonPrimitive(cost)else JsonNull)
