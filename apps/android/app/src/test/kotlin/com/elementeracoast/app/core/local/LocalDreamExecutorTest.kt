@@ -253,4 +253,40 @@ class LocalDreamExecutorTest {
         assertEquals(1,generated);assertTrue(LocalSideRecords(store).clips(cid).isEmpty())
     }
 
+
+    @Test fun independentImageOriginalKeepsActivityIdentityAndCannotBecomeChatAttachment(){
+        val (store,initial)=fixture();val cache=RemoteCacheStore(store);val ledger=LocalDreamLedger(store)
+        val history=cache.history(cid)!!
+        cache.putHistory(cid,history.copy(contextSettings=history.contextSettings.copy(localModelWriteEnabled=true)))
+        val cfg2=cfg.copy(execution=cfg.execution!!.copy(allowImage=true,tokenBudget=24000))
+        val settings=ledger.configure(cid,DreamSettingsRequest(cid,initial.revision,"arm",cfg2,model,true),true,at-86400000)!!
+        val imageConfig=LocalProviderConfig("image-fixture","fixture","https://openrouter.ai/api/v1","fixture-only",listOf("fixture/paid"))
+        val selected=imageConfig.modelId("fixture/paid")
+        cache.putProfile(RemoteProfile(currentImageModel=selected))
+        val claim=ledger.claim(cid,settings.revision!!,model,at)!!
+        assertTrue(ledger.reserveStep(claim,0,at))
+        assertTrue(ledger.recordStep(claim,0,true,buildJsonObject{},at))
+        assertTrue(ledger.reserveTool(claim,0,0,"image_generate",at))
+        val bytes=ByteArray(24);byteArrayOf(137.toByte(),80,78,71,13,10,26,10).copyInto(bytes)
+        var calls=0
+        val generator=LocalDreamImage(store,claim,selected,{imageConfig},
+            discover={listOf(LocalImageProvider.Model("fixture/paid","fixture",false))},
+            generate={_,_->calls++;LocalImageProvider.Generated(bytes,"image/png","openrouter","fixture/paid",null,null,"fixture")})
+        val result=generator.execute(claim.id+":0:0",buildJsonObject{put("prompt","fixture")})
+        val original=LocalAttachmentStore(store).entries().single()
+        assertEquals("att_dream_"+claim.id+"_0_0",result.getValue("id").jsonPrimitive.content)
+        assertEquals(JsonNull,original.metadata["turn_id"])
+        assertArrayEquals(bytes,LocalAttachmentStore(store).bytes(original))
+        assertEquals(1,cache.history(cid)!!.turns.size)
+        assertTrue(runCatching{LocalAttachmentStore.validate(JsonObject(original.metadata+("turn_id" to JsonPrimitive("t"))))}.isFailure)
+        assertTrue(runCatching{generator.execute(claim.id+":0:0",buildJsonObject{put("prompt","again")})}.isFailure)
+        assertEquals(1,calls)
+        assertTrue(ledger.reserveTool(claim,0,1,"image_generate",at))
+        val revoked=LocalDreamImage(store,claim,selected,{imageConfig},
+            discover={listOf(LocalImageProvider.Model("fixture/paid","fixture",false))},
+            generate={_,_->assertNotNull(ledger.configure(cid,DreamSettingsRequest(cid,settings.revision,"disarm"),false,at));LocalImageProvider.Generated(bytes,"image/png","openrouter","fixture/paid",null,null,"fixture")})
+        assertTrue(runCatching{revoked.execute(claim.id+":0:1",buildJsonObject{put("prompt","revoked")})}.isFailure)
+        assertEquals(1,LocalAttachmentStore(store).entries().size)
+    }
+
 }
