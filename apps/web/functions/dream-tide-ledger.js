@@ -99,12 +99,12 @@ export async function setDreamTideExtra(db,cid,revision,extraId,at,now=Date.now(
     AND extra_id IS NULL AND NOT EXISTS(SELECT 1 FROM dream_tide_runs WHERE conversation_id=? AND slot_key=?)`,
     extraId,at,cid,revision,cid,'extra:'+extraId).run());
 }
-export async function claimDreamTide(db,cid,{now=Date.now(),currentModelId,busy=true}={}){
+export async function claimDreamTide(db,cid,{now=Date.now(),currentModelId,busy=true,expectedRevision=null}={}){
   if(!id(cid)||!time(now)||busy!==false)return null;
   await schema(db);
   let arm=await stmt(db,"SELECT * FROM dream_tide_arms WHERE conversation_id=? AND enabled=1",cid).first();
   if(await expireExtra(db,arm,now))arm=await stmt(db,"SELECT * FROM dream_tide_arms WHERE conversation_id=? AND enabled=1",cid).first();
-  if(!arm||currentModelId!==arm.model_id)return null;
+  if(!arm||currentModelId!==arm.model_id||(expectedRevision!==null&&arm.revision!==expectedRevision))return null;
   const config=JSON.parse(arm.config_json);
   const state={armed:true,armedAt:arm.armed_at,busy:false,
     extra:arm.extra_id?{id:arm.extra_id,at:arm.extra_at}:null};
