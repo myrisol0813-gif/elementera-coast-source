@@ -25,9 +25,9 @@ function normalizeConfig(config){
   if(config.execution!=null){
     const e=config.execution, int=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
     if(!int(e.tokenBudget,1,1000000)||!int(e.outputLimit,1,65536)||!int(e.toolBudget,0,128)||!int(e.readTurns,1,400)
-      ||typeof e.invitation!=='string'||e.invitation.length>16000||!e.invitation.trim())throw new TypeError('invalid dream tide execution settings');
+      ||!int(e.extraPerDay??0,0,128)||typeof e.invitation!=='string'||e.invitation.length>16000||!e.invitation.trim())throw new TypeError('invalid dream tide execution settings');
     execution={tokenBudget:e.tokenBudget,outputLimit:e.outputLimit,toolBudget:e.toolBudget,readTurns:e.readTurns,
-      invitation:e.invitation,includeTime:e.includeTime===true,includePrevious:e.includePrevious===true,
+      extraPerDay:e.extraPerDay??0,invitation:e.invitation,includeTime:e.includeTime===true,includePrevious:e.includePrevious===true,
       includeReplies:e.includeReplies===true,readHistory:e.readHistory===true,writeNote:e.writeNote===true};
   }
   return {enabled:true,timeZone:config.timeZone,dailyTime:config.dailyTime,quietHours,allowExtra:config.allowExtra===true,execution};
@@ -86,6 +86,11 @@ export async function claimDreamTide(db,cid,{now=Date.now(),currentModelId,busy=
     candidate=dreamTideCandidate(config,state,now);
   }
   if(!candidate)return null;
+  const extraLimit=config.execution?.extraPerDay??null;
+  if(candidate.kind==='extra'&&extraLimit!==null){
+    const count=await stmt(db,"SELECT COUNT(*) AS n FROM dream_tide_runs WHERE conversation_id=? AND local_day=? AND kind='extra'",cid,candidate.day).first();
+    if(count.n>=extraLimit)return null;
+  }
   const claimId=crypto.randomUUID();
   // Unique slot and partial unique active index enforce atomic claim.
   // Other admission statements check this ledger in the same D1 write.
