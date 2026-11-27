@@ -21,7 +21,9 @@ export async function routeDreamTide(request,env){
     if(path===base)return json({ok:true,settings,executionAvailable:env.COAST_DREAM_TIDE_ENABLED==='true',schedulerConfigured:env.COAST_DREAM_TIDE_SCHEDULER==='true'});
     const limit=Number(u.searchParams.get('limit')||20),offset=Number(u.searchParams.get('offset')||0);
     if(!Number.isSafeInteger(limit)||limit<1||limit>100||!Number.isSafeInteger(offset)||offset<0)throw invalid();
-    const rows=path===base+'/notes'?await readDreamNotes(db,cid,limit,offset):await readDreamActivity(db,cid,limit,offset);
+    const mediaId=u.searchParams.get('media_id');
+    if(mediaId!==null&&(!id(mediaId)||! /^(att|voice)_dream_/.test(mediaId)||path!==base+'/activity'))throw invalid();
+    const rows=path===base+'/notes'?await readDreamNotes(db,cid,limit,offset):await readDreamActivity(db,cid,limit,offset,mediaId);
     return json({ok:true,items:rows,nextOffset:rows.length===limit?offset+rows.length:null});
   }
   if(method!=='POST'||![base,base+'/reply'].includes(path))return methodNotAllowed(path===base?'GET, POST':readable?'GET':'POST');
