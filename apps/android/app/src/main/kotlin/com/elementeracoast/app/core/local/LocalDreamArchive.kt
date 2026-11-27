@@ -15,13 +15,15 @@ internal class LocalDreamArchive(private val store:LocalPersistence){
     private fun id(v:String)=v.matches(Regex("[A-Za-z0-9_.:-]{1,160}"))
     private fun emptyHistory()=buildJsonObject{put("version",1);put("settings",JsonNull);lists.forEach{put(it,JsonArray(emptyList()))}}
     private fun history(cid:String)=store.get(key(cid)).takeIf{it.isNotBlank()}?.let{json.parseToJsonElement(it).jsonObject}?:emptyHistory()
-    private fun validate(value:JsonObject,cid:String):DreamSettings?{
+    internal fun runtimeHistory(cid:String)=history(cid)
+    internal fun writeRuntimeHistory(cid:String,value:JsonObject)=store.put(key(cid),value.toString())
+    private fun validate(value:JsonObject,cid:String,allowRunning:Boolean=false):DreamSettings?{
         require(id(cid)&&value.keys==lists.toSet()+setOf("version","settings")&&value["version"]?.jsonPrimitive?.int==1)
         require(value.toString().encodeToByteArray().size<=1400000)
         val rows=lists.associateWith{value.rows(it).also{r->require(r.size<=20000)}}
         val runs=rows.getValue("runs").associateBy{it.str("claim_id")}
         require(runs.size==rows.getValue("runs").size)
-        require(runs.values.all{r->id(r.str("claim_id"))&&r.str("conversation_id")==cid&&r.str("status") in setOf("completed","failed","cancelled","interrupted")})
+        require(runs.values.all{r->id(r.str("claim_id"))&&r.str("conversation_id")==cid&&(r.str("status") in setOf("completed","failed","cancelled","interrupted")||allowRunning&&r.str("status")=="running")})
         val notes=rows.getValue("notes").associateBy{it.str("claim_id")}
         require(notes.size==rows.getValue("notes").size)
         require(notes.values.all{r->r.str("conversation_id")==cid&&runs.containsKey(r.str("claim_id"))&&r.str("body").isNotBlank()&&r.str("body").length<=16000})
@@ -82,14 +84,15 @@ internal class LocalDreamArchive(private val store:LocalPersistence){
         }
         return buildJsonObject{put("ok",true);put("items",JsonArray(page));put("nextOffset",if(offset+page.size<all.size)JsonPrimitive(offset+page.size)else JsonNull)}
     }
-    fun reply(cid:String,claim:String,rid:String,body:String):Boolean{
+    fun reply(cid:String,claim:String,rid:String,body:String):Boolean=store.readConsistent{s->LocalDreamArchive(s).replyLocked(cid,claim,rid,body)}
+    private fun replyLocked(cid:String,claim:String,rid:String,body:String):Boolean{
         require(id(rid)&&body.isNotBlank()&&body.length<=16000)
         val h=history(cid);if(h.rows("notes").none{it.str("claim_id")==claim})return false
         val prior=h.rows("replies").firstOrNull{it.str("id")==rid}
         if(prior!=null)return prior.str("claim_id")==claim&&prior.str("body")==body
         val row=buildJsonObject{put("id",rid);put("claim_id",claim);put("conversation_id",cid);put("body",body);put("created_at",System.currentTimeMillis())}
         val next=JsonObject(h+("replies" to JsonArray(h.rows("replies")+row)))
-        validate(next,cid);store.put(key(cid),next.toString());return true
+        validate(next,cid,allowRunning=true);store.put(key(cid),next.toString());return true
     }
     fun remove(cid:String){store.remove(key(cid));store.remove(draftKey(cid))}
 }
