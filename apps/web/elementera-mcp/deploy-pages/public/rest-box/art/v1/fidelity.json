@@ -2,24 +2,16 @@
   "version": 1,
   "sources": {
     "furniture": {
-      "repo": "myrisol0813-gif/elementera-creature-workshop",
-      "commit": "6fd374173ad9c0c4233fb5bc7b922bff26ad0839",
-      "file": "furniture/v1/preview-mobile.html"
+      "archive": "original-artwork"
     },
     "wardrobe": {
-      "repo": "myrisol0813-gif/elementera-creature-workshop",
-      "commit": "525df964c870885aaddb5ad8af52638d9c6da3f4",
-      "file": "wardrobe/v0.5/preview.html"
+      "archive": "original-artwork"
     },
     "original-props": {
-      "repo": "myrisol0813-gif/elementera-creature-workshop",
-      "commit": "9012b6ebb81109a6cebd8d4eb22a68fc2ee0a1e1",
-      "file": "originals/2026-11-26/props/"
+      "archive": "original-artwork"
     },
     "recovered": {
-      "repo": "myrisol0813-gif/elementera-creature-workshop",
-      "commit": "ad18990d381bc7fd972d691d7790db4226db2c2a",
-      "file": "furniture/recovered-original-v1/svg/"
+      "archive": "original-artwork"
     }
   },
   "expected": [
