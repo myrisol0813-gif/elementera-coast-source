@@ -22,6 +22,8 @@ object NativeWorkspace {
     fun persistence(context: Context): LocalPersistence =
         localStore ?: SharedPreferencesLocalPersistence(context)
 
+    fun localSelected(context:Context):Boolean=context.applicationContext.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getBoolean(KEY,false)
+
     @Synchronized fun initialize(context: Context) {
         val local = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getBoolean(KEY, false)
@@ -30,7 +32,9 @@ object NativeWorkspace {
             val store = FileLocalPersistence(File(context.noBackupFilesDir, "coast-local-v1"))
             store.semanticIndex = LocalSemanticIndex(File(context.noBackupFilesDir, "coast-embedding-index-v1"), { LocalMemoryStore(store).snapshot().entries }, { CoastEmbedding(context.applicationContext) }).also { it.requestRefresh() }
             localStore = store
-            current = LocalCoastTransport(store,LocalIndependentWeb(context.applicationContext),LocalVoiceProvider(context.applicationContext)) { LocalProviderStore(context).catalog() }.also{transport->transport.imageConfig={selected->LocalProviderStore(context.applicationContext).resolveImageProvider(selected)}}
+            // Fresh process: no previous live coroutine can own these claims.
+            RemoteCacheRecovery.recoverWakeClaims(store)
+            current = LocalCoastTransport(store,LocalIndependentWeb(context.applicationContext),LocalVoiceProvider(context.applicationContext)) { LocalProviderStore(context).catalog() }.also{transport->transport.imageConfig={selected->LocalProviderStore(context.applicationContext).resolveImageProvider(selected)};transport.dreamCanArm={selected->com.elementeracoast.app.BuildConfig.LOCAL_DREAM_EXECUTION_ENABLED&&LocalProviderStore(context.applicationContext).resolve(selected)!=null};transport.dreamChanged={LocalDreamWorker.sync(context.applicationContext)}}
         } else {
             (localStore as? FileLocalPersistence)?.semanticIndex?.close()
             current = null
@@ -38,9 +42,11 @@ object NativeWorkspace {
         }
     }
 
-    fun select(context: Context, local: Boolean): Boolean =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putBoolean(KEY, local).commit()
+    fun select(context: Context, local: Boolean): Boolean {
+        val lease=LocalDreamRuntime.acquire()?:return false
+        return try{context.applicationContext.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().putBoolean(KEY,local).commit()}
+        finally{lease.close()}
+    }
 }
 
 /** One authoritative generation. Restore writes into a private staged directory, then switches a single atomic pointer. */
