@@ -25,7 +25,7 @@ internal fun MessageNotificationControls(){
         status=if(DreamNotice.permitted(context))"通知权限已允许。"else "系统尚未允许通知。"
     }
     LaunchedEffect(context){ChatNotice.ensure(context)}
-    Card(Modifier.fillMaxWidth()){
+    com.elementeracoast.app.ui.theme.SnowLetterSurface(modifier=Modifier.fillMaxWidth(),role=com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole.StatusCard,fallbackColor=MaterialTheme.colorScheme.surface,fallbackBorder=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=.55f)),fallbackElevation=1.dp){
         Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
             Text("通知设置",style=MaterialTheme.typography.titleMedium)
             NoticeToggle("每条正式聊天回复",enabled){ChatNotice.setFlag(context,"enabled",it);enabled=it}

@@ -32,7 +32,7 @@ internal fun DreamNotificationControls(cid:String){
         lifecycle?.addObserver(observer)
         onDispose{lifecycle?.removeObserver(observer)}
     }
-    Card(modifier=Modifier.fillMaxWidth()){
+    com.elementeracoast.app.ui.theme.SnowLetterSurface(modifier=Modifier.fillMaxWidth(),role=com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole.StatusCard,fallbackColor=MaterialTheme.colorScheme.surface,fallbackBorder=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=.55f)),fallbackElevation=1.dp){
         Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
             Text("本机系统通知",style=MaterialTheme.typography.titleMedium)
             Text("应用级设置，适用于本机所有已授权窗口。锁屏默认隐藏私密正文；不影响模型活动或费用。",style=MaterialTheme.typography.bodySmall)

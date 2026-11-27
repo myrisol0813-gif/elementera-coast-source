@@ -21,7 +21,7 @@ internal class NativeDreamPlanRoute(private val store:LocalPersistence,private v
     fun requestLimit(window:String,revision:String?,model:String?)=grants.requestLimit(window,revision,model)
     fun revoke(window:String)=grants.revoke(window)
     suspend fun grant(window:String,revision:String,model:String,accepted:Boolean,requestLimit:Int):Boolean{
-        if(!accepted||NativeDreamPlanProtocol.slug(model)==null||requestLimit !in 1..129)return false
+        if(!accepted||NativeDreamPlanProtocol.slug(model)==null||requestLimit !in 1..2147483646)return false
         val current=account.currentAccount()?:return false
         val epoch=account.wakeConnectionEpoch()?:return false
         val names=account.models().map{it.slug}.toSet()

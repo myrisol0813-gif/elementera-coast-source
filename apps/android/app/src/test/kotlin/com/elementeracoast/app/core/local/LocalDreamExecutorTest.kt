@@ -128,6 +128,14 @@ class LocalDreamExecutorTest {
         assertEquals(listOf("start" to "running","failure" to "failed"),failed)
     }
 
+    @Test fun largerOwnerBudgetsSaveAndArchiveWithoutClamping(){
+        val (store,armed)=fixture()
+        val e=cfg.execution!!.copy(tokenBudget=2000000,outputLimit=100000,toolBudget=200,readTurns=500,extraPerDay=200,voiceLimit=200,imageLimit=200)
+        val updated=LocalDreamLedger(store).configure(cid,DreamSettingsRequest(cid,armed.revision,"save",cfg.copy(execution=e),model),false,at)!!
+        assertEquals(e,updated.config!!.execution)
+        assertNotNull(LocalDreamArchive(store).export(cid))
+        assertFalse(updated.enabled)
+    }
     @Test fun scheduleQuietAndAlreadyConsumedSlots(){
         val (_,a)=fixture()
         assertEquals("daily:2026-11-27",LocalDreamSchedule.candidate(a,emptySet(),at)?.key)
