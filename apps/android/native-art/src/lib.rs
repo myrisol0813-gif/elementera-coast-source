@@ -107,3 +107,26 @@ pub extern "system" fn Java_com_elementeracoast_app_core_restbox_LegacyStudioRec
         None => ptr::null_mut(),
     }
 }
+
+#[cfg(test)]
+mod legacy_tests {
+    use super::*;
+    #[test]
+    fn exact_legacy_key_is_read_and_other_origin_is_ignored() {
+        let dir = std::env::temp_dir().join(format!("coast-legacy-test-{}-{:?}", std::process::id(), std::thread::current().id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut db = rusty_leveldb::DB::open(&dir, rusty_leveldb::Options::default()).unwrap();
+        db.put(b"_https://unrelated.invalid\0\x01rest-box.studio.v1", b"\x01not-the-studio").unwrap();
+        db.flush().unwrap();
+        db.close().unwrap();
+        drop(db);
+        assert_eq!(read_legacy_studio(dir.to_str().unwrap()).unwrap(), b"");
+        let mut db = rusty_leveldb::DB::open(&dir, rusty_leveldb::Options::default()).unwrap();
+        db.put(b"_https://rest-studio.invalid\0\x01rest-box.studio.v1", b"\x01{\"version\":1}").unwrap();
+        db.flush().unwrap();
+        db.close().unwrap();
+        drop(db);
+        assert_eq!(read_legacy_studio(dir.to_str().unwrap()).unwrap(), b"\x01{\"version\":1}");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+}
