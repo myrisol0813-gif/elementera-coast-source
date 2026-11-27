@@ -158,7 +158,7 @@ export function createDaily({ storage, router, toast, chat }) {
       ['vault', '文件库', '媒体归档与收藏', 'book'],
       ['calendar', '日历', '公历日程与纪念日', 'calendar'],
       ['library', '书房', '翻书、划线与批注', 'book'],
-      ['pets', '宠物系统', '还在准备休憩箱', 'heart'],
+      ['pets', '休憩箱', '造物间 · 布置与捏人', 'heart'],
       ['widgets', '未来小组件', '以后再慢慢长出来', 'plus'],
     ];
     return {
@@ -170,6 +170,10 @@ export function createDaily({ storage, router, toast, chat }) {
   }
 
   function placeholderView({ title = '未上线' } = {}) {
+    if (title === '宠物系统') return {
+      title: '休憩箱', subtitle: '造物间', className: 'daily-panel',
+      body: '<iframe title="休憩箱造物间" src="/public/rest-box/room-lab.html" sandbox="allow-scripts allow-same-origin allow-downloads allow-modals" style="display:block;width:100%;height:78dvh;min-height:300px;border:0;border-radius:12px"></iframe>',
+    };
     return {
       title,
       subtitle: '小组件',
