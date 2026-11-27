@@ -23,8 +23,6 @@ data class ConversationContextSettings(
     @SerialName("reality_enabled") val realityEnabled: Boolean = false,
     @SerialName("reality_fields") val realityFields: List<String> = emptyList(),
     @SerialName("short_reply_mode") val shortReplyMode: Boolean = false,
-    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
-    @SerialName("dream_readback_enabled") val dreamReadbackEnabled: Boolean = false,
     @SerialName("weather_city") val weatherCity: String = "",
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     @SerialName("cross_window_auto") val crossWindowAuto: Boolean = false,
@@ -43,7 +41,9 @@ data class ConversationContextSettings(
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     @SerialName("reply_sequence_tool_budget") val replySequenceToolBudget: Int? = null,
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
-    @SerialName("reply_sequence_token_budget") val replySequenceTokenBudget: Int? = null
+    @SerialName("reply_sequence_token_budget") val replySequenceTokenBudget: Int? = null,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("dream_readback_enabled") val dreamReadbackEnabled: Boolean = false
 ) {
     fun normalized(): ConversationContextSettings = copy(
         realityFields = realityFields.filter(RealityContextFields.all::contains).distinct(),
