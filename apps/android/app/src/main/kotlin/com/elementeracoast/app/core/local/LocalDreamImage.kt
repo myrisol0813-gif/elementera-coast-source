@@ -10,7 +10,7 @@ internal class LocalDreamImage(
     private val discover:(String)->List<LocalImageProvider.Model> = {LocalImageProvider().discover(it)},
     private val generate:(LocalImageProvider.Config,JsonObject)->LocalImageProvider.Generated={c,p->LocalImageProvider().generate(c,p)}
 ){
-    private var attempted=false
+    private var attempts=0
     private fun config():Pair<LocalProviderConfig,String>?{
         val p=resolve(selected)?:return null
         val m=p.models.firstOrNull{p.modelId(it)==selected}?:return null
@@ -19,7 +19,7 @@ internal class LocalDreamImage(
     }
     fun configured()=config()!=null
     fun execute(callId:String,input:JsonObject):JsonObject{
-        require(!attempted&&input.keys==setOf("prompt"))
+        require(attempts<requireNotNull(claim.config.execution).imageLimit&&input.keys==setOf("prompt"))
         val prompt=input.getValue("prompt").jsonPrimitive.let{require(it.isString);it.content.trim()}
         require(prompt.length in 1..4000)
         val (p,model)=requireNotNull(config())
@@ -31,7 +31,7 @@ internal class LocalDreamImage(
                 LocalAttachmentStore(s).entries().none{it.metadata["id"]?.jsonPrimitive?.contentOrNull==id}
         }
         require(store.readConsistent{allowed(it)})
-        attempted=true
+        attempts++
         require(discover(p.apiKey).any{it.id==model})
         require(config()==(p to model)&&store.readConsistent{allowed(it)})
         val generated=generate(LocalImageProvider.Config(p.apiKey,model,true),buildJsonObject{put("prompt",prompt)})
