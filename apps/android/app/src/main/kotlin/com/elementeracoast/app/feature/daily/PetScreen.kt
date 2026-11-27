@@ -148,6 +148,7 @@ private fun NativeStudioPage(r: StudioResources) {
     val bitmaps by produceState<Map<String,android.graphics.Bitmap>>(emptyMap(),r.atlas,keys) {
         value=withContext(Dispatchers.IO){r.atlas.load(keys)}
     }
+    val roomMotionKeys=if(panel=="room")r.atlas.roomMotionKeys(scene)else emptyList()
     val motionRequests=remember(panel,role,action,prop,state.household,occupants,scene){
         if(panel=="appearance")listOf(StudioMotionRequest("preview",if(role=="model")state.household.model else state.household.human,action,prop))
         else scene.filterIsInstance<NativeSceneLayer.Occupant>().map{layer->
@@ -174,10 +175,12 @@ private fun NativeStudioPage(r: StudioResources) {
             delay(250)
         }
     }
-    val moving by produceState<Map<String,android.graphics.Bitmap>>(emptyMap(),r.atlas,motionRequests,state.reducedMotion,panel){
+    val moving by produceState<Map<String,android.graphics.Bitmap>>(emptyMap(),r.atlas,motionRequests,state.reducedMotion,panel,roomMotionKeys){
         value=emptyMap()
-        if(state.reducedMotion||motionRequests.isEmpty())return@produceState
+        if(state.reducedMotion||(motionRequests.isEmpty()&&roomMotionKeys.isEmpty()))return@produceState
         val start=SystemClock.uptimeMillis()
+        var roomCursor=0
+        val retained=linkedMapOf<String,android.graphics.Bitmap>()
         while(isActive) {
             val elapsed=SystemClock.uptimeMillis()-start
             val frames=withContext(Dispatchers.Default){
@@ -185,7 +188,14 @@ private fun NativeStudioPage(r: StudioResources) {
                     r.atlas.motionFrame(req.appearance,req.action,req.prop,elapsed,if(req.id=="preview")384 else 192)?.let{req.id to it}
                 }.toMap()
             }
-            value=frames
+            // Round-robin one independently moving furniture/environment layer per tick.
+            // Do not rasterize every painted object for every frame.
+            if(roomMotionKeys.isNotEmpty()){
+                val key=roomMotionKeys[roomCursor++ % roomMotionKeys.size]
+                val frame=withContext(Dispatchers.Default){r.atlas.roomMotionFrame(key,elapsed)}
+                if(frame!=null)retained[key]=frame
+            }
+            value=retained.toMap()+frames
             delay(125)
         }
     }
