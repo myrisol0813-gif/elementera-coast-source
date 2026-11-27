@@ -150,6 +150,8 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
                 DreamSwitch("期间新增对话轮数",execution.includeConversationCount,!busy){execution=execution.copy(includeConversationCount=it)}
                 DreamSwitch("天气（需窗口现实权限）",execution.includeWeather,!busy){execution=execution.copy(includeWeather=it)}
                 DreamSwitch("未来日历（需窗口现实权限）",execution.includeCalendar,!busy){execution=execution.copy(includeCalendar=it)}
+                DreamSwitch("步数（仅本机且已授权）",execution.includeSteps,!busy){execution=execution.copy(includeSteps=it)}
+                DreamSwitch("应用使用情况（仅本机且已授权）",execution.includeAppUsage,!busy){execution=execution.copy(includeAppUsage=it)}
                 Text("通用工具（同时遵循现有窗口权限）",style=MaterialTheme.typography.titleMedium)
                 DreamSwitch("独立联网",execution.allowWeb,!busy){execution=execution.copy(allowWeb=it)}
                 DreamSwitch("书房阅读",execution.allowLibrary,!busy){execution=execution.copy(allowLibrary=it)}
