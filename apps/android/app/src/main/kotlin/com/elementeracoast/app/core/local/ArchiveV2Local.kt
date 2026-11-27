@@ -27,6 +27,9 @@ internal object ArchiveV2Local {
         val attachmentRows=originals.entries()
         val metadata=attachmentRows.associate{it.metadata.getValue("id").jsonPrimitive.content to it.metadata}
         for(c in LocalBackupArchive.capture(store,applicationId).conversations)for(t in c.history.turns)for(v in t.user.variants+t.assistant.variantsByUserVariant.values.flatten())for(a in v.attachments)LocalAttachmentStore.checkReference(c.conversation.id,t.id,a,metadata)
+        val dreamArchive=LocalDreamArchive(store)
+        for(row in attachmentRows)if(row.metadata.getValue("id").jsonPrimitive.content.startsWith("att_dream_"))dreamArchive.validateMediaOrigin(dreamArchive.export(row.metadata.getValue("conversation_id").jsonPrimitive.content),row.metadata,"image")
+        for(row in LocalSideRecords(store).rows().filter{it.kind=="voice"&&it.data["source"]==JsonPrimitive("dream_tide")})dreamArchive.validateMediaOrigin(dreamArchive.export(row.data.getValue("conversation_id").jsonPrimitive.content),row.data,"voice")
         val records=mutableListOf<ArchiveV2Record>();val objects=linkedMapOf<String,ArchiveV2Object>()
         try {
             ArchiveV2ZipWriter(output.outputStream()).use { writer->
@@ -172,6 +175,16 @@ internal object ArchiveV2Local {
             for((cid,value) in dreams){
                 require(cid in (parents?.first?:existing)&&cid !in parents?.second.orEmpty()){"自主唤醒所属窗口存在冲突，未恢复。"}
                 LocalDreamArchive(target).restore(cid,value,write)
+            }
+            val dreamArchive=LocalDreamArchive(target)
+            val dreamByCid=dreams.toMap()
+            for(item in attachments.filter{it.metadata.getValue("id").jsonPrimitive.content.startsWith("att_dream_")}){
+                val cid=item.metadata.getValue("conversation_id").jsonPrimitive.content
+                dreamArchive.validateMediaOrigin(dreamByCid[cid]?:dreamArchive.export(cid),item.metadata,"image")
+            }
+            for(row in side.filter{it.kind=="voice"&&it.data["source"]==JsonPrimitive("dream_tide")}){
+                val cid=row.data.getValue("conversation_id").jsonPrimitive.content
+                dreamArchive.validateMediaOrigin(dreamByCid[cid]?:dreamArchive.export(cid),row.data,"voice")
             }
             val extras=ArchiveV2Knowledge.apply(rows,extra,target,write,parents?.first?:existing,parents?.second.orEmpty(),histories)
             val files=if("attachments" in selection)mapOf("attachments" to ArchiveV2Attachments.apply(attachments,target,histories,parents?.second.orEmpty(),write))else emptyMap()
