@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "assets": {
+    "bedroom-slippers": {
+      "slots": {
+        "upper": {
+          "base": "#c18e89",
+          "selector": {
+            "groupId": "slippers",
+            "attribute": "fill",
+            "original": "#c18e89"
+          }
+        },
+        "sole": {
+          "base": "#d4b89d",
+          "selector": {
+            "groupId": "slippers",
+            "attribute": "fill",
+            "original": "#d4b89d"
+          }
+        }
+      },
+      "presets": [
+        {
+          "id": "original",
+          "name": "原色",
+          "values": {
+            "upper": "#c18e89",
+            "sole": "#d4b89d"
+          }
+        },
+        {
+          "id": "apricot",
+          "name": "杏黄",
+          "values": {
+            "upper": "#d7b166",
+            "sole": "#d4b89d"
+          }
+        }
+      ]
+    }
+  },
+  "notes": "Instance override only; do not recolor unrelated SVG definitions. Other original furniture slots require per-asset authoring."
+}

@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "rooms": [
+    {
+      "id": "living",
+      "manifest": "rooms/living.json"
+    },
+    {
+      "id": "study",
+      "manifest": "rooms/study.json"
+    },
+    {
+      "id": "bedroom",
+      "manifest": "rooms/bedroom.json"
+    }
+  ],
+  "extras": [
+    "extras/afternoon.json",
+    "extras/stationery.json"
+  ],
+  "creatures": "creatures/index.json",
+  "accessories": "accessories/index.json",
+  "props": {
+    "anchors": "props/anchors.json",
+    "items": [
+      {
+        "id": "book",
+        "file": "props/book.svg"
+      },
+      {
+        "id": "flower",
+        "file": "props/flower.svg"
+      },
+      {
+        "id": "cookie",
+        "file": "props/cookie.svg"
+      },
+      {
+        "id": "tea",
+        "file": "props/tea.svg"
+      },
+      {
+        "id": "letter",
+        "file": "props/letter.svg"
+      }
+    ]
+  },
+  "colorPresets": "color-presets.json",
+  "counts": {
+    "furniture": 55,
+    "creatures": 16,
+    "handheldProps": 5
+  },
+  "status": "art resources only; runtime and packaging not connected"
+}
