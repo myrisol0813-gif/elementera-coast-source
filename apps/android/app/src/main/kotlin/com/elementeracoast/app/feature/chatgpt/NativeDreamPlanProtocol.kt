@@ -46,7 +46,7 @@ internal object NativeDreamPlanProtocol {
         require(tools.map{it.str("name")}.distinct().size==tools.size)
         return buildJsonObject{
             put("model",model);put("store",false);put("stream",true)
-            put("instructions",instructions+"\\n本次为系统发起的独立活动，不是人类新发言。剩余软 token 预算约 "+softRemaining+"，请简洁结束；这不是供应商强制上限。")
+            put("instructions",instructions+"\n本次为系统发起的独立活动，不是人类新发言。剩余软 token 预算约 "+softRemaining+"，请简洁结束；这不是供应商强制上限。")
             put("input",JsonArray(items.ifEmpty{listOf(buildJsonObject{put("role","developer");put("content","自主活动开始；请按已授权邀请自行决定是否使用工具。")})}))
             put("include",JsonArray(listOf(JsonPrimitive("reasoning.encrypted_content"))))
             if(tools.isNotEmpty())put("tools",JsonArray(listOf(buildJsonObject{
