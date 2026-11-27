@@ -119,7 +119,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val ledger=LocalDreamLedger(store)
             val previous=ledger.settings(cid)
             val ready=BuildConfig.LOCAL_DREAM_EXECUTION_ENABLED&&dreamCanArm!=null
-            fun payload(settings:DreamSettings)=element(DreamSettingsResponse.serializer(),DreamSettingsResponse(ok=true,settings=settings,executionAvailable=ready,schedulerConfigured=ready,planExecutionAvailable=ready&&dreamPlan!=null,planStatus=if(settings.modelId?.startsWith("chatgpt-plan:")==true)dreamPlan?.status(cid,settings.revision,settings.modelId)else null)).jsonObject
+            fun payload(settings:DreamSettings)=element(DreamSettingsResponse.serializer(),DreamSettingsResponse(ok=true,settings=settings,executionAvailable=ready,schedulerConfigured=ready,planExecutionAvailable=ready&&dreamPlan!=null,planStatus=if(settings.modelId?.startsWith("chatgpt-plan:")==true)dreamPlan?.status(cid,settings.revision,settings.modelId)else null,planRequestLimit=dreamPlan?.requestLimit(cid,settings.revision,settings.modelId))).jsonObject
             if(method=="GET"){
                 if(path=="/api/chat/dream-tide")return response(r,200,payload(previous))
                 val offset=r.url.queryParameter("offset")?.toIntOrNull()?:0
