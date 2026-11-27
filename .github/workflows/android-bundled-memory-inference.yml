@@ -27,6 +27,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install build-only reference art compiler
+        working-directory: apps/android
+        run: |
+          npm install --prefix art-tools --no-audit --no-fund
+          ./art-tools/node_modules/.bin/playwright install --with-deps chromium
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -48,6 +56,8 @@ jobs:
               for name, digest in expected.items():
                   assert hashlib.sha256(z.read(name)).hexdigest() == digest, name
               assert "assets/coast-embedding/NOTICE.txt" in z.namelist()
+              assert "assets/rest-box/native/v1/index.json" in z.namelist()
+              assert not any(n.startswith("assets/rest-box/") and n.endswith((".html", ".mjs")) for n in z.namelist())
               native = [n for n in z.infolist() if n.filename.startswith("lib/") and "onnxruntime" in n.filename]
               assert native
               assert {n.filename.split("/")[1] for n in native} >= {"arm64-v8a", "armeabi-v7a", "x86_64", "x86"}
