@@ -58,6 +58,20 @@ class ChatGptPlanRepository(
         withContext(Dispatchers.IO) { activeCredentials().accessToken }
     }
 
+    /** Only for the isolated plan-wake transport. A fresh account catalog must
+     * have been read on this repository; credential refresh cannot change identity. */
+    internal suspend fun accessTokenForDream(grant:NativeDreamPlanProtocol.Grant,window:String,revision:String,modelId:String):String=mutex.withLock{
+        withContext(Dispatchers.IO){
+            val advertised=latestModels.map{it.slug}.toSet()
+            if(!NativeDreamPlanProtocol.permitted(grant,window,revision,currentAccount(),modelId,advertised))
+                throw NativeDreamPlanFailure("plan_authorization_unavailable")
+            val account=activeCredentials()
+            if(!NativeDreamPlanProtocol.permitted(grant,window,revision,account,modelId,advertised))
+                throw NativeDreamPlanFailure("plan_authorization_unavailable")
+            account.accessToken
+        }
+    }
+
     suspend fun connect(openBrowser: (String) -> Unit): ChatGptConnection = mutex.withLock {
         val existing = store.load()
         val hostId = store.hostId()
