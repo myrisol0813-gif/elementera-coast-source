@@ -106,7 +106,7 @@ internal object ArchiveV2Appearance {
         val objects=m.objects.associateBy{it.objectSha256}
         val raw=Json.parseToJsonElement(stage.verify(objects.getValue(r.recordObject),1800000).readBytes().decodeToString(throwOnInvalidSequence=true)).jsonObject
         require(raw.keys==setOf("kind","data")&&raw.str("kind")==MODULE)
-        val data=raw.getValue("data").jsonObject;require(data.keys==setOf("settings","files")||data.keys==setOf("settings","files","basic_settings"))
+        val data=raw.getValue("data").jsonObject;require(data.keys.containsAll(setOf("settings","files"))&&data.keys.all{it in setOf("settings","files","basic_settings","rest_studio")})
         val files=data.getValue("files").jsonArray;require(files.size==r.mediaObjects.size&&files.size<=2)
         val assets=files.mapIndexed{i,f->
             val row=f.jsonObject;require(row.keys==setOf("role","format","size","sha256"))
@@ -126,11 +126,23 @@ internal object ArchiveV2Appearance {
         require(raw.keys==setOf("kind","data"))
         val data=raw.getValue("data").jsonObject
         when(r.id){
-            DEVICE_ID->require(m.workspace=="backend"&&raw.str("kind")=="device_basic_settings"&&r.mediaObjects.isEmpty()&&data.keys==setOf("basic_settings"))
+            DEVICE_ID->require(m.workspace=="backend"&&raw.str("kind")=="device_basic_settings"&&r.mediaObjects.isEmpty()&&data.keys.contains("basic_settings")&&data.keys.all{it in setOf("basic_settings","rest_studio")})
             ID->require(m.workspace=="local"&&raw.str("kind")==MODULE&&(data.keys==setOf("settings","files")||data.keys==setOf("settings","files","basic_settings")))
             else->error("未知设备设置记录。")
         }
         return data["basic_settings"]?.jsonObject?.also(::checkBasic)
+    }
+    fun readStudio(m:ArchiveV2Manifest,stage:ArchiveV2Stage):JsonObject? {
+        val rows=m.records.filter{it.module==MODULE}
+        require(rows.size<=1)
+        val r=rows.singleOrNull()?:return null
+        require(r.dependencies.isEmpty())
+        val raw=Json.parseToJsonElement(stage.verify(m.objects.single{it.objectSha256==r.recordObject},1800000).readBytes().decodeToString(throwOnInvalidSequence=true)).jsonObject
+        val data=raw.getValue("data").jsonObject
+        if("rest_studio" !in data)return null
+        // Reuse device-envelope identity/allowlist checks before exposing a studio choice.
+        readDeviceBasic(m,stage)
+        return data.getValue("rest_studio").jsonObject
     }
     fun applyBasic(values:JsonObject,store:LocalPersistence,write:Boolean):LocalRestoreCount {
         checkBasic(values)
