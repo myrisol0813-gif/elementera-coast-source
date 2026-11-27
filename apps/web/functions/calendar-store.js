@@ -1,3 +1,4 @@
+import {insertAutonomousRecord} from './dream-tide-write-fence.js';
 import { anniversaryCalendarDay } from './calendar-anniversary.js';
 // Independent, non-destructive Gregorian calendar. Never restores legacy coast_calendar_* tables.
 export const CALENDAR_LIMITS = Object.freeze({ title: 120, body: 4000, yearMin: 1900, yearMax: 2200 });
@@ -194,12 +195,13 @@ export async function createCalendarEntry(db, value, context = {}) {
   }
   const id = crypto.randomUUID();
   const now = Date.now();
-  await db.prepare(`INSERT INTO coast_calendar_entries_v2
+  const sql=`INSERT INTO coast_calendar_entries_v2
     (id, day, kind, title, body, recurrence, author, source, conversation_id, source_turn_id, tool_call_id, model_label, created_at, updated_at, anniversary_start_day, anniversary_mode, anniversary_target_days, anniversary_pinned)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(id, item.day, item.kind, item.title, item.body, item.recurrence,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,values=[id, item.day, item.kind, item.title, item.body, item.recurrence,
       actor(context), context.source === 'official_mcp' ? 'official_mcp' : context.author === 'owner' ? 'manual' : 'coast_chat',
-      context.conversation_id || null, context.source_turn_id || null, idem, context.model_label || null, now, now, ...anniversaryColumns(item.anniversary)).run();
+      context.conversation_id || null, context.source_turn_id || null, idem, context.model_label || null, now, now, ...anniversaryColumns(item.anniversary)];
+  if(context.autonomous_claim)await insertAutonomousRecord(db,sql.replace('VALUES (','SELECT ').slice(0,-1),values,context,'allowCalendarWrite','calendar_create');
+  else await db.prepare(sql).bind(...values).run();
   return hydrate(await find(db, id));
 }
 

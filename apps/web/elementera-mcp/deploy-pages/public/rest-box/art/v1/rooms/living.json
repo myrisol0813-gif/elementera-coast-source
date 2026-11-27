@@ -1,0 +1,357 @@
+{
+  "version": 1,
+  "id": "living",
+  "width": 400,
+  "height": 380,
+  "environment": "rooms/living-environment.svg",
+  "overlay": "rooms/living-overlay.svg",
+  "order": [
+    "living-window",
+    "living-curtains",
+    "living-chime",
+    "living-picture",
+    "living-bookcase",
+    "living-vase",
+    "living-lamp",
+    "living-sofa",
+    "living-rug",
+    "living-table",
+    "living-plant",
+    "living-nest",
+    "living-books"
+  ],
+  "assets": [
+    {
+      "id": "living-window",
+      "name": "海景窗户",
+      "box": [
+        36,
+        26,
+        161,
+        151
+      ],
+      "groups": [
+        "window"
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/living-window.svg",
+      "defaultPlacement": {
+        "x": 36,
+        "y": 26,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "living"
+    },
+    {
+      "id": "living-curtains",
+      "name": "碎花窗帘",
+      "box": [
+        31,
+        30,
+        169,
+        157
+      ],
+      "groups": [
+        "curtain-left",
+        "curtain-right"
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/living-curtains.svg",
+      "defaultPlacement": {
+        "x": 31,
+        "y": 30,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "living"
+    },
+    {
+      "id": "living-chime",
+      "name": "海玻璃风铃",
+      "box": [
+        180,
+        8,
+        64,
+        108
+      ],
+      "groups": [
+        "sea-glass"
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/living-chime.svg",
+      "defaultPlacement": {
+        "x": 180,
+        "y": 8,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "living"
+    },
+    {
+      "id": "living-picture",
+      "name": "山林挂画",
+      "box": [
+        231,
+        25,
+        80,
+        83
+      ],
+      "groups": [
+        "picture"
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/living-picture.svg",
+      "defaultPlacement": {
+        "x": 231,
+        "y": 25,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "living"
+    },
+    {
+      "id": "living-bookcase",
+      "name": "木质书柜",
+      "box": [
+        215,
+        102,
+        147,
+        157
+      ],
+      "groups": [
+        "bookshelf"
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/living-bookcase.svg",
+      "defaultPlacement": {
+        "x": 215,
+        "y": 102,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "living"
+    },
+    {
+      "id": "living-vase",
+      "name": "桌面花瓶",
+      "box": [
+        284,
+        35,
+        71,
+        93
+      ],
+      "groups": [
+        "vase"
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/living-vase.svg",
+      "defaultPlacement": {
+        "x": 284,
+        "y": 35,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "living"
+    },
+    {
+      "id": "living-lamp",
+      "name": "暖光落地灯",
+      "box": [
+        125,
+        65,
+        158,
+        212
+      ],
+      "groups": [
+        "lamp"
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/living-lamp.svg",
+      "defaultPlacement": {
+        "x": 125,
+        "y": 65,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "living"
+    },
+    {
+      "id": "living-sofa",
+      "name": "碎花沙发",
+      "box": [
+        4,
+        140,
+        185,
+        160
+      ],
+      "groups": [
+        "sofa-back",
+        "sofa-front"
+      ],
+      "anchors": [
+        {
+          "id": "seat",
+          "x": 91,
+          "y": 85,
+          "action": "sit",
+          "provisional": true
+        }
+      ],
+      "hasFront": true,
+      "file": "assets/living-sofa.svg",
+      "defaultPlacement": {
+        "x": 4,
+        "y": 140,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "living"
+    },
+    {
+      "id": "living-rug",
+      "name": "编织地毯",
+      "box": [
+        35,
+        250,
+        333,
+        115
+      ],
+      "groups": [
+        "rug-piece"
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/living-rug.svg",
+      "defaultPlacement": {
+        "x": 35,
+        "y": 250,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "living"
+    },
+    {
+      "id": "living-table",
+      "name": "午后茶几",
+      "box": [
+        65,
+        207,
+        134,
+        119
+      ],
+      "groups": [
+        "tea-table",
+        "tea-steam"
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/living-table.svg",
+      "defaultPlacement": {
+        "x": 65,
+        "y": 207,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "living"
+    },
+    {
+      "id": "living-plant",
+      "name": "落地绿植",
+      "box": [
+        302,
+        176,
+        103,
+        129
+      ],
+      "groups": [
+        "plant"
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/living-plant.svg",
+      "defaultPlacement": {
+        "x": 302,
+        "y": 176,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "living"
+    },
+    {
+      "id": "living-nest",
+      "name": "藤编小窝",
+      "box": [
+        193,
+        256,
+        150,
+        96
+      ],
+      "groups": [
+        "nest-back",
+        "nest-front"
+      ],
+      "anchors": [
+        {
+          "id": "nest",
+          "x": 75,
+          "y": 39,
+          "action": "sleep",
+          "provisional": true
+        }
+      ],
+      "hasFront": true,
+      "file": "assets/living-nest.svg",
+      "defaultPlacement": {
+        "x": 193,
+        "y": 256,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "living"
+    },
+    {
+      "id": "living-books",
+      "name": "地面书堆",
+      "box": [
+        13,
+        284,
+        70,
+        56
+      ],
+      "groups": [
+        "book-pile"
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/living-books.svg",
+      "defaultPlacement": {
+        "x": 13,
+        "y": 284,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "living"
+    }
+  ]
+}

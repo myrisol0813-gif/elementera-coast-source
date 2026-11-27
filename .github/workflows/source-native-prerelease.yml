@@ -56,6 +56,18 @@ jobs:
             echo 'skip=false' >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Require version-specific public release notes
+        if: steps.version_gate.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          notes="$GITHUB_WORKSPACE/docs/release-notes/${{ steps.version_gate.outputs.version }}.md"
+          test -s "$notes" || { echo "Missing version-specific release notes: $notes" >&2; exit 1; }
+          grep -Fxq "# ${{ steps.version_gate.outputs.version }}" "$notes"
+          grep -Eq '^[-*] .+' "$notes"
+          ! grep -Eiq '(^|[^[:alnum:]])(TODO|TBD|PLACEHOLDER)([^[:alnum:]]|$)' "$notes"
+          test "$(wc -c < "$notes")" -le 4000
+
       - uses: actions/setup-java@v4
         if: steps.version_gate.outputs.skip != 'true'
         with:
@@ -145,7 +157,7 @@ jobs:
             --target "${{ github.event.workflow_run.head_sha || github.sha }}" \
             --title "Elementera Coast Source Native ${{ steps.version_gate.outputs.base_version }} · Stable signed" \
             --latest \
-            --notes "First stable-signed Source Native release series. Local mode uses your own provider credentials; the visitor doorway remains isolated from private production services. No API keys, private backend or model budget included. Previous disposable-signed QA APKs cannot be upgraded in place: do not uninstall if you have local data without a verified migration or backup. Future releases signed by this same Source certificate support in-place Android updates. Package: com.elementeracoast.source."
+            --notes-file "$GITHUB_WORKSPACE/docs/release-notes/${{ steps.version_gate.outputs.version }}.md"
           echo "### Source stable APK published" >> "$GITHUB_STEP_SUMMARY"
           echo "Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"
           echo "APK: https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/elementera-coast-source-v${{ steps.version_gate.outputs.base_version }}-release.apk" >> "$GITHUB_STEP_SUMMARY"

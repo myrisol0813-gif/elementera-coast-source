@@ -112,7 +112,8 @@ fun MainShell(
     onEnterLocalWorkspace: () -> Unit,
     onLogout: () -> Unit,
     onPlaceholder: (String) -> Unit,
-    onSnackbarShown: () -> Unit
+    onSnackbarShown: () -> Unit,
+    dreamApi: com.elementeracoast.app.core.network.CoastApiClient? = null
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val snackbar = remember { SnackbarHostState() }
@@ -381,6 +382,7 @@ fun MainShell(
                 localMode = state.localMode,
                 selectedModel = state.currentModel,
                 roomType = state.activeRoomType.wireValue,
+                dreamApi = dreamApi,
                 onSettingsChange = onSetContextSettings,
                 onSetThoughtSoilEnabled = onSetThoughtSoilEnabled,
                 onOpenIslandLetter = {

@@ -1,4 +1,5 @@
 import { ensureChatAttachmentSchema, getChatAttachmentRecord, MAX_ATTACHMENT_BYTES } from './chat-attachments.js';
+import {readDreamArchive,validateDreamMediaOrigin} from './dream-tide-archive.js';
 import { getConversation } from './chat-store.js';
 import { ensureDogtalkSchema } from './dogtalk-store.js';
 import { ARCHIVE_CHUNK_BYTES, digestBytes, describeObject, stageVerifiedObject } from './coast-archive-v2-chunks.js';
@@ -20,6 +21,7 @@ export async function readArchiveAttachment(db,conversationId,id){
   check(validId(conversationId)&&validId(id),'invalid attachment identity');
   await getConversation(db,conversationId);
   const record=await getChatAttachmentRecord(db,conversationId,id);
+  if(id.startsWith('att_dream_'))validateDreamMediaOrigin(await readDreamArchive(db,conversationId),record,'image');
   const bytes=toBytes(record.data);
   check(bytes&&Number.isSafeInteger(record.size)&&record.size===bytes.length&&record.size>0&&record.size<=MAX_ATTACHMENT_BYTES,'attachment original missing or corrupt');
   const chunks=[];for(let offset=0;offset<bytes.length;offset+=ARCHIVE_CHUNK_BYTES)chunks.push(bytes.subarray(offset,offset+ARCHIVE_CHUNK_BYTES));
@@ -54,6 +56,7 @@ export async function listArchiveDogtalk(db,{kind='snapshots',cursor='',limit=50
 export async function prepareArchiveAttachment(db,metadata,descriptor,source,{conversationIds}={}){
   const m=metadata;
   check(m&&validId(m.id)&&validId(m.conversation_id)&&(m.turn_id==null||validId(m.turn_id)),'invalid attachment reference');
+  check(!m.id.startsWith('att_dream_')||m.turn_id==null&&m.kind==='image','invalid autonomous image origin');
   check(conversationIds instanceof Set&&conversationIds.has(m.conversation_id),'attachment conversation not in verified restore plan');
   check(['image','file'].includes(m.kind)&&typeof m.name==='string'&&m.name.length>0&&m.name.length<=180&&typeof m.mime==='string'&&/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(m.mime)&&m.mime.length<=120,'invalid attachment metadata');
   check(Number.isSafeInteger(m.created_at)&&m.created_at>=0&&Number.isSafeInteger(m.updated_at)&&m.updated_at>=0&&m.size===descriptor?.size&&m.size>0,'invalid attachment timestamps or size');

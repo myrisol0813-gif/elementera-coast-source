@@ -1,5 +1,5 @@
 import { guideMarkup } from '../../core/feature-guide.js';
-import { escapeAttribute, escapeHtml, formatRichText, qa } from '../../core/dom.js';
+import { escapeAttribute, escapeHtml, formatRichText, splitReplySegments, qa } from '../../core/dom.js';
 import { icon } from '../../core/icons.js';
 import { activeBranch, createState } from '../chat-state.js';
 import { replyAlternatives } from './chat-reply-sequence.js';
@@ -11,6 +11,12 @@ import {
   renderModelMetadataTrace,
 } from './chat-model-metadata.js';
 
+function renderAssistantText(content,errorDetail='',loading=false) {
+  const parts=splitReplySegments(content,loading);
+  const suffix=(errorDetail?`<span class="message-error">${escapeHtml(errorDetail)}</span>`:'')+(loading?'<span class="typing-cursor"></span>':'');
+  if(parts.length===1)return formatRichText(parts[0])+suffix;
+  return `<div class="assistant-segments">${parts.map((part,i)=>`<div class="assistant-segment">${formatRichText(part)}${i===parts.length-1?suffix:''}</div>`).join('')}</div>`;
+}
 function messageStamp(value) {
   const date = new Date(String(value || ''));
   if (!Number.isFinite(date.getTime())) return null;
@@ -141,9 +147,7 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
           const article = qa('.message.assistant', ui.messages).find((node) => node.dataset.turn === patch.turnId && node.dataset.messageId === patch.messageId);
           const text = article?.querySelector('.assistant-text');
           if (!text) continue;
-          text.innerHTML = formatRichText(patch.content)
-            + (patch.errorDetail ? `<span class="message-error">${escapeHtml(patch.errorDetail)}</span>` : '')
-            + (patch.loading ? '<span class="typing-cursor"></span>' : '');
+          text.innerHTML = renderAssistantText(patch.content,patch.errorDetail,patch.loading);
         }
         if (ui.scroller) ui.scroller.scrollTop = ui.scroller.scrollHeight;
       });
@@ -230,14 +234,14 @@ export function createChatRender({ runtime, ui, closeMenu, roomTypeLabels }) {
           && runtime.generation.turnId === turn.id
           && runtime.generation.userIndex === branch.userIndex
           && runtime.generation.assistantIndex === branch.assistantIndex;
-        const assistantAttachment = branch.assistant?.id ? renderMessageAttachments(branch.assistant.attachments || [], conversationId) + renderRikkaAttachments(runtime, conversationId, branch.assistant.id) : '';
+        const assistantAttachment = branch.assistant?.id ? renderMessageAttachments(branch.assistant.attachments || [], conversationId,state.context_settings?.sticker_display_size??144) + renderRikkaAttachments(runtime, conversationId, branch.assistant.id) : '';
         const assistantImported = branch.assistant?.message_source === 'rikkahub';
         const assistantStamp = messageStamp(branch.assistant?.created_at);
         const assistantDivider = branch.assistant && assistantStamp?.key && assistantStamp.key !== lastDateKey
           ? `<div class="message-date-divider">${escapeHtml(assistantStamp.date)}</div>`
           : '';
         if (branch.assistant && assistantStamp?.key) lastDateKey = assistantStamp.key;
-        const assistant = branch.assistant ? `<article class="message assistant ${assistantImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}" data-message-id="${escapeAttribute(branch.assistant.id || '')}" data-legacy-favorite="${legacyAssistantHeart}"><button class="avatar" type="button" data-action="settings:avatar" aria-label="更换助手头像"></button><div class="content">${renderFurnitureBubble(branch.assistant.furniture_runs, { conversationId })}<div class="assistant-text">${formatRichText(branch.assistant.content || (branch.assistant.finish_reason==='image_pending'?'正在绘制图片 · 刷新窗口查看结果':branch.assistant.finish_reason==='image_tool_ready'?'等待回复 · 刷新窗口查看结果':''))}${branch.assistant.errorDetail ? `<span class="message-error">${escapeHtml(branch.assistant.errorDetail)}</span>` : ''}${loading ? '<span class="typing-cursor"></span>' : ''}</div>${assistantAttachment}${voiceAudioCards(conversationId, turn.id, branch.assistant.id, isLast)}${assistantImported ? `<span class="message-dogtalk-mark">RikkaHub 旧档案${branch.assistant.model_id ? ` · ${escapeHtml(shortModelName(branch.assistant.model_id))}` : ''}</span>` : ''}${assistantStamp?.time ? `<span class="message-time is-assistant">${escapeHtml(assistantStamp.time)}</span>` : ''}<div class="message-actions">${actionButton('copy', '复制')}${actionButton('voice', '生成语音')}${actionButton('like', '点赞', { active: branch.assistant.liked, reaction: 'liked' })}${isLast ? actionButton('regenerate', '重新生成') : ''}${actionButton('favorite', legacyAssistantPending ? '旧红心 · 待迁入收藏' : '收藏', { active: assistantHeartActive, legacy: legacyAssistantPending, reaction: 'favorite' })}${isLast ? actionButton('delete-assistant', '删除') + variantControl('assistant', turn.id, alternativeIndex, alternatives.length) : ''}${generationFootprint(branch.assistant, turn.id)}${!loading&&branch.assistant.desk_slip?'<button class="generation-footprint" type="button" data-action="chat:history-desk">历史桌面</button>':''}</div>${loading ? '' : renderModelMetadataTrace(branch.assistant, conversationId)}</div></article>` : '';
+        const assistant = branch.assistant ? `<article class="message assistant ${assistantImported ? 'imported-message' : ''}" data-turn="${escapeAttribute(turn.id)}" data-message-id="${escapeAttribute(branch.assistant.id || '')}" data-legacy-favorite="${legacyAssistantHeart}"><button class="avatar" type="button" data-action="settings:avatar" aria-label="更换助手头像"></button><div class="content">${renderFurnitureBubble(branch.assistant.furniture_runs, { conversationId })}<div class="assistant-text">${renderAssistantText(branch.assistant.content || (branch.assistant.finish_reason==='image_pending'?'正在绘制图片 · 刷新窗口查看结果':branch.assistant.finish_reason==='image_tool_ready'?'等待回复 · 刷新窗口查看结果':''),branch.assistant.errorDetail,loading)}</div>${assistantAttachment}${voiceAudioCards(conversationId, turn.id, branch.assistant.id, isLast)}${assistantImported ? `<span class="message-dogtalk-mark">RikkaHub 旧档案${branch.assistant.model_id ? ` · ${escapeHtml(shortModelName(branch.assistant.model_id))}` : ''}</span>` : ''}${assistantStamp?.time ? `<span class="message-time is-assistant">${escapeHtml(assistantStamp.time)}</span>` : ''}<div class="message-actions">${actionButton('copy', '复制')}${actionButton('voice', '生成语音')}${actionButton('like', '点赞', { active: branch.assistant.liked, reaction: 'liked' })}${isLast ? actionButton('regenerate', '重新生成') : ''}${actionButton('favorite', legacyAssistantPending ? '旧红心 · 待迁入收藏' : '收藏', { active: assistantHeartActive, legacy: legacyAssistantPending, reaction: 'favorite' })}${isLast ? actionButton('delete-assistant', '删除') + variantControl('assistant', turn.id, alternativeIndex, alternatives.length) : ''}${generationFootprint(branch.assistant, turn.id)}${!loading&&branch.assistant.desk_slip?'<button class="generation-footprint" type="button" data-action="chat:history-desk">历史桌面</button>':''}</div>${loading ? '' : renderModelMetadataTrace(branch.assistant, conversationId)}</div></article>` : '';
         return assistantDivider + assistant;
       }
       const soil = branch.assistant

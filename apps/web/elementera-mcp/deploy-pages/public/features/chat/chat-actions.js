@@ -1,3 +1,4 @@
+import { plainReplyText } from '../../core/dom.js';
 import {
   activeBranch,
   selectedAssistantMessage,
@@ -185,7 +186,7 @@ export function createChatActions({
       const turn = visible.turns.find((item) => item.id === turnId);
       const assistant=turn ? selectedAssistantMessage(turn,messageId) : null;
       if (!assistant) return toast('原消息版本已经改变，请重新打开。');
-      await navigator.clipboard.writeText(assistant.content || '');
+      await navigator.clipboard.writeText(plainReplyText(assistant.content || ''));
       return toast('已复制');
     }
     if (name === 'favorite') return treasures?.open(target);

@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit
 class LocalVoiceProvider(
     private val config:()->LocalProviderConfig?,
     private val http:OkHttpClient=OkHttpClient.Builder().followRedirects(false).followSslRedirects(false)
+        .retryOnConnectionFailure(false)
         .connectTimeout(10,TimeUnit.SECONDS).callTimeout(45,TimeUnit.SECONDS).build()
 ){
     constructor(context:Context):this({LocalProviderStore(context,voiceOnly=true).load().firstOrNull{it.id=="elevenlabs"}})
@@ -49,10 +50,10 @@ class LocalVoiceProvider(
 }
 internal class VoiceFailure(val type:String,override val message:String,val status:Int):IllegalStateException(message)
 
-internal fun saveLocalVoice(s:LocalPersistence,cid:String,turn:String?,message:String?,source:String,model:String?,audio:LocalVoiceProvider.Generated):JsonObject {
+internal fun saveLocalVoice(s:LocalPersistence,cid:String,turn:String?,message:String?,source:String,model:String?,audio:LocalVoiceProvider.Generated,recordId:String="voice_"+UUID.randomUUID()):JsonObject {
     val side=LocalSideRecords(s)
     val data=buildJsonObject{
-        put("id","voice_"+UUID.randomUUID());put("conversation_id",cid);put("turn_id",turn?.let(::JsonPrimitive)?:JsonNull);put("message_id",message?.let(::JsonPrimitive)?:JsonNull)
+        put("id",recordId);put("conversation_id",cid);put("turn_id",turn?.let(::JsonPrimitive)?:JsonNull);put("message_id",message?.let(::JsonPrimitive)?:JsonNull)
         put("source",source);put("model_label",model?.take(180)?.let(::JsonPrimitive)?:JsonNull);put("voice_id",audio.voiceId);put("text",audio.text);put("audio_bytes",audio.bytes.size);put("created_at",System.currentTimeMillis())
     }
     val row=LocalSideRecords.Row("voice",data,ArchiveV2Chunks.digest(audio.bytes))

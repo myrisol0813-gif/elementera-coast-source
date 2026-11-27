@@ -32,11 +32,14 @@ android {
         minSdk = 26
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         targetSdk = 34
-        versionCode = 51
-        versionName = "0.2.49-source"
+        versionCode = 52
+        versionName = "0.2.50-source"
         buildConfigField("String", "COAST_API_BASE_URL", "\"${sourceApiBaseUrl.get()}\"")
         buildConfigField("String", "SOURCE_PREVIEW_PASSWORD_HINT", "\"${sourcePreviewPasswordHint.get()}\"")
         buildConfigField("boolean", "SOURCE_TOUR_ENABLED", sourceTourEnabled.get().toString())
+        // Explicit experimental build gate; not enabled in normal releases yet.
+        buildConfigField("boolean", "LOCAL_DREAM_EXECUTION_ENABLED", providers.gradleProperty("COAST_LOCAL_DREAM_EXECUTION_ENABLED").orElse("false").map { it.equals("true",ignoreCase=true) }.get().toString())
+        buildConfigField("boolean", "LOCAL_DREAM_PLAN_EXECUTION_ENABLED", providers.gradleProperty("COAST_LOCAL_DREAM_PLAN_EXECUTION_ENABLED").orElse("false").map { it.equals("true",ignoreCase=true) }.get().toString())
     }
 
     signingConfigs {
@@ -86,6 +89,7 @@ dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.09.02")
     implementation(composeBom)
     implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.6")
@@ -169,4 +173,19 @@ val prepareCoastEmbedding by tasks.registering {
 android.sourceSets.getByName("main").assets.srcDir(coastEmbeddingAssets)
 tasks.matching { it.name in setOf("preBuild", "preDebugBuild", "preReleaseBuild") }.configureEach {
     dependsOn(prepareCoastEmbedding)
+}
+
+ // One canonical art/editor source; no duplicate handwritten Android SVG assets.
+val restStudioAssets = layout.buildDirectory.dir("generated/rest-studio-assets")
+val prepareRestStudio by tasks.registering(Sync::class) {
+    from(rootProject.file("../web/elementera-mcp/deploy-pages/public/rest-box")) {
+        include("room-lab.html", "room-lab.mjs", "room-state.mjs", "room-renderer.mjs",
+            "creature-state.mjs", "creature-renderer.mjs", "creature-editor.mjs", "art/v1/**")
+        into("rest-box")
+    }
+    into(restStudioAssets)
+}
+android.sourceSets.getByName("main").assets.srcDir(restStudioAssets)
+tasks.matching { it.name in setOf("preBuild", "preDebugBuild", "preReleaseBuild") }.configureEach {
+    dependsOn(prepareRestStudio)
 }

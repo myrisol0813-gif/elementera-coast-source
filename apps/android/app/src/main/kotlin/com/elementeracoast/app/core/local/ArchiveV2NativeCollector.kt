@@ -83,7 +83,7 @@ object ArchiveV2NativeCollector {
                     pages({api.archiveV2RecordPage(m,it)}){row->
                         val id=row.string("id")
                         when(m){
-                            "chat"->{val c=api.archiveV2Chat(id);record(m,id,m,JsonObject(c.filterKeys { it in setOf("conversation","history_json","history_updated_at") }))}
+                            "chat"->{val c=api.archiveV2Chat(id);record(m,id,m,JsonObject(c.filterKeys { it in setOf("conversation","history_json","history_updated_at","dream_tide") }))}
                             "voice"->{val item=api.archiveV2Voice(id);val meta=item.getValue("metadata").jsonObject;val h=media(item){d,i->api.archiveV2VoiceChunk(id,d,i)};record(m,id,m,meta,chatLinks(meta),listOf(h))}
                             else->record(m,id,m,row,chatLinks(row))
                         }

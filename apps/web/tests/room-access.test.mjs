@@ -32,12 +32,13 @@ for (const access of ownerAccess) {
     'cross_window.search', 'cross_window.keyword_search', 'cross_window.read_messages', 'cross_window.read_recent',
     'calendar.list', 'calendar.create', 'calendar.update', 'calendar.delete',
     'library.books', 'library.read', 'library.notes', 'library.write', 'voice.create',
+    ...(access.surface==='main_chat'?['dream.readback']:[]),
   ]);
-  assert.deepEqual(access.backendTools, ['web.independent_search', 'web.independent_read', 'daily.*', 'dogtalk.*', 'memory.*', 'cross_window.*', 'calendar.*', 'library.*', 'voice.create', 'vault.*']);
+  assert.deepEqual(access.backendTools, ['web.independent_search', 'web.independent_read', 'daily.*', 'dogtalk.*', 'memory.*', 'cross_window.*', 'calendar.*', 'library.*', 'voice.create', 'vault.*', ...(access.surface==='main_chat'?['dream.readback']:[])]);
 }
 for (const access of ownerAccess.slice(1)) {
-  assert.deepEqual(access.backendTools, ownerAccess[0].backendTools, 'main/radio/lighthouse backend tools must stay identical');
-  assert.deepEqual(access.modelVisibleTools, ownerAccess[0].modelVisibleTools, 'main/radio/lighthouse model-visible tools must stay identical');
+  assert.deepEqual(access.backendTools, ownerAccess[0].backendTools.filter(k=>k!=='dream.readback'), 'only main chat may read autonomous history');
+  assert.deepEqual(access.modelVisibleTools, ownerAccess[0].modelVisibleTools.filter(k=>k!=='dream.readback'), 'only main chat may expose autonomous history');
   assert.equal(access.soil, ownerAccess[0].soil);
   assert.equal(access.memory, ownerAccess[0].memory);
 }
@@ -60,6 +61,7 @@ for (const [surface, conversation, expected, forbidden] of [
   for (const required of ['create_diary', 'create_moment', 'global_excerpt_propose', 'user_portrait_propose', 'memory_search', 'memory_write_candidate', 'moment_comment', 'moment_like', 'read_mystic_dogtalk']) {
     assert.ok(functionToolNames.includes(required), `${surface} lost required owner tool ${required}`);
   }
+  assert.ok(!functionToolNames.includes('dream_readback'),'readback defaults off');
   assert.ok(functionToolNames.includes('calendar_list'), `${surface} lost owner calendar tool`);
   assert.ok(functionToolNames.includes('library_read'), `${surface} lost owner reader tool`);
   assert.equal(

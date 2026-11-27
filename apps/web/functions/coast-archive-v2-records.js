@@ -1,3 +1,4 @@
+import {readDreamArchive,validateDreamMediaOrigin,validateDreamCandidateOrigin} from './dream-tide-archive.js';
 import { safeToolPage } from './coast-archive-v2-tool-audit.js';
 import { ensureChatSchema } from './chat-store.js';
 import {recoverStaleReplyRuns} from './chat-reply-run.js';
@@ -30,6 +31,13 @@ export async function archiveRecordPage(db,module,{cursor='',limit=20}={}){
   // Chat list is metadata only: history is fetched individually, never truncated to a UI preview.
   const rows=(await db.prepare(m.sql+' AND '+(m.key||'id')+'>? ORDER BY '+(m.key||'id')+' LIMIT ?').bind(...(m.params||[]),cursor,limit+1).all()).results||[];
   const items=rows.slice(0,limit);
+  if(module==='memory_pockets'){
+    const histories=new Map();
+    for(const row of items)if(row.source_type==='dream_tide'||row.id.startsWith('pocket_dream_')){
+      if(!histories.has(row.conversation_id))histories.set(row.conversation_id,await readDreamArchive(db,row.conversation_id));
+      validateDreamCandidateOrigin(histories.get(row.conversation_id),row);
+    }
+  }
   return {items,next_cursor:rows.length>limit?items.at(-1).id:null};
 }
 export async function readArchiveChat(db,conversationId){
@@ -43,12 +51,14 @@ export async function readArchiveChat(db,conversationId){
   if(!row)throw Object.assign(Error('conversation history missing'),{status:409});
   if(row.reply_active)throw Object.assign(Error('该窗口正在连续回复，请结束本组后重新导出。'),{status:409,type:'archive_reply_run_active'});
   // Preserve the persisted JSON text, including historical receipt numeric tokens.
-  return {conversation,history_json:row.state_json,history_updated_at:row.updated_at};
+  const dream_tide=await readDreamArchive(db,conversationId);
+  return {conversation,history_json:row.state_json,history_updated_at:row.updated_at,...(dream_tide?{dream_tide}:{})};
 }
 export async function readArchiveVoice(db,clipId){
   check(id.test(clipId),'invalid voice clip id');await ensureVoiceSchema(db);
   const metadata=await db.prepare(modules.voice.sql+' AND id=?').bind(clipId).first();
   if(!metadata)throw Object.assign(Error('voice clip not found'),{status:404});
+  if(metadata.source==='dream_tide'||clipId.startsWith('voice_dream_'))validateDreamMediaOrigin(await readDreamArchive(db,metadata.conversation_id),metadata,'voice');
   const bytes=await voiceClipAudio(db,clipId);
   check(bytes.length===metadata.audio_bytes&&bytes.length>0&&bytes.length<=VOICE_LIMITS.audio_bytes,'voice original incomplete');
   const chunks=[];for(let i=0;i<bytes.length;i+=ARCHIVE_CHUNK_BYTES)chunks.push(bytes.subarray(i,i+ARCHIVE_CHUNK_BYTES));

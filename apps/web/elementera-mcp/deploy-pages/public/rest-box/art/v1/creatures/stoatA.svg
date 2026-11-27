@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-35 -65 590 720"><style>
+#pet{transform-origin:178px 595px;animation:breathe 3s infinite ease-in-out}
+#headTilt{transform-origin:178px 265px;transition:transform .45s ease}
+#tail{transform-origin:267px 470px;animation:wag 2.3s infinite ease-in-out}
+#eyes{transform-box:fill-box;transform-origin:center;animation:blink 5s infinite}
+#outerEar,#innerEar{transition:d .55s ease-in-out}
+#earL{transform-origin:68px 86px}#earR{transform-origin:288px 86px}
+#sadEyes,#happyEyes,#clingEyes,#sleepEyes,#sadMouth,#happyMouth,#sleepMouth,#raised,#hearts,#tear,#sparkles,#hat,#zzz{display:none}
+.sad #eyes,.sad #mouth,.cheer #eyes,.cheer #mouth,.cheer #hands,.cling #eyes,.sleep #eyes,.sleep #mouth{display:none}
+.sad #sadEyes,.sad #sadMouth,.sad #tear,.cheer #happyEyes,.cheer #happyMouth,.cheer #raised,.cheer #sparkles,.cling #clingEyes,.cling #hearts,.sleep #sleepEyes,.sleep #sleepMouth,.sleep #hat,.sleep #zzz{display:inline}
+.sad #headTilt{transform:translateY(15px) rotate(-3deg)}
+.sad #tail{animation:none;transform:rotate(14deg)}
+.sad #pet{animation:sadBody 3s infinite}
+.sad #hands{transform:translateY(12px)}
+.cheer #pet{animation:hop .65s infinite}
+.cheer #tail{animation:wag .3s infinite}
+.cheer #pawL{animation:raise .4s infinite alternate}
+.cheer #pawR{animation:raise .4s infinite alternate-reverse}
+.cling #headTilt{animation:nuzzle 2s infinite ease-in-out}
+.cling #tail{animation:wag .5s infinite}
+.cling #hands{animation:plead 2s infinite}
+.idle #earL,.sit #earL{animation:twitchL 6s infinite}
+.idle #earR,.sit #earR{animation:twitchR 6s infinite}
+.sit #pet{animation:sit 3s infinite}
+.sleep #pet{animation:sleep 3.5s infinite}
+.sleep #tail{animation:none}
+.sleep #headTilt{transform:rotate(-5deg)}
+#tear{animation:tear 3s infinite}
+#hearts{animation:float 2s infinite}
+#zzz{animation:float 3s infinite}
+@keyframes breathe{50%{transform:scale(1.015,.984)}}
+@keyframes wag{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(13deg)}}
+@keyframes blink{0%,44%,48%,100%{transform:scaleY(1)}46%{transform:scaleY(.07)}}
+@keyframes twitchL{0%,15%,23%,100%{transform:rotate(0)}19%{transform:rotate(-9deg)}}
+@keyframes twitchR{0%,58%,66%,100%{transform:rotate(0)}62%{transform:rotate(9deg)}}
+@keyframes sadBody{0%,100%{transform:scale(1.03,.94)}50%{transform:scale(1.03,.96)}}
+@keyframes hop{0%,100%{transform:scale(1.04,.96)}50%{transform:translateY(-30px) scale(.97,1.04)}}
+@keyframes raise{to{transform:translateY(-22px)}}
+@keyframes nuzzle{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
+@keyframes plead{50%{transform:translateY(-14px)}}
+@keyframes sit{0%,100%{transform:scale(1.05,.9)}50%{transform:scale(1.05,.92)}}
+@keyframes sleep{0%,100%{transform:scale(1.16,.74)}50%{transform:scale(1.16,.78)}}
+@keyframes tear{0%,15%{opacity:0;transform:translateY(-3px)}35%{opacity:1}85%,100%{opacity:0;transform:translateY(8px)}}
+@keyframes float{50%{transform:translateY(-5px);opacity:.6}}
+
+#earL,#earR{transition:transform .45s}.sad #earL{transform:rotate(-8deg)}.sad #earR{transform:rotate(8deg)}
+@media(prefers-reduced-motion:reduce){svg *{animation:none!important}}</style><defs><clipPath id="faceClip"><path d="M48 170C47 119 76 83 132 69C121 61 108 43 114 36C121 29 150 41 171 57C169 45 157 27 165 23C177 17 209 41 224 68C280 79 309 119 308 170C308 190 310 195 321 204C333 215 333 230 320 243C294 269 238 282 178 282C118 282 62 269 36 243C23 230 23 215 35 204C46 195 48 190 48 170Z"/></clipPath><clipPath id="tailClip"><path d="M267 430C340 433 410 400 458 351C475 333 480 315 494 311C510 306 511 321 505 338C476 423 378 503 267 530Z"/></clipPath><g id="pad"><circle r="53" fill="var(--hand)"/><ellipse cy="13" rx="26" ry="23" fill="var(--pad)"/><g fill="var(--pad)"><circle cx="-32" cy="-15" r="10"/><circle cx="-9" cy="-32" r="10"/><circle cx="15" cy="-32" r="10"/><circle cx="35" cy="-15" r="10"/></g></g></defs>
+<ellipse cx="178" cy="612" rx="110" ry="12" fill="#514653" opacity=".13"/><g id="scene" class="idle" style="--fur:#fcfaff;--body:#e7e2ec;--cheek:#fffdf8;--chest:#f0ebf5;--hand:#faf7fc;--inner:#e7becb;--tail:#ece7ef;--tip:#45414e;--eye:#4d485b;--pad:#dca5b6"><g id="pet"><g id="tail"><path d="M267 430C340 433 410 400 458 351C475 333 480 315 494 311C510 306 511 321 505 338C476 423 378 503 267 530Z" fill="var(--tail)"/><path d="M449 356C459 369 467 384 473 400L550 370V280H449Z" fill="var(--tip)" clip-path="url(#tailClip)"/></g><path id="body" d="M87 258C79 279 76 319 76 358L78 514C78 544 88 570 102 586C115 601 132 592 145 575C153 565 165 563 178 563C191 563 203 565 211 575C224 592 241 601 254 586C268 570 278 544 278 514L280 358C280 319 277 279 269 258Z" fill="var(--body)"/><path d="M87 259Q178 244 269 259C256 293 244 306 236 310Q231 314 231 305C214 320 195 331 181 334C163 329 146 320 132 309Q126 320 119 313C105 300 95 286 87 259Z" fill="var(--chest)"/>
+<g id="headTilt"><g id="earL"><circle cx="68" cy="86" r="48" fill="var(--fur)"/><circle cx="71" cy="86" r="27" fill="var(--inner)"/></g><g id="earR"><circle cx="288" cy="86" r="48" fill="var(--fur)"/><circle cx="285" cy="86" r="27" fill="var(--inner)"/></g><path d="M48 170C47 119 76 83 132 69C121 61 108 43 114 36C121 29 150 41 171 57C169 45 157 27 165 23C177 17 209 41 224 68C280 79 309 119 308 170C308 190 310 195 321 204C333 215 333 230 320 243C294 269 238 282 178 282C118 282 62 269 36 243C23 230 23 215 35 204C46 195 48 190 48 170Z" fill="var(--fur)"/><path d="M16 212C54 196 85 196 116 221Q178 208 240 221C271 196 302 196 340 212V310H16Z" fill="var(--cheek)" clip-path="url(#faceClip)"/>
+<g transform="translate(-238 -146.2) scale(2.6)"><g transform="translate(0 8.8461538)"><g id="eyes" fill="var(--eye)"><ellipse cx="137" cy="122" rx="8" ry="10"/><ellipse cx="183" cy="122" rx="8" ry="10"/><circle cx="135" cy="119" r="2.4" fill="white"/><circle cx="181" cy="119" r="2.4" fill="white"/></g><g id="clingEyes" fill="var(--eye)"><ellipse cx="137" cy="123" rx="10" ry="13"/><ellipse cx="183" cy="123" rx="10" ry="13"/><ellipse cx="134" cy="119" rx="3.7" ry="4.5" fill="white"/><ellipse cx="180" cy="119" rx="3.7" ry="4.5" fill="white"/><circle cx="141" cy="130" r="2" fill="#c5c9eb"/><circle cx="187" cy="130" r="2" fill="#c5c9eb"/></g><g id="sadEyes" fill="var(--eye)"><path d="M129 111Q135 110 141 105M179 105Q185 110 191 111" fill="none" stroke="var(--eye)" stroke-width="2.8" stroke-linecap="round"/><ellipse cx="137" cy="125" rx="7" ry="9"/><ellipse cx="183" cy="125" rx="7" ry="9"/><circle cx="135" cy="128" r="2.5" fill="white"/><circle cx="181" cy="128" r="2.5" fill="white"/></g><path id="happyEyes" d="M127 126Q137 110 147 126M173 126Q183 110 193 126" fill="none" stroke="var(--eye)" stroke-width="4.3" stroke-linecap="round"/><path id="sleepEyes" d="M128 123Q137 132 146 123M174 123Q183 132 192 123" fill="none" stroke="var(--eye)" stroke-width="3" stroke-linecap="round"/><path id="tear" d="M194 131Q188 141 190 145Q194 150 198 145Q200 141 194 131Z" fill="#a5c6ed"/></g><path d="M155 140Q160 137 165 140Q165 144 160 146Q155 144 155 140Z" fill="var(--eye)"/><path id="mouth" d="M160 145Q156 152 151 148M160 145Q164 152 169 148" stroke="var(--eye)" stroke-width="2.5" stroke-linecap="round" fill="none"/><path id="sadMouth" d="M154 154Q160 146 166 154" fill="none" stroke="var(--eye)" stroke-width="2.8" stroke-linecap="round"/><g id="happyMouth"><path d="M150 148Q160 153 170 148Q171 164 160 164Q149 164 150 148Z" fill="#9d6687"/><ellipse cx="160" cy="160" rx="6" ry="3.5" fill="#efaac2"/></g><ellipse id="sleepMouth" cx="160" cy="151" rx="3" ry="3.6" fill="var(--eye)"/></g>
+<g id="hat" transform="translate(178 70) scale(2.1) translate(-160 -78)"><path d="M119 78Q120 45 138 25Q157 3 180 15Q202 24 212 48Q194 44 182 51L197 78Z" fill="#8f97c5"/><rect x="117" y="69" width="84" height="17" rx="8.5" fill="#dce0f0"/><circle cx="211" cy="49" r="10" fill="#f6f3fb"/><path d="M145 40L148 47L156 48L150 53L152 61L145 57L138 61L140 53L134 48L142 47Z" fill="#f6e6b2"/></g></g>
+<g id="hands" fill="var(--hand)"><circle cx="86" cy="374" r="53"/><circle cx="270" cy="374" r="53"/></g><g id="raised"><g id="pawL"><use href="#pad" x="39" y="251"/></g><g id="pawR"><use href="#pad" x="317" y="251"/></g></g></g><g id="hearts" fill="#d891b0"><path d="M-5 105Q8 83 25 105Q42 83 55 105Q55 128 25 148Q-5 128 -5 105ZM356 65Q370 45 385 65Q400 45 414 65Q414 88 385 108Q356 88 356 65Z"/></g><g id="sparkles" stroke="#d6ad6d" stroke-width="7" stroke-linecap="round" fill="none"><path d="M-5 120V150M-20 135H10M390 90V120M375 105H405"/></g><g id="zzz" fill="#77738d" font-family="sans-serif" font-weight="bold"><text x="345" y="75" font-size="28">z</text><text x="385" y="38" font-size="38">z</text><text x="435" y="5" font-size="48">Z</text></g></g></svg>

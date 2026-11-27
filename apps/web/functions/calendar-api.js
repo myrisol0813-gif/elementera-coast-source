@@ -17,7 +17,7 @@ async function route(request, env, session) {
   if (!rest) {
     if (request.method === 'GET') {
       const pinned = url.searchParams.get('pinned') === '1';
-      const entries = await listCalendarEntries(env.COAST_CHAT_DB, { month: url.searchParams.get('month') || '', pinned });
+      const entries = await listCalendarEntries(env.COAST_CHAT_DB, { month: url.searchParams.get('month') || '', pinned, all: url.searchParams.get('all') === '1' || url.searchParams.get('all') === 'true' });
       const today = url.searchParams.get('today');
       if (pinned && today) {
         try {

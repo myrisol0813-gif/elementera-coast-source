@@ -235,7 +235,8 @@ object ChatSyncMapper {
                         attachments = assistant.attachments.map(::toChatAttachment),
                         furnitureRuns = assistant.furnitureRuns.map(::toFurnitureRun),
                         deskReceipt = assistant.deskSlip?.let(TurnDeskMapper::toUi),
-                        replyGroupTail = tail
+                        replyGroupTail = tail,
+                        stickerDisplaySize = history.contextSettings.stickerDisplaySize
                     )
                 )
             }
@@ -265,7 +266,8 @@ object ChatSyncMapper {
         mime = value.mime,
         size = value.size,
         storageKey = value.storageKey,
-        createdAt = value.createdAt
+        createdAt = value.createdAt,
+        isSticker = value.stickerDelivery != null
     )
 
     /** Ephemeral preview only, sharing the exact identity of the future saved

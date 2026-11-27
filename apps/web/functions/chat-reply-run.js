@@ -56,8 +56,10 @@ export async function acquireReplyRun(db,identity,budget,{nativePlanModel=null}=
   const tokens=Math.min(budget.tokenBudget,cfg.reply_sequence_token_budget??budget.tokenBudget);
   if(max<1||list.some(v=>v.reply_sequence?.id===identity.sequenceId||['image_pending','image_tool_ready','sticker_tool_ready','image_saved','sticker_saved'].includes(v.finish_reason)))return false;
   return changes(await stmt(db,`INSERT OR IGNORE INTO chat_reply_runs(sequence_id,conversation_id,turn_id,user_variant_id,status,max_messages,tool_budget,token_budget,updated_at,native_plan_model)
-    SELECT ?,?,?,?,'running',?,?,?,?,? WHERE EXISTS(SELECT 1 FROM conversation_states s JOIN conversations c ON c.id=s.conversation_id WHERE s.conversation_id=? AND s.state_json=? AND c.deleted_at IS NULL)`,
-    identity.sequenceId,identity.conversationId,identity.turnId,identity.userVariantId,max,tools,tokens,Date.now(),nativePlanModel,identity.conversationId,raw).run());
+    SELECT ?,?,?,?,'running',?,?,?,?,? WHERE EXISTS(SELECT 1 FROM conversation_states s JOIN conversations c ON c.id=s.conversation_id WHERE s.conversation_id=? AND s.state_json=? AND c.deleted_at IS NULL)
+    AND NOT EXISTS(SELECT 1 FROM dream_tide_runs WHERE conversation_id=? AND status='running')
+    AND NOT EXISTS(SELECT 1 FROM chat_single_runs WHERE conversation_id=?)`,
+    identity.sequenceId,identity.conversationId,identity.turnId,identity.userVariantId,max,tools,tokens,Date.now(),nativePlanModel,identity.conversationId,raw,identity.conversationId,identity.conversationId).run());
 }
 export async function reserveReplyStep(db,identity,messageId,index){
   ids(messageId);

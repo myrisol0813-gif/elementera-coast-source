@@ -84,6 +84,46 @@ async function createLatestSchema(db) {
   await ensureColumn(db,'chat_reply_runs','native_plan_soil_revision','TEXT DEFAULT NULL');
   await run(db, `CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_reply_run_live
     ON chat_reply_runs(conversation_id) WHERE status='running'`);
+  // All execution entrypoints use the same database snapshot for admission.
+  await run(db, `CREATE TABLE IF NOT EXISTS dream_tide_arms (
+    conversation_id TEXT PRIMARY KEY, revision TEXT NOT NULL, enabled INTEGER NOT NULL,
+    config_json TEXT NOT NULL, armed_at INTEGER NOT NULL, model_id TEXT NOT NULL,
+    extra_id TEXT, extra_at INTEGER
+  )`);
+  await run(db, `CREATE TABLE IF NOT EXISTS dream_tide_runs (
+    conversation_id TEXT NOT NULL, slot_key TEXT NOT NULL, local_day TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('daily','extra')), arm_revision TEXT NOT NULL,
+    claim_id TEXT NOT NULL UNIQUE, model_id TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('running','completed','failed','cancelled','interrupted')),
+    started_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+    PRIMARY KEY(conversation_id,slot_key)
+  )`);
+  await run(db, "CREATE UNIQUE INDEX IF NOT EXISTS dream_tide_one_active ON dream_tide_runs(conversation_id) WHERE status='running'");
+  await ensureColumn(db,'dream_tide_runs','result_json','TEXT DEFAULT NULL');
+  await run(db, `CREATE TABLE IF NOT EXISTS dream_tide_steps (
+    claim_id TEXT NOT NULL, step_index INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('claimed','completed','failed')),
+    receipt_json TEXT, started_at INTEGER NOT NULL, finished_at INTEGER,
+    PRIMARY KEY(claim_id,step_index)
+  )`);
+  await run(db, `CREATE TABLE IF NOT EXISTS dream_tide_tool_events (
+    claim_id TEXT NOT NULL, step_index INTEGER NOT NULL, call_index INTEGER NOT NULL,
+    tool_name TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('claimed','completed','failed')),
+    receipt_json TEXT, started_at INTEGER NOT NULL, finished_at INTEGER,
+    PRIMARY KEY(claim_id,step_index,call_index)
+  )`);
+  await run(db, `CREATE TABLE IF NOT EXISTS dream_tide_notes (
+    claim_id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, model_id TEXT NOT NULL,
+    body TEXT NOT NULL, created_at INTEGER NOT NULL
+  )`);
+  await run(db, `CREATE TABLE IF NOT EXISTS dream_tide_replies (
+    id TEXT PRIMARY KEY, claim_id TEXT NOT NULL, conversation_id TEXT NOT NULL,
+    body TEXT NOT NULL, created_at INTEGER NOT NULL
+  )`);
+  await run(db, `CREATE TABLE IF NOT EXISTS chat_single_runs (
+    conversation_id TEXT PRIMARY KEY, claim_id TEXT NOT NULL UNIQUE,
+    started_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+  )`);
   await run(db, `CREATE TABLE IF NOT EXISTS chat_profiles (
     user_id TEXT PRIMARY KEY,
     assistant_avatar_dataurl TEXT,

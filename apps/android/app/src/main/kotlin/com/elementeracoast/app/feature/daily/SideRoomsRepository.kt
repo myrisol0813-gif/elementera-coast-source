@@ -63,6 +63,7 @@ class SideRoomsRepository(private val config: CoastApiConfig, private val client
         }
 
     suspend fun calendar(month: String): JsonObject = request("/api/calendar/entries?month=${encode(month)}")
+    suspend fun allCalendar(): JsonObject = request("/api/calendar/entries?all=1")
     suspend fun pinnedCalendar(today: String): JsonObject = request("/api/calendar/entries?pinned=1&today=${encode(today)}")
     suspend fun saveCalendar(id: String?, input: JsonObject): JsonObject =
         request(id?.let { "/api/calendar/entries/${path(it)}" } ?: "/api/calendar/entries",
@@ -229,6 +230,9 @@ class SideRoomsRepository(private val config: CoastApiConfig, private val client
             if(enabled!=null)put("enabled",enabled)
         })
     suspend fun vaultRemoveSticker(id:String):JsonObject=request("/api/coast-vault/stickers/"+path(id),"DELETE")
+
+    suspend fun vaultDreamOrigin(cid:String,mediaId:String):JsonObject =
+        request("/api/chat/dream-tide/activity?conversation_id="+encode(cid)+"&media_id="+encode(mediaId))
 
     suspend fun vaultMedia(kind: String = "all", query: String = "", cursor: String = ""): JsonObject =
         request("/api/coast-vault/media?kind=" + encode(kind) + "&q=" + encode(query) + "&cursor=" + encode(cursor))

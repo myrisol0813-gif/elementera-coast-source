@@ -15,6 +15,7 @@ import { createLetters } from './features/letters.js';
 import { createMemory } from './features/memory.js';
 import { createModels } from './features/models.js';
 import { createSettings } from './features/settings.js';
+import { createDreamTideViews } from './features/dream-tide.js';
 import { createShell } from './features/shell.js';
 import { createSidebarSearch } from './features/sidebar-search.js';
 import { createCoastVault } from './features/vault.js';
@@ -63,6 +64,7 @@ const models = createModels({ chat, router, toast });
 const tools = createTools({ storage, router, toast, memory });
 const daily = createDaily({ storage, router, toast, chat });
 const settings = createSettings({ storage, shell, chat, router, toast, memory, daily, dogtalk });
+const dreamTide = createDreamTideViews({router,chat,toast});
 const calendar = createCalendar({ router, toast });
 const library = createTidalLibrary({ router, toast });
 const letters = createLetters({ storage, chat, models, router, toast });
@@ -74,6 +76,7 @@ chat.setRunSettingsProvider(tools.getSettings);
 chat.setMemoryController(memory);
 chat.setDeskController(desk);
 chat.setLettersController(letters);
+chat.setDreamTideController(dreamTide);
 
 const eventOwners = Object.freeze([
   Object.freeze({
@@ -103,6 +106,7 @@ const eventOwners = Object.freeze([
   memory,
   desk,
   createActionEventOwner({ id: 'settings', priority: 60, controller: settings }),
+  dreamTide,
   devHands,
   dogtalk,
   tools,

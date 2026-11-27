@@ -1,4 +1,5 @@
 import { readConversationState, sanitizeId } from './chat-store.js';
+import { prepareAutonomousRecord } from './dream-tide-write-fence.js';
 
 export const VOICE_LIMITS = Object.freeze({ text_chars: 2400, clips_per_message: 12, paragraphs_per_clip: 40, audio_bytes: 4 * 1024 * 1024 });
 // Voice selection belongs to the self-hosting owner. No voice identity is bundled in public source.
@@ -97,7 +98,11 @@ export async function voiceClipAudio(db, id) {
   return bytes;
 }
 
-export async function generateVoiceClip(db, env, input, context = {}) {
+export function autonomousVoiceConfigured(env) {
+  return env?.COAST_DREAM_MEDIA_ENABLED === 'true' && !!String(env.ELEVENLABS_API_KEY || '').trim() && /^[a-zA-Z0-9_-]{8,80}$/.test(String(env.ELEVENLABS_VOICE_ID || '').trim());
+}
+
+export async function generateVoiceClip(db, env, input, context = {}, fetchVoice = fetch) {
   await ensureVoiceSchema(db);
   const conversationId = sanitizeId(input.conversation_id || context.conversation_id || '', 'conversation');
   if (!input.conversation_id && !context.conversation_id) throw new VoiceClipError('conversation_required', '必须提供对应的海岸聊天窗口。');
@@ -105,6 +110,18 @@ export async function generateVoiceClip(db, env, input, context = {}) {
   const source = messageId
     ? await sourceText(db, conversationId, messageId, input.paragraph_indices)
     : (await readConversationState(db, conversationId), { text: String(input.text || '').trim(), turn_id: context.source_turn_id || null });
+  const autonomous = context.autonomous_activity === true;
+  let independentId = null;
+  if (autonomous) {
+    if (!autonomousVoiceConfigured(env) || messageId || context.source_turn_id || conversationId !== context.conversation_id || !context.autonomous_claim)
+      throw new VoiceClipError('tool_forbidden', '自主语音未授权或来源无效。', 403);
+    const event = context.autonomous_event;
+    const allowed = await prepareAutonomousRecord(db,'SELECT 1 AS permitted',[],context,'allowVoice','voice_create').first();
+    if (!allowed) throw new VoiceClipError('tool_forbidden','自主语音权限已撤回。',403);
+    independentId = `voice_dream_${context.autonomous_claim.claimId}_${event.step}_${event.index}`;
+    if (await db.prepare('SELECT id FROM coast_voice_clips WHERE id = ?').bind(independentId).first())
+      throw new VoiceClipError('already_saved','这次自主语音已保存，不重复生成。',409);
+  }
   const text = source.text;
   if (!text || text.length > VOICE_LIMITS.text_chars) {
     throw new VoiceClipError('text_limit', `一次最多可生成 ${VOICE_LIMITS.text_chars} 字的语音，请减少选段。`);
@@ -118,11 +135,12 @@ export async function generateVoiceClip(db, env, input, context = {}) {
   if (!key || !/^[a-zA-Z0-9_-]{8,80}$/.test(voiceId)) throw new VoiceClipError('voice_not_configured', '请在服务端配置 ELEVENLABS_API_KEY 和 ELEVENLABS_VOICE_ID。', 503);
   let response;
   try {
-    response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`, {
+    response = await fetchVoice(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`, {
       method: 'POST',
       headers: { 'xi-api-key': key, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
       body: JSON.stringify({ text, model_id: 'eleven_multilingual_v2' }),
       signal: AbortSignal.timeout(45000),
+      ...(autonomous ? { redirect: 'error' } : {}),
     });
   } catch {
     throw new VoiceClipError('voice_provider_unavailable', 'ElevenLabs 暂时无法连接，请稍后重试。', 502);
@@ -130,8 +148,24 @@ export async function generateVoiceClip(db, env, input, context = {}) {
   if (!response.ok) throw new VoiceClipError('voice_provider_failed', `ElevenLabs 语音生成失败（HTTP ${response.status}），请检查额度与权限。`, 502);
   const data = new Uint8Array(await response.arrayBuffer());
   if (!data.length || data.length > VOICE_LIMITS.audio_bytes) throw new VoiceClipError('audio_limit', '生成音频为空或超过 4 MB 上限，未写入。', 413);
-  const id = `voice_${crypto.randomUUID()}`;
+  const id = independentId || `voice_${crypto.randomUUID()}`;
   const now = Date.now();
+  if (autonomous) {
+    // Metadata and every audio chunk commit together, under the live tool claim.
+    // A revoked claim cannot leave an orphaned or partial clip.
+    const first = prepareAutonomousRecord(db,`INSERT INTO coast_voice_clips
+      (id,conversation_id,turn_id,message_id,source,model_label,voice_id,text,audio_bytes,created_at)
+      SELECT ?,?,NULL,NULL,'dream_tide',?,?,?,?,?`,
+      [id,conversationId,String(context.model_label || '').slice(0,180),voiceId,text,data.length,now],context,'allowVoice','voice_create');
+    const statements = [first];
+    for (let pos=0,i=0;pos<data.length;pos+=CHUNK_BYTES,i++) {
+      statements.push(db.prepare('INSERT INTO coast_voice_chunks (clip_id,chunk_index,body_b64) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM coast_voice_clips WHERE id=?)')
+        .bind(id,i,asBase64(data.subarray(pos,pos+CHUNK_BYTES)),id));
+    }
+    const result = await db.batch(statements);
+    if (result[0]?.meta?.changes !== 1) throw new VoiceClipError('tool_forbidden','生成后自主语音权限已撤回；未保存。',403);
+    return meta(await db.prepare('SELECT * FROM coast_voice_clips WHERE id = ?').bind(id).first());
+  }
   try {
     await db.prepare(`INSERT INTO coast_voice_clips
       (id,conversation_id,turn_id,message_id,source,model_label,voice_id,text,audio_bytes,created_at)

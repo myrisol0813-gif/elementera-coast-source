@@ -28,7 +28,7 @@ const CONVERSATION_ACCESS = Object.freeze({
 });
 
 const VALUES = {
-  main_chat: CONVERSATION_ACCESS,
+  main_chat: {...CONVERSATION_ACCESS,backendTools:[...CONVERSATION_ACCESS.backendTools,'dream.readback'],modelVisibleTools:[...CONVERSATION_ACCESS.modelVisibleTools,'dream.readback']},
   radio: CONVERSATION_ACCESS,
   lighthouse: CONVERSATION_ACCESS,
   landing: {

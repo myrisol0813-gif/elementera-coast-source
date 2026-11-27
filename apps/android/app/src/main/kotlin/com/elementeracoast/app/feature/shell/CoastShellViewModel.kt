@@ -90,9 +90,15 @@ class CoastShellViewModel(
     val dogtalk: DogtalkRepository get() = backend.dogtalk
     val crossWindowRepository: CrossWindowRepository get() = backend.crossWindow
     val archive: GlobalArchiveRepository get() = backend.archive
+    val dreamApi get() = backend.dreamApi
     private var generationJob: Job? = null
+        set(value){
+            field=value
+            if(value!=null){val lease=generationRun?.localLease;value.invokeOnCompletion{lease?.close()}}
+        }
     private class GenerationRun(var ownerId: String) {
         var lease: AutoCloseable? = null
+        var localLease: AutoCloseable? = null
         var preparing = true
         var streaming = false
         var messageId: Long? = null
@@ -113,19 +119,23 @@ class CoastShellViewModel(
         )
     }
 
-    private fun beginGeneration(ownerId: String) {
-        check(generationRun == null)
+    private fun beginGeneration(ownerId: String):Boolean {
+        if(generationRun!=null)return false
+        val localLease=if(localMode)com.elementeracoast.app.core.local.LocalDreamRuntime.acquire() else null
+        if(localMode&&localLease==null){showPlaceholder("本机正在自主唤醒；请稍后再发送，或在对应窗口撤回唤醒授权。");return false}
         historyJob?.cancel()
-        val run = GenerationRun(ownerId)
+        val run = GenerationRun(ownerId).also{it.localLease=localLease}
         generationRun = run
         _state.update { generationUi(it.copy(historyLoading = false)) }
         run.lease = foregroundLease?.invoke({ if (generationRun === run) generationJob?.cancel() }, {
             if (generationRun === run) showPlaceholder("系统后台保护不可用；本轮仍可在应用内继续，切出应用可能中断。")
         })
+        return true
     }
 
     private fun finishGeneration() {
         generationRun?.lease?.close()
+        generationRun?.localLease?.close()
         generationRun = null
         generationJob = null
         _state.update(::generationUi)
@@ -648,7 +658,7 @@ class CoastShellViewModel(
         if(current.activeRoomType==RoomType.Lighthouse){showPlaceholder("灯塔窗口不支持生图。");return}
         if(current.pendingAttachments.isNotEmpty()){showPlaceholder("手动生图暂不接收参考图或文件，请先移除待发送附件。");return}
         if(current.searchFocus!=null){showPlaceholder("请先结束旧版本预览。");return}
-        beginGeneration(current.activeConversationId)
+        if(!beginGeneration(current.activeConversationId))return
         generationJob=viewModelScope.launch(workDispatcher){
             var cid=""
             var requested=false
@@ -691,8 +701,8 @@ class CoastShellViewModel(
         pendingSearchHit = null
         _state.update { it.copy(searchFocus = null) }
         val submittedModel = _state.value.currentModel
+        if(!beginGeneration(_state.value.activeConversationId))return
         val submittedCrossWindow = consumeCrossWindowRequest()
-        beginGeneration(_state.value.activeConversationId)
         generationJob = viewModelScope.launch(workDispatcher) {
             try {
                 val conversation = ensureRemoteConversation()
@@ -1434,8 +1444,8 @@ class CoastShellViewModel(
             showPlaceholder("当前模型还没有从后端载入，暂时不能重试。")
             return
         }
+        if(!beginGeneration(conversationId))return
         val submittedCrossWindow = consumeCrossWindowRequest()
-        beginGeneration(conversationId)
         generationJob = viewModelScope.launch(workDispatcher) {
             try {
                 val cleared = backend.chat.clearFailure(history, turnId)
@@ -1486,12 +1496,12 @@ class CoastShellViewModel(
         }
         val edited = ChatHistoryMutations.editActiveUser(previous, turnId, clean)
         if (edited == previous) return
+        if(!beginGeneration(conversationId))return
         backend.chat.cacheHistory(conversationId, edited)
         showHistory(conversationId, edited)
 
         val submittedModel = _state.value.currentModel
         val submittedCrossWindow = consumeCrossWindowRequest()
-        beginGeneration(conversationId)
         generationJob = viewModelScope.launch(workDispatcher) {
             try {
                 val persisted = backend.chat.persistHistory(conversationId, edited)
@@ -1540,8 +1550,8 @@ class CoastShellViewModel(
             showPlaceholder("当前模型还没有从后端载入，暂时不能重新生成。")
             return
         }
+        if(!beginGeneration(conversationId))return
         val submittedCrossWindow = consumeCrossWindowRequest()
-        beginGeneration(conversationId)
         generationJob = viewModelScope.launch(workDispatcher) {
             try {
                 generateTurn(conversationId, history, turnId, model, submittedCrossWindow)

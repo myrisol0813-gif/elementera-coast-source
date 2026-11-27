@@ -139,3 +139,21 @@ export function timestampLabel(date = new Date()) {
   const two = (value) => String(value).padStart(2, '0');
   return `${date.getFullYear()}${two(date.getMonth() + 1)}${two(date.getDate())}-${two(date.getHours())}${two(date.getMinutes())}${two(date.getSeconds())}`;
 }
+
+export const REPLY_SEGMENT_MARKER = '<!--tideloom:split-->';
+export function splitReplySegments(value, streaming = false) {
+  const text = String(value ?? ''), lines=text.split('\n'), parts=[];
+  let buffer=[], fence='', divided=false;
+  const flush=()=>{const part=buffer.join('\n').replace(/^[\r\n]+|[\r\n]+$/g,'');if(part.trim())parts.push(part);buffer=[];};
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i].replace(/\r$/,''), active=fence;
+    const m=line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if(m){if(!active)fence=m[1];else if(m[1][0]===active[0]&&m[1].length>=active.length&&!m[2].trim())fence='';}
+    if(!active&&line===REPLY_SEGMENT_MARKER){divided=true;flush();}
+    else if(!active&&streaming&&i===lines.length-1&&line&&REPLY_SEGMENT_MARKER.startsWith(line)){divided=true;}
+    else buffer.push(lines[i]);
+  }
+  if(!divided)return [text];
+  flush();return parts.length?parts:[''];
+}
+export function plainReplyText(value){return splitReplySegments(value).join('\n\n');}

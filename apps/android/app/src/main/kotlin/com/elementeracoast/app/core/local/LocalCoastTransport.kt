@@ -24,6 +24,9 @@ class LocalCoastTransport(private val store: LocalPersistence,
     private val voice:LocalVoiceProvider?=null,
     private val providerCatalog: () -> RemoteModelCatalogResponse = { RemoteModelCatalogResponse(ok = true) }
 ) : Interceptor {
+    internal var dreamCanArm:((String)->Boolean)?=null
+    internal var dreamChanged:(()->Unit)?=null
+    internal var dreamPlan:com.elementeracoast.app.feature.chatgpt.NativeDreamPlanRoute?=null
     internal var imageConfig:(String)->LocalProviderConfig?={null}
     private val cache = RemoteCacheStore(store)
     private val calendar = LocalCalendarStore(store)
@@ -109,6 +112,54 @@ class LocalCoastTransport(private val store: LocalPersistence,
     private fun route(r: Request): Response {
         val path = r.url.encodedPath
         val method = r.method
+        if (path == "/api/chat/dream-tide" || path == "/api/chat/dream-tide/notes" || path == "/api/chat/dream-tide/activity" || path == "/api/chat/dream-tide/reply") {
+            val b=if(method=="POST")body(r)else JsonObject(emptyMap())
+            val cid=if(method=="POST")b.str("conversation_id").orEmpty()else r.url.queryParameter("conversation_id").orEmpty()
+            if(cache.conversations().none{it.id==cid&&it.roomType=="main"&&it.source=="coast"&&it.deletedAt==null})return missing(r)
+            val ledger=LocalDreamLedger(store)
+            val previous=ledger.settings(cid)
+            val ready=BuildConfig.LOCAL_DREAM_EXECUTION_ENABLED&&dreamCanArm!=null
+            fun payload(settings:DreamSettings)=element(DreamSettingsResponse.serializer(),DreamSettingsResponse(ok=true,settings=settings,executionAvailable=ready,schedulerConfigured=ready,planExecutionAvailable=ready&&dreamPlan!=null,planStatus=if(settings.modelId?.startsWith("chatgpt-plan:")==true)dreamPlan?.status(cid,settings.revision,settings.modelId)else null,planRequestLimit=dreamPlan?.requestLimit(cid,settings.revision,settings.modelId))).jsonObject
+            if(method=="GET"){
+                if(path=="/api/chat/dream-tide")return response(r,200,payload(previous))
+                val offset=r.url.queryParameter("offset")?.toIntOrNull()?:0
+                require(offset>=0)
+                if(path=="/api/chat/dream-tide/notes")return response(r,200,LocalDreamArchive(store).notes(cid,offset))
+                if(path=="/api/chat/dream-tide/activity"){
+                    val mediaId=r.url.queryParameter("media_id")
+                    require(mediaId==null||mediaId.matches(Regex("(att|voice)_dream_[A-Za-z0-9_.:-]{1,149}")))
+                    return response(r,200,LocalDreamArchive(store).activity(cid,offset,mediaId))
+                }
+            }
+            if(method=="POST"&&path=="/api/chat/dream-tide/reply"){
+                if(!LocalDreamArchive(store).reply(cid,b.str("claim_id").orEmpty(),b.str("reply_id").orEmpty(),b.str("body").orEmpty()))
+                    return failure(r,409,"dream_reply_conflict","自主手记不存在或回复身份冲突。")
+                return ok(r)
+            }
+            if(method!="POST"||path!="/api/chat/dream-tide")return unsupported(r)
+            val request=json.decodeFromJsonElement(DreamSettingsRequest.serializer(),b)
+            if(!b.containsKey("revision")||request.revision!=previous.revision)return failure(r,409,"dream_tide_conflict","设置已改变，请刷新。")
+            val isPlan=request.modelId?.startsWith("chatgpt-plan:")==true
+            val planArm=isPlan&&request.action=="arm"
+            val saved=if(planArm){
+                val route=dreamPlan
+                if(!ready||route==null||!request.confirmExecution||!request.confirmPlanSoftBudget||request.planRequestLimit !in 1..129)return failure(r,409,"dream_plan_not_available","套餐自主唤醒未开放，或缺少独立软预算确认。")
+                val lease=LocalDreamRuntime.acquire()?:return failure(r,409,"dream_tide_busy","当前有活动或聊天正在执行。")
+                try{
+                    val nextRevision=UUID.randomUUID().toString()
+                    if(ledger.settings(cid).revision!=request.revision)return failure(r,409,"dream_tide_conflict","设置已改变，请刷新。")
+                    val granted=try{kotlinx.coroutines.runBlocking{route.grant(cid,nextRevision,request.modelId.orEmpty(),true,request.planRequestLimit)}}catch(_:Exception){false}
+                    if(!granted)return failure(r,409,"dream_plan_grant_unavailable","当前账号或模型未获授权，请重新连接套餐并刷新模型目录。")
+                    ledger.configure(cid,request,true,planRevision=nextRevision)?:run{route.revoke(cid);return failure(r,409,"dream_tide_conflict","设置已变化，未授权。")}
+                }finally{lease.close()}
+            }else{
+                val mayArm=ready&&request.confirmExecution&&request.modelId?.let{dreamCanArm?.invoke(it)}==true
+                if(request.action=="arm"&&!mayArm)return failure(r,409,"dream_tide_not_available","本机自主唤醒尚未开放，或所选供应商不可用。")
+                (ledger.configure(cid,request,mayArm)?:return failure(r,409,"dream_tide_conflict","设置已变化或活动尚未结束。")).also{dreamPlan?.revoke(cid)}
+            }
+            dreamChanged?.invoke()
+            return response(r,200,payload(saved))
+        }
         if (path == "/api/chat/conversations") {
             if (method == "GET") return ok(r, "conversations" to array(RemoteConversation.serializer(), cache.conversations()))
             if (method == "POST") {
@@ -130,10 +181,12 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 return ok(r, "conversation" to element(RemoteConversation.serializer(), next))
             }
             if (method == "DELETE") {
-                if(LocalReplyRunStore(store).active(cid))return failure(r,409,"reply_run_active","当前窗口正在连续回复。")
+                if(LocalReplyRunStore(store).active(cid)||LocalDreamLedger(store).active(cid))return failure(r,409,"generation_active","当前窗口正在执行活动。")
                 store.atomic{staged->
+                    require(!LocalDreamLedger(staged).active(cid)){"窗口正在自主唤醒。"}
                     LocalSideRecords(staged).removeConversation(cid)
                     LocalDogtalkStore(staged).deleteConversation(cid)
+                    LocalDreamArchive(staged).remove(cid)
                     val c=RemoteCacheStore(staged,strictReads=true)
                     c.putConversations(all.filterNot{it.id==cid});c.removeHistory(cid)
                     LocalAttachmentStore(staged).deleteConversation(cid)
@@ -150,7 +203,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if (method == "GET") {
                 LocalReplyRunStore(store).recover(cid)
                 val h=store.readConsistent{s->val c=RemoteCacheStore(s,strictReads=true);val old=c.history(cid)?:RemoteHistory(conversationId=cid)
-                    if(LocalReplyRunStore(s).active(cid))old else LocalImageRecovery.recover(old).also{if(it!=old)c.putHistory(cid,it)}}
+                    if(LocalReplyRunStore(s).active(cid)||LocalDreamLedger(s).active(cid))old else LocalImageRecovery.recover(old).also{if(it!=old)c.putHistory(cid,it)}}
                 return ok(r,"source" to JsonPrimitive("local"),"history" to element(RemoteHistory.serializer(),h))
             }
             if (method == "PUT") {
@@ -158,7 +211,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 val h=store.readConsistent{s->
                     val c=RemoteCacheStore(s,strictReads=true)
                     val old=c.history(cid)?:RemoteHistory(conversationId=cid)
-                    require(!LocalReplyRunStore(s).active(cid)){"当前窗口正在连续回复。"}
+                    require(!LocalReplyRunStore(s).active(cid)&&!LocalDreamLedger(s).active(cid)){"当前窗口正在执行活动。"}
                     LocalReplyRunStore.protect(old,input,r.header("X-Coast-Delete-Revision"))
                     val next=LocalImageRecovery.protect(old,input,r.header("X-Coast-Delete-Revision")).copy(conversationId=cid,updatedAt=now())
                     val originals=LocalAttachmentStore(s)
@@ -298,7 +351,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             return response(r, 200, element(RemoteNativeChatContext.serializer(), RemoteNativeChatContext(
                 ok = true,
                 tools = session?.tools?:JsonArray(emptyList()),
-                modelMessages = localMultimodalMessages(prepared.messages,prepared.imageParts),
+                modelMessages = localMultimodalMessages(session?.withWorkbench(prepared.messages)?:prepared.messages,prepared.imageParts),
                 deskSlip = session?.receipt?:prepared.receipt,
                 limitations = RemoteNativeToolLimits(session?.maxCalls?:com.elementeracoast.app.core.network.TurnToolPolicy.stored(store))
             )).jsonObject)
@@ -428,7 +481,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             return daily(r, path, method)
         if (path == "/api/calendar/entries") {
             if (method == "GET") return ok(r, "entries" to JsonArray(calendar.list(r.url.queryParameter("month"),
-                r.url.queryParameter("pinned") == "1", r.url.queryParameter("today"))))
+                r.url.queryParameter("pinned") == "1", r.url.queryParameter("today"), r.url.queryParameter("all") in setOf("1", "true"))))
             if (method == "POST") return ok(r, "entry" to calendar.save(null, body(r)))
         }
         if (path.startsWith("/api/calendar/entries/") && r.url.pathSegments.size == 4) {

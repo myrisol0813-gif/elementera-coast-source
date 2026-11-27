@@ -285,7 +285,8 @@ data class RemoteChatRequest(
     @SerialName("image_tool_enabled") val imageToolEnabled: Boolean = false,
     @SerialName("image_model_id") val imageModelId: String? = null,
     @SerialName("reply_sequence_id") val replySequenceId:String?=null,
-    @SerialName("user_variant_id") val userVariantId:String?=null
+    @SerialName("user_variant_id") val userVariantId:String?=null,
+    @SerialName("native_single_claim") val nativeSingleClaim:String?=null
 )
 
 @Serializable

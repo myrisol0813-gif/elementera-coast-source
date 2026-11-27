@@ -135,10 +135,11 @@ internal class LocalSideRecords(private val store:LocalPersistence) {
         val histories=mutableMapOf<String,RemoteHistory?>()
         val items=media.map{v->
             val k=v.optional("kind")?:"audio";val cid=v.str("conversation_id");val id=v.str("id");val key="$k:$cid:$id";val treasure=treasures[key]?.data
-            val origin=if(k=="audio")AttachmentOrigin("assistant",v.optional("message_id"),if(v.optional("message_id")==null)"turn_only" else "linked")else attachmentOrigin(histories.getOrPut(cid){cache.history(cid)},v)
+            val origin=if(k=="audio")AttachmentOrigin("assistant",v.optional("message_id"),if(v.optional("message_id")!=null)"linked" else if(v.optional("source")=="dream_tide")"unlinked" else "turn_only")else if(id.startsWith("att_dream_"))AttachmentOrigin("assistant",null,"unlinked") else attachmentOrigin(histories.getOrPut(cid){cache.history(cid)},v)
             buildJsonObject{
                 put("id",id);put("source_id",id);put("kind",k);put("conversation_id",cid);put("turn_id",v["turn_id"]?:JsonNull);put("message_id",origin.messageId?.let(::JsonPrimitive)?:JsonNull);put("role",origin.role?.let(::JsonPrimitive)?:JsonNull);put("origin_status",origin.status)
-                put("name",v.optional("name")?:"语音");put("display_name",labels[key]?.data?.optional("display_name")?:v.optional("name")?:"语音");put("source_text",v.optional("text").orEmpty());put("size",v["size"]?:v.getValue("audio_bytes"));put("created_at",v.getValue("created_at"));put("treasure_id",treasure?.get("id")?:JsonNull);put("notes",treasure?.get("notes")?:JsonPrimitive(""))
+                val mediaName=v.optional("name")?:if(v.optional("source")=="dream_tide")"自主活动语音" else "语音"
+                put("name",mediaName);put("display_name",labels[key]?.data?.optional("display_name")?:mediaName);put("source_text",v.optional("text").orEmpty());put("size",v["size"]?:v.getValue("audio_bytes"));put("created_at",v.getValue("created_at"));put("treasure_id",treasure?.get("id")?:JsonNull);put("notes",treasure?.get("notes")?:JsonPrimitive(""))
             }
         }.filter{(kind=="all"||it.str("kind")==kind)&&(q.isEmpty()||listOf(it.str("display_name"),it.str("source_text"),it.str("notes")).any{t->t.contains(q,true)})}.sortedByDescending{it.number("created_at")}
         return page(items,cursor)
@@ -212,7 +213,7 @@ internal class LocalSideRecords(private val store:LocalPersistence) {
             for(k in listOf("chapter_index","paragraph_index","start_offset","end_offset"))if(v[k]!=null&&v[k]!=JsonNull)require(v.number(k) in 0..Int.MAX_VALUE.toLong())
             if(limit(r.kind)>0)require(r.digest!=null&&hex.matches(r.digest)&&size(r) in 1..limit(r.kind))else require(r.digest==null)
             when(r.kind){
-                "voice"->{require(v.str("source").length<=160&&v.str("voice_id").length<=180&&v.str("text").length<=2400&&v.optional("model_label")?.length?.let{it<=180}!=false)}
+                "voice"->{require(!(v.str("id").startsWith("voice_dream_")||v.str("source")=="dream_tide")||v.str("id").startsWith("voice_dream_")&&v.str("source")=="dream_tide"&&v["turn_id"]==JsonNull&&v["message_id"]==JsonNull);require(v.str("source").length<=160&&v.str("voice_id").length<=180&&v.str("text").length<=2400&&v.optional("model_label")?.length?.let{it<=180}!=false)}
                 "vault_treasures"->{require(v.str("kind") in setOf("text","soil","audio","image","file")&&v.str("source_key")==v.str("kind")+":"+v.str("conversation_id")+":"+v.str("source_id")&&v.str("notes").length<=1200&&v.str("excerpt").length<=12000&&v.str("role") in setOf("user","assistant"));val p=Json.parseToJsonElement(v.str("selections_json")).jsonArray.map{it.jsonPrimitive.int};require(p.size<=40&&p==p.distinct().sorted()&&p.all{it>=0})}
                 "vault_media_labels"->require(v.str("source_key").startsWith("image:")&&v.str("source_key").length<=327&&v.str("display_name").length in 1..120&&v.str("display_name").trim()==v.str("display_name")&&v.str("display_name").none{it.code<32||it.code==127})
                 "library_books"->require(v.str("title").length in 1..160&&v.str("title").isNotBlank()&&v.str("format") in setOf("epub","txt"))
@@ -270,6 +271,7 @@ internal class LocalSideRecords(private val store:LocalPersistence) {
             }else if(kind in setOf("image","file")){
                 val row=attachments.find{it.str("id")==id&&it.str("conversation_id")==cid&&it.str("kind")==kind}
                 if(row!=null){
+                    if(id.startsWith("att_dream_")&&row["turn_id"]==JsonNull)return Source(null,null,"assistant",row.str("name"))
                     val origin=attachmentOrigin(h,row)
                     require(origin.status!="ambiguous"&&(origin.role!="assistant"||origin.messageId!=null)){"无法唯一确认助手附件来源。"}
                     // Old human favorites had no message ID; retain compatibility.

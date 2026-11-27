@@ -26,6 +26,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         NativeWorkspace.initialize(applicationContext)
+        com.elementeracoast.app.core.local.LocalDreamWorker.sync(applicationContext)
         if (NativeWorkspace.isLocal) SourceVisitGate.leave()
         setContent {
             val vm: CoastShellViewModel = viewModel(factory = CoastShellViewModel.factory(applicationContext))
@@ -67,6 +68,7 @@ class MainActivity : ComponentActivity() {
                         state = state,
                         chatGpt = chatGpt,
                         services = vm.local,
+                        dreamApi = vm.dreamApi,
                         daily = vm.daily,
                         memory = vm.memory,
                         dogtalk = vm.dogtalk,
@@ -135,7 +137,7 @@ class MainActivity : ComponentActivity() {
 
     private fun switchWorkspace(local: Boolean) {
         if (!NativeWorkspace.select(applicationContext, local)) {
-            android.widget.Toast.makeText(this, "无法保存模式选择，请重试", android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(this, "当前本机有执行任务或模式切换未保存，请稍后重试", android.widget.Toast.LENGTH_SHORT).show()
             return
         }
         startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))

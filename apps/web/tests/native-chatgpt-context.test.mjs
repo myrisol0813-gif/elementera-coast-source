@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { prepareNativeChatGpt, executeNativeChatGptTool, saveNativeChatGptEcho } from '../functions/native-chatgpt-chat.js';
+import { prepareNativeChatGpt, executeNativeChatGptTool, saveNativeChatGptEcho, routeNativeSingleChatRun } from '../functions/native-chatgpt-chat.js';
 import { ChatStoreError } from '../functions/chat-store.js';
 import { isChatApiPath } from '../functions/chat-router.js';
 
-for (const path of ['/api/chat/native-context', '/api/chat/native-tool', '/api/chat/native-echo']) {
+for (const path of ['/api/chat/native-context', '/api/chat/native-tool', '/api/chat/native-echo','/api/chat/native-single-run']) {
   test(path + ' is a protected chat route', () => assert.equal(isChatApiPath(path), true));
 }
 
-for (const action of [prepareNativeChatGpt, executeNativeChatGptTool, saveNativeChatGptEcho]) {
+for (const action of [prepareNativeChatGpt, executeNativeChatGptTool, saveNativeChatGptEcho, routeNativeSingleChatRun]) {
   test(action.name + ' rejects state changing requests from another origin', async () => {
     const request = new Request('https://coast.example/api/chat/native-context', {
       method: 'POST',
@@ -157,4 +157,31 @@ test('Native ChatGPT plan delivers an uploaded image without consulting the Open
   assert.match(lastUser.content[1].image_url.url, /^data:image[/]png;base64,/);
   assert.equal(body.desk_slip.attachments.vision.images_delivered, 1);
   assert.deepEqual(body.desk_slip.attachments.not_delivered, []);
+});
+
+test('native ordinary inference owns its window through explicit start, heartbeat and release',async()=>{
+  const {createConversation,writeConversationState}=await import('../functions/chat-store.js');
+  const {D1Database}=await import('./d1-helper.mjs');
+  const {armDreamTide,claimDreamTide,settleDreamTide}=await import('../functions/dream-tide-ledger.js');
+  const db=new D1Database(),cv=await createConversation(db,'native lease','main');
+  const cid=cv.id,env={COAST_CHAT_DB:db,COAST_DREAM_TIDE_ENABLED:'true'};
+  await writeConversationState(db,cid,{turns:[{id:'turn',user:{variants:[{id:'user',content:'hello'}]}}]});
+  const envelope={conversation_id:cid,source_turn_id:'turn',message_id:'reply',model:'gpt-5.5',messages:[{role:'user',content:'hello'}]};
+  const req=(path,value)=>new Request('https://coast.example'+path,{method:'POST',headers:{Origin:'https://coast.example','Content-Type':'application/json'},body:JSON.stringify(value)});
+  const action=(value)=>routeNativeSingleChatRun(req('/api/chat/native-single-run',{conversation_id:cid,...value}),env);
+  await assert.rejects(()=>prepareNativeChatGpt(req('/api/chat/native-context',envelope),env),e=>e.type==='native_single_claim_required');
+  const start=await (await action({action:'start'})).json(),id=start.claim_id;
+  assert.ok(id);
+  await assert.rejects(()=>action({action:'start'}),e=>e.type==='window_execution_busy');
+  await assert.rejects(()=>prepareNativeChatGpt(req('/api/chat/native-context',{...envelope,native_single_claim:'wrong'}),env),e=>e.type==='native_single_claim_lost');
+  assert.equal((await prepareNativeChatGpt(req('/api/chat/native-context',{...envelope,native_single_claim:id}),env)).status,200);
+  assert.equal((await (await action({action:'heartbeat',claim_id:id})).json()).ok,true);
+  const now=Date.parse('2026-11-27T09:00:00Z'),model='fixture/model';
+  await armDreamTide(db,cid,{timeZone:'UTC',dailyTime:'09:00'},model,now-86400000);
+  assert.equal(await claimDreamTide(db,cid,{now,currentModelId:model,busy:false}),null);
+  assert.equal((await (await action({action:'release',claim_id:id})).json()).ok,true);
+  const dream=await claimDreamTide(db,cid,{now,currentModelId:model,busy:false});assert.ok(dream);
+  await assert.rejects(()=>action({action:'start'}),e=>e.type==='window_execution_busy');
+  await settleDreamTide(db,dream,'completed',now);
+  assert.ok((await (await action({action:'start'})).json()).claim_id);
 });

@@ -28,6 +28,22 @@ class LocalToolSessionTest {
         val c=k.context(listOf(RemoteChatMessage("user","现在的问题")),12000,"main_chat","current",crossWindow=req)
         return k.toolSession("current","turn-now",req,c.receipt)
     }
+    @Test fun windowWorkbenchInvitationFollowsActualToolsAndOverrides(){
+        val s=fixture();val cache=RemoteCacheStore(s);val history=cache.history("current")!!
+        val messages=listOf(RemoteChatMessage("system","system context"),RemoteChatMessage("user","hi"))
+        val default=open(s)!!
+        assertTrue(default.withWorkbench(messages).first().content.contains("希望你用得顺手，也用得开心。"))
+        assertTrue(default.receipt.workbench.promptDelivered)
+        cache.putHistory("current",history.copy(contextSettings=history.contextSettings.copy(workbenchPrompt="CUSTOM_INVITATION_713")))
+        val edited=open(s)!!
+        assertTrue(edited.withWorkbench(messages).first().content.contains("CUSTOM_INVITATION_713"))
+        assertEquals("CUSTOM_INVITATION_713",edited.receipt.workbench.prompt)
+        cache.putHistory("current",history.copy(contextSettings=history.contextSettings.copy(workbenchPrompt="")))
+        val blank=open(s)!!
+        assertEquals(messages,blank.withWorkbench(messages))
+        assertFalse(blank.receipt.workbench.promptDelivered)
+        assertEquals(edited.tools,blank.tools)
+    }
     private val select="""{"messages":[{"conversation_id":"old","message_id":"u-old"}]}"""
     @Test fun permissionSearchAndReadAreSeparateAndAuditIsRedacted(){
         val s=fixture();val tool=open(s)!!
@@ -56,6 +72,7 @@ class LocalToolSessionTest {
             assertEquals("provider.example",r.url.host)
             val body=if(n++==0){
                 assertTrue(payload.getValue("tools").toString().contains("cross_window_keyword_search"))
+                assertTrue(payload.getValue("messages").jsonArray.first().jsonObject.getValue("content").jsonPrimitive.content.contains("希望你用得顺手，也用得开心。"))
                 val chunk=buildJsonObject{putJsonArray("choices"){add(buildJsonObject{
                     putJsonObject("delta"){putJsonArray("tool_calls"){add(buildJsonObject{
                         put("index",0);put("id","call1");putJsonObject("function"){put("name","cross_window_keyword_search");put("arguments","""{"query":"海岸"}""")}

@@ -40,23 +40,41 @@ fun CalendarScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Unit
     var day by remember { mutableStateOf(LocalDate.now()) }
     var entries by remember { mutableStateOf<List<JsonObject>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
+    var overview by remember { mutableStateOf(false) }
+    var filter by remember { mutableStateOf("all") }
+    var loadError by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<JsonObject?>(null) }
     var formOpen by remember { mutableStateOf(false) }
     var revision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
 
     suspend fun refresh() {
         busy = true
+        loadError = false
         try {
-            val rows = repository.calendar(month.toString())["entries"]?.jsonArray.orEmpty()
+            val rows = (if (overview) repository.allCalendar() else repository.calendar(month.toString()))["entries"]?.jsonArray.orEmpty()
             entries = rows.mapNotNull { it as? JsonObject }
+        } catch (error: kotlinx.coroutines.CancellationException) { throw error
         } catch (error: Exception) {
+            loadError = true
             onSnackbar("日历读取失败：${error.message}")
         } finally { busy = false }
     }
-    LaunchedEffect(month, revision) { refresh() }
-    val visible = entries.filter { it.day() == day.toString() }
+    LaunchedEffect(month, overview, revision) { refresh() }
+    fun entryType(item: JsonObject) = if (item["anniversary"] is JsonObject) "anniversary" else if (item.kind() == "note") "note" else "event"
+    val visible = if (overview) entries.filter { filter == "all" || entryType(it) == filter } else entries.filter { it.day() == day.toString() }
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 12.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = { overview = !overview; entries = emptyList(); loadError = false }) { Text(if (overview) "返回月历" else "全部记录") }
+            if (overview) Text("共 ${entries.size} 条", modifier = Modifier.padding(top = 10.dp))
+        }
+        if (overview) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                listOf("all" to "全部", "anniversary" to "纪念日", "event" to "日程", "note" to "随记").forEach { (key, label) ->
+                    TextButton(onClick = { filter = key }) { Text(label, fontWeight = if (filter == key) FontWeight.Bold else FontWeight.Normal) }
+                }
+            }
+        } else {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             TextButton(onClick = {
                 val candidate = month.minusMonths(1)
@@ -103,15 +121,18 @@ fun CalendarScreen(repository: SideRoomsRepository, onSnackbar: (String) -> Unit
             Text(day.toString(), style = MaterialTheme.typography.titleMedium)
             TextButton(onClick = { editing = null; formOpen = true }) { Text("＋ 记录") }
         }
+        }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (busy) item { Text("正在同步日历…", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            if (visible.isEmpty() && !busy) item { Text("这一天还没有记录。", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            items(visible, key = { it.value("id") }) { item ->
+            if (loadError) item { TextButton(onClick = { revision++ }) { Text("读取失败，重试") } }
+            if (visible.isEmpty() && !busy && !loadError) item { Text(if (overview) "这里还没有记录。" else "这一天还没有记录。", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            items(if (overview && busy) emptyList() else visible, key = { it.value("id") }) { item ->
                 DailySurfaceCard(onClick = { editing = item; formOpen = true }) {
                     Text(item.value("title"), fontWeight = FontWeight.SemiBold)
+                    if (overview) Text((item["anniversary"] as? JsonObject)?.value("startDay") ?: item.value("day"), style = MaterialTheme.typography.labelSmall)
                     Text("${if (item["anniversary"] is JsonObject) "纪念日" else if (item.kind() == "note") "随记" else "日程"} · ${if (item.value("author") == "owner") "屋主" else "模型伙伴"}" +
                         (if (item.value("recurrence") == "yearly") " · 每年重复" else "") +
-                        (if ((item["anniversary"] as? JsonObject)?.get("pinned")?.toString() == "true") " · 侧栏展示" else ""),
+                        (if (item["anniversary"] is JsonObject) { if ((item["anniversary"] as JsonObject)["pinned"]?.toString() == "true") " · 侧栏展示" else " · 未置顶" } else ""),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (item.value("body").isNotEmpty()) Text(item.value("body"), style = MaterialTheme.typography.bodyMedium)
