@@ -36,6 +36,55 @@ Native local execution is separate from Pages; the server does not handle subscr
 No archive restore path may automatically restore execution authorization.
 
 
+## Online Worker setup checklist (operator, not APK)
+
+The following is a deployment template, not a configured production Worker.
+From the Web repository root (apps/web in Tideloom), prepare a separate local Wrangler configuration
+beside the Worker entrypoint. Substitute the actual Worker name and the D1
+database name/ID already used by the intended Pages deployment. Do not
+create an empty replacement database or commit a real credential.
+
+```toml
+name = "REPLACE_WITH_WORKER_NAME"
+main = "dream-tide-worker.js"
+compatibility_date = "2026-11-27"
+workers_dev = false
+
+[[d1_databases]]
+binding = "COAST_CHAT_DB"
+database_name = "REPLACE_WITH_EXISTING_D1_NAME"
+database_id = "REPLACE_WITH_EXISTING_D1_ID"
+
+[vars]
+COAST_DREAM_TIDE_ENABLED = "false"
+COAST_DREAM_TIDE_SCHEDULER = "false"
+COAST_DREAM_TIDE_MAX_RUNS_PER_TICK = "1"
+
+[triggers]
+crons = []
+```
+
+Save as a local, untracked configuration under workers/. The Worker uses
+its own encrypted OPENROUTER_API_KEY secret (Pages secrets are not
+automatically inherited). First verify the intended D1 binding, then run
+Wrangler deploy --dry-run with that explicit configuration. Register the
+actual Cron cadence and change the two availability variables on both
+Pages and the Worker only as a deliberate operator action after acceptance.
+The proposed initial per-tick cap of 1 is an editable deployment choice,
+not a restriction on a window's own model/tool settings. Re-deploy both
+environments as needed; the window still requires explicit authorization.
+
+For a no-inference shutdown, disable the Worker execution/scheduler flags
+and remove its Cron trigger; disable Pages authorization availability too.
+A previously armed window can resume if deployment is re-enabled, so
+revoke its window authorization separately when permanent withdrawal is
+wanted. Never configure a ChatGPT plan token on this Worker. The Android
+local build flags have no effect on these cloud settings.
+
+The scheduled handler uses a live clock throughout the tick, including
+heartbeats and the quiet-time recheck before each later window. An initial
+timestamp alone must not be propagated as a frozen execution clock.
+
 ## Android local execution — available, explicitly authorized per window
 
 The local executor uses the existing encrypted device provider catalog. It sends
