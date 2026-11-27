@@ -52,6 +52,8 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
     var voiceLimitText by remember(cid){mutableStateOf("1")}
     var imageLimitText by remember(cid){mutableStateOf("1")}
     var consent by remember(cid){mutableStateOf(false)}
+    var softConsent by remember(cid){mutableStateOf(false)}
+    var planLimitText by remember(cid){mutableStateOf("5")}
     var notePage by remember(cid){mutableStateOf(DreamNotesResponse())}
     var activityPage by remember(cid){mutableStateOf(DreamActivityResponse())}
     var previewId by remember(cid){mutableStateOf<String?>(null)}
@@ -66,7 +68,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
         quietStart=cfg.quietHours?.start?:"23:00";quietEnd=cfg.quietHours?.end?:"07:00"
         tokenText=execution.tokenBudget.toString();outputText=execution.outputLimit.toString()
         toolsText=execution.toolBudget.toString();readText=execution.readTurns.toString();extraText=execution.extraPerDay.toString();voiceLimitText=execution.voiceLimit.toString();imageLimitText=execution.imageLimit.toString()
-        consent=false;loaded=true
+        consent=false;softConsent=false;loaded=true
     }
     suspend fun load(){
         busy=true;error=""
@@ -83,6 +85,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
     previewId?.let{id->DreamMediaPreview(api,cid,id){previewId=null}}
     val canArm=response.executionAvailable&&response.schedulerConfigured
     val planDraft=model.startsWith("chatgpt-plan:")
+    val canArmSelected=canArm&&(!planDraft||localMode&&response.planExecutionAvailable)
     fun save(action:String){
         if(busy||!loaded)return
         val e=if(action=="disarm")null else {
@@ -94,9 +97,11 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
             }
             execution.copy(tokenBudget=t,outputLimit=o,toolBudget=u,readTurns=r,extraPerDay=x,voiceLimit=v,imageLimit=i)
         }
-        if(action=="arm"&&(!canArm||!consent))return
+        if(action=="arm"&&(!canArmSelected||!consent||planDraft&&!softConsent))return
+        val planLimit=planLimitText.toIntOrNull()
+        if(action=="arm"&&planDraft&&(planLimit==null||planLimit !in 1..129)){error="请填写 1–129 的套餐请求次数上限。";return}
         val request=DreamSettingsRequest(cid,response.settings.revision,action,
-            e?.let{cfg.copy(quietHours=if(quiet)DreamQuietHours(quietStart,quietEnd)else null,execution=it)},model,consent)
+            e?.let{cfg.copy(quietHours=if(quiet)DreamQuietHours(quietStart,quietEnd)else null,execution=it)},model,consent,softConsent,planLimit?:5)
         busy=true;error="";notice=""
         scope.launch{
             try{
@@ -128,7 +133,13 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
                 response.settings.extraAt?.let{Text("下一次额外预约："+stamp(it))}
                 if(response.settings.enabled)Button(onClick={save("disarm")},enabled=!busy){Text("关闭唤醒授权")}
                 DreamField("绑定模型 ID",model,{model=it.take(180)},!busy)
-                if(planDraft)Text("套餐模型：仅保存草稿；独立账户授权和后台软预算尚未通过验收。套餐请求没有供应商强制输出 token 上限。",style=MaterialTheme.typography.bodySmall)
+                if(planDraft){
+                    Text(if(canArmSelected)"套餐调用使用当前本机账号的共享额度。没有供应商强制输出 token 上限；额度不足会暂停已授权窗口，须明确重新授权。" else "套餐模型：当前构建仅保存草稿，不启用后台调用。",style=MaterialTheme.typography.bodySmall)
+                    response.planStatus?.let{Text(when(it){"paused"->"套餐活动已暂停，请检查额度并重新授权。";"account_disconnected"->"套餐账号未连接或需重新授权。";"authorization_changed"->"账号或窗口授权已改变。";"authorized"->"套餐独立授权有效";else->"尚无套餐独立授权"},style=MaterialTheme.typography.bodySmall)}
+                    val uri=androidx.compose.ui.platform.LocalUriHandler.current
+                    TextButton(onClick={uri.openUri(com.elementeracoast.app.feature.chatgpt.NativeDreamPlanProtocol.USAGE_URL)}){Text("查看 ChatGPT 使用额度")}
+                    DreamField("套餐单次请求次数上限",planLimitText,{planLimitText=it},!busy)
+                }
                 DreamField("时区（IANA）",cfg.timeZone,{cfg=cfg.copy(timeZone=it)},!busy)
                 DreamField("每日固定时间（HH:mm）",cfg.dailyTime,{cfg=cfg.copy(dailyTime=it)},!busy)
                 DreamSwitch("安静时段",quiet,!busy){quiet=it}
@@ -142,7 +153,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
                 DreamField("每日额外次数上限",extraText,{extraText=it},!busy)
                 Text("独立预算与邀请",style=MaterialTheme.typography.titleMedium)
                 DreamField("单次累计 token 预算",tokenText,{tokenText=it},!busy)
-                DreamField("每次请求输出上限",outputText,{outputText=it},!busy)
+                DreamField(if(planDraft)"每次请求建议输出（软限制）" else "每次请求输出上限",outputText,{outputText=it},!busy)
                 DreamField("单次工具调用上限",toolsText,{toolsText=it},!busy)
                 DreamField("每次阅读最大轮数",readText,{readText=it},!busy)
                 DreamField("每次活动语音尝试上限",voiceLimitText,{voiceLimitText=it},!busy)
@@ -176,9 +187,10 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
                 DreamSwitch("自主生图（独立供应商费用）",execution.allowImage,!busy){execution=execution.copy(allowImage=it)}
                 DreamSwitch("允许将本次自主生图原件转交支持视觉的模型（计入推理预算）",execution.allowImageReadback,!busy){execution=execution.copy(allowImageReadback=it)}
                 Button(onClick={save("save")},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text("保存设置（不启用）")}
-                if(canArm&&!planDraft){
-                    DreamSwitch("确认按上述设置进行模型调用并产生相应费用",consent,!busy){consent=it}
-                    Button(onClick={save("arm")},enabled=!busy&&consent,modifier=Modifier.fillMaxWidth()){Text("保存并授权唤醒")}
+                if(canArmSelected){
+                    DreamSwitch(if(planDraft)"确认允许按设置自动使用本机套餐额度（媒体可能另计费用）" else "确认按上述设置进行模型调用并产生相应费用",consent,!busy){consent=it}
+                    if(planDraft)DreamSwitch("理解套餐 token 为软预算，不是供应商硬上限",softConsent,!busy){softConsent=it}
+                    Button(onClick={save("arm")},enabled=!busy&&consent&&(!planDraft||softConsent),modifier=Modifier.fillMaxWidth()){Text("保存并授权唤醒")}
                 }
             }else if(tab==1){
                 if(localMode&&!canArm)Text("本机自动执行尚未开放；已归档的历史仍可阅读。",style=MaterialTheme.typography.bodySmall)
