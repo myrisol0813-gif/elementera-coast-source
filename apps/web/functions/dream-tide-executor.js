@@ -10,6 +10,7 @@ import {readCustomInstructions,readUserPortrait,readGlobalExcerpt} from './memor
 import {buildRealityContext} from './reality-context.js';
 import {localClock} from './dream-tide-schedule.js';
 import {dreamToolNames} from './dream-tide-policy.js';
+import {autonomousVoiceConfigured} from './voice-clips.js';
 import {resolveToolSelection,executeModelTool} from './tool-registry-core.js';
 import {estimateWireInputTokens,assertWireInputBudget} from './context-budget.js';
 
@@ -102,7 +103,7 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
     const e=actual.execution,context=await buildDreamContext(db,claim,actual,now,env);
     await authorize();
     const toolContext={permission:'owner',surface:'main_chat',env,conversation_id:cid,source_turn_id:null,
-      model_label:currentModelId,local_date:localClock(now,actual.timeZone).day,autonomous_activity:true,autonomous_claim:claim,autonomous_tool_names:dreamToolNames(actual),
+      model_label:currentModelId,local_date:localClock(now,actual.timeZone).day,autonomous_activity:true,autonomous_claim:claim,autonomous_tool_names:dreamToolNames(actual).filter(name=>name!=='voice_create'||autonomousVoiceConfigured(env)),
       independent_web_enabled:e.allowWeb===true};
     const common=resolveToolSelection(toolContext).modelVisibleTools.map(t=>t.function.name==='create_diary'?{...t,function:{...t.function,description:'可选：创建自己的日记，追加而不替换既有日记。',parameters:{...t.function.parameters,properties:Object.fromEntries(Object.entries(t.function.parameters.properties).filter(([k])=>!['replace_id','conflict_mode'].includes(k)))}}}:t.function.name==='create_moment'?{...t,function:{...t.function,description:'可选：在海岸内部新增自己的动态，不外发。'}}:t.function.name==='library_write'?{
       ...t,function:{...t.function,description:'可选：创建自己的书房批注、划线或读后感。此次活动不修改或删除既有笔记。',parameters:{...t.function.parameters,properties:{...t.function.parameters.properties,action:{type:'string',enum:['create']}}}}
@@ -174,7 +175,7 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
               const value=await executeModelTool(db,{...call,id:callId},{...toolContext,tool_call_id:callId,autonomous_event:{step:index,index:callIndex}});
               if(name==='library_write'&&value?.note?.id)result.record_id=value.note.id;
               if(['create_moment','create_diary'].includes(name)&&value?.record_id)result.record_id=value.record_id;
-              if(name==='calendar_create'&&value?.id)result.record_id=value.id;
+              if(['calendar_create','voice_create'].includes(name)&&value?.id)result.record_id=value.id;
               const encoded=JSON.stringify(value);
               result=encoded.length<=24000?{ok:value?.ok!==false,data:value,...(result.record_id?{record_id:result.record_id}:{})}:result.record_id?{ok:true,record_id:result.record_id,reason:'saved_result_body_omitted'}:{ok:false,reason:'result_too_large'};
               activities.push({kind:name,ok:result.ok});
@@ -192,7 +193,7 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
     clearInterval(heartbeat);signal?.removeEventListener('abort',abort);if(pending)await pending;
   }
   const result={reason,activities,tool_calls:calls,total_tokens:known?used:null,reported_cost:costKnown?cost:null,
-    ...(extraAt!==null?{proposed_extra_at:extraAt}:{}),accounting:'provider_reported; input estimate is not a hard billing guarantee'};
+    ...(extraAt!==null?{proposed_extra_at:extraAt}:{}),accounting:'chat provider reported; separate media cost not included; input estimate is not a hard billing guarantee'};
   const settled=await finishDreamActivity(db,claim,status,result,clock());
   if(!settled.finished){
     await settleDreamTide(db,claim,'interrupted',clock());
