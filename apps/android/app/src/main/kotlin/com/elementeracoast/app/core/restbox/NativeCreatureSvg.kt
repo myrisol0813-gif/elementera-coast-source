@@ -8,6 +8,20 @@ import kotlin.math.ceil
 @Serializable
 data class NativeAccessoryMount(val parentId:String,val index:Int,val svg:String)
 @Serializable
+data class NativeMotionTrack(
+    val targetId:String,val attribute:String,val durationMs:Double,val delayMs:Double=0.0,
+    val alternate:Boolean=false,val frames:List<String>,
+) {
+    fun frame(elapsedMs:Long):String? {
+        if(elapsedMs<delayMs||frames.isEmpty()||durationMs<=0||!durationMs.isFinite())return null
+        val t=(elapsedMs-delayMs)/durationMs
+        val cycle=kotlin.math.floor(t).toLong()
+        var phase=t-kotlin.math.floor(t)
+        if(alternate&&cycle%2L!=0L)phase=1-phase
+        return frames[(phase*frames.size).toInt().coerceIn(0,frames.lastIndex)]
+    }
+}
+@Serializable
 data class NativePoseTemplate(
     val version:Int,
     val bodyId:String,
@@ -18,6 +32,7 @@ data class NativePoseTemplate(
     val accessoryMarker:Map<String,String>,
     val svg:String,
     val mounts:Map<String,NativeAccessoryMount>,
+    val motion:List<NativeMotionTrack> = emptyList(),
 )
 data class NativePreparedPose(val svg:String,val width:Int,val height:Int)
 
@@ -35,9 +50,10 @@ class NativeCreatureSvg(private val appearance:RestAppearanceCatalogue) {
         require(t.palette in body.palettes&&t.slots.keys==body.slots.keys)
         require((t.slots.values+t.accessoryMarker.values).all{hex.matches(it)})
         require((t.slots.values+t.accessoryMarker.values).distinct().size==t.slots.size+t.accessoryMarker.size)
+        require(t.motion.size<=100&&t.motion.all{it.attribute in setOf("transform","opacity","d")&&it.durationMs.isFinite()&&it.durationMs>0&&it.frames.size in 1..128})
         return t
     }
-    fun prepare(t:NativePoseTemplate,input:RestAppearance,prop:String?=null):NativePreparedPose {
+    fun prepare(t:NativePoseTemplate,input:RestAppearance,prop:String?=null,elapsedMs:Long?=null,maxDimension:Int=1536):NativePreparedPose {
         val a=RestAppearancePolicy.validate(appearance,input)
         require(a.bodyId==t.bodyId&&a.palette==t.palette&&t.action in RestAppearancePolicy.actions)
         require(prop==null||prop in setOf("book","flower","cookie","tea","letter"))
@@ -55,6 +71,7 @@ class NativeCreatureSvg(private val appearance:RestAppearanceCatalogue) {
         if(!a.hat)byId["hat"]?.setAttribute("display","none")
         if(!a.tongue)byId["tongue"]?.setAttribute("display","none")
         if(!a.horn)NativeSvgXml.elements(root).firstOrNull{it.getAttribute("data-coast-toggle")=="horn"}?.setAttribute("display","none")
+        if(elapsedMs!=null)for(track in t.motion)track.frame(elapsedMs)?.let{value->byId[track.targetId]?.setAttribute(track.attribute,value)}
         val originalChildren=byId.mapValues{(_,parent)->
             (0 until parent.childNodes.length).mapNotNull{parent.childNodes.item(it) as? Element}
         }
@@ -87,6 +104,7 @@ class NativeCreatureSvg(private val appearance:RestAppearanceCatalogue) {
         if(prop!=null&&"prop:$prop" in t.mounts)mount("prop:$prop","prop")
         val box=t.viewBox.trim().split(Regex("\\s+")).map{it.toDouble()}
         require(box.size==4&&box.all{it.isFinite()}&&box[2]>0&&box[3]>0)
-        return NativePreparedPose(NativeSvgXml.serialize(doc),ceil(box[2]*2).toInt().coerceIn(1,1536),ceil(box[3]*2).toInt().coerceIn(1,1536))
+        val factor=minOf(2.0,maxDimension.toDouble()/maxOf(box[2],box[3]))
+        return NativePreparedPose(NativeSvgXml.serialize(doc),ceil(box[2]*factor).toInt().coerceIn(1,1536),ceil(box[3]*factor).toInt().coerceIn(1,1536))
     }
 }
