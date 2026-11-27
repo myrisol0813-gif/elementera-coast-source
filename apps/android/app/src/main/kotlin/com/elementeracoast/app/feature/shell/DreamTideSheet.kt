@@ -161,6 +161,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
                 DreamSwitch("独立联网",execution.allowWeb,!busy){execution=execution.copy(allowWeb=it)}
                 DreamSwitch("书房阅读",execution.allowLibrary,!busy){execution=execution.copy(allowLibrary=it)}
                 DreamSwitch("按需检索正式记忆",execution.allowMemory,!busy){execution=execution.copy(allowMemory=it)}
+                DreamSwitch("提议记忆候选（仅待确认）",execution.allowMemoryCandidate,!busy){execution=execution.copy(allowMemoryCandidate=it)}
                 DreamSwitch("查阅日历",execution.allowCalendar,!busy){execution=execution.copy(allowCalendar=it)}
                 DreamSwitch("查阅收藏",execution.allowCollection,!busy){execution=execution.copy(allowCollection=it)}
                 DreamSwitch("创建自己的书房笔记",execution.allowLibraryWrite,!busy){execution=execution.copy(allowLibraryWrite=it)}
