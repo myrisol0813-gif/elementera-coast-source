@@ -310,6 +310,9 @@ test('autonomous media and activity receipts restore atomically without arming a
   assert.deepEqual(await voiceClipAudio(target,clip.id),audio);
   assert.deepEqual((await readArchiveChat(target,cid)).dream_tide,chat.dream_tide);
   assert.equal((await readConversationState(target,cid)).turns.length,1);
+  for(const id of [picture.id,clip.id])assert.equal((await readDreamActivity(target,cid,20,0,id))[0].claim_id,claim.claimId);
+  assert.deepEqual(await readDreamActivity(target,cid,20,0,picture.id+'_forged'),[]);
+  assert.deepEqual(await readDreamActivity(target,'other-window',20,0,clip.id),[]);
   assert.equal((await target.prepare('SELECT enabled FROM dream_tide_arms WHERE conversation_id=?').bind(cid).first()).enabled,0);
 });
 
