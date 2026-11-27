@@ -39,7 +39,7 @@ internal class LocalDreamArchive(private val store:LocalPersistence){
         val clock=Regex("([01][0-9]|2[0-3]):[0-5][0-9]")
         require(clock.matches(cfg.dailyTime));java.time.ZoneId.of(cfg.timeZone)
         cfg.quietHours?.let{require(clock.matches(it.start)&&clock.matches(it.end))}
-        cfg.execution?.let{e->require(e.tokenBudget in 1..1000000&&e.outputLimit in 1..65536&&e.toolBudget in 0..128&&e.readTurns in 1..400&&e.extraPerDay in 0..128&&e.invitation.isNotBlank()&&e.invitation.length<=16000)}
+        cfg.execution?.let{e->require(e.tokenBudget in 1..1000000&&e.outputLimit in 1..65536&&e.toolBudget in 0..128&&e.readTurns in 1..400&&e.extraPerDay in 0..128&&e.voiceLimit in 0..128&&e.imageLimit in 0..128&&e.invitation.isNotBlank()&&e.invitation.length<=16000)}
         return DreamSettings(revision=UUID.randomUUID().toString(),enabled=false,config=cfg,modelId=model)
     }
     fun export(cid:String):JsonObject?{
