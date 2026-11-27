@@ -33,5 +33,5 @@
     "fishNeckDisabled": true,
     "bodyMountAndSleepAnchors": "creatures/index.json"
   },
-  "brandBadges": "excluded pending trademark/asset review"
+  "brandBadges": "Optional decorative badges are in accessories/badges.json; distribution permission review required before release."
 }

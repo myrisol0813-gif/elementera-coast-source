@@ -5,19 +5,17 @@
       "slots": {
         "upper": {
           "base": "#c18e89",
-          "selector": {
-            "groupId": "slippers",
-            "attribute": "fill",
-            "original": "#c18e89"
-          }
+          "members": [
+            "#c18e89"
+          ],
+          "label": "鞋面"
         },
         "sole": {
           "base": "#d4b89d",
-          "selector": {
-            "groupId": "slippers",
-            "attribute": "fill",
-            "original": "#d4b89d"
-          }
+          "members": [
+            "#d4b89d"
+          ],
+          "label": "鞋底"
         },
         "lining": {
           "base": "#f2dbc0",
@@ -128,7 +126,16 @@
           }
         }
       },
-      "presets": []
+      "presets": [
+        {
+          "id": "sage",
+          "name": "浅绿",
+          "values": {
+            "cloth": "#b7c2a8",
+            "flowers": "#c88f88"
+          }
+        }
+      ]
     },
     "living-chime": {
       "slots": {
@@ -361,7 +368,24 @@
           ]
         }
       },
-      "presets": []
+      "presets": [
+        {
+          "id": "blue",
+          "name": "雾蓝",
+          "values": {
+            "cloth": "#859bad",
+            "flowers": "#e9dbb0"
+          }
+        },
+        {
+          "id": "rose",
+          "name": "旧玫瑰",
+          "values": {
+            "cloth": "#b58e91",
+            "flowers": "#eadac6"
+          }
+        }
+      ]
     },
     "living-rug": {
       "slots": {
@@ -1071,7 +1095,16 @@
           ]
         }
       },
-      "presets": []
+      "presets": [
+        {
+          "id": "moon",
+          "name": "月雾",
+          "values": {
+            "cloth": "#c1c5d7",
+            "stars": "#a5a2b3"
+          }
+        }
+      ]
     },
     "bedroom-chest": {
       "slots": {
@@ -1170,7 +1203,22 @@
           }
         }
       },
-      "presets": []
+      "presets": [
+        {
+          "id": "sage",
+          "name": "苔绿",
+          "values": {
+            "cloth": "#a0b39b"
+          }
+        },
+        {
+          "id": "rose",
+          "name": "旧玫瑰",
+          "values": {
+            "cloth": "#c5a2ae"
+          }
+        }
+      ]
     },
     "bedroom-bed": {
       "slots": {
@@ -1247,7 +1295,24 @@
           ]
         }
       },
-      "presets": []
+      "presets": [
+        {
+          "id": "moss",
+          "name": "苔绿",
+          "values": {
+            "blanket": "#a4b29a",
+            "check": "#e5dec4"
+          }
+        },
+        {
+          "id": "sea",
+          "name": "雾蓝",
+          "values": {
+            "blanket": "#95a8bc",
+            "check": "#e7e3d5"
+          }
+        }
+      ]
     },
     "bedroom-nest": {
       "slots": {

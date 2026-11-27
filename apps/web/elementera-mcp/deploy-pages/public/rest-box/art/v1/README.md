@@ -9,3 +9,6 @@ Canonical SVG art directory for the rest-box feature, shared by future Web and A
 - Native must consume the same resource source in its build, not keep a second hand-edited asset library. Browser SVG rendering and native support for filters, CSS, palettes, animation and foreground masking must be verified separately. Do not introduce a WebView as an implicit substitute for the native renderer.
 - Public pack contains generic artwork only. Third-party badge artwork remains excluded pending rights review.
 - Static checks: from apps/web, run `node tests/rest-box-art-assets.test.mjs`. No existing test scripts or shared build files changed yet; CI integration, real rendering and device tests are pending.
+
+## Coordinated palette and optional badges
+All 41 default furniture components now have authored color groups, including referenced cloth patterns, and the 14 extras keep their existing slots. Original artwork is unchanged. Palette choices and badge positions require visual/device checks. Five optional third-party decorative marks use the original wardrobe paths; do not claim they are covered by the project artwork license. Release review is pending. Shared art source applies to both Web and Native, private and Source; packaging and actual rendering on Native remain separate tasks.
