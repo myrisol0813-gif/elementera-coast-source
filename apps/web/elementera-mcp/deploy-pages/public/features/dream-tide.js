@@ -1,9 +1,9 @@
 import {escapeHtml as h,escapeAttribute as a,q} from '../core/dom.js';
 import {requestJson} from '../core/api.js';
 const BASE='/api/chat/dream-tide';
-const modules=[['includeTime','当前时间'],['includePrevious','上次活动与间隔'],['includeReplies','小笺与回笺'],['readHistory','允许自主选读窗口历史'],['writeNote','允许写小笺']];
+const modules=[['includeTime','当前时间'],['includePrevious','上次活动与间隔'],['includeReplies','自主手记与回复'],['readHistory','允许自主选读窗口历史'],['writeNote','允许写自主手记']];
 const names={running:'活动中',completed:'已结束',failed:'未完成',cancelled:'已取消',interrupted:'已中断',claimed:'已认领，结果未确认'};
-const toolNames={dream_read_history:'阅读历史',dream_write_note:'写小笺',dream_schedule_extra:'提议额外唤醒'};
+const toolNames={dream_read_history:'阅读历史',dream_write_note:'写自主手记',dream_schedule_extra:'提议额外唤醒'};
 const row=(label,body)=>'<label>'+h(label)+body+'</label>';
 const input=(id,value,type='text',extra='')=>'<input id="'+id+'" type="'+type+'" value="'+a(String(value??''))+'" '+extra+'>';
 const checkbox=(id,label,checked)=>'<label><input type="checkbox" id="'+id+'" '+(checked?'checked':'')+'> '+h(label)+'</label>';
@@ -17,9 +17,9 @@ export function createDreamTideViews({router,chat,toast}){
   const current=()=>chat.getCurrentConversationId();
   const pinned=()=>router.current()?.params?.conversationId||null;
   const open=cid=>router.open('dream-tide',{conversationId:cid});
-  const nav=()=>'<div class="feature-card">'+button('梦醒设置','open')+button('小笺','notes')+button('潮痕','activity')+'</div>';
+  const nav=()=>'<div class="feature-card">'+button('唤醒设置','open')+button('自主手记','notes')+button('活动记录','activity')+'</div>';
   const page=(title,body)=>({title,subtitle:'当前窗口 · 独立于普通聊天',className:'settings-form',body:nav()+body});
-  const noWindow=()=>page('梦醒潮','<p class="feature-note">请先打开支持梦醒潮的普通聊天窗口。</p>');
+  const noWindow=()=>page('自主唤醒','<p class="feature-note">请先打开支持自主唤醒的普通聊天窗口。</p>');
   router.register('dream-tide',async({conversationId:cid}={})=>{if(!cid)return noWindow();
     const data=await requestJson(query('',cid)),s=data.settings,c=s.config||{},e=c.execution||{};
     configState={cid,s,available:data.executionAvailable&&data.schedulerConfigured};
@@ -27,7 +27,7 @@ export function createDreamTideViews({router,chat,toast}){
     const zone=c.timeZone||Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
     const status=s.enabled?(s.running?'活动中':'已授权'):'未授权';
     const notice=configState.available?'服务端已配置调度；授权后才会请求模型。':'当前服务端未开通实际调度；可保存设置，不会自动请求模型。';
-    return page('梦醒潮',section('当前状态','<p class="feature-note">'+h(status+' · '+notice)+'</p>'+
+    return page('自主唤醒',section('当前状态','<p class="feature-note">'+h(status+' · '+notice)+'</p>'+
       (s.extraAt?'<p class="feature-note">下一次额外预约：'+h(stamp(s.extraAt))+'</p>':'')+
       (s.enabled?button('关闭唤醒授权','disarm'):''))
       +section('唤醒与模型','<div class="form-stack">'+row('绑定模型 ID',input('dreamModel',model,'text','maxlength="180"'))+
@@ -51,9 +51,9 @@ export function createDreamTideViews({router,chat,toast}){
     const d=await requestJson(query('/notes',cid,notesOffset));
     const body=d.items.map(n=>'<article class="feature-group"><h2>'+h(stamp(n.created_at)+' · '+n.model_id)+'</h2><div class="feature-card">'+
       '<p style="white-space:pre-wrap;overflow-wrap:anywhere">'+h(n.body)+'</p>'+
-      n.replies.map(r=>'<p class="feature-note" style="white-space:pre-wrap;overflow-wrap:anywhere">'+h(stamp(r.created_at)+' · 回笺\n'+r.body)+'</p>').join('')+
-      '<div class="form-stack"><label>回笺<textarea rows="3" maxlength="16000"></textarea></label>'+button('存入回笺','reply','data-cid="'+a(cid)+'" data-claim="'+a(n.claim_id)+'"')+'</div></div></article>').join('');
-    return page('小笺',(body||'<p class="feature-note">还没有小笺。</p>')+'<p class="feature-note">回笺只保存文字，不立即唤醒模型。</p>'+
+      n.replies.map(r=>'<p class="feature-note" style="white-space:pre-wrap;overflow-wrap:anywhere">'+h(stamp(r.created_at)+' · 回复\n'+r.body)+'</p>').join('')+
+      '<div class="form-stack"><label>回复<textarea rows="3" maxlength="16000"></textarea></label>'+button('保存回复','reply','data-cid="'+a(cid)+'" data-claim="'+a(n.claim_id)+'"')+'</div></div></article>').join('');
+    return page('自主手记',(body||'<p class="feature-note">还没有自主手记。</p>')+'<p class="feature-note">回复只保存文字，不立即唤醒模型。</p>'+
       (notesOffset?button('上一页','notes-prev'):'')+(d.nextOffset!==null?button('下一页','notes-next'):''));
   });
   router.register('dream-tide-activity',async({conversationId:cid}={})=>{if(!cid)return noWindow();
@@ -65,7 +65,7 @@ export function createDreamTideViews({router,chat,toast}){
       r.tools.map(t=>'<p class="feature-note">'+h((toolNames[t.tool_name]||t.tool_name)+' · '+(names[t.status]||t.status)+(Number.isInteger(t.receipt?.count)?' · '+t.receipt.count+' 轮':''))+'</p>').join('')+
       (r.result?.extra_scheduled?'<p class="feature-note">已保存额外预约。</p>':'')+
       (r.steps.some(s=>s.status==='claimed')?'<p class="feature-note">存在未确认请求，不会自动重放。</p>':''))).join('');
-    return page('潮痕',(body||'<p class="feature-note">还没有活动记录。</p>')+
+    return page('活动记录',(body||'<p class="feature-note">还没有活动记录。</p>')+
       (activityOffset?button('上一页','activity-prev'):'')+(d.nextOffset!==null?button('下一页','activity-next'):''));
   });
   const value=id=>q('#'+id)?.value??'';
@@ -73,7 +73,7 @@ export function createDreamTideViews({router,chat,toast}){
   const number=id=>{const v=value(id);if(!v.trim()||!Number.isSafeInteger(Number(v)))throw Error('请填写完整整数预算。');return Number(v);};
   async function handle(name,target){
     const cid=pinned();
-    if(!cid||cid!==current())return toast('窗口已切换，请从当前窗口重新打开梦醒潮。');
+    if(!cid||cid!==current())return toast('窗口已切换，请从当前窗口重新打开自主唤醒。');
     if(name==='open')return open(cid);
     if(name==='notes'){notesOffset=0;return router.open('dream-tide-notes',{conversationId:cid});}
     if(name==='activity'){activityOffset=0;return router.open('dream-tide-activity',{conversationId:cid});}
@@ -83,11 +83,11 @@ export function createDreamTideViews({router,chat,toast}){
     try{
       if(name==='reply'){
         const cid=target.dataset.cid,claim=target.dataset.claim,box=target.closest('.form-stack')?.querySelector('textarea'),body=box?.value;
-        if(cid!==pinned()||cid!==current()||!body?.trim())throw Error('请填写回笺。');
+        if(cid!==pinned()||cid!==current()||!body?.trim())throw Error('请填写回复。');
         // Keep the ID for a network-ambiguous retry of the same text.
         if(box.dataset.replyBody!==body){box.dataset.replyId=crypto.randomUUID();box.dataset.replyBody=body;}
         await post('/reply',{conversation_id:cid,claim_id:claim,reply_id:box.dataset.replyId,body});
-        toast('回笺已保存');return router.refresh();
+        toast('回复已保存');return router.refresh();
       }
       if(!configState||configState.cid!==pinned()||configState.cid!==current())throw Error('窗口已切换，请重新打开。');
       const data={conversation_id:configState.cid,revision:configState.s.revision,action:name};
@@ -100,8 +100,16 @@ export function createDreamTideViews({router,chat,toast}){
           execution:{invitation:value('dreamInvitation'),tokenBudget:number('dreamTokens'),outputLimit:number('dreamOutput'),toolBudget:number('dreamTools'),readTurns:number('dreamReadTurns'),extraPerDay:number('dreamExtraLimit'),
             ...Object.fromEntries(modules.map(([key])=>[key,checked('dream-'+key)]))}};
       }
-      await post('',data);toast(name==='arm'?'已授权梦醒潮':name==='disarm'?'已撤回授权':'设置已保存 · 未启用');return router.refresh();
+      await post('',data);toast(name==='arm'?'已授权自主唤醒':name==='disarm'?'已撤回授权':'设置已保存 · 未启用');return router.refresh();
     }catch(e){toast(e.message||'操作未完成',4500);}finally{busy=false;}
   }
-  return {open,handleAction:handle};
+  function ownsRoute(route){return ['dream-tide','dream-tide-notes','dream-tide-activity'].includes(route?.name);}
+  function ownsEvent(_event,context){return context.namespace==='dream-tide'&&context.eventType==='click'?{preventDefault:true}:false;}
+  function handleEvent(_event,context){return handle(context.name,context.target);}
+  function mount(){}
+  function refresh({navigation}={}){
+    if(navigation&&!ownsRoute(navigation.current)){configState=null;notesOffset=0;activityOffset=0;notesWindow=null;activityWindow=null;}
+  }
+  function destroy(){configState=null;notesOffset=0;activityOffset=0;notesWindow=null;activityWindow=null;}
+  return Object.freeze({id:'dream-tide',priority:60,mountOrder:60,ownsRoute,ownsEvent,handleEvent,mount,refresh,destroy,open,handleAction:handle});
 }
