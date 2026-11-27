@@ -34,6 +34,7 @@ internal class LocalDreamExecutor(
         val e=requireNotNull(c.config.execution)
         return buildList{
             if(e.readHistory)add(tool("dream_read_history","自行选读本窗口历史轮次。mode 为 window 或 since_previous，从 0 开始分页。",linkedMapOf("mode" to "string","start" to "integer","count" to "integer")))
+            if(e.allowMemoryCandidate&&RemoteCacheStore(store,strictReads=true).history(c.cid)?.contextSettings?.localModelWriteEnabled==true)add(tool("dream_memory_candidate","可选：提议待屋主确认的记忆或种子，不写入正式记忆。destination 为 memory 或 seed，不伪造聊天来源。",mapOf("title" to "string","content" to "string","destination" to "string")))
             if(e.writeNote)add(tool("dream_write_note","可选，写一封自主手记。不是普通聊天消息。",mapOf("body" to "string")))
             if(c.config.allowExtra&&e.extraPerDay>0)add(tool("dream_schedule_extra","可选，提出一次带时区 ISO 8601 未来额外唤醒时间。",mapOf("at" to "string")))
         }
@@ -190,6 +191,10 @@ internal class LocalDreamExecutor(
                                 result=try{
                                     when{
                                         name=="dream_read_history"&&args!=null->history(c,args,previous)
+                                        name=="dream_memory_candidate"&&args!=null->{
+                                            val value=LocalMemoryStore(store).proposeDreamCandidate(c,step,index,args,clock())
+                                            buildJsonObject{put("ok",true);put("data",value);value["id"]?.let{put("record_id",it)}}
+                                        }
                                         name=="dream_write_note"&&args?.keys==setOf("body")->buildJsonObject{put("ok",ledger.note(c,args.str("body"),clock()))}
                                         name=="dream_schedule_extra"&&args?.keys==setOf("at")&&proposed==null->{
                                             val at=Instant.parse(args.str("at")).toEpochMilli()
