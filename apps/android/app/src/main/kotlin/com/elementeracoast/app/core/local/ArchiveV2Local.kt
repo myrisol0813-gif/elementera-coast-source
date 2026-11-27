@@ -18,8 +18,8 @@ internal object ArchiveV2Local {
         val hashes=(bytes.indices step chunk).map { ArchiveV2Chunks.digest(bytes.copyOfRange(it,minOf(it+chunk,bytes.size))) }
         return ArchiveV2Object(bytes.size.toLong(),hashes,ArchiveV2Chunks.fingerprint(bytes.size.toLong(),hashes))
     }
-    fun export(store:LocalPersistence,applicationId:String,output:File,appearanceRoot:File?=null):ArchiveV2Manifest = store.readConsistent { stable -> exportStable(stable,applicationId,output,appearanceRoot) }
-    private fun exportStable(store:LocalPersistence,applicationId:String,output:File,appearanceRoot:File?):ArchiveV2Manifest {
+    fun export(store:LocalPersistence,applicationId:String,output:File,appearanceRoot:File?=null,restStudio:JsonObject?=null):ArchiveV2Manifest = store.readConsistent { stable -> exportStable(stable,applicationId,output,appearanceRoot,restStudio) }
+    private fun exportStable(store:LocalPersistence,applicationId:String,output:File,appearanceRoot:File?,restStudio:JsonObject?):ArchiveV2Manifest {
         require(!output.exists()&&output.parentFile?.isDirectory==true)
         require(RemoteCacheStore(store,strictReads=true).conversations().none{LocalReplyRunStore(store).active(it.id)}){"本机有窗口正在连续回复，请结束本组或恢复中断任务后重新导出。"}
         val payload=CoastTransferCodec.decode(LocalBackupArchive.encode(LocalBackupArchive.capture(store,applicationId)))
@@ -82,7 +82,7 @@ internal object ArchiveV2Local {
                         val d=describe(a.bytes);ByteArrayInputStream(a.bytes).use{writer.objectEntry(d,it)}
                         objects[d.objectSha256]=d;d.objectSha256
                     }
-                    add("appearance",ArchiveV2Appearance.ID,"appearance",appearance.data(),media)
+                    add("appearance",ArchiveV2Appearance.ID,"appearance",if(restStudio==null)appearance.data() else JsonObject(appearance.data()+("rest_studio" to restStudio)),media)
                 }
                 val counts=records.groupingBy { it.module }.eachCount()
                 val manifest=ArchiveV2Manifest("elementera-coast-archive",2,"local",applicationId,payload.getValue("exportedAt").jsonPrimitive.content,
