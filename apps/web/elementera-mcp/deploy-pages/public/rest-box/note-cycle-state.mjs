@@ -21,14 +21,20 @@ function tagsOf(t){assertRule(t&&string(t.emotion)&&string(t.energy)&&t.emotion.
 
 function activeCycle(state){return state.cycles.find(c=>c.id===state.activeCycleId)??null}
 
-function commandFingerprint(proposal,source){return JSON.stringify([proposal.body,proposal.ordinary===true,proposal.action??null,proposal.tags?.emotion??null,proposal.tags?.energy??null,proposal.reason??null,source.windowId,source.modelId,source.turnId,source.messageIds])}
+function sameNoteCommand(state,n,proposal,source,context){
+  if(n.body!==proposal.body||n.ordinary!==(proposal.ordinary===true)||n.action!==(proposal.action??null)||n.source.windowId!==source.windowId||n.source.modelId!==source.modelId||n.source.turnId!==source.turnId||JSON.stringify(n.source.messageIds)!==JSON.stringify(source.messageIds))return false;
+  if(!n.action)return true;
+  const cycle=state.cycles.find(c=>c.id===n.cycleId);
+  const boundary=n.action==='enter'?cycle?.entry:cycle?.exit;
+  return !!boundary&&n.cycleId===context.cycleId&&boundary.tags.emotion===proposal.tags?.emotion&&boundary.tags.energy===proposal.tags?.energy&&(n.action==='enter'?boundary.reason===proposal.reason:boundary.method===context.exitMethod);
+}
 
 function writeNote(state,config,proposal,context){
   const opts=settings(config),action=proposal.action??null,ordinary=proposal.ordinary===true;
   assertRule(string(proposal.body)&&["enter","exit",null].includes(action),"note body and valid action required");
-  const source=sourceOf(context,proposal.messageIds??[]),fingerprint=commandFingerprint(proposal,source);
+  const source=sourceOf(context,proposal.messageIds??[]);
   const existing=state.notes.find(n=>n.id===context.requestId);
-  if(existing){assertRule(existing.fingerprint===fingerprint,"request id reused with different payload");return {state,note:existing,replayed:true,settled:{ordinary:existing.ordinary,rest:existing.action}}}
+  if(existing){assertRule(sameNoteCommand(state,existing,proposal,source,context),"request id reused with different payload");return {state,note:existing,replayed:true,settled:{ordinary:existing.ordinary,rest:existing.action}}}
   assertRule(context.expectedRevision===state.revision,"stale revision");
   assertRule(ordinary||action!==null,"no writing task");
   assertRule(!ordinary||opts.ordinaryEnabled,"ordinary excerpts disabled");
@@ -45,7 +51,7 @@ function writeNote(state,config,proposal,context){
     const tags=tagsOf(proposal.tags);linked=current.id;cycleId=null;
     cycles=cycles.map(c=>c.id===linked?{...c,currentTags:tags,exit:{noteId:context.requestId,source,tags,method:context.exitMethod,elapsedMs:context.at-c.entry.source.at}}:c);
   }
-  const note={id:context.requestId,body:proposal.body,ordinary,action,cycleId:linked,source,fingerprint};
+  const note={id:context.requestId,body:proposal.body,ordinary,action,cycleId:linked,source};
   return {state:{...state,revision:state.revision+1,activeCycleId:cycleId,notes:[...state.notes,note],cycles},note,replayed:false,settled:{ordinary,rest:action}};
 }
 
@@ -53,7 +59,7 @@ function appendRestEvent(state,event,context){
   assertRule(id(context.requestId)&&id(context.cycleId)&&id(context.windowId)&&time(context.at),"invalid event context");
   assertRule(["interaction","dialogue","action","state"].includes(event.kind)&&id(event.refId),"invalid actual event reference");
   const old=state.cycles.flatMap(c=>c.events).find(e=>e.id===context.requestId);
-  if(old){assertRule(old.cycleId===context.cycleId&&old.kind===event.kind&&old.refId===event.refId&&old.windowId===context.windowId,"event id reused");return state}
+  if(old){assertRule(old.cycleId===context.cycleId&&old.kind===event.kind&&old.refId===event.refId&&old.windowId===context.windowId&&(event.kind!=='state'||(old.tags?.emotion===event.tags?.emotion&&old.tags?.energy===event.tags?.energy)),"event id reused");return state}
   assertRule(context.expectedRevision===state.revision,"stale revision");
   const c=activeCycle(state);assertRule(c&&c.id===context.cycleId&&context.at>=c.entry.source.at,"closed or missing cycle");
   const tags=event.kind==="state"?tagsOf(event.tags):null;
@@ -68,7 +74,7 @@ function readNotes(state,config,query={},visibleWindowIds=[]){
   if(query.before)assertRule(time(query.before.at)&&id(query.before.id),"invalid cursor");
   const keyword=typeof query.keyword==="string"?query.keyword.trim().toLocaleLowerCase():"";
   const rows=state.notes.filter(n=>visible.has(n.source.windowId)&&(type==="all"||(type==="ordinary"?n.ordinary:type==="rest"?!!n.action:n.action===type))&&(!query.windowId||n.source.windowId===query.windowId)&&(query.from==null||n.source.at>=query.from)&&(query.to==null||n.source.at<=query.to)&&(!keyword||n.body.toLocaleLowerCase().includes(keyword))&&(!query.before||n.source.at<query.before.at||n.source.at===query.before.at&&n.id<query.before.id)).sort((a,b)=>b.source.at-a.source.at||(a.id===b.id?0:a.id>b.id?-1:1));
-  const items=rows.slice(0,limit).map(({fingerprint,...n})=>n),last=items.at(-1);
+  const items=rows.slice(0,limit).map(n=>({...n,source:{...n.source,messageIds:[...n.source.messageIds]}})),last=items.at(-1);
   return {items,next:rows.length>limit?{at:last.source.at,id:last.id}:null};
 }
 export {settings,eligible,initialNotes,writeNote,appendRestEvent,readNotes};

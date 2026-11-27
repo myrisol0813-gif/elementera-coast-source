@@ -41,8 +41,8 @@ export function prepareSvg(source,asset={},colors={},part='whole'){
     }else{
       const afternoon=['extra-rocker','extra-telescope','extra-lace-table','extra-teapot','extra-letter-shelf','extra-moon-cushion'].includes(asset.id);
       const secondary=key==='secondary';
-      const l=secondary?mix(val,'#f3d8ad',.38):mix(val,afternoon?'#fff3d5':'#fff1d2',.44+(afternoon?.01:0));
-      const d=secondary?mix(val,'#503d31',.28):mix(val,afternoon?'#67503e':'#514a3d',afternoon?.25:.32);
+      const l=secondary?mix(val,'#f3d8ad',.38):mix(val,afternoon?'#fff3d5':'#fff1d2',afternoon ? .45 : .44);
+      const d=secondary?mix(val,'#503d31',.28):mix(val,afternoon?'#67503e':'#514a3d',afternoon ? .25 : .32);
       for(const [from,to] of [[slot.base,val],[slot.light,l],[slot.dark,d]]){
         if(!hex(from))continue;const k=from.toLowerCase();if(changes.has(k)&&changes.get(k)!==to)throw Error('overlapping palette slots');changes.set(k,to);
       }
@@ -85,7 +85,7 @@ export function createRoomRenderer(container,art){
     const bg=await paint({file:r.environment});
     const nodes=await Promise.all(layers.map(async l=>{
       if(l.kind==='creature'){
-        const body=art.creatures[l.creatureId];if(!body)return null;
+        const body=Object.hasOwn(art.creatures,l.creatureId)?art.creatures[l.creatureId]:null;if(!body)return null;
         const [, , bw,bh]=body.viewBox.split(/\s+/).map(Number),h=55,w=h*bw/bh;
         return image(await paint(body),...pct(l.x-w/2,l.y-h/2,w,h),{label:l.role});
       }
