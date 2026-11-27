@@ -301,7 +301,7 @@ export function createDesk({ router, toast }) {
         <label class="desk-check"><input type="checkbox" name="enabled" ${entry.enabled !== false ? 'checked' : ''}><span>启用</span></label>
         <label class="desk-check"><input type="checkbox" name="use_regex" ${entry.use_regex ? 'checked' : ''}><span>关键词按正则处理</span></label>
         <label class="desk-check"><input type="checkbox" name="visitor_safe" ${entry.visitor_safe ? 'checked' : ''}><span>可安全用于访客房间</span></label>
-        <button class="primary-wide" type="submit">保存词条</button>${entry.id ? '<button class="danger-row desk-delete-word" type="button" data-action="desk:delete-worldbook">停用词条</button>' : ''}
+        <button class="primary-wide" type="submit">保存词条</button>${entry.id ? '<button class="danger-row desk-delete-word" type="button" data-action="desk:delete-worldbook">停用词条</button><button class="danger-row desk-delete-word" type="button" data-action="desk:purge-worldbook">永久删除词条</button>' : ''}
       </form>`,
     };
   }
@@ -337,6 +337,16 @@ export function createDesk({ router, toast }) {
       const result = q('#worldbookTestResult');
       if (result) result.innerHTML = data.matches.length ? data.matches.map((entry) => `<span>${escapeHtml(entry.title)}</span>`).join('') : '<small>没有命中词条。</small>';
       return;
+    }
+    if (name === 'purge-worldbook') {
+      const id = target.closest('form')?.dataset.id;
+      const entry = state.worldbook.find(item => item.id === id);
+      if (!entry || !confirm('永久删除词条「' + entry.title + '」？删除后不会参与匹配，已有聊天和备份不会改变。')) return;
+      const result = await requestJson(`${API.worldbook}/${encodeURIComponent(id)}/permanent`, { method: 'DELETE' });
+      if (result.deleted_id !== id) throw Error('未确认词条已删除，请刷新后检查。');
+      toast('词条已删除。');
+      await loadWorldbook();
+      return router.open('desk-worldbook', {}, { replace: true });
     }
     if (name === 'delete-worldbook') {
       const id = target.closest('form')?.dataset.id;

@@ -241,6 +241,7 @@ export function createMemoryActions({
     }
     if (name === 'entry-edit') return router.open('memory-entry-edit', { id: target.dataset.id, scope: runtime.libraryTab });
     if (name === 'entry-delete') {
+      if (!confirm('确定删除这条记忆或种子？此操作不能撤销，已有聊天和备份不会改变。')) return;
       await deleteEntryRequest(target.dataset.id);
       await fetchEntries(runtime.libraryTab);
       return router.refresh();
