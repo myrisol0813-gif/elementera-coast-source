@@ -219,7 +219,7 @@ internal class LocalDreamExecutor(
         val result=buildJsonObject{
             put("reason",reason);put("activities",JsonArray(activities));put("tool_calls",calls)
             put("total_tokens",if(known)JsonPrimitive(total)else JsonNull);put("reported_cost",if(costKnown)JsonPrimitive(cost)else JsonNull)
-            proposed?.let{put("proposed_extra_at",it)};put("accounting","provider_reported; input estimate is not a hard billing guarantee")
+            proposed?.let{put("proposed_extra_at",it)};put("accounting","chat provider reported; separate media cost not included; input estimate is not a hard billing guarantee")
         }
         val saved=withContext(NonCancellable){ledger.finish(c,status,result,proposed,clock())}
         cancelled?.let{throw it}
