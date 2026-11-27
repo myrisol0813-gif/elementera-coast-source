@@ -40,6 +40,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install build-only reference art compiler
+        run: |
+          npm install --prefix art-tools --no-audit --no-fund
+          ./art-tools/node_modules/.bin/playwright install --with-deps chromium
       - name: Verify source identity
         shell: bash
         run: |
