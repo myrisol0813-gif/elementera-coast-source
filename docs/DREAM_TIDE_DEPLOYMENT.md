@@ -87,9 +87,8 @@ voice/media costs are not included in reported chat-provider token costs.
 Android uses the separately configured on-device ElevenLabs credential and
 existing original-byte store. It requires both the ordinary local model-write
 permission and the window's autonomous voice permission, an active claim and
-reserved tool event. Normal build execution remains disabled. The current native
-session permits one voice attempt per activity; online is bounded by its tool
-budget. No real speech provider is called by the fixture tests. Neither path
+reserved tool event. Normal build execution remains disabled. Both the native and online executors permit one voice attempt per activity,
+within the general tool budget. No real speech provider is called by the fixture tests. Neither path
 should promise a hard monetary cap or refund on cancellation.
 
 ## Independent image — disabled until acceptance
@@ -109,3 +108,15 @@ activity receipts and voice/image originals is still an acceptance item; the
 image provider/model/cost metadata in the transient result is not a durable
 separate billing record. No actual provider request or scheduler activation
 is part of the fixture tests or this draft.
+
+## Independent media archive ownership
+
+Present autonomous voice/image originals now require a matching historical
+activity and tool reservation during cloud restore and native export/restore.
+A missing original is not itself an invalid historical receipt: selective
+exports and deliberate deletion can preserve history without a binary. An
+interrupted operation may have committed its original before settling its
+receipt. Favorites of independent images keep assistant authorship and no
+message ID. New fixture tests cover native ZIP restore and cloud staged
+restore of images, audio and activity history, with the restored arm disabled.
+Cross-workspace end-to-end fixture and actual-device acceptance remain separate.
