@@ -5,12 +5,7 @@ import org.w3c.dom.Document
 import org.w3c.dom.Element
 import org.xml.sax.InputSource
 import java.io.StringReader
-import java.io.StringWriter
 import javax.xml.parsers.DocumentBuilderFactory
-import javax.xml.transform.TransformerFactory
-import javax.xml.transform.OutputKeys
-import javax.xml.transform.dom.DOMSource
-import javax.xml.transform.stream.StreamResult
 import kotlin.math.roundToInt
 
 /** Geometry and color-slot rules are shared with room-renderer.mjs; no HTML or arbitrary imported SVG. */
@@ -147,11 +142,44 @@ internal object NativeSvgXml {
         add(root)
         for(i in 0 until root.childNodes.length)(root.childNodes.item(i) as? Element)?.let{addAll(elements(it))}
     }
+    /** Serialize the restricted DOM ourselves. Android's JAXP transformer is not
+     * the desktop JVM implementation; preserve namespace-qualified SVG attributes
+     * and raw text deterministically without optional transformer providers. */
     fun serialize(doc:Document):String {
-        val writer=StringWriter()
-        TransformerFactory.newInstance().newTransformer().apply{
-            setOutputProperty(OutputKeys.OMIT_XML_DECLARATION,"yes")
-        }.transform(DOMSource(doc),StreamResult(writer))
-        return writer.toString()
+        return buildString {
+            fun escaped(value:String,attribute:Boolean) {
+                for(ch in value)when(ch){
+                    '&'->append("&amp;")
+                    '<'->append("&lt;")
+                    '>'->append("&gt;")
+                    '"'->if(attribute)append("&quot;")else append(ch)
+                    '\r'->append("&#13;")
+                    '\n'->if(attribute)append("&#10;")else append(ch)
+                    '\t'->if(attribute)append("&#9;")else append(ch)
+                    else->append(ch)
+                }
+            }
+            fun write(node:org.w3c.dom.Node) {
+                when(node.nodeType){
+                    org.w3c.dom.Node.ELEMENT_NODE->{
+                        append('<');append(node.nodeName)
+                        for(i in 0 until node.attributes.length){
+                            val a=node.attributes.item(i)
+                            append(' ');append(a.nodeName);append("=\"");escaped(a.nodeValue,true);append('"')
+                        }
+                        if(node===doc.documentElement){
+                            val root=node as Element
+                            if(!root.hasAttribute("xmlns"))append(" xmlns=\"http://www.w3.org/2000/svg\"")
+                            if(!root.hasAttribute("xmlns:xlink"))append(" xmlns:xlink=\"http://www.w3.org/1999/xlink\"")
+                        }
+                        append('>')
+                        for(i in 0 until node.childNodes.length)write(node.childNodes.item(i))
+                        append("</");append(node.nodeName);append('>')
+                    }
+                    org.w3c.dom.Node.TEXT_NODE,org.w3c.dom.Node.CDATA_SECTION_NODE->escaped(node.nodeValue,false)
+                }
+            }
+            write(doc.documentElement)
+        }.also{require(it.length<=1_000_000){"Prepared SVG exceeds byte budget"}}
     }
 }
