@@ -24,6 +24,11 @@ internal class NativeRestSprites(private val assets: AssetManager) {
             require(tracks.size<=100&&tracks.all{it.targetId.matches(Regex("^@[0-9]+$"))&&it.attribute in setOf("transform","opacity","d")&&it.durationMs.isFinite()&&it.durationMs>0&&it.frames.size in 1..128})
         }
     }
+    private val roomTracks = index["roomMotion"]?.jsonObject.orEmpty().mapValues { (_,v) ->
+        Json.decodeFromJsonElement<List<NativeMotionTrack>>(v).also { tracks ->
+            require(tracks.size<=100&&tracks.all{it.attribute in setOf("transform","opacity","d")&&it.durationMs>0&&it.durationMs.isFinite()&&it.frames.size in 1..128})
+        }
+    }
     private val cache = object : LruCache<String,Bitmap>(48 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
     }
@@ -95,6 +100,39 @@ internal class NativeRestSprites(private val assets: AssetManager) {
             NativeSvgRaster.render(svg,kotlin.math.ceil(a.width*2).toInt().coerceIn(1,1536),kotlin.math.ceil(a.height*2).toInt().coerceIn(1,1536))
         }.getOrNull()?.also{cache.put(key,it)}
     }
+
+    fun roomMotionKeys(layers:List<NativeSceneLayer>):List<String> = layers.mapNotNull { layer ->
+        when(layer){
+            is NativeSceneLayer.Environment -> environmentKey(layer.path).takeIf{it in roomTracks}
+            is NativeSceneLayer.Furniture -> layer.asset?.let{a->
+                if(furnitureKey(a,layer.part,emptyMap()) in roomTracks)furnitureKey(a,layer.part,layer.item.colors)else null
+            }
+            else -> null
+        }
+    }.distinct()
+    fun roomMotionFrame(key:String,elapsedMs:Long):Bitmap?=runCatching {
+        val source:String
+        val tracks:List<NativeMotionTrack>
+        val width:Double
+        val height:Double
+        if(key.startsWith("e|")){
+            val path=key.substringAfter('|')
+            tracks=roomTracks[key]?:return null
+            val room=catalogue.rooms.values.firstOrNull{it.environment==path||it.overlay==path}?:return null
+            source=art.svg(path);width=room.width;height=room.height
+        }else{
+            val p=key.split('|')
+            if(p.size!=4||p[0]!="f")return null
+            val a=catalogue.assets[p[1]]?:return null
+            val part=NativePaintPart.entries.firstOrNull{it.name.lowercase()==p[2]}?:return null
+            tracks=roomTracks[furnitureKey(a,part,emptyMap())]?:return null
+            val colors=if(p[3].isEmpty())emptyMap()else customFurniture(key)?.colors?:return null
+            source=furnitureSvg.prepare(a,colors,part);width=a.width;height=a.height
+        }
+        val prepared=NativeSvgXml.motion(source,tracks,elapsedMs)
+        val factor=minOf(2.0,640.0/maxOf(width,height))
+        NativeSvgRaster.render(prepared,kotlin.math.ceil(width*factor).toInt().coerceAtLeast(1),kotlin.math.ceil(height*factor).toInt().coerceAtLeast(1))
+    }.getOrNull()
 
     /** Resolve explicitly; custom colors and accessories must not silently masquerade as complete. */
     fun furnitureKey(asset: NativeFurnitureAsset, part: NativePaintPart, colors: Map<String,String>): String =
