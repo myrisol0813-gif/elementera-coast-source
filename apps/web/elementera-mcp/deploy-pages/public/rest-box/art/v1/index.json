@@ -52,5 +52,6 @@
     "handheldProps": 5
   },
   "status": "isolated Web room and creature runtime; production navigation, persistence and Native pending",
-  "appearance": "creatures/appearance.json"
+  "appearance": "creatures/appearance.json",
+  "propMounts": "props/mounts.json"
 }

@@ -1,0 +1,215 @@
+{
+  "version": 1,
+  "props": [
+    {
+      "id": "book",
+      "file": "props/book.svg",
+      "grip": [
+        0,
+        27
+      ],
+      "viewBox": "-50 -52 100 100"
+    },
+    {
+      "id": "flower",
+      "file": "props/flower.svg",
+      "grip": [
+        -2,
+        34
+      ],
+      "viewBox": "-50 -52 100 100"
+    },
+    {
+      "id": "cookie",
+      "file": "props/cookie.svg",
+      "grip": [
+        0,
+        26
+      ],
+      "viewBox": "-50 -52 100 100"
+    },
+    {
+      "id": "tea",
+      "file": "props/tea.svg",
+      "grip": [
+        34,
+        1
+      ],
+      "viewBox": "-50 -52 100 100"
+    },
+    {
+      "id": "letter",
+      "file": "props/letter.svg",
+      "grip": [
+        0,
+        20
+      ],
+      "viewBox": "-50 -52 100 100"
+    }
+  ],
+  "mounts": {
+    "wolf": {
+      "kind": "paw",
+      "normal": [
+        187,
+        176
+      ],
+      "raised": [
+        231,
+        131
+      ],
+      "scale": 0.48
+    },
+    "cat": {
+      "kind": "paw",
+      "normal": [
+        187,
+        176
+      ],
+      "raised": [
+        231,
+        131
+      ],
+      "scale": 0.48
+    },
+    "fox": {
+      "kind": "paw",
+      "normal": [
+        187,
+        176
+      ],
+      "raised": [
+        231,
+        131
+      ],
+      "scale": 0.48
+    },
+    "rabbit": {
+      "kind": "paw",
+      "normal": [
+        187,
+        176
+      ],
+      "raised": [
+        231,
+        131
+      ],
+      "scale": 0.48
+    },
+    "bear": {
+      "kind": "paw",
+      "normal": [
+        187,
+        176
+      ],
+      "raised": [
+        231,
+        131
+      ],
+      "scale": 0.48
+    },
+    "deer": {
+      "kind": "paw",
+      "normal": [
+        187,
+        176
+      ],
+      "raised": [
+        231,
+        131
+      ],
+      "scale": 0.48
+    },
+    "lion": {
+      "kind": "paw",
+      "normal": [
+        187,
+        176
+      ],
+      "raised": [
+        231,
+        131
+      ],
+      "scale": 0.48
+    },
+    "tiger": {
+      "kind": "paw",
+      "normal": [
+        187,
+        176
+      ],
+      "raised": [
+        231,
+        131
+      ],
+      "scale": 0.48
+    },
+    "bird": null,
+    "snake": {
+      "kind": "tail",
+      "scale": 0.48
+    },
+    "fish": null,
+    "puppy": {
+      "kind": "paw",
+      "normal": [
+        187,
+        176
+      ],
+      "raised": [
+        231,
+        131
+      ],
+      "scale": 0.48
+    },
+    "dog": {
+      "kind": "paw",
+      "normal": [
+        187,
+        176
+      ],
+      "raised": [
+        231,
+        131
+      ],
+      "scale": 0.48
+    },
+    "stoatA": {
+      "kind": "paw",
+      "normal": [
+        270,
+        374
+      ],
+      "raised": [
+        317,
+        251
+      ],
+      "scale": 1.35
+    },
+    "stoat": {
+      "kind": "paw",
+      "normal": [
+        181,
+        163
+      ],
+      "raised": [
+        231,
+        131
+      ],
+      "scale": 0.38
+    },
+    "redPanda": {
+      "kind": "paw",
+      "normal": [
+        187,
+        176
+      ],
+      "raised": [
+        231,
+        131
+      ],
+      "scale": 0.48
+    }
+  },
+  "notes": "Paw coordinates from canonical SVG. Bird/fish have no approved grip; sleep hides props. Stoat B raised grip uses paw-local coordinates. All scale values provisional for visual review."
+}

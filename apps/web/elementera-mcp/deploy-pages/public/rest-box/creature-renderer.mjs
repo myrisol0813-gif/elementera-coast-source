@@ -41,7 +41,22 @@ function mountNeck(doc,body,def,appearance,action,accessories){
 function animate(doc,node,attr,values,duration){
   if(!node)return;const el=doc.createElementNS(NS,'animate');for(const [k,v] of Object.entries({attributeName:attr,values:values.join(';'),dur:duration+'s',repeatCount:'indefinite',keyTimes:'0;0.25;0.5;0.75;1'}))el.setAttribute(k,v);node.append(el);
 }
-export function creatureSvg(source,body,defs,accessories,input,action='idle',{reducedMotion=false}={}){
+function mountProp(doc,body,action,prop,mount,source){
+  if(!prop||!mount||action==='sleep')return;
+  const $=id=>doc.getElementById(id);
+  let parent,x=0,y=0;
+  if(mount.kind==='tail'){parent=$('giftAnchor')}
+  else if(action==='cheer'){parent=$('pawR');[x,y]=mount.raised}
+  else{parent=$('hands');[x,y]=mount.normal}
+  if(!parent)return;
+  const [gx,gy]=prop.grip,sz=mount.scale;
+  const g=group(doc,parent,null,{transform:'translate('+x+' '+y+') scale('+sz+') translate('+(-gx)+' '+(-gy)+')'});
+  const parsed=new DOMParser().parseFromString(source,'image/svg+xml');
+  if(parsed.documentElement.localName!=='svg'||parsed.querySelector('parsererror,script,foreignObject'))throw Error('invalid bundled prop');
+  for(const n of [...parsed.documentElement.querySelectorAll('*')])for(const a of [...n.attributes])if(/^on/i.test(a.name)||((a.localName==='href'||a.localName==='src')&&!a.value.startsWith('#')))throw Error('invalid prop reference');
+  for(const n of [...parsed.documentElement.children])g.append(doc.importNode(n,true));
+}
+export function creatureSvg(source,body,defs,accessories,input,action='idle',{reducedMotion=false,prop=null,mount=null,propSource=null}={}){
   if(!ACTIONS.includes(action))throw Error('unsupported action');
   const appearance=normalizeAppearance(defs,input),def=defs[appearance.bodyId];
   if(body.id!==appearance.bodyId)throw Error('body mismatch');
@@ -59,13 +74,14 @@ export function creatureSvg(source,body,defs,accessories,input,action='idle',{re
   if(cfg.kind==='snake'){
     if(!appearance.horn&&$('face')?.firstElementChild)$('face').firstElementChild.setAttribute('display','none');
     if($('giftAnchor'))$('giftAnchor').setAttribute('display',action==='sleep'?'none':'inline');
-    const f=tailFrames(action);if(f){const first=f.frames[0];$('bodyShape')?.setAttribute('d',first.body);$('bellyShape')?.setAttribute('d',first.belly);$('giftAnchor')?.setAttribute('transform','translate('+first.anchor.join(' ')+')');if(!reducedMotion&&action!=='sit'){animate(doc,$('bodyShape'),'d',f.frames.map(x=>x.body),f.duration);animate(doc,$('bellyShape'),'d',f.frames.map(x=>x.belly),f.duration)}}
+    const f=tailFrames(action);if(f){const first=f.frames[0];$('bodyShape')?.setAttribute('d',first.body);$('bellyShape')?.setAttribute('d',first.belly);$('giftAnchor')?.setAttribute('transform','translate('+first.anchor.join(' ')+')');if(!reducedMotion&&action!=='sit'){animate(doc,$('bodyShape'),'d',f.frames.map(x=>x.body),f.duration);animate(doc,$('bellyShape'),'d',f.frames.map(x=>x.belly),f.duration);animate(doc,$('giftAnchor'),'transform',f.frames.map(x=>'translate('+x.anchor.join(' ')+')'),f.duration)}}
   }
   if(!appearance.hat&&$('hat'))$('hat').style.setProperty('display','none','important');
   if(appearance.glasses!=='none'){
     const parent=$(cfg.head);if(parent){const g=group(doc,parent,$('hat'),{transform:'translate('+cfg.x+' '+cfg.y+') scale('+(cfg.gs||1)+')',color:appearance.glassesColor,stroke:appearance.glassesColor,'stroke-width':2.7,'stroke-linecap':'round',fill:'none'});appendMarkup(doc,g,accessories.glasses[appearance.glasses])}
   }
   mountNeck(doc,body,def,appearance,action,accessories);
+  if(prop&&mount&&propSource)mountProp(doc,body,action,prop,mount,propSource);
   if(reducedMotion){const style=doc.createElementNS(NS,'style');style.textContent='*{animation:none!important;transition:none!important}';svg.append(style)}
   return new XMLSerializer().serializeToString(svg);
 }
@@ -73,8 +89,9 @@ export function createCreatureRenderer(art){
   const cache=new Map();
   return async (input,action='idle',opts={})=>{
     const body=art.creatures[input.bodyId];if(!body)throw Error('unknown body');
-    const key=JSON.stringify([input,action,!!opts.reducedMotion]);
-    if(!cache.has(key)){const task=art.read(body.file).then(s=>uri(creatureSvg(s,body,art.appearance,art.accessories,input,action,opts)));cache.set(key,task);task.catch(()=>{if(cache.get(key)===task)cache.delete(key)});if(cache.size>96)cache.delete(cache.keys().next().value)}
+    const prop=art.props?.props.find(p=>p.id===opts.prop)??null,mount=art.props?.mounts[input.bodyId]??null;
+    const key=JSON.stringify([input,action,!!opts.reducedMotion,prop?.id??null]);
+    if(!cache.has(key)){const task=Promise.all([art.read(body.file),prop&&mount?art.read(prop.file):null]).then(([s,propSource])=>uri(creatureSvg(s,body,art.appearance,art.accessories,input,action,{...opts,prop,mount,propSource})));cache.set(key,task);task.catch(()=>{if(cache.get(key)===task)cache.delete(key)});if(cache.size>96)cache.delete(cache.keys().next().value)}
     return cache.get(key)
   }
 }

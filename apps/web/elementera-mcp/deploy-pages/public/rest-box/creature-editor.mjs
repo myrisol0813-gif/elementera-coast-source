@@ -8,7 +8,7 @@ const slots={fur:'毛色',body:'身体',inner:'耳内',ear:'耳朵',tail:'尾巴
 const node=(tag,cls)=>{const e=document.createElement(tag);if(cls)e.className=cls;return e};
 function button(text,fn,active=false){const e=node('button');e.type='button';e.textContent=text;e.setAttribute('aria-pressed',String(active));e.onclick=fn;return e}
 export function mountCreatureEditor(root,art,getState,setState){
-  let role='model',tab='body',action='idle',epoch=0;const paint=createCreatureRenderer(art);
+  let role='model',tab='body',action='idle',prop=null,epoch=0;const paint=createCreatureRenderer(art);
   root.classList.add('creature-editor-box');
   const roles=node('div','row'),preview=node('img','creature-preview'),motions=node('div','row'),tabs=node('div','creature-panes'),content=node('div','creature-scroll'),status=node('p','muted');
   preview.alt='动物试穿';root.replaceChildren(roles,preview,motions,tabs,content,status);
@@ -18,8 +18,8 @@ export function mountCreatureEditor(root,art,getState,setState){
     const state=getState(),a=state[role],d=art.appearance[a.bodyId],token=++epoch;
     const toggle=node('label');const check=node('input');check.type='checkbox';check.checked=state.humanEnabled;check.onchange=()=>{setState({...getState(),humanEnabled:check.checked});refresh()};toggle.append(check,document.createTextNode('显示我的动物'));
     roles.replaceChildren(button('模型形象',()=>{role='model';refresh()},role==='model'),button('我的形象',()=>{role='human';refresh()},role==='human'),toggle);
-    paint(a,action,{reducedMotion:globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches??false}).then(u=>{if(token===epoch)preview.src=u}).catch(e=>{if(token===epoch)status.textContent=e.message});
-    motions.replaceChildren(...ACTIONS.map(m=>button(actions[m],()=>{action=m;refresh()},m===action)));
+    paint(a,action,{prop,reducedMotion:globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches??false}).then(u=>{if(token===epoch)preview.src=u}).catch(e=>{if(token===epoch)status.textContent=e.message});
+    motions.replaceChildren(...ACTIONS.map(m=>button(actions[m],()=>{action=m;refresh()},m===action)));const p=node('select');p.setAttribute('aria-label','手持道具试穿');for(const [id,label] of [['','不拿道具'],['book','书'],['flower','花'],['cookie','饼干'],['tea','茶'],['letter','信']]){const option=node('option');option.value=id;option.textContent=label;p.append(option)}p.disabled=!art.props.mounts[a.bodyId]||action==='sleep';p.value=p.disabled?'':prop??'';p.onchange=()=>{prop=p.value||null;refresh()};motions.append(p);
     tabs.replaceChildren(...[['body','身体'],['colors','配色'],['accessories','配饰']].map(([id,title])=>button(title,()=>{tab=id;refresh()},tab===id)));
     content.replaceChildren();
     if(tab==='body'){const grid=node('div','catalog');for(const b of Object.values(art.creatures)){const item=button(b.name,()=>apply({bodyId:b.id}),b.id===a.bodyId),img=node('img');img.src=new URL('art/v1/'+b.file,import.meta.url).href;img.alt='';img.loading='lazy';item.prepend(img);grid.append(item)}content.append(grid)}
