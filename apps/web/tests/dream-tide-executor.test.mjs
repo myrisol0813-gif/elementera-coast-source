@@ -41,6 +41,8 @@ test('model reads scoped originals, writes optional note, human reply never wake
     return response();
   };
   const out=await executeDreamTide(env,cid,{...opts,invoke});assert.equal(out.status,'completed');assert.equal(out.extraScheduled,true);assert.equal(out.tool_calls,3);assert.equal(out.total_tokens,360);assert.equal(n,3);
+  const activity=(await readDreamActivity(db,cid))[0];assert.equal(activity.result.extra_scheduled,true);assert.deepEqual(activity.tools.map(x=>[x.tool_name,x.status]),[['dream_read_history','completed'],['dream_write_note','completed'],['dream_schedule_extra','completed']]);
+  assert.ok(!JSON.stringify(activity.tools).includes('window-original'));assert.ok(!JSON.stringify(activity.tools).includes('一张小笺'));
   const notes=await readDreamNotes(db,cid);assert.equal(notes[0].body,'一张小笺');
   assert.equal(await replyDreamNote(db,other.id,out.claimId,'wrong','wrong',due+1),false);
   assert.equal(await replyDreamNote(db,cid,out.claimId,'reply','回笺',due+1),true);
