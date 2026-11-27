@@ -91,3 +91,21 @@ reserved tool event. Normal build execution remains disabled. The current native
 session permits one voice attempt per activity; online is bounded by its tool
 budget. No real speech provider is called by the fixture tests. Neither path
 should promise a hard monetary cap or refund on cancellation.
+
+## Independent image — disabled until acceptance
+
+The image permission (execution.allowImage) is independent of voice. Web needs
+the media deployment gate and configured, selected OpenRouter image model;
+native needs the existing local model-write switch and configured on-device
+OpenRouter image model. Both snapshot the selection, validate the catalog before
+generation, reserve the activity tool, refuse saves after revocation and
+attempt at most one image per activity. Original bytes are in the existing
+attachment store, with att_dream_<claim>_<step>_<index> IDs, null turn_id,
+activity tool receipt and no artificial human/assistant turn. Readback checks
+original bytes but does not send image pixels to the autonomous chat model.
+The model must not claim to have seen them. Archive attachment validation rejects
+binding these IDs to chat history. Full cross-end archive roundtrip including
+activity receipts and voice/image originals is still an acceptance item; the
+image provider/model/cost metadata in the transient result is not a durable
+separate billing record. No actual provider request or scheduler activation
+is part of the fixture tests or this draft.
