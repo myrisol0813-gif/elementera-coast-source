@@ -135,6 +135,12 @@ internal class NativeStudioStore(private val context: Context) {
     fun save(raw: String) {
         require(prefs.edit().putString("state",raw).putBoolean("legacyChecked",true).commit()){"房间保存未确认"}
     }
+    fun replaceFromArchive(value:String) {
+        val editor=prefs.edit().putString("state",value).putBoolean("legacyChecked",true)
+        // Keep the previous native save separately; never overwrite the recovered WebView original.
+        raw()?.let{editor.putString("archivePrevious",it)}
+        require(editor.commit()){"归档造物间保存未确认"}
+    }
     fun preserve(raw: String) {
         require(prefs.edit().putString("recovery",raw).commit()){"旧房间备份保存未确认"}
     }
