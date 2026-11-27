@@ -74,3 +74,35 @@ test('missed extra appointment is not replayed and cannot block future appointme
   const extra=await claimDreamTide(db,cid,{now:tomorrow+100,currentModelId:model,busy:false});
   assert.equal(extra.key,'extra:new');
 });
+
+test('ordinary, grouped and dream admissions exclude each other atomically',async()=>{
+  const {db,cid}=await fixture();
+  const {writeConversationState}=await import('../functions/chat-store.js');
+  const {acquireReplyRun,settleReplyRun}=await import('../functions/chat-reply-run.js');
+  const {acquireSingleChatRun,releaseSingleChatRun,heartbeatSingleChatRun,recoverSingleChatRuns}=await import('../functions/chat-single-run.js');
+  const identity={conversationId:cid,turnId:'turn',userVariantId:'user',sequenceId:'group'};
+  await writeConversationState(db,cid,{context_settings:{reply_sequence_enabled:true},turns:[{id:'turn',user:{variants:[{id:'user',content:'hello'}]}}]});
+  const budget={maxMessages:2,toolBudget:0,tokenBudget:200};
+  const claim=await acquireSingleChatRun(db,cid,due);
+  assert.ok(claim);
+  assert.equal(await acquireSingleChatRun(db,cid,due),null);
+  assert.equal(await acquireReplyRun(db,identity,budget),false);
+  assert.equal(await claimDreamTide(db,cid,{now:due,currentModelId:model,busy:false}),null);
+  assert.equal(await heartbeatSingleChatRun(db,claim,due+100),true);
+  assert.equal(await recoverSingleChatRuns(db,due+150,100),0);
+  assert.equal(await releaseSingleChatRun(db,claim),true);
+  assert.equal(await acquireReplyRun(db,identity,budget),true);
+  assert.equal(await acquireSingleChatRun(db,cid,due),null);
+  assert.equal(await claimDreamTide(db,cid,{now:due,currentModelId:model,busy:false}),null);
+  await settleReplyRun(db,identity,'cancelled');
+  const dream=await claimDreamTide(db,cid,{now:due,currentModelId:model,busy:false});
+  assert.ok(dream);
+  assert.equal(await acquireSingleChatRun(db,cid,due),null);
+  assert.equal(await acquireReplyRun(db,{...identity,sequenceId:'other'},budget),false);
+  assert.equal(await settleDreamTide(db,dream,'completed',due+1),true);
+  const next=await acquireSingleChatRun(db,cid,due+2);
+  assert.ok(next);
+  assert.equal(await releaseSingleChatRun(db,claim),false);
+  assert.equal(await recoverSingleChatRuns(db,due+200,100),1);
+  assert.equal(await heartbeatSingleChatRun(db,next,due+201),false);
+});
