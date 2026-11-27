@@ -5,7 +5,8 @@ import {runDreamTideTick} from '../functions/dream-tide-scheduler.js';
 // explicit operator actions; do not deploy this file from the Pages workflow.
 export default {
   async scheduled(event,env,ctx){
-    ctx.waitUntil(runDreamTideTick(env,{now:Date.now()}).then(result=>{
+    // A live clock is required for heartbeats, receipts and rechecking later windows.
+    ctx.waitUntil(runDreamTideTick(env).then(result=>{
       console.log('dream-tide tick',JSON.stringify(result));
     }));
   },
