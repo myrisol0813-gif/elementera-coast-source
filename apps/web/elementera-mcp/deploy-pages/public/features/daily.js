@@ -1,4 +1,3 @@
-import '../rest-box/room-lab.mjs';
 import { escapeHtml } from '../core/dom.js';
 import { icon } from '../core/icons.js';
 import { createDailyClient } from './daily-client.js';
@@ -159,7 +158,7 @@ export function createDaily({ storage, router, toast, chat }) {
       ['vault', '文件库', '媒体归档与收藏', 'book'],
       ['calendar', '日历', '公历日程与纪念日', 'calendar'],
       ['library', '书房', '翻书、划线与批注', 'book'],
-      ['pets', '休憩箱', '造物间 · 布置与捏人', 'heart'],
+      ['pets', '休憩箱', '还在准备休憩箱', 'heart'],
       ['widgets', '未来小组件', '以后再慢慢长出来', 'plus'],
     ];
     return {
@@ -171,10 +170,6 @@ export function createDaily({ storage, router, toast, chat }) {
   }
 
   function placeholderView({ title = '未上线' } = {}) {
-    if (title === '宠物系统') return {
-      title: '休憩箱', subtitle: '造物间', className: 'daily-panel',
-      body: '<coast-room-studio></coast-room-studio>',
-    };
     return {
       title,
       subtitle: '小组件',

@@ -46,6 +46,8 @@ internal fun SeedLibraryScreen(
     var filterValue by remember { mutableStateOf("") }
     var editing by remember { mutableStateOf<MemoryEntry?>(null) }
     var creating by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf<MemoryEntry?>(null) }
+    var deletingBusy by remember { mutableStateOf(false) }
     var expandedId by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(createRequested) {
         if (createRequested) {
@@ -125,19 +127,37 @@ internal fun SeedLibraryScreen(
                             Spacer(Modifier.height(10.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                                 Text("编辑", modifier = Modifier.clickable { editing = seed }, color = MaterialTheme.colorScheme.primary)
-                                Text("删除", modifier = Modifier.clickable {
-                                    scope.launch {
-                                        runCatching { repository.deleteEntry(seed.id) }
-                                            .onSuccess { onSnackbar("种子已删除") }
-                                            .onFailure { onSnackbar(it.message ?: "删除种子失败") }
-                                    }
-                                }, color = MaterialTheme.colorScheme.primary)
+                                TextButton(enabled = !deletingBusy, onClick = { deleting = seed }) { Text("删除", color = MaterialTheme.colorScheme.error) }
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    deleting?.let { item ->
+        AlertDialog(
+            onDismissRequest = { if (!deletingBusy) deleting = null },
+            title = { Text("删除种子？") },
+            text = { Text("确定删除「${item.title}」？此操作不能撤销，已有聊天和备份不会改变。") },
+            confirmButton = {
+                TextButton(enabled = !deletingBusy, onClick = {
+                    deletingBusy = true
+                    scope.launch {
+                        try {
+                            repository.deleteEntry(item.id)
+                            deleting = null
+                            
+                            onSnackbar("种子已删除")
+                        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                        catch (e: Exception) { onSnackbar(e.message ?: "删除种子失败") }
+                        finally { deletingBusy = false }
+                    }
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(enabled = !deletingBusy, onClick = { deleting = null }) { Text("取消") } }
+        )
     }
 
     if (creating) SeedEditor(null, { creating = false }) { draft ->

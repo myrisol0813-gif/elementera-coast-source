@@ -1,4 +1,3 @@
-import {captureStudio} from '../rest-box/studio-archive.mjs';
 import { collectArchiveV2 } from './archive-v2-collect.js';
 
 // Export directly to a user-selected file when supported. Mobile browsers use
@@ -21,8 +20,7 @@ async function writeArchive({applicationId,filename,onProgress,deviceBasic}){
       handle=await root.getFileHandle(tempName,{create:true});
     }
     writable=await handle.createWritable();
-    const restStudio=await captureStudio();
-    const manifest=await collectArchiveV2({applicationId,onProgress,deviceBasic,restStudio,sink:{
+    const manifest=await collectArchiveV2({applicationId,onProgress,deviceBasic,sink:{
       write:b=>writable.write(b),
       close:async()=>{await writable.close();finished=true;},
       abort:async()=>{if(!finished)await writable.abort();}

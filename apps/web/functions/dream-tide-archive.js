@@ -62,7 +62,7 @@ export function validateDreamArchive(v,cid){
   }
   for(const r of v.steps){
     const key=r.claim_id+':'+r.step_index;
-    check(exact(r,specs.steps[1].split(','))&&runs.has(r.claim_id)&&Number.isInteger(r.step_index)&&r.step_index>=0&&r.step_index<=128&&!steps.has(key)&&receiptStates.includes(r.status)&&jsonText(r.receipt_json)&&stamp(r.started_at)&&(r.finished_at===null||stamp(r.finished_at)),'invalid historical model receipt');
+    check(exact(r,specs.steps[1].split(','))&&runs.has(r.claim_id)&&Number.isInteger(r.step_index)&&r.step_index>=0&&r.step_index<=2147483646&&!steps.has(key)&&receiptStates.includes(r.status)&&jsonText(r.receipt_json)&&stamp(r.started_at)&&(r.finished_at===null||stamp(r.finished_at)),'invalid historical model receipt');
     steps.add(key);
   }
   for(const r of v.tools){

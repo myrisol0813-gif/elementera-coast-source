@@ -26,6 +26,7 @@ import {
   WorldbookError,
   createWorldbookEntry,
   deleteWorldbookEntry,
+  purgeWorldbookEntry,
   listWorldbookEntries,
   matchWorldbook,
   updateWorldbookEntry,
@@ -139,6 +140,11 @@ export async function routeWorkbenchApi(request, env, session = null) {
           limit: value.limit || 6,
         }),
       });
+    }
+    const purgeMatch = url.pathname.match(/^\/api\/worldbook\/([^/]+)\/permanent$/u);
+    if (purgeMatch) {
+      if (request.method !== 'DELETE') return methodNotAllowed('DELETE');
+      return json({ ok: true, deleted_id: await purgeWorldbookEntry(db, decoded(purgeMatch[1])) });
     }
     const worldbookMatch = url.pathname.match(/^\/api\/worldbook\/([^/]+)$/u);
     if (worldbookMatch) {

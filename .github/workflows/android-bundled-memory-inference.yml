@@ -5,12 +5,6 @@ on:
     paths:
       - '.github/workflows/android-bundled-memory-inference.yml'
       - '**/core/local/**'
-      - '**/core/restbox/**'
-      - '**/feature/daily/NativeRest*.kt'
-      - '**/feature/daily/PetScreen.kt'
-      - '**/art-tools/**'
-      - '**/native-art/**'
-      - '**/rest-box/art/**'
       - '**/app/build.gradle.kts'
       - '**/coast-embedding/**'
   workflow_dispatch:
@@ -33,31 +27,6 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: Install build-only reference art compiler
-        working-directory: apps/android
-        run: |
-          npm install --prefix art-tools --no-audit --no-fund
-          # Hosted Ubuntu already supplies Chromium runtime libraries. Avoid refreshing
-          # unrelated third-party apt feeds unless the actual browser smoke test fails.
-          ./art-tools/node_modules/.bin/playwright install chromium
-          smoke='const {chromium}=require("./art-tools/node_modules/playwright"); (async()=>{const b=await chromium.launch({headless:true});try{const p=await b.newPage();await p.setContent("<p>coast</p>");if(await p.locator("p").textContent()!=="coast")throw Error("browser smoke test");}finally{await b.close()}})().catch(e=>{console.error(e);process.exit(1)})'
-          if ! node -e "$smoke"; then
-            ./art-tools/node_modules/.bin/playwright install-deps chromium
-            node -e "$smoke"
-          fi
-      - name: Prepare native SVG toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
-          cargo install cargo-ndk --version 3.5.4 --locked
-          ndk="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-}}"
-          if [[ ! -d "$ndk" ]]; then ndk="$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"; fi
-          test -d "$ndk/toolchains/llvm"
-          echo "ANDROID_NDK_HOME=$ndk" >> "$GITHUB_ENV"
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -79,9 +48,6 @@ jobs:
               for name, digest in expected.items():
                   assert hashlib.sha256(z.read(name)).hexdigest() == digest, name
               assert "assets/coast-embedding/NOTICE.txt" in z.namelist()
-              assert "assets/rest-box/native/v1/index.json" in z.namelist()
-              assert {n.split('/')[1] for n in z.namelist() if n.endswith('/libcoast_native_art.so')} >= {"arm64-v8a", "armeabi-v7a", "x86_64", "x86"}
-              assert not any(n.startswith("assets/rest-box/") and n.endswith((".html", ".mjs")) for n in z.namelist())
               native = [n for n in z.infolist() if n.filename.startswith("lib/") and "onnxruntime" in n.filename]
               assert native
               assert {n.filename.split("/")[1] for n in native} >= {"arm64-v8a", "armeabi-v7a", "x86_64", "x86"}
@@ -106,8 +72,4 @@ jobs:
             result="$(adb shell am instrument -w -r -e class com.elementeracoast.app.core.local.BundledEmbeddingDeviceTest com.elementeracoast.source.test/androidx.test.runner.AndroidJUnitRunner)";
             printf '%s\n' "$result";
             printf '%s\n' "$result" | grep -F 'OK (2 tests)';
-            if printf '%s\n' "$result" | grep -E 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process crashed'; then exit 1; fi;
-            scene="$(adb shell am instrument -w -r -e class com.elementeracoast.app.feature.daily.NativeRestSceneDeviceTest com.elementeracoast.source.test/androidx.test.runner.AndroidJUnitRunner)";
-            printf '%s\n' "$scene";
-            printf '%s\n' "$scene" | grep -F 'OK (4 tests)';
-            if printf '%s\n' "$scene" | grep -E 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process crashed'; then exit 1; fi
+            if printf '%s\n' "$result" | grep -E 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process crashed'; then exit 1; fi

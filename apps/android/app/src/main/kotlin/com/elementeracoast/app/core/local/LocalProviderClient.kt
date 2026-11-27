@@ -180,7 +180,7 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
     /** A single autonomous request, no synthetic user turn or implicit retries.
      * The caller persists its step claim before invoking this method. */
     internal suspend fun dreamRequest(p:LocalProviderConfig,model:String,messages:JsonArray,tools:JsonArray,output:Int):JsonObject {
-        require(output in 1..65536&&model in p.models)
+        require(output>0&&model in p.models)
         val sent=java.util.concurrent.atomic.AtomicBoolean(false)
         val oneShot=http.newBuilder().retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false)
             .addNetworkInterceptor{chain->

@@ -76,6 +76,17 @@ class LocalCoastTransportTest {
         assertTrue(over.receipt.contextBudget.exceedsComfortCeiling)
         assertEquals(longText,over.messages.last().content)
     }
+    @Test fun permanentWorldbookDeletionIsDistinctFromDisabling(){
+        val store=MemoryLocalPersistence()
+        val a=client(store)
+        fun create(title:String)=call(a,"/api/worldbook","POST",buildJsonObject{put("title",title);put("content","test")}.toString()).second.getValue("entry").jsonObject.getValue("id").jsonPrimitive.content
+        val id=create("remove");val keep=create("keep")
+        assertEquals(200,call(a,"/api/worldbook/"+id,"DELETE").first)
+        assertFalse(LocalKnowledgeStore(store).entries().single{it.id==id}.enabled)
+        val result=call(a,"/api/worldbook/"+id+"/permanent","DELETE")
+        assertEquals(200,result.first);assertEquals(id,result.second.getValue("deleted_id").jsonPrimitive.content)
+        assertEquals(listOf(keep),LocalKnowledgeStore(store).entries().map{it.id})
+    }
     @Test fun dailyRecordsSurviveReopen() {
         val local = MemoryLocalPersistence()
         val a = client(local)

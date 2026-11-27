@@ -142,6 +142,14 @@ export async function deleteWorldbookEntry(db, id) {
   return entryFromRow(await requireRow(db, row.id));
 }
 
+// Permanent deletion is a separate owner-only HTTP operation; legacy DELETE still disables.
+export async function purgeWorldbookEntry(db, id) {
+  await ensureWorldbookSchema(db);
+  const row = await requireRow(db, id);
+  await run(db, 'DELETE FROM coast_worldbook_entries WHERE id = ?', [row.id]);
+  return row.id;
+}
+
 function inScope(entry, surface, allowedScopes) {
   if (surface === 'mailbox_visitor') {
     return entry.visitor_safe && ['visitor', 'both'].includes(entry.scope);

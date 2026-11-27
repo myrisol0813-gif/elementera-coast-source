@@ -47,6 +47,8 @@ internal fun MemoryLibraryScreen(
     var filterValue by remember { mutableStateOf("") }
     var editing by remember { mutableStateOf<MemoryEntry?>(null) }
     var creating by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf<MemoryEntry?>(null) }
+    var deletingBusy by remember { mutableStateOf(false) }
     var expandedId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(createRequested) {
@@ -138,22 +140,37 @@ internal fun MemoryLibraryScreen(
                             Spacer(Modifier.height(10.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                                 Text("编辑", modifier = Modifier.clickable { editing = entry }, color = MaterialTheme.colorScheme.primary)
-                                Text("删除", modifier = Modifier.clickable {
-                                    scope.launch {
-                                        runCatching { repository.deleteEntry(entry.id) }
-                                            .onSuccess {
-                                                onActionLogged("memory.delete", "删除记忆", "删除 1 条 canonical 记忆")
-                                                onSnackbar("记忆已删除")
-                                            }
-                                            .onFailure { onSnackbar(it.message ?: "删除记忆失败") }
-                                    }
-                                }, color = MaterialTheme.colorScheme.primary)
+                                TextButton(enabled = !deletingBusy, onClick = { deleting = entry }) { Text("删除", color = MaterialTheme.colorScheme.error) }
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    deleting?.let { item ->
+        AlertDialog(
+            onDismissRequest = { if (!deletingBusy) deleting = null },
+            title = { Text("删除记忆？") },
+            text = { Text("确定删除「${item.title}」？此操作不能撤销，已有聊天和备份不会改变。") },
+            confirmButton = {
+                TextButton(enabled = !deletingBusy, onClick = {
+                    deletingBusy = true
+                    scope.launch {
+                        try {
+                            repository.deleteEntry(item.id)
+                            deleting = null
+                            onActionLogged("memory.delete", "删除记忆", "删除 1 条 canonical 记忆")
+                            onSnackbar("记忆已删除")
+                        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                        catch (e: Exception) { onSnackbar(e.message ?: "删除记忆失败") }
+                        finally { deletingBusy = false }
+                    }
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(enabled = !deletingBusy, onClick = { deleting = null }) { Text("取消") } }
+        )
     }
 
     if (creating) MemoryEditor(null, onDismiss = { creating = false }) { draft ->

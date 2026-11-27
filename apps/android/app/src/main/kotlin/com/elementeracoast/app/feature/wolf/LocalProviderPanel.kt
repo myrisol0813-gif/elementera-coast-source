@@ -67,7 +67,7 @@ internal fun LocalProviderPanel(current: String, onRefresh: () -> Unit) {
         Text("支持 HTTPS OpenAI 兼容 Chat Completions。Key 加密留在本机，聊天只发送给选中的模型服务。当前仅支持近期文字上下文；记忆、工具、附件与自动整理待接入。",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         providers.forEach { p ->
-            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .6f)) {
+            com.elementeracoast.app.ui.theme.SnowLetterSurface(modifier=Modifier.fillMaxWidth(),role=com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole.StatusCard,fallbackColor=MaterialTheme.colorScheme.surface,fallbackBorder=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=.55f)),fallbackElevation=1.dp) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text(p.name, style = MaterialTheme.typography.titleSmall)
                     Text(p.baseUrl, style = MaterialTheme.typography.bodySmall)
@@ -176,7 +176,7 @@ private fun LocalIndependentWebPanel(){
     var status by remember{mutableStateOf("")}
     var busy by remember{mutableStateOf(false)}
     LaunchedEffect(store){configured=withContext(Dispatchers.IO){runCatching{store.load().any{it.id=="tavily"}}.getOrDefault(false)}}
-    Surface(shape=RoundedCornerShape(18.dp),color=MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.6f)){
+    com.elementeracoast.app.ui.theme.SnowLetterSurface(modifier=Modifier.fillMaxWidth(),role=com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole.StatusCard,fallbackColor=MaterialTheme.colorScheme.surface,fallbackBorder=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=.55f)),fallbackElevation=1.dp) {
         Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
             Text("独立联网 · Tavily",style=MaterialTheme.typography.titleSmall)
             Text(if(configured)"Key 已保存 · 窗口开启模型工具后可使用" else "尚未配置 · 不开放联网工具",style=MaterialTheme.typography.bodySmall)
@@ -214,7 +214,7 @@ internal fun LocalVoicePanel(){
         val saved=withContext(Dispatchers.IO){runCatching{store.load().firstOrNull{it.id=="elevenlabs"}}.getOrNull()}
         configured=saved!=null;voiceId=saved?.models?.singleOrNull().orEmpty()
     }
-    Surface(shape=RoundedCornerShape(18.dp),color=MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.6f)){
+    com.elementeracoast.app.ui.theme.SnowLetterSurface(modifier=Modifier.fillMaxWidth(),role=com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole.StatusCard,fallbackColor=MaterialTheme.colorScheme.surface,fallbackBorder=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=.55f)),fallbackElevation=1.dp) {
         Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
             Text("独立语音 · ElevenLabs",style=MaterialTheme.typography.titleSmall)
             Text(if(configured)"已配置 · 可选段生成；窗口开启模型写入后允许模型主动生成" else "尚未配置",style=MaterialTheme.typography.bodySmall)

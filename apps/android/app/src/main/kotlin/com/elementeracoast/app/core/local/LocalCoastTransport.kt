@@ -441,6 +441,11 @@ class LocalCoastTransport(private val store: LocalPersistence,
             val req=json.decodeFromJsonElement(RemoteWorldbookMatchRequest.serializer(),body(r))
             return ok(r,"matches" to array(RemoteWorldbookEntry.serializer(),knowledge.match(req.input,emptyList(),req.surface,req.limit,req.allowedScopes).map{it.entry}))
         }
+        if(path.startsWith("/api/worldbook/")&&r.url.pathSegments.size==4&&r.url.pathSegments.last()=="permanent"&&method=="DELETE"){
+            val id=r.url.pathSegments[2]
+            knowledge.purgeWorldbook(id)
+            return ok(r,"deleted_id" to JsonPrimitive(id))
+        }
         if(path.startsWith("/api/worldbook/")&&r.url.pathSegments.size==3){
             val id=r.url.pathSegments.last()
             if(method=="PATCH")return ok(r,"entry" to element(RemoteWorldbookEntry.serializer(),knowledge.saveWorldbook(id,json.decodeFromJsonElement(RemoteWorldbookEntryWriteRequest.serializer(),body(r)))))

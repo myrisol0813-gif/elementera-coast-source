@@ -92,7 +92,7 @@ assert.match(chatActions, /name === 'open-type'/);
 assert.match(chatActions, /openRoomType\(target\.dataset\.kind \|\| 'main'\)/);
 assert.match(chatConversations, /room_type/);
 
-for (const dailyEntry of ['碳硅圈', '日记', '宠物系统', '未来小组件']) assert.ok(daily.includes(dailyEntry));
+for (const dailyEntry of ['碳硅圈', '日记', '休憩箱', '未来小组件']) assert.ok(daily.includes(dailyEntry));
 for (const retiredDaily of ['一日总结', '相册', '草稿袋', 'daily:summary', 'daily:album']) assert.equal(daily.includes(retiredDaily), false);
 assert.match(tools, /上下文舒服区间/);
 assert.match(html, /模型工作台/);

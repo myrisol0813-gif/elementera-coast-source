@@ -124,6 +124,7 @@ internal fun BasicSettingsScreen(settings: BasicSettings, store: WolfStore, onSn
 
     LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("基本设置", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) }
+        item { com.elementeracoast.app.feature.shell.MessageNotificationControls() }
         item {
             SettingGroup("上下文舒服区间") {
                 Text("最近聊天轮数", fontWeight = FontWeight.Medium)

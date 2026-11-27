@@ -131,7 +131,7 @@ export async function runDailyFlow() {
       await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'daily-placeholder'
         && document.querySelector('#overlayRoot').textContent.includes(title), `${title} destination`);
       const studio = document.querySelector('#overlayRoot coast-room-studio');
-      assert.equal(Boolean(studio), action === 'pets', 'only the rest-box entry mounts the editor');
+      assert.equal(Boolean(studio), false, 'placeholder does not mount the editor');
     }
     document.querySelector('[data-action="daily:home"]').click();
     await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'daily-home', 'Daily home after placeholders');

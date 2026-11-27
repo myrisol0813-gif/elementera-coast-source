@@ -66,12 +66,12 @@ internal class LocalDreamLedger(private val store:LocalPersistence){
         val model=request.modelId.orEmpty().trim()
         require(model.isNotBlank()&&model.length<=180)
         val clock=Regex("([01][0-9]|2[0-3]):[0-5][0-9]")
-        require(clock.matches(cfg.dailyTime));ZoneId.of(cfg.timeZone)
-        cfg.quietHours?.let{require(clock.matches(it.start)&&clock.matches(it.end))}
-        require(e.tokenBudget in 1..1000000&&e.outputLimit in 1..65536&&e.toolBudget in 0..128&&e.readTurns in 1..400&&e.extraPerDay in 0..128&&e.voiceLimit in 0..128&&e.imageLimit in 0..128&&e.invitation.isNotBlank()&&e.invitation.length<=16000)
+        require(clock.matches(cfg.dailyTime)){"每日固定时间须为 HH:mm。"};ZoneId.of(cfg.timeZone)
+        cfg.quietHours?.let{require(clock.matches(it.start)&&clock.matches(it.end)){"安静时段须为 HH:mm。"}}
+        require(e.tokenBudget in 1..2147483646&&e.outputLimit in 1..2147483646&&e.toolBudget in 0..2147483646&&e.readTurns in 1..2147483646&&e.extraPerDay in 0..2147483646&&e.voiceLimit in 0..2147483646&&e.imageLimit in 0..2147483646&&e.invitation.isNotBlank()&&e.invitation.length<=16000)
         val arm=request.action=="arm"
         val plan=com.elementeracoast.app.feature.chatgpt.NativeDreamPlanProtocol.slug(model)!=null
-        if(arm&&(!enableAllowed||!request.confirmExecution||(if(plan)planRevision==null||!request.confirmPlanSoftBudget||request.planRequestLimit !in 1..129 else !model.startsWith("local:")||'/' !in model)))return@readConsistent null
+        if(arm&&(!enableAllowed||!request.confirmExecution||(if(plan)planRevision==null||!request.confirmPlanSoftBudget||request.planRequestLimit !in 1..2147483646 else !model.startsWith("local:")||'/' !in model)))return@readConsistent null
         val next=DreamSettings(revision=if(arm&&plan)requireNotNull(planRevision)else UUID.randomUUID().toString(),enabled=arm,config=cfg,modelId=model,armedAt=if(arm)now else null)
         save(s,cid,next);next
     }

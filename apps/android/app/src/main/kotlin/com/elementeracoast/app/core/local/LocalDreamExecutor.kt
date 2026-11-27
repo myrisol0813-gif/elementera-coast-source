@@ -24,7 +24,8 @@ internal class LocalDreamExecutor(
     private val imageProvider:((String)->LocalProviderConfig?)?=null,
     private val modelBudget:suspend (LocalProviderConfig,String,Int)->LocalInputBudget?={_,_,_->null},
     private val imageFactory:(LocalPersistence,LocalDreamLedger.Claim,String,(String)->LocalProviderConfig?)->LocalDreamImage={s,c,id,resolver->LocalDreamImage(s,c,id,resolver)},
-    private val preparePlan:suspend (String,String,String)->NativeDreamPlanBinding?={_,_,_->null}
+    private val preparePlan:suspend (String,String,String)->NativeDreamPlanBinding?={_,_,_->null},
+    private val onNotice:(String,String,String)->Unit={_,_,_->}
 ){
     private val ledger=LocalDreamLedger(store)
     private fun JsonObject.str(k:String)=(get(k) as? JsonPrimitive)?.contentOrNull.orEmpty()
@@ -120,6 +121,8 @@ internal class LocalDreamExecutor(
         val initial=if(isPlan)null else (resolve(modelId)?:return "model_unavailable")
         if(plan!=null&&!plan.authorized())return "model_unavailable"
         val c=ledger.claim(cid,revision,modelId,now)?:return "not_due"
+        fun notify(kind:String){runCatching{onNotice(cid,c.id,kind)}}
+        notify("start")
         val e=requireNotNull(c.config.execution);var status="failed";var reason="incomplete"
         var total=0L;var cost=0.0;var known=true;var costKnown=!isPlan;var calls=0;var proposed:Long?=null
         val activities=mutableListOf<JsonElement>()
@@ -228,7 +231,11 @@ internal class LocalDreamExecutor(
                                             val value=LocalMemoryStore(store).proposeDreamCandidate(c,step,index,args,clock())
                                             buildJsonObject{put("ok",true);put("data",value);value["id"]?.let{put("record_id",it)}}
                                         }
-                                        name=="dream_write_note"&&args?.keys==setOf("body")->buildJsonObject{put("ok",ledger.note(c,args.str("body"),clock()))}
+                                        name=="dream_write_note"&&args?.keys==setOf("body")->buildJsonObject{
+                                            val written=ledger.note(c,args.str("body"),clock())
+                                            put("ok",written)
+                                            if(written)notify("note")
+                                        }
                                         name=="dream_schedule_extra"&&args?.keys==setOf("at")&&proposed==null->{
                                             val at=Instant.parse(args.str("at")).toEpochMilli()
                                             if(at>clock()){proposed=at;buildJsonObject{put("ok",true);put("status","proposed_pending_completion")}}else result
@@ -279,6 +286,7 @@ internal class LocalDreamExecutor(
         }
         if(status=="completed"&&plan!=null&&!plan.authorized()){status="cancelled";proposed=null}
         val saved=withContext(NonCancellable){ledger.finish(c,status,result,proposed,clock())}
+        if(saved&&status=="failed")notify("failure")
         cancelled?.let{throw it}
         return if(saved)status else "unconfirmed"
     }

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createWorldbookEntry, matchWorldbook } from '../functions/worldbook.js';
+import { createWorldbookEntry, matchWorldbook, listWorldbookEntries } from '../functions/worldbook.js';
 import { ensureWorldbookSchema, worldbookMigrationIds } from '../functions/worldbook-schema.js';
 import { routeWorkbenchApi } from '../functions/workbench-api.js';
 import { D1Database } from './d1-helper.mjs';
@@ -89,4 +89,18 @@ const acceptedMutation = await routeWorkbenchApi(new Request('https://coast.test
 }), { COAST_CHAT_DB: db }, { sub: 'owner' });
 assert.equal(acceptedMutation.status, 201);
 
+const retire = await createWorldbookEntry(db, {title:'删除回归',content:'只删这一条',keywords:['删除回归']});
+const url = 'https://coast.test/api/worldbook/' + encodeURIComponent(retire.id);
+const same = {Origin:'https://coast.test'};
+const denied = await routeWorkbenchApi(new Request(url+'/permanent',{method:'DELETE'}),{COAST_CHAT_DB:db},{sub:'owner'});
+assert.equal(denied.status,403);
+const disabled = await routeWorkbenchApi(new Request(url,{method:'DELETE',headers:same}),{COAST_CHAT_DB:db},{sub:'owner'});
+assert.equal(disabled.status,200);
+assert.equal((await disabled.json()).entry.enabled,false);
+assert.equal((await listWorldbookEntries(db)).some(e=>e.id===retire.id),true);
+const purged = await routeWorkbenchApi(new Request(url+'/permanent',{method:'DELETE',headers:same}),{COAST_CHAT_DB:db},{sub:'owner'});
+assert.equal(purged.status,200);
+assert.equal((await purged.json()).deleted_id,retire.id);
+assert.equal((await listWorldbookEntries(db)).some(e=>e.id===retire.id),false);
+assert.equal((await listWorldbookEntries(db)).some(e=>e.id===ownerEntry.id),true);
 console.log('worldbook: ok');

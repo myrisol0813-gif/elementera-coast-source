@@ -320,12 +320,7 @@ internal fun WindowContextSheet(
 
 @Composable
 private fun SoftSettingsCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .52f),
-        tonalElevation = 0.dp
-    ) {
+    com.elementeracoast.app.ui.theme.SnowLetterSurface(modifier=Modifier.fillMaxWidth(),role=com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole.StatusCard,fallbackColor=MaterialTheme.colorScheme.surface,fallbackBorder=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=.55f)),fallbackElevation=1.dp) {
         Column(
             modifier = Modifier.padding(horizontal = 15.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),

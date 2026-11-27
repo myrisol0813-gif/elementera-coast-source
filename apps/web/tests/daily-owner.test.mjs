@@ -176,10 +176,10 @@ for (const name of ['moments', 'diary', 'pets', 'widgets']) {
   await daily.handleEvent({ type: 'click' }, { eventType: 'click', namespace: 'daily', name, target: document.body });
 }
 assert.deepEqual(router.opens.slice(-4).map((entry) => entry.name), ['moments', 'diary', 'daily-placeholder', 'daily-placeholder']);
-assert.equal(router.opens.at(-2).params.title, '宠物系统');
-const studio = router.renderers.get('daily-placeholder')({ title: '宠物系统' });
-assert.match(studio.body, /<coast-room-studio><\/coast-room-studio>/);
-assert.doesNotMatch(studio.body, /<iframe/);
+assert.equal(router.opens.at(-2).params.title, '休憩箱');
+const studio = router.renderers.get('daily-placeholder')({ title: '休憩箱' });
+assert.match(studio.body, /干净空地/);
+assert.doesNotMatch(studio.body, /<iframe|coast-room-studio/);
 assert.doesNotMatch(router.renderers.get('daily-placeholder')({ title: '未来小组件' }).body, /<iframe|coast-room-studio/);
 assert.equal(router.opens.at(-1).params.title, '未来小组件');
 

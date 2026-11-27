@@ -23,7 +23,7 @@ internal object NativeDreamPlanProtocol {
         val model=slug(modelId)?:return false
         return grant!=null&&account!=null&&grant.window==window&&grant.revision==revision&&grant.model==model&&
             grant.subject==account.subject&&grant.clientId==account.clientId&&grant.softBudgetAccepted&&
-            grant.requestLimit in 1..129&&model in advertised&&
+            grant.requestLimit in 1..2147483646&&model in advertised&&
             setOf("chatgpt.tokens.use.direct","resource.invoke").all{it in account.scopes}
     }
 

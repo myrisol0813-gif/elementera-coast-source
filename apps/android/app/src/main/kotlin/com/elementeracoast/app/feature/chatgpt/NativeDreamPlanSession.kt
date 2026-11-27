@@ -13,7 +13,7 @@ internal class NativeDreamPlanSession(
     private val outputHint:Int,
     private val send:suspend (JsonObject,Set<String>)->NativeDreamPlanProtocol.Step
 ){
-    init{require(grant.softBudgetAccepted&&grant.requestLimit in 1..129&&tokenBudget in 1..1000000&&outputHint in 1..65536)}
+    init{require(grant.softBudgetAccepted&&grant.requestLimit in 1..2147483646&&tokenBudget in 1..2147483646&&outputHint in 1..2147483646)}
     private val history=mutableListOf<JsonObject>()
     private var previous:NativeDreamPlanProtocol.Step?=null
     private var used=0L

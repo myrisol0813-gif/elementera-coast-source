@@ -19,7 +19,7 @@ internal class NativeDreamPlanGrants(private val store:LocalPersistence){
     fun grant(window:String,revision:String,modelId:String,account:ChatGptConnection,epoch:String,
               advertised:Set<String>,accepted:Boolean,requestLimit:Int):Boolean=store.readConsistent{s->
         val model=NativeDreamPlanProtocol.slug(modelId)?:return@readConsistent false
-        if(!safe.matches(window)||!safe.matches(revision)||epoch.isBlank()||!accepted||requestLimit !in 1..129)return@readConsistent false
+        if(!safe.matches(window)||!safe.matches(revision)||epoch.isBlank()||!accepted||requestLimit !in 1..2147483646)return@readConsistent false
         val grant=NativeDreamPlanProtocol.Grant(window,revision,account.subject,account.clientId,model,true,requestLimit)
         if(!NativeDreamPlanProtocol.permitted(grant,window,revision,account,modelId,advertised))return@readConsistent false
         val identity=identity(account,epoch)
@@ -34,7 +34,7 @@ internal class NativeDreamPlanGrants(private val store:LocalPersistence){
         val r=row(window,s)?:return@readConsistent null
         val identity=identity(a,epoch)
         val count=(r["request_limit"] as? JsonPrimitive)?.intOrNull?:return@readConsistent null
-        if(r.str("identity")!=identity||r.str("revision")!=revision||r.str("model")!=model||r.str("fence")!=s.get(pauseKey(identity),"0")||count !in 1..129)return@readConsistent null
+        if(r.str("identity")!=identity||r.str("revision")!=revision||r.str("model")!=model||r.str("fence")!=s.get(pauseKey(identity),"0")||count !in 1..2147483646)return@readConsistent null
         val g=NativeDreamPlanProtocol.Grant(window,revision,a.subject,a.clientId,model,true,count)
         g.takeIf{NativeDreamPlanProtocol.permitted(it,window,revision,a,modelId,setOf(model))}
     }
@@ -49,7 +49,7 @@ internal class NativeDreamPlanGrants(private val store:LocalPersistence){
     fun requestLimit(window:String,revision:String?,modelId:String?):Int?=store.readConsistent{s->
         val r=row(window,s)?:return@readConsistent null
         if(r.str("revision")!=revision||r.str("model")!=modelId?.let(NativeDreamPlanProtocol::slug))return@readConsistent null
-        (r["request_limit"] as? JsonPrimitive)?.intOrNull?.takeIf{it in 1..129}
+        (r["request_limit"] as? JsonPrimitive)?.intOrNull?.takeIf{it in 1..2147483646}
     }
     fun revoke(window:String)=store.remove(key(window))
     /** Invalidate all grants belonging to the same account connection. A new

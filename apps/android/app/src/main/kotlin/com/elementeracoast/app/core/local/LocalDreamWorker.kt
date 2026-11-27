@@ -11,9 +11,20 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 
 internal object RemoteCacheRecovery{
-    fun recoverWakeClaims(store:LocalPersistence){
+    fun recoverWakeClaims(store:LocalPersistence,context:Context?=null){
         val ledger=LocalDreamLedger(store)
-        RemoteCacheStore(store,strictReads=true).conversations().forEach{ledger.recover(it.id,System.currentTimeMillis())}
+        val now=System.currentTimeMillis()
+        RemoteCacheStore(store,strictReads=true).conversations().forEach{recoverOne(store,ledger,it.id,now,context)}
+    }
+    fun recoverOne(store:LocalPersistence,ledger:LocalDreamLedger,cid:String,now:Long,context:Context?){
+        if(!ledger.recover(cid,now)||context==null)return
+        // A notice is optional; a persisted interruption must never be rolled back.
+        runCatching{
+            val last=LocalDreamArchive(store).runtimeHistory(cid)["runs"]!!.jsonArray.map{it.jsonObject}
+                .filter{it["status"]?.jsonPrimitive?.contentOrNull=="interrupted"}
+                .maxByOrNull{it.getValue("updated_at").jsonPrimitive.long}
+            last?.get("claim_id")?.jsonPrimitive?.contentOrNull?.let{LocalDreamNotifications.post(context,cid,it,"failure")}
+        }
     }
 }
 
@@ -35,11 +46,18 @@ class LocalDreamWorker(context:Context,params:WorkerParameters):CoroutineWorker(
             val plan=if(BuildConfig.LOCAL_DREAM_PLAN_EXECUTION_ENABLED)com.elementeracoast.app.feature.chatgpt.NativeDreamPlanRoute(store,com.elementeracoast.app.feature.chatgpt.ChatGptPlanRepository(com.elementeracoast.app.feature.chatgpt.ChatGptSecureStore(applicationContext,true)))else null
             val executor=LocalDreamExecutor(store,provider::resolve,client::dreamRequest,workspaceActive={
                 NativeWorkspace.localSelected(applicationContext)&&NativeWorkspace.isLocal&&NativeWorkspace.persistence(applicationContext)===store
-            },web=LocalIndependentWeb(applicationContext),captureReality={settings->com.elementeracoast.app.feature.chat.AndroidRealityContextSource(applicationContext,store,true).capture(settings)},voice=LocalVoiceProvider(applicationContext),imageProvider=provider::resolveImageProvider,modelBudget={p,m,output->client.inputBudget(p,m,0,output,true)},preparePlan={cid,revision,model->plan?.open(cid,revision,model)})
+            },web=LocalIndependentWeb(applicationContext),captureReality={settings->com.elementeracoast.app.feature.chat.AndroidRealityContextSource(applicationContext,store,true).capture(settings)},voice=LocalVoiceProvider(applicationContext),imageProvider=provider::resolveImageProvider,modelBudget={p,m,output->client.inputBudget(p,m,0,output,true)},preparePlan={cid,revision,model->plan?.open(cid,revision,model)},onNotice={cid,claim,kind->
+                val body=if(kind=="note")runCatching{
+                    LocalDreamArchive(store).runtimeHistory(cid)["notes"]?.jsonArray?.map{it.jsonObject}
+                        ?.firstOrNull{it["claim_id"]?.jsonPrimitive?.contentOrNull==claim}
+                        ?.get("body")?.jsonPrimitive?.contentOrNull
+                }.getOrNull()else null
+                LocalDreamNotifications.post(applicationContext,cid,claim,kind,body)
+            })
             val windows=RemoteCacheStore(store,strictReads=true).conversations().filter{it.roomType=="main"&&it.source=="coast"&&it.deletedAt==null}
             val now=System.currentTimeMillis()
             // No previous in-flight wake can be alive while this lease is held.
-            windows.forEach{ledger.recover(it.id,now)}
+            windows.forEach{RemoteCacheRecovery.recoverOne(store,ledger,it.id,now,applicationContext)}
             val eligible=windows.mapNotNull{w->
                 val a=ledger.settings(w.id)
                 val history=LocalDreamArchive(store).runtimeHistory(w.id)["runs"]!!.jsonArray.map{it.jsonObject}
