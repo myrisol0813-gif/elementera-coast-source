@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
@@ -174,6 +175,39 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
             }
             awaitClose{active.getAndSet(null)?.cancel();job.cancel()}
         }
+    }
+
+    /** A single autonomous request, no synthetic user turn or implicit retries.
+     * The caller persists its step claim before invoking this method. */
+    internal suspend fun dreamRequest(p:LocalProviderConfig,model:String,messages:JsonArray,tools:JsonArray,output:Int):JsonObject {
+        require(output in 1..65536&&model in p.models)
+        val oneShot=http.newBuilder().retryOnConnectionFailure(false).callTimeout(120,TimeUnit.SECONDS).build()
+        return callbackFlow<JsonObject>{
+            val active=java.util.concurrent.atomic.AtomicReference<okhttp3.Call?>()
+            val job=launch(Dispatchers.IO){
+                try{
+                    val host=normalizeLocalProviderUrl(p.baseUrl).toHttpUrl().host
+                    val payload=buildJsonObject{
+                        put("model",model);put("stream",false)
+                        put(if(host=="api.openai.com")"max_completion_tokens"else "max_tokens",output)
+                        put("messages",messages)
+                        if(tools.isNotEmpty()){put("tools",tools);put("tool_choice","auto")}
+                    }
+                    val call=oneShot.newCall(request(p,"/chat/completions").header("Accept","application/json").post(payload.toString().toRequestBody(media)).build())
+                    active.set(call)
+                    call.execute().use{response->
+                        if(!response.isSuccessful)throw failure(response.code)
+                        val source=requireNotNull(response.body).source()
+                        source.request(2097153);require(source.buffer.size<=2097152){"供应商响应超过安全读取容量。"}
+                        val root=json.parseToJsonElement(source.readUtf8()).jsonObject
+                        require(root["error"]==null||root["error"]==JsonNull)
+                        send(root)
+                    }
+                    close()
+                }catch(e:CancellationException){throw e}catch(e:Exception){close(e)}
+            }
+            awaitClose{active.getAndSet(null)?.cancel();job.cancel()}
+        }.first()
     }
 
     fun stream(p: LocalProviderConfig, model: String, messages: List<RemoteChatMessage>, maxTokens: Int,imageParts:List<JsonObject> = emptyList(),temperature:Double?=null): Flow<LocalProviderEvent> =
