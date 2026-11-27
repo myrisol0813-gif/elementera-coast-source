@@ -47,6 +47,16 @@ jobs:
         run: |
           npm install --prefix art-tools --no-audit --no-fund
           ./art-tools/node_modules/.bin/playwright install --with-deps chromium
+      - name: Prepare native SVG toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+          cargo install cargo-ndk --version 3.5.4 --locked
+          ndk="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-}}"
+          if [[ ! -d "$ndk" ]]; then ndk="$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"; fi
+          test -d "$ndk/toolchains/llvm"
+          echo "ANDROID_NDK_HOME=$ndk" >> "$GITHUB_ENV"
       - name: Verify source identity
         shell: bash
         run: |
