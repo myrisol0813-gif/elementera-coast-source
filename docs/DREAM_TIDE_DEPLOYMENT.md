@@ -184,3 +184,19 @@ continuation without regenerating or removing saved originals. Old drafts
 default off; archive import still disables wake. Offline fixtures cover
 explicit opt-in, known/unknown vision, budget, exact original pixels, and
 one-shot transport. Real provider compatibility requires later acceptance.
+
+## Cross-workspace migration acceptance
+
+The source archive preserves the historical claim, steps, tool receipts,
+notes, replies, independent media originals and pending memory candidates.
+Cloud export rejects independent originals while the activity is running
+and verifies media ownership against the terminal activity. Cloud and Native
+candidate export/import verify the candidate ID, destination, window, model,
+claim and tool indices against its recorded activity. A candidate with a
+missing or mismatched activity cannot be silently restored as a genuine
+proposal. Native restores the chat and selected modules in its existing
+atomic transaction; cloud restores chat/media as a group, then memory and
+favorites through their existing dependency-aware record restore. No import
+arms the schedule or replays providers. The combined fixtures exercise both
+workspace wire shapes and byte preservation; they are not a live network or
+device round-trip test. Retain same-edition constraints and conflict refusal.
