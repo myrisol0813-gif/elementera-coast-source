@@ -219,7 +219,7 @@ internal class LocalToolSession private constructor(
                     JsonObject(value+("ok" to JsonPrimitive(true)))
                 }
                 "sticker_send"->{
-                    val uid=sourceTurn.user.variants[sourceTurn.user.active].id
+                    val uid=requireNotNull(sourceTurn).let{it.user.variants[it.user.active].id}
                     val sent=lib.deliver(cid,turn,uid,requireNotNull(stickerMessageId),string("sticker_id",160),true,sequenceId)
                     stickerSaved=true
                     buildJsonObject{put("ok",true);put("status","saved");put("reused",sent.reused);putJsonObject("attachment"){put("id",sent.attachment.id);put("type","image");put("mime",sent.attachment.mime);put("size",sent.attachment.size)}}
