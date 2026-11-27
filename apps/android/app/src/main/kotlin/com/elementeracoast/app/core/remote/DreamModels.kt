@@ -16,6 +16,7 @@ data class DreamExecutionConfig(
     val readHistory:Boolean=false,val writeNote:Boolean=false,
     val includeCustom:Boolean=false,val includeUserPortrait:Boolean=false,val includeSelfPortrait:Boolean=false,
     val includeConversationCount:Boolean=false,val includeWeather:Boolean=false,val includeCalendar:Boolean=false,
+    val includeSteps:Boolean=false,val includeAppUsage:Boolean=false,
     val allowWeb:Boolean=false,val allowLibrary:Boolean=false,val allowMemory:Boolean=false,val allowCalendar:Boolean=false,
     val allowCollection:Boolean=false,val allowLibraryWrite:Boolean=false
 )
