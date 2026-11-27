@@ -182,7 +182,7 @@ internal object ArchiveV2Local {
                 val cid=item.metadata.getValue("conversation_id").jsonPrimitive.content
                 dreamArchive.validateMediaOrigin(dreamByCid[cid]?:dreamArchive.export(cid),item.metadata,"image")
             }
-            for(row in side.filter{it.kind=="voice"&&it.data["source"]==JsonPrimitive("dream_tide")}){
+            for(row in side.map{it.row}.filter{it.kind=="voice"&&it.data["source"]==JsonPrimitive("dream_tide")}){
                 val cid=row.data.getValue("conversation_id").jsonPrimitive.content
                 dreamArchive.validateMediaOrigin(dreamByCid[cid]?:dreamArchive.export(cid),row.data,"voice")
             }
