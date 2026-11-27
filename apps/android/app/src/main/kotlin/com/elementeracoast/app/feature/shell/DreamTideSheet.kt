@@ -68,6 +68,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
         quietStart=cfg.quietHours?.start?:"23:00";quietEnd=cfg.quietHours?.end?:"07:00"
         tokenText=execution.tokenBudget.toString();outputText=execution.outputLimit.toString()
         toolsText=execution.toolBudget.toString();readText=execution.readTurns.toString();extraText=execution.extraPerDay.toString();voiceLimitText=execution.voiceLimit.toString();imageLimitText=execution.imageLimit.toString()
+        planLimitText=(value.planRequestLimit?:5).toString()
         consent=false;softConsent=false;loaded=true
     }
     suspend fun load(){
@@ -128,7 +129,13 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
             if(notice.isNotBlank())Text(notice,style=MaterialTheme.typography.bodySmall)
             if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
             if(tab==0&&loaded){
-                Text(if(response.settings.enabled)if(response.settings.running)"活动中" else "已授权" else "未授权")
+                Text(when{
+                    !response.settings.enabled->"未授权"
+                    response.settings.running->"活动中"
+                    response.settings.modelId?.startsWith("chatgpt-plan:")==true&&!response.planExecutionAvailable->"已保存 · 本构建不执行"
+                    response.settings.modelId?.startsWith("chatgpt-plan:")==true&&response.planStatus!="authorized"->"套餐活动暂停或待重新授权"
+                    else->"已授权"
+                })
                 Text(if(localMode)if(canArm)"本机按系统后台调度尝试唤醒。仅向绑定供应商请求；强停、关机、断网或省电限制可能延迟或中断。" else "本机目前仅支持保存配置，尚未开放自动执行。不会访问云端。" else if(canArm)"服务端已配置调度，授权后才会请求模型。" else "服务端尚未开通调度，可先保存设置。",style=MaterialTheme.typography.bodySmall)
                 response.settings.extraAt?.let{Text("下一次额外预约："+stamp(it))}
                 if(response.settings.enabled)Button(onClick={save("disarm")},enabled=!busy){Text("关闭唤醒授权")}
