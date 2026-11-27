@@ -14,7 +14,7 @@ function localPaint(v){
 function freezeElement(e) {
   const style=getComputedStyle(e);
   const tag=e.localName;
-  const attrs=['fill','stroke','stroke-width','stroke-linecap','stroke-linejoin','fill-rule','fill-opacity','stroke-opacity','opacity','visibility','display','color','stop-color','stop-opacity'];
+  const attrs=['fill','stroke','stroke-width','stroke-linecap','stroke-linejoin','fill-rule','fill-opacity','stroke-opacity','opacity','visibility','display','color','stop-color','stop-opacity','filter','clip-path','mask'];
   if(tag==='text'||tag==='tspan')attrs.push('font-family','font-size','font-weight','text-anchor');
   const changes=attrs.map(k=>[k,localPaint(style.getPropertyValue(k).trim())]).filter(([k,v])=>v&&v!=='normal');
   const transform=style.transform, origin=style.transformOrigin;
@@ -65,19 +65,21 @@ function authoredMatrix(e){
 // Capture the actual authored animation rather than re-inventing wag/blink/breath paths.
 // CSS tracks keep their own periods; native time sampling combines them.
 function captureMotion(svg,{indexed=false}={}){
-  const tracks=[],animated=svg.getAnimations({subtree:true});
+  const tracks=[],animated=svg.getAnimations({subtree:true}),elements=[svg,...svg.querySelectorAll('*')];
+  const idFor=e=>e?.getAttribute('id')||(anonymous&&e?'@'+elements.indexOf(e):null);
   for(const a of animated){a.pause();a.currentTime=0}
   const seen=new Set(),elements=[svg,...svg.querySelectorAll('*')];
   for(const a of animated){
     const target=a.effect?.target, id=indexed&&target?'@'+elements.indexOf(target):target?.getAttribute('id'), timing=a.effect?.getTiming();
     if(!id||!timing||typeof timing.duration!=='number'||timing.duration<=0)continue;
     const frames=a.effect.getKeyframes();
+    a.effect.updateTiming({delay:0});
     const props=['transform','opacity'].filter(p=>frames.some(f=>Object.hasOwn(f,p)));
     for(const prop of props){
       const key=id+'|'+prop;if(seen.has(key))continue;seen.add(key);
       const values=[], steps=24;
       for(let i=0;i<steps;i++){
-        a.currentTime=timing.delay+timing.duration*i/steps;
+        a.currentTime=timing.duration*i/steps;
         values.push(prop==='transform'?authoredMatrix(target):getComputedStyle(target).opacity);
       }
       a.currentTime=0;
@@ -86,7 +88,7 @@ function captureMotion(svg,{indexed=false}={}){
     }
   }
   for(const anim of svg.querySelectorAll('animate,animateTransform')){
-    const id=anim.parentElement?.getAttribute('id'), attr=anim.getAttribute('attributeName'),dur=anim.getAttribute('dur')??'';
+    const id=idFor(anim.parentElement), attr=anim.getAttribute('attributeName'),dur=anim.getAttribute('dur')??'';
     const values=(anim.getAttribute('values')??'').split(';').filter(Boolean);
     const match=dur.match(/^([0-9.]+)(ms|s)$/);
     if(!id||!match||!values.length||!['d','transform'].includes(attr))continue;
