@@ -124,7 +124,11 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 val offset=r.url.queryParameter("offset")?.toIntOrNull()?:0
                 require(offset>=0)
                 if(path=="/api/chat/dream-tide/notes")return response(r,200,LocalDreamArchive(store).notes(cid,offset))
-                if(path=="/api/chat/dream-tide/activity")return response(r,200,LocalDreamArchive(store).activity(cid,offset))
+                if(path=="/api/chat/dream-tide/activity"){
+                    val mediaId=r.url.queryParameter("media_id")
+                    require(mediaId==null||mediaId.matches(Regex("(att|voice)_dream_[A-Za-z0-9_.:-]{1,149}")))
+                    return response(r,200,LocalDreamArchive(store).activity(cid,offset,mediaId))
+                }
             }
             if(method=="POST"&&path=="/api/chat/dream-tide/reply"){
                 if(!LocalDreamArchive(store).reply(cid,b.str("claim_id").orEmpty(),b.str("reply_id").orEmpty(),b.str("body").orEmpty()))
