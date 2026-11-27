@@ -4,8 +4,8 @@ import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.RectF
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +41,7 @@ internal fun NativeRestScene(
     selectedId: String?,
     onSelect: (String?) -> Unit,
     onMove: (String, Double, Double) -> Unit,
+    onMoveFinished: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val room = catalogue.rooms.getValue(roomId)
@@ -48,39 +49,39 @@ internal fun NativeRestScene(
     val currentItems = rememberUpdatedState(items)
     val select = rememberUpdatedState(onSelect)
     val move = rememberUpdatedState(onMove)
+    val finish = rememberUpdatedState(onMoveFinished)
     val paint = remember { Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG) }
     val selectionColor = MaterialTheme.colorScheme.primary
     val fallback = MaterialTheme.colorScheme.surfaceVariant
-    val gestures = if (editing) Modifier
-        .pointerInput(roomId, catalogue) {
-            detectTapGestures { point ->
-                if (size.width > 0 && size.height > 0) select.value(
-                    catalogue.hitTest(currentItems.value,
-                        point.x * room.width / size.width, point.y * room.height / size.height)?.id)
+    val gestures = if (editing) Modifier.pointerInput(roomId, catalogue) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            if (down.isConsumed || size.width == 0 || size.height == 0) return@awaitEachGesture
+            val hit = catalogue.hitTest(currentItems.value, down.position.x * room.width / size.width,
+                down.position.y * room.height / size.height) ?: return@awaitEachGesture
+            down.consume()
+            select.value(hit.id)
+            var moved = false
+            try {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                    if (change.isConsumed) break
+                    if (!change.pressed) { change.consume(); break }
+                    val delta = change.position - down.position
+                    if (moved || delta.getDistance() >= viewConfiguration.touchSlop) {
+                        moved = true
+                        move.value(hit.id,
+                            (hit.x + delta.x * room.width / size.width).coerceIn(-10000.0,10000.0),
+                            (hit.y + delta.y * room.height / size.height).coerceIn(-10000.0,10000.0))
+                    }
+                    change.consume()
+                }
+            } finally {
+                if (moved) finish.value()
             }
         }
-        .pointerInput(roomId, catalogue) {
-            var dragging: NativeFurniture? = null
-            var x = 0.0
-            var y = 0.0
-            detectDragGestures(
-                onDragStart = { point ->
-                    dragging = if (size.width > 0 && size.height > 0) catalogue.hitTest(currentItems.value,
-                        point.x * room.width / size.width, point.y * room.height / size.height) else null
-                    dragging?.let { x = it.x; y = it.y; select.value(it.id) }
-                },
-                onDragEnd = { dragging = null },
-                onDragCancel = { dragging = null },
-                onDrag = { change, delta ->
-                    dragging?.let {
-                        change.consume()
-                        x = (x + delta.x * room.width / size.width).coerceIn(-10000.0, 10000.0)
-                        y = (y + delta.y * room.height / size.height).coerceIn(-10000.0, 10000.0)
-                        move.value(it.id, x, y)
-                    }
-                }
-            )
-        } else Modifier
+    } else Modifier
     Canvas(modifier.fillMaxWidth().aspectRatio((room.width / room.height).toFloat()).then(gestures)) {
         drawRect(fallback)
         drawIntoCanvas { target ->
