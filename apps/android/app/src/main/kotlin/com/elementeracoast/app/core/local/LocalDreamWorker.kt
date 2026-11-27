@@ -32,9 +32,10 @@ class LocalDreamWorker(context:Context,params:WorkerParameters):CoroutineWorker(
             val ledger=LocalDreamLedger(store)
             val provider=LocalProviderStore(applicationContext)
             val client=LocalProviderClient()
+            val plan=if(BuildConfig.LOCAL_DREAM_PLAN_EXECUTION_ENABLED)com.elementeracoast.app.feature.chatgpt.NativeDreamPlanRoute(store,com.elementeracoast.app.feature.chatgpt.ChatGptPlanRepository(com.elementeracoast.app.feature.chatgpt.ChatGptSecureStore(applicationContext,true)))else null
             val executor=LocalDreamExecutor(store,provider::resolve,client::dreamRequest,workspaceActive={
                 NativeWorkspace.localSelected(applicationContext)&&NativeWorkspace.isLocal&&NativeWorkspace.persistence(applicationContext)===store
-            },web=LocalIndependentWeb(applicationContext),captureReality={settings->com.elementeracoast.app.feature.chat.AndroidRealityContextSource(applicationContext,store,true).capture(settings)},voice=LocalVoiceProvider(applicationContext),imageProvider=provider::resolveImageProvider,modelBudget={p,m,output->client.inputBudget(p,m,0,output,true)})
+            },web=LocalIndependentWeb(applicationContext),captureReality={settings->com.elementeracoast.app.feature.chat.AndroidRealityContextSource(applicationContext,store,true).capture(settings)},voice=LocalVoiceProvider(applicationContext),imageProvider=provider::resolveImageProvider,modelBudget={p,m,output->client.inputBudget(p,m,0,output,true)},preparePlan={cid,revision,model->plan?.open(cid,revision,model)})
             val windows=RemoteCacheStore(store,strictReads=true).conversations().filter{it.roomType=="main"&&it.source=="coast"&&it.deletedAt==null}
             val now=System.currentTimeMillis()
             // No previous in-flight wake can be alive while this lease is held.
@@ -43,7 +44,7 @@ class LocalDreamWorker(context:Context,params:WorkerParameters):CoroutineWorker(
                 val a=ledger.settings(w.id)
                 val history=LocalDreamArchive(store).runtimeHistory(w.id)["runs"]!!.jsonArray.map{it.jsonObject}
                 val used=history.map{it.getValue("slot_key").jsonPrimitive.content}.toSet()
-                if(LocalDreamSchedule.candidate(a,used,now)==null||a.revision==null||a.modelId==null)null
+                if(LocalDreamSchedule.candidate(a,used,now)==null||a.revision==null||a.modelId==null||a.modelId.startsWith("chatgpt-plan:")&&plan?.status(w.id,a.revision,a.modelId)!="authorized")null
                 else Triple(w.id,a,history.maxOfOrNull{it.getValue("started_at").jsonPrimitive.long}?:0L)
             }.sortedBy{it.third}
             // One active window per worker tick. A bounded tick cannot turn
