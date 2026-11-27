@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -30 330 270">
+<!-- Red panda V4: approved B V3.1 face and V4 motion preview, derived from bear mother template. -->
+<style>
+#pet{transform-origin:160px 218px;animation:breathe 3s infinite ease-in-out}
+#head{transform-origin:160px 148px;transition:transform .45s ease}
+#tail{transform-origin:195px 191px;animation:wag 2.3s infinite ease-in-out}
+#eyes{transform-box:fill-box;transform-origin:center;animation:blink 5s infinite}
+
+#earL{transform-origin:115px 88px}#earR{transform-origin:205px 88px}
+#sadEyes,#happyEyes,#clingEyes,#sleepEyes,#sadMouth,#happyMouth,#sleepMouth,#raised,#hearts,#tear,#sparkles,#hat,#zzz{display:none}
+.sad #eyes,.sad #mouth,.cheer #eyes,.cheer #mouth,.cheer #hands,.cling #eyes,.sleep #eyes,.sleep #mouth{display:none}
+.sad #sadEyes,.sad #sadMouth,.sad #tear,.cheer #happyEyes,.cheer #happyMouth,.cheer #raised,.cheer #sparkles,.cling #clingEyes,.cling #hearts,.sleep #sleepEyes,.sleep #sleepMouth,.sleep #hat,.sleep #zzz{display:inline}
+.sad #head{transform:translateY(7px) rotate(-3deg)}
+.sad #tail{animation:none;transform:rotate(12deg)}
+.sad #pet{animation:sadBody 3s infinite}
+.sad #hands{transform:translateY(5px)}
+.cheer #pet{animation:hop .65s infinite}
+.cheer #tail{animation:wag .35s infinite}
+.cheer #pawL{animation:raise .4s infinite alternate}
+.cheer #pawR{animation:raise .4s infinite alternate-reverse}
+.cling #head{animation:nuzzle 2s infinite ease-in-out}
+.cling #tail{animation:wag .5s infinite}
+.cling #hands{animation:plead 2s infinite}
+.idle #earL,.sit #earL{animation:twitchL 6s infinite}
+.idle #earR,.sit #earR{animation:twitchR 6s infinite}
+.sit #pet{animation:sit 3s infinite}
+.sleep #pet{animation:sleep 3.5s infinite}
+.sleep #tail{animation:none;transform:rotate(12deg)}
+.sleep #head{transform:rotate(-5deg)}
+#tear{animation:tear 3s infinite}
+#hearts{animation:float 2s infinite}
+#zzz{animation:float 3s infinite}
+@keyframes breathe{50%{transform:scale(1.015,.984)}}
+@keyframes wag{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(10deg)}}
+@keyframes blink{0%,44%,48%,100%{transform:scaleY(1)}46%{transform:scaleY(.07)}}
+@keyframes twitchL{0%,15%,23%,100%{transform:rotate(0)}19%{transform:rotate(-9deg)}}
+@keyframes twitchR{0%,58%,66%,100%{transform:rotate(0)}62%{transform:rotate(9deg)}}
+@keyframes sadBody{0%,100%{transform:scale(1.03,.94)}50%{transform:scale(1.03,.96)}}
+@keyframes hop{0%,100%{transform:scale(1.04,.96)}50%{transform:translateY(-13px) scale(.97,1.04)}}
+@keyframes raise{to{transform:translateY(-10px)}}
+@keyframes nuzzle{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
+@keyframes plead{50%{transform:translateY(-6px)}}
+@keyframes sit{0%,100%{transform:scale(1.05,.9)}50%{transform:scale(1.05,.92)}}
+@keyframes sleep{0%,100%{transform:scale(1.16,.74)}50%{transform:scale(1.16,.78)}}
+@keyframes tear{0%,15%{opacity:0;transform:translateY(-3px)}35%{opacity:1}85%,100%{opacity:0;transform:translateY(8px)}}
+@keyframes float{50%{transform:translateY(-5px);opacity:.6}}
+
+.sad #earL{transform:rotate(-12deg)}.sad #earR{transform:rotate(12deg)}
+.paint .pigment{filter:url(#grain)}
+@media(prefers-reduced-motion:reduce){svg *{animation:none!important}}</style>
+<defs>
+<path id="face" d="M160 72C116 70 92 87 84 111C72 136 83 158 106 169C126 179 194 179 214 169C237 158 248 136 236 111C228 87 204 70 160 72Z"/><path id="tailShape" d="M187 190C209 189 231 170 252 148C268 132 287 137 294 151C305 176 278 201 251 211C228 220 205 218 188 206Z"/>
+<clipPath id="faceClip"><use href="#face"/></clipPath><clipPath id="tailClip"><use href="#tailShape"/></clipPath>
+<g id="ear"><path d="M88 115C74 103 69 84 75 66C79 51 88 45 101 50C118 56 132 74 141 92Q120 112 88 115Z" fill="var(--cream)"/><path d="M91 99C82 85 83 68 92 64C101 60 115 76 122 91Q107 99 91 99Z" fill="var(--inner)"/></g>
+<g id="pad"><circle r="18" fill="var(--paw)"/><ellipse cy="5" rx="8.5" ry="7.5" fill="var(--pad)"/><g fill="var(--pad)"><circle cx="-12" cy="-5" r="2.9"/><circle cx="-6" cy="-10" r="2.9"/><circle cy="-12" r="2.9"/><circle cx="6" cy="-10" r="2.9"/><circle cx="12" cy="-5" r="2.9"/></g></g>
+<filter id="grain" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency=".28 .65" numOctaves="3" seed="13" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 .45 0 0 0 0 .36 0 0 0 0 .41 .25 .25 .25 0 -.10" result="t"/><feComposite in="t" in2="SourceGraphic" operator="in" result="p"/><feBlend in="SourceGraphic" in2="p" mode="multiply"/></filter>
+<clipPath id="wardBodyClip"><path d="M160 111C127 111 112 145 116 178Q117 197 133 207Q133 216 145 216Q154 216 154 210Q160 211 166 210Q166 216 175 216Q187 216 187 207Q203 197 204 178C208 145 193 111 160 111Z"/></clipPath></defs><ellipse cx="160" cy="222" rx="69" ry="7" fill="#39333e" opacity=".15"/>
+<g id="scene" class="idle" style="--fur:#b47f94;--body:#5c485e;--belly:#776079;--paw:#927187;--cream:#f8e7ea;--mask:#98657f;--inner:#98657f;--tail:#b7869d;--ring:#825e7d;--eye:#564359;--pad:#bd91a7"><g id="pet">
+<g id="tail" class="pigment"><use href="#tailShape" fill="var(--tail)"/><g clip-path="url(#tailClip)" fill="none" stroke="var(--ring)" stroke-width="14"><path d="M198 169Q222 194 219 231M220 150Q247 175 248 222M245 130Q274 155 279 200M273 120Q298 141 307 177"/></g></g>
+<g class="pigment" id="bodyGroup"><path id="body" d="M160 111C127 111 112 145 116 178Q117 197 133 207Q133 216 145 216Q154 216 154 210Q160 211 166 210Q166 216 175 216Q187 216 187 207Q203 197 204 178C208 145 193 111 160 111Z" fill="var(--body)"/><ellipse cx="160" cy="176" rx="24" ry="27" fill="var(--belly)"/></g>
+<g transform="translate(0 -14)"><g id="head">
+<g id="earL" class="pigment"><use href="#ear"/></g><g id="earR" class="pigment"><use href="#ear" transform="translate(320 0) scale(-1 1)"/></g>
+<g class="pigment"><use href="#face" fill="var(--fur)"/><g clip-path="url(#faceClip)">
+<path d="M89 151C99 133 119 133 132 144C143 129 177 129 188 144C201 133 221 133 231 151L233 190H87Z" fill="var(--cream)"/>
+<g fill="var(--mask)"><path d="M134 137Q137 134 140 139C135 147 132 153 133 161C134 170 142 178 150 185L138 190C127 180 121 170 122 160C122 150 128 143 134 137Z"/><path d="M134 137Q137 134 140 139C135 147 132 153 133 161C134 170 142 178 150 185L138 190C127 180 121 170 122 160C122 150 128 143 134 137Z" transform="translate(320 0) scale(-1 1)"/></g>
+<g fill="var(--cream)"><ellipse cx="137" cy="117" rx="6.5" ry="4.7" transform="rotate(-12 137 117)"/><ellipse cx="183" cy="117" rx="6.5" ry="4.7" transform="rotate(12 183 117)"/></g></g></g>
+<g id="eyes" fill="var(--eye)"><ellipse cx="136" cy="135" rx="6.5" ry="7.5"/><ellipse cx="184" cy="135" rx="6.5" ry="7.5"/><g fill="#fffaf4"><circle cx="134" cy="132" r="1.7"/><circle cx="182" cy="132" r="1.7"/></g></g>
+<g id="clingEyes" fill="var(--eye)"><ellipse cx="136" cy="135" rx="8.5" ry="10.5"/><ellipse cx="184" cy="135" rx="8.5" ry="10.5"/><g fill="#fffaf4"><ellipse cx="133" cy="131" rx="3" ry="4"/><ellipse cx="181" cy="131" rx="3" ry="4"/><circle cx="140" cy="140" r="1.7"/><circle cx="188" cy="140" r="1.7"/></g></g>
+<g id="sadEyes" fill="var(--eye)"><path d="M129 126Q135 126 141 122M179 122Q185 126 191 126" fill="none" stroke="var(--eye)" stroke-width="2.6" stroke-linecap="round"/><ellipse cx="136" cy="137" rx="6.5" ry="8"/><ellipse cx="184" cy="137" rx="6.5" ry="8"/><g fill="#fffaf4"><circle cx="134" cy="139" r="2"/><circle cx="182" cy="139" r="2"/></g></g>
+<path id="happyEyes" d="M127 138Q136 122 145 138M175 138Q184 122 193 138" stroke="var(--eye)" stroke-width="4.2" stroke-linecap="round" fill="none"/>
+<path id="sleepEyes" d="M127 133Q136 145 145 133M175 133Q184 145 193 133" stroke="var(--eye)" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+<path d="M154 148Q160 144 166 148Q166 153 160 154Q154 153 154 148Z" fill="var(--eye)"/>
+<path id="mouth" d="M160 153Q156 160 152 157M160 153Q164 160 168 157" fill="none" stroke="var(--eye)" stroke-width="2.4" stroke-linecap="round"/>
+<path id="sadMouth" d="M154 162Q160 155 166 162" stroke="var(--eye)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+<g id="happyMouth"><path d="M150 157Q160 162 170 157Q171 172 160 172Q149 172 150 157Z" fill="#9d6687"/><ellipse cx="160" cy="168" rx="6" ry="3" fill="#efaac2"/></g>
+<ellipse id="sleepMouth" cx="160" cy="161" rx="3" ry="3.5" fill="var(--eye)"/>
+<path id="tear" d="M195 143Q189 152 191 156Q195 160 199 156Q201 152 195 143Z" fill="#a5c6ed"/>
+<g id="hat">
+<path d="M119 78Q120 45 138 25Q157 3 180 15Q202 24 212 48Q194 44 182 51L197 78Z" fill="#8f97c5"/>
+<path d="M138 25Q157 3 180 15Q202 24 212 48Q193 38 177 41Q160 24 138 25Z" fill="#a3abd4"/>
+<rect x="117" y="69" width="84" height="17" rx="8.5" fill="#dce0f0"/>
+<path d="M145 40L148 47L156 48L150 53L152 61L145 57L138 61L140 53L134 48L142 47Z" fill="#f6e6b2"/>
+<circle cx="211" cy="49" r="10" fill="#f6f3fb"/>
+</g></g></g>
+<g id="hands" class="pigment" fill="var(--paw)"><circle cx="133" cy="176" r="16"/><circle cx="187" cy="176" r="16"/></g>
+<g id="raised" class="pigment"><g id="pawL"><use href="#pad" x="89" y="131"/></g><g id="pawR"><use href="#pad" x="231" y="131"/></g></g></g>
+<g id="hearts" fill="#d891b0"><path d="M56 78Q63 68 70 78Q77 68 84 78Q84 89 70 97Q56 89 56 78ZM252 61Q257 53 263 61Q269 53 274 61Q274 70 263 77Q252 70 252 61Z"/></g>
+<g id="sparkles" stroke="#d6ad6d" stroke-width="3.5" fill="none" stroke-linecap="round"><path d="M43 78V94M35 86H51M276 66V82M268 74H284M51 110L45 117M269 101L276 108"/></g>
+<g id="zzz" fill="#77738d" font-family="sans-serif" font-weight="bold"><text x="242" y="91" font-size="15">z</text><text x="260" y="70" font-size="21">z</text><text x="278" y="46" font-size="26">Z</text></g>
+</g>
+</svg>
