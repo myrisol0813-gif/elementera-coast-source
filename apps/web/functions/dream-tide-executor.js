@@ -147,7 +147,7 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
       if(stepCost===null)costKnown=false;else cost+=stepCost;
       let requested;
       try{requested=normalizeToolCalls(choice?.message?.tool_calls);}
-      catch(error){await recordDreamStep(db,claim,index,'failed',{error_type:safeError(error),usage,cost:stepCost},clock());throw error;}
+      catch(error){await recordDreamStep(db,claim,index,'failed',{error_type:safeError(error),usage,cost:stepCost,...(images.length?{image_readback_unconfirmed:images.map(x=>x.id)}:{})},clock());throw error;}
       const receipt={usage,cost:stepCost,model:typeof raw?.model==='string'?raw.model.slice(0,180):null,
         finish_reason:typeof choice?.finish_reason==='string'?choice.finish_reason.slice(0,80):null,requested_tools:requested.map(x=>x.function.name),...(images.length?{[choice?'image_readback_accepted':'image_readback_unconfirmed']:images.map(x=>x.id)}:{})};
       if(!await recordDreamStep(db,claim,index,'completed',receipt,clock()))throw new DOMException('Aborted','AbortError');
