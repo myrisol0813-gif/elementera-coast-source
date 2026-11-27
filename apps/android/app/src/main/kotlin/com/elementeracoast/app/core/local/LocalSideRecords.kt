@@ -135,7 +135,7 @@ internal class LocalSideRecords(private val store:LocalPersistence) {
         val histories=mutableMapOf<String,RemoteHistory?>()
         val items=media.map{v->
             val k=v.optional("kind")?:"audio";val cid=v.str("conversation_id");val id=v.str("id");val key="$k:$cid:$id";val treasure=treasures[key]?.data
-            val origin=if(k=="audio")AttachmentOrigin("assistant",v.optional("message_id"),if(v.optional("message_id")!=null)"linked" else if(v.optional("source")=="dream_tide")"unlinked" else "turn_only")else attachmentOrigin(histories.getOrPut(cid){cache.history(cid)},v)
+            val origin=if(k=="audio")AttachmentOrigin("assistant",v.optional("message_id"),if(v.optional("message_id")!=null)"linked" else if(v.optional("source")=="dream_tide")"unlinked" else "turn_only")else if(id.startsWith("att_dream_"))AttachmentOrigin("assistant",null,"unlinked") else attachmentOrigin(histories.getOrPut(cid){cache.history(cid)},v)
             buildJsonObject{
                 put("id",id);put("source_id",id);put("kind",k);put("conversation_id",cid);put("turn_id",v["turn_id"]?:JsonNull);put("message_id",origin.messageId?.let(::JsonPrimitive)?:JsonNull);put("role",origin.role?.let(::JsonPrimitive)?:JsonNull);put("origin_status",origin.status)
                 val mediaName=v.optional("name")?:if(v.optional("source")=="dream_tide")"自主活动语音" else "语音"
