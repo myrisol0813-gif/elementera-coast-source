@@ -295,7 +295,7 @@ class LocalDreamExecutorTest {
         try{
             val (store,initial)=fixture();val cache=RemoteCacheStore(store);val ledger=LocalDreamLedger(store)
             val history=cache.history(cid)!!
-            cache.putHistory(cid,history.copy(contextSettings=history.contextSettings.copy(localModelWriteEnabled=true)))
+            cache.putHistory(cid,history.copy(updatedAt=Instant.ofEpochMilli(at).toString(),contextSettings=history.contextSettings.copy(localModelWriteEnabled=true)))
             val cfg2=cfg.copy(execution=cfg.execution!!.copy(allowImage=true,allowVoice=true,allowMemoryCandidate=true,tokenBudget=24000))
             val settings=ledger.configure(cid,DreamSettingsRequest(cid,initial.revision,"arm",cfg2,model,true),true,at-86400000)!!
             val claim=ledger.claim(cid,settings.revision!!,model,at)!!
