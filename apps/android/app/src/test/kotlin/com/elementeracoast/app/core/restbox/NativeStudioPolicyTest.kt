@@ -68,7 +68,9 @@ class NativeStudioPolicyTest {
             poseChoices=mapOf("study" to mapOf("model" to "none")))
         assertEquals(policy.validate(study),policy.import(policy.export(study),original))
         // Old room-only exports remain accepted without resetting the household.
-        val old=kotlinx.serialization.json.Json.encodeToString(NativeRoomLayout.serializer(),study.layout)
+        // Original JS exports always include version:1 and default placement fields.
+        val old=kotlinx.serialization.json.Json { encodeDefaults=true }.encodeToString(NativeRoomLayout.serializer(),study.layout)
         assertEquals(original.household,policy.import(old,original).household)
+        assertThrows(IllegalArgumentException::class.java){policy.import("""{"rooms":{}}""",original)}
     }
 }
