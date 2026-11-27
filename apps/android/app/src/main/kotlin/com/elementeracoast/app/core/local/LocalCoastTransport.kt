@@ -120,8 +120,15 @@ class LocalCoastTransport(private val store: LocalPersistence,
             fun payload(settings:DreamSettings)=element(DreamSettingsResponse.serializer(),DreamSettingsResponse(ok=true,settings=settings)).jsonObject
             if(method=="GET"){
                 if(path=="/api/chat/dream-tide")return response(r,200,payload(previous))
-                if(path=="/api/chat/dream-tide/notes"||path=="/api/chat/dream-tide/activity")
-                    return ok(r,"items" to JsonArray(emptyList()),"nextOffset" to JsonNull)
+                val offset=r.url.queryParameter("offset")?.toIntOrNull()?:0
+                require(offset>=0)
+                if(path=="/api/chat/dream-tide/notes")return response(r,200,LocalDreamArchive(store).notes(cid,offset))
+                if(path=="/api/chat/dream-tide/activity")return response(r,200,LocalDreamArchive(store).activity(cid,offset))
+            }
+            if(method=="POST"&&path=="/api/chat/dream-tide/reply"){
+                if(!LocalDreamArchive(store).reply(cid,b.str("claim_id").orEmpty(),b.str("reply_id").orEmpty(),b.str("body").orEmpty()))
+                    return failure(r,409,"dream_reply_conflict","自主手记不存在或回复身份冲突。")
+                return ok(r)
             }
             if(method!="POST"||path!="/api/chat/dream-tide")return unsupported(r)
             val request=json.decodeFromJsonElement(DreamSettingsRequest.serializer(),b)
@@ -166,7 +173,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 store.atomic{staged->
                     LocalSideRecords(staged).removeConversation(cid)
                     LocalDogtalkStore(staged).deleteConversation(cid)
-                    staged.remove("local.dream.settings."+cid)
+                    LocalDreamArchive(staged).remove(cid)
                     val c=RemoteCacheStore(staged,strictReads=true)
                     c.putConversations(all.filterNot{it.id==cid});c.removeHistory(cid)
                     LocalAttachmentStore(staged).deleteConversation(cid)
