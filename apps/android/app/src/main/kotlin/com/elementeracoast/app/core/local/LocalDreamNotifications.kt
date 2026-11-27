@@ -59,7 +59,7 @@ internal object LocalDreamNotifications {
         return Target(cid,claim,when(kind){NOTE->1;START,FAILURE->2;"test"->0;else->return null})
     }
     /** One stable tag per persisted claim and event. Reposting cannot stack duplicate alerts. */
-    fun post(c:Context,cid:String,claim:String,kind:String):Boolean=runCatching{
+    fun post(c:Context,cid:String,claim:String,kind:String,body:String?=null):Boolean=runCatching{
         if(kind !in setOf(NOTE,FAILURE,START,"test"))return false
         if(kind!="test"&&!enabled(c,kind))return false
         ensure(c)
@@ -69,14 +69,17 @@ internal object LocalDreamNotifications {
             .setData(Uri.Builder().scheme("coast-dream").authority("notice").appendPath(cid).appendPath(claim).appendPath(kind).build())
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val open=PendingIntent.getActivity(c,0,intent,PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        val text=when(kind){NOTE->"有一份新的自主手记，打开看看吧。";FAILURE->"有一次活动未完成，请查看记录。";START->"一次活动已经开始。";else->"这是一条测试通知，没有调用模型。"}
+        val fallback=when(kind){NOTE->"有一份新的自主手记，打开看看吧。";FAILURE->"有一次活动未完成，请查看记录。";START->"一次活动已经开始。";else->"这是一条测试通知，没有调用模型。"}
+        val text=if(kind==NOTE)CoastMessageNotifications.display(c,body.orEmpty(),fallback) else fallback
+        val showPublic=kind==NOTE&&CoastMessageNotifications.publicContent(c)
         val title=when(kind){NOTE->"新的自主手记";FAILURE->"自主唤醒 · 活动异常";START->"自主唤醒 · 开始活动";else->"自主唤醒 · 测试通知"}
         val public=Notification.Builder(c,ch).setSmallIcon(android.R.drawable.ic_dialog_email)
-            .setContentTitle(c.applicationInfo.loadLabel(c.packageManager)).setContentText("有一条新通知")
+            .setContentTitle(c.applicationInfo.loadLabel(c.packageManager)).setContentText(if(showPublic)text else "有一条新通知")
             .setVisibility(Notification.VISIBILITY_PUBLIC).build()
         val notification=Notification.Builder(c,ch).setSmallIcon(android.R.drawable.ic_dialog_email)
             .setContentTitle(title).setContentText(text).setContentIntent(open).setAutoCancel(true)
-            .setOnlyAlertOnce(true).setVisibility(Notification.VISIBILITY_PRIVATE).setPublicVersion(public)
+            .setOnlyAlertOnce(true).setVisibility(if(showPublic)Notification.VISIBILITY_PUBLIC else Notification.VISIBILITY_PRIVATE).setPublicVersion(public)
+            .setStyle(Notification.BigTextStyle().bigText(text))
             .setCategory(Notification.CATEGORY_MESSAGE).build()
         val tag="coast-dream:$cid:$claim:$kind"
         if(kind=="test")manager(c).cancel(tag,4218)

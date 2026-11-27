@@ -46,7 +46,14 @@ class LocalDreamWorker(context:Context,params:WorkerParameters):CoroutineWorker(
             val plan=if(BuildConfig.LOCAL_DREAM_PLAN_EXECUTION_ENABLED)com.elementeracoast.app.feature.chatgpt.NativeDreamPlanRoute(store,com.elementeracoast.app.feature.chatgpt.ChatGptPlanRepository(com.elementeracoast.app.feature.chatgpt.ChatGptSecureStore(applicationContext,true)))else null
             val executor=LocalDreamExecutor(store,provider::resolve,client::dreamRequest,workspaceActive={
                 NativeWorkspace.localSelected(applicationContext)&&NativeWorkspace.isLocal&&NativeWorkspace.persistence(applicationContext)===store
-            },web=LocalIndependentWeb(applicationContext),captureReality={settings->com.elementeracoast.app.feature.chat.AndroidRealityContextSource(applicationContext,store,true).capture(settings)},voice=LocalVoiceProvider(applicationContext),imageProvider=provider::resolveImageProvider,modelBudget={p,m,output->client.inputBudget(p,m,0,output,true)},preparePlan={cid,revision,model->plan?.open(cid,revision,model)},onNotice={cid,claim,kind->LocalDreamNotifications.post(applicationContext,cid,claim,kind)})
+            },web=LocalIndependentWeb(applicationContext),captureReality={settings->com.elementeracoast.app.feature.chat.AndroidRealityContextSource(applicationContext,store,true).capture(settings)},voice=LocalVoiceProvider(applicationContext),imageProvider=provider::resolveImageProvider,modelBudget={p,m,output->client.inputBudget(p,m,0,output,true)},preparePlan={cid,revision,model->plan?.open(cid,revision,model)},onNotice={cid,claim,kind->
+                val body=if(kind=="note")runCatching{
+                    LocalDreamArchive(store).runtimeHistory(cid)["notes"]?.jsonArray?.map{it.jsonObject}
+                        ?.firstOrNull{it["claim_id"]?.jsonPrimitive?.contentOrNull==claim}
+                        ?.get("body")?.jsonPrimitive?.contentOrNull
+                }.getOrNull()else null
+                LocalDreamNotifications.post(applicationContext,cid,claim,kind,body)
+            })
             val windows=RemoteCacheStore(store,strictReads=true).conversations().filter{it.roomType=="main"&&it.source=="coast"&&it.deletedAt==null}
             val now=System.currentTimeMillis()
             // No previous in-flight wake can be alive while this lease is held.

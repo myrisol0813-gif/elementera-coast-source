@@ -66,7 +66,8 @@ class CoastShellViewModel(
     private val workDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
     private val chatGpt: ChatGptPlanRepository? = null,
     private val localMode: Boolean = false,
-    private val foregroundLease: ((()->Unit,()->Unit)->AutoCloseable?)? = null
+    private val foregroundLease: ((()->Unit,()->Unit)->AutoCloseable?)? = null,
+    private val onCommittedNotice: (String,com.elementeracoast.app.core.remote.RemoteVariant)->Unit = {_,_->}
 ) : ViewModel() {
     private val _state = MutableStateFlow(CoastShellState(
         currentModel = chatGpt?.preferredModel()?.let { CHATGPT_PLAN_PREFIX + it }.orEmpty(),
@@ -678,6 +679,7 @@ class CoastShellViewModel(
                 requested=true
                 val result=backend.chat.generateImage(cid,turn.id,uid,mid,prompt)
                 showHistory(cid,result)
+                result.turns.firstOrNull{it.id==turn.id}?.assistant?.variantsByUserVariant?.values?.flatten()?.firstOrNull{it.id==mid}?.let{notifyCommitted(cid,it)}
                 showPlaceholder("图片已保存。")
             }catch(error:kotlinx.coroutines.CancellationException){
                 if(requested&&cid.isNotBlank())kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable){runCatching{backend.chat.loadHistory(cid)}.onSuccess{showHistory(cid,it)}}
@@ -1212,6 +1214,10 @@ class CoastShellViewModel(
         return backend.chat.loadHistory(conversationId)
     }
 
+    private fun notifyCommitted(cid:String,variant:com.elementeracoast.app.core.remote.RemoteVariant){
+        if(!variant.hidden && variant.finishReason !in setOf("cancelled","error","image_pending","image_tool_ready","image_failed") && (variant.content.isNotBlank()||variant.attachments.isNotEmpty()))runCatching{onCommittedNotice(cid,variant)}
+    }
+
     private suspend fun generateTurn(
         conversationId: String,
         history: RemoteHistory,
@@ -1268,6 +1274,8 @@ class CoastShellViewModel(
                         generationRun?.apply { streaming = false; preview = null }
                         _state.update(::generationUi)
                         showHistory(conversationId, progress.history)
+                        val newId=ChatSyncMapper.nextAssistantVariantId(cleared,turnId)
+                        progress.history.turns.firstOrNull{it.id==turnId}?.assistant?.variantsByUserVariant?.values?.flatten()?.firstOrNull{it.id==newId}?.let{notifyCommitted(conversationId,it)}
                         if (_state.value.activeConversationId == conversationId) {
                             _state.update {
                                 it.copy(
@@ -1316,6 +1324,7 @@ class CoastShellViewModel(
         var index=0
         var partial=""
         var tail:com.elementeracoast.app.core.remote.RemoteVariant?=null
+        val notified=mutableSetOf<String>()
         var end:ReplyRunEvent.End?=null
         val run=generationRun
         fun preview(){
@@ -1366,6 +1375,7 @@ class CoastShellViewModel(
                     is ReplyRunEvent.Delta->{partial+=event.content;preview()}
                     is ReplyRunEvent.Committed->{
                         canonical=event.history;tail=event.variant;mid=null;partial=""
+                        if(notified.add(event.variant.id))notifyCommitted(cid,event.variant)
                         displayCanonical()
                         if(_state.value.activeConversationId==cid)_state.update{it.copy(backendOffline=false,
                             turnDeskReceipt=event.variant.deskSlip?.let(com.elementeracoast.app.feature.chat.TurnDeskMapper::toUi))}
@@ -1768,7 +1778,8 @@ class CoastShellViewModel(
                 val chatGpt = ChatGptPlanRepository(ChatGptSecureStore(appContext, localMode = isLocal))
                 val backend = CoastBackendGraph.production(appContext, persistence, chatGpt)
                 return CoastShellViewModel(persistence, backend, chatGpt = chatGpt, localMode = isLocal,
-                    foregroundLease = { cancel, unavailable -> GenerationForegroundService.acquire(appContext, cancel, unavailable) }) as T
+                    foregroundLease = { cancel, unavailable -> GenerationForegroundService.acquire(appContext, cancel, unavailable) },
+                    onCommittedNotice={cid,variant->com.elementeracoast.app.core.local.CoastMessageNotifications.post(appContext,cid,variant,isLocal)}) as T
             }
         }
     }
