@@ -71,6 +71,7 @@ internal class LocalDreamExecutor(
                 permitted(c)
                 val real=localReality(store,scoped,actual,Instant.ofEpochMilli(c.startedAt).atZone(ZoneId.of(c.config.timeZone)).toLocalDateTime())
                 if(real.delivered)parts.add("【已授权现实上下文】"+real.context)
+                if(real.missing.isNotEmpty())parts.add("【未取得的现实资料】"+real.missing.joinToString("、"))
             }
         }
         return parts.joinToString("\n\n")
