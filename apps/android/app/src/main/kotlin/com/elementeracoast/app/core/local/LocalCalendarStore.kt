@@ -36,7 +36,7 @@ internal class LocalCalendarStore(private val persistence: LocalPersistence) {
         put("targetDays", targetDays?.let(::JsonPrimitive) ?: JsonNull); put("pinned", pinned)
     }
 
-    fun list(month: String?, pinned: Boolean = false, today: String? = null): List<JsonObject> {
+    fun list(month: String?, pinned: Boolean = false, today: String? = null, allRecords: Boolean = false): List<JsonObject> {
         val entries = all()
         if (pinned) {
             val date = today?.let(::day)
@@ -50,6 +50,8 @@ internal class LocalCalendarStore(private val persistence: LocalPersistence) {
                     }))
                 }
         }
+        if (allRecords) return entries.map { row -> JsonObject(row + ("occurrence_day" to JsonPrimitive(row.text("day")))) }
+            .sortedWith(compareBy({ it.text("day") }, { it["created_at"]?.jsonPrimitive?.longOrNull ?: 0L }, { it.text("id") }))
         val selected = try {
             (month?.let(YearMonth::parse) ?: YearMonth.now()).also { require(it.year in 1900..2200) }
         } catch (_: Exception) { throw LocalCalendarError("invalid_month", "月份应为 YYYY-MM 格式。") }

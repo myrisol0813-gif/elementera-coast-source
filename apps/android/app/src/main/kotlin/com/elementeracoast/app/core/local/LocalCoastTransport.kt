@@ -481,7 +481,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             return daily(r, path, method)
         if (path == "/api/calendar/entries") {
             if (method == "GET") return ok(r, "entries" to JsonArray(calendar.list(r.url.queryParameter("month"),
-                r.url.queryParameter("pinned") == "1", r.url.queryParameter("today"))))
+                r.url.queryParameter("pinned") == "1", r.url.queryParameter("today"), r.url.queryParameter("all") in setOf("1", "true"))))
             if (method == "POST") return ok(r, "entry" to calendar.save(null, body(r)))
         }
         if (path.startsWith("/api/calendar/entries/") && r.url.pathSegments.size == 4) {

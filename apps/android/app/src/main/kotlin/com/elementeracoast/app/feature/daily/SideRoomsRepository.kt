@@ -63,6 +63,7 @@ class SideRoomsRepository(private val config: CoastApiConfig, private val client
         }
 
     suspend fun calendar(month: String): JsonObject = request("/api/calendar/entries?month=${encode(month)}")
+    suspend fun allCalendar(): JsonObject = request("/api/calendar/entries?all=1")
     suspend fun pinnedCalendar(today: String): JsonObject = request("/api/calendar/entries?pinned=1&today=${encode(today)}")
     suspend fun saveCalendar(id: String?, input: JsonObject): JsonObject =
         request(id?.let { "/api/calendar/entries/${path(it)}" } ?: "/api/calendar/entries",

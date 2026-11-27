@@ -15,7 +15,7 @@ const monthShift = (month, delta) => {
 const monthTitle = (month) => `${month.slice(0, 4)} 年 ${Number(month.slice(5))} 月`;
 
 export function createCalendar({ router, toast }) {
-  const state = { month: today().slice(0, 7), day: today(), entries: [], busy: false, ready: false, error: '' };
+  const state = { month: today().slice(0, 7), day: today(), entries: [], busy: false, ready: false, error: '', overview: false, filter: 'all' };
   let root = null, pinnedRoot = null, pinnedTimer = null;
   let pinnedEntries = [], pinnedError = '';
   let pinnedRevision = 0;
@@ -67,30 +67,48 @@ export function createCalendar({ router, toast }) {
     if (state.busy) return;
     state.busy = true;
     const requestedMonth = state.month;
+    const requestedOverview = state.overview;
+    const currentRequest = () => requestedOverview === state.overview && (requestedOverview || requestedMonth === state.month);
     state.error = '';
     try {
-      const result = await requestJson(`${API.calendarEntries}?month=${encodeURIComponent(requestedMonth)}`);
-      if (requestedMonth === state.month) {
+      const result = await requestJson(`${API.calendarEntries}?${requestedOverview ? 'all=1' : `month=${encodeURIComponent(requestedMonth)}`}`);
+      if (currentRequest()) {
         state.entries = result.entries || [];
         state.ready = true;
       }
     } catch (error) {
-      if (requestedMonth === state.month) state.error = error?.message || '无法读取日历。';
+      if (currentRequest()) state.error = error?.message || '无法读取日历。';
     } finally {
       state.busy = false;
-      if (requestedMonth !== state.month) void load();
+      if (!currentRequest()) void load();
       else if (router.current()?.name === 'calendar') await router.refresh({ preserveScroll: true });
     }
   }
 
   const card = (entry) => `<article class="coast-calendar-entry">
-    <div><strong>${escapeHtml(entry.title)}</strong><small>${entry.anniversary ? '纪念日' : entry.kind === 'note' ? '随记' : '日程'} · ${escapeHtml(entry.author === 'owner' ? '用户' : '助手')}${entry.recurrence === 'yearly' ? ' · 每年' : ''}${entry.anniversary?.pinned ? ' · 侧栏展示' : ''}</small></div>
+    <div><strong>${escapeHtml(entry.title)}</strong><small>${state.overview ? `${escapeHtml(entry.anniversary?.startDay || entry.day)} · ` : ''}${entry.anniversary ? '纪念日' : entry.kind === 'note' ? '随记' : '日程'} · ${escapeHtml(entry.author === 'owner' ? '用户' : '助手')}${entry.recurrence === 'yearly' ? ' · 每年' : ''}${entry.anniversary ? (entry.anniversary.pinned ? ' · 侧栏展示' : ' · 未置顶') : ''}</small></div>
     ${entry.body ? `<p>${escapeHtml(entry.body)}</p>` : ''}
     <button type="button" data-action="calendar:edit" data-id="${escapeAttribute(entry.id)}">编辑</button>
   </article>`;
 
+  const entryType = entry => entry.anniversary ? 'anniversary' : entry.kind === 'note' ? 'note' : 'event';
+  const overviewFilters = [['all','全部'],['anniversary','纪念日'],['event','日程'],['note','随记']];
+  function overviewView() {
+    const visible = state.entries.filter(entry => state.filter === 'all' || entryType(entry) === state.filter);
+    return {
+      title: '日历 · 全部记录', subtitle: '跨月份、跨年份 · 每条原始记录仅展示一次', className: 'coast-calendar-panel',
+      headerAction: '<button class="feature-head-action" data-action="calendar:overview-toggle" type="button">返回月历</button>',
+      body: `<section class="coast-calendar-shell"><div class="coast-calendar-detail">
+        <h2>全部记录 <small>${state.ready ? state.entries.length + ' 条' : ''}</small></h2>
+        <div class="coast-calendar-overview-filters" style="display:flex;flex-wrap:wrap;gap:6px">${overviewFilters.map(([key,label]) => `<button type="button" data-action="calendar:overview-filter" data-filter="${key}" aria-pressed="${state.filter === key}">${label}${state.ready ? ' ' + state.entries.filter(entry => key === 'all' || entryType(entry) === key).length : ''}</button>`).join('')}</div>
+        ${state.error ? `<p class="coast-calendar-error">${escapeHtml(state.error)}</p><button type="button" data-action="calendar:reload">重试</button>` : ''}
+        ${state.busy ? '<p class="feature-note">正在翻阅全部记录…</p>' : state.ready ? (visible.length ? visible.map(card).join('') : '<p class="feature-empty">这里还没有记录。</p>') : ''}
+      </div></section>`,
+    };
+  }
   function calendarView() {
-    if (!state.ready && !state.busy) void load();
+    if (!state.ready && !state.busy && !state.error) void load();
+    if (state.overview) return overviewView();
     const [y, m] = state.month.split('-').map(Number);
     const firstWeekday = new Date(y, m - 1, 1).getDay();
     const lastDay = new Date(y, m, 0).getDate();
@@ -107,6 +125,7 @@ export function createCalendar({ router, toast }) {
       headerAction: '<button class="feature-head-action" data-action="calendar:new" type="button">＋ 记录</button>',
       body: `<section class="coast-calendar-shell">
         <div class="coast-calendar-month"><button data-action="calendar:previous" type="button" aria-label="上个月">‹</button><strong>${monthTitle(state.month)}</strong><button data-action="calendar:next" type="button" aria-label="下个月">›</button></div>
+        <button class="coast-calendar-add" type="button" data-action="calendar:overview-toggle">全部记录</button>
         <div class="coast-calendar-grid">${['日','一','二','三','四','五','六'].map((v) => `<span class="coast-calendar-week">${v}</span>`).join('')}${squares}</div>
         <div class="coast-calendar-detail"><h2>${escapeHtml(state.day)} <small>${visible.length} 条记录</small></h2>
           ${state.error ? `<p class="coast-calendar-error">${escapeHtml(state.error)}</p><button type="button" data-action="calendar:reload">重试</button>` : ''}
@@ -194,10 +213,17 @@ export function createCalendar({ router, toast }) {
     if (name === 'anniversary-edit') return router.open('calendar-edit', { id: target.dataset.id, fromSidebar: true });
     if (name === 'pinned-reload') return loadPinned();
     if (name === 'open') return router.open('calendar');
+    if (name === 'overview-toggle') {
+      state.overview = !state.overview; state.ready = false; state.entries = []; state.error = '';
+      void load(); return router.refresh();
+    }
+    if (name === 'overview-filter' && overviewFilters.some(([key]) => key === target.dataset.filter)) {
+      state.filter = target.dataset.filter; return router.refresh();
+    }
     if (name === 'previous' || name === 'next') {
       state.month = monthShift(state.month, name === 'previous' ? -1 : 1);
       state.day = `${state.month}-01`;
-      state.ready = false;
+      state.ready = false; state.entries = []; state.error = '';
       void load(); return router.refresh();
     }
     if (name === 'day') { state.day = target.dataset.day; return router.refresh(); }
@@ -209,6 +235,7 @@ export function createCalendar({ router, toast }) {
       if (!globalThis.confirm?.('确定删除这条日历记录吗？')) return;
       try {
         await requestJson(`${API.calendarEntries}/${encodeURIComponent(target.dataset.id)}`, { method: 'DELETE' });
+        state.ready = false; state.entries = state.entries.filter(item => item.id !== target.dataset.id); state.error = '';
         toast('日历记录已经删除。');
         void loadPinned();
         await router.open('calendar', {}, { replace: true });

@@ -25,6 +25,18 @@ const id = created.body.entry.id;
 const next = await request('/api/calendar/entries?month=2031-06');
 assert.equal(next.status, 200);
 assert.equal(next.body.entries[0].occurrence_day, '2031-06-12');
+const unpinned = await request('/api/calendar/entries', 'POST', {
+  day: '2026-01-01', title: 'Unpinned', anniversary: {startDay:'2026-01-01', mode:'yearly', targetDays:null, pinned:false}
+});
+assert.equal(unpinned.status, 201);
+const overview = await request('/api/calendar/entries?all=1');
+assert.equal(overview.status, 200);
+assert.equal(overview.body.entries.length, 2);
+assert.equal(overview.body.entries.find(row=>row.id===id).occurrence_day,'2030-06-12');
+assert.equal(overview.body.entries.find(row=>row.id===unpinned.body.entry.id).anniversary.pinned,false);
+assert.equal((await request('/api/calendar/entries?pinned=1&all=1')).body.entries.length,0);
+assert.equal((await request('/api/calendar/entries?all=1','GET',undefined,null)).status,401);
+await request('/api/calendar/entries/'+unpinned.body.entry.id,'DELETE');
 const invalid = await request('/api/calendar/entries', 'POST', {
   day: '2030-02-30', title: 'Invalid', kind: 'event', recurrence: 'none'
 });
