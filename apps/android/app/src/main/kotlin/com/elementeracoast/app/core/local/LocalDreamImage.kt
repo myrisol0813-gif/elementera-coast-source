@@ -3,6 +3,20 @@ package com.elementeracoast.app.core.local
 import com.elementeracoast.app.core.remote.RemoteCacheStore
 import kotlinx.serialization.json.*
 
+internal data class DreamImageReadback(val id:String,val bytes:Int,val message:JsonObject){
+    override fun toString()="DreamImageReadback(id=$id, bytes=$bytes, message=redacted)"
+}
+internal fun prepareDreamImageReadback(store:LocalPersistence,cid:String,id:String,vision:Boolean?):DreamImageReadback?{
+    if(vision!=true)return null
+    require(id.startsWith("att_dream_"))
+    val originals=LocalAttachmentStore(store)
+    val original=originals.entries().single{it.metadata["id"]?.jsonPrimitive?.contentOrNull==id&&it.metadata["conversation_id"]?.jsonPrimitive?.contentOrNull==cid}
+    require(original.metadata["turn_id"]==JsonNull&&original.metadata["kind"]==JsonPrimitive("image"))
+    val bytes=originals.bytes(original)
+    val prepared=prepareGeneratedImageReadback(id,bytes,original.metadata.getValue("mime").jsonPrimitive.content,true)
+    return DreamImageReadback(id,bytes.size,requireNotNull(prepared.continuationMessage))
+}
+
 /** An independent activity original never requires a fictional chat turn. */
 internal class LocalDreamImage(
     private val store:LocalPersistence,private val claim:LocalDreamLedger.Claim,
