@@ -3,11 +3,19 @@ import {requestJson} from '../core/api.js';
 const BASE='/api/chat/dream-tide';
 const modules=[['includeTime','当前时间'],['includePrevious','上次活动与间隔'],['includeReplies','自主手记与回复'],['readHistory','允许自主选读窗口历史'],['writeNote','允许写自主手记'],['includeCustom','核心自定义'],['includeUserPortrait','用户画像'],['includeSelfPortrait','自我画像'],['includeConversationCount','期间新增对话轮数'],['includeWeather','天气（需窗口现实权限）'],['includeCalendar','未来日历（需窗口现实权限）'],['includeSteps','步数（目前仅本机 Android 可取得）'],['includeAppUsage','应用使用情况（目前仅本机 Android 可取得）'],['allowWeb','独立联网（已配置供应商）'],['allowLibrary','书房阅读'],['allowMemory','按需检索正式记忆'],['allowMemoryCandidate','提议记忆候选（仅待确认）'],['allowCalendar','查阅日历'],['allowCollection','查阅收藏'],['allowLibraryWrite','创建自己的书房笔记'],['allowDailyWrite','新增自己的日记与动态'],['allowCalendarWrite','新增日历事项'],['allowVoice','自主语音（独立供应商费用）'],['allowImage','自主生图（独立供应商费用）']];
 const names={running:'活动中',completed:'已结束',failed:'未完成',cancelled:'已取消',interrupted:'已中断',claimed:'已认领，结果未确认'};
-const toolNames={dream_read_history:'阅读历史',dream_write_note:'写自主手记',dream_memory_candidate:'提议记忆候选',dream_schedule_extra:'提议额外唤醒'};
+const toolNames={voice_create:'自主语音',image_generate:'自主生图',dream_read_history:'阅读历史',dream_write_note:'写自主手记',dream_memory_candidate:'提议记忆候选',dream_schedule_extra:'提议额外唤醒'};
 const row=(label,body)=>'<label>'+h(label)+body+'</label>';
 const input=(id,value,type='text',extra='')=>'<input id="'+id+'" type="'+type+'" value="'+a(String(value??''))+'" '+extra+'>';
 const checkbox=(id,label,checked)=>'<label><input type="checkbox" id="'+id+'" '+(checked?'checked':'')+'> '+h(label)+'</label>';
 const button=(label,action,extra='')=>'<button type="button" class="feature-row" data-action="dream-tide:'+action+'" '+extra+'><span><strong>'+h(label)+'</strong></span></button>';
+const mediaLink=(cid,t)=>{
+  const id=t.receipt?.record_id;
+  const audio=t.tool_name==='voice_create'&&typeof id==='string'&&id.startsWith('voice_dream_');
+  const image=t.tool_name==='image_generate'&&typeof id==='string'&&id.startsWith('att_dream_');
+  if(!audio&&!image)return '';
+  const url=audio?'/api/voice/clips/'+encodeURIComponent(id)+'/audio':'/api/chat/attachments/'+encodeURIComponent(id)+'?conversation_id='+encodeURIComponent(cid)+'&inline=1';
+  return '<p><a target="_blank" rel="noopener" href="'+a(url)+'">'+(audio?'查看原声':'查看原图')+'</a></p>';
+};
 const section=(title,body)=>'<section class="feature-group"><h2>'+h(title)+'</h2><div class="feature-card">'+body+'</div></section>';
 const stamp=v=>Number.isFinite(v)?new Date(v).toLocaleString():'未记录';
 const query=(path,cid,offset=0)=>BASE+path+'?'+new URLSearchParams({conversation_id:cid,limit:'20',offset:String(offset)});
@@ -64,7 +72,7 @@ export function createDreamTideViews({router,chat,toast}){
     const body=d.items.map(r=>section(stamp(r.started_at)+' · '+(r.kind==='daily'?'固定唤醒':'额外唤醒'),
       '<p>'+h(names[r.status]||r.status)+'</p><p class="feature-note">'+h(r.model_id)+'</p>'+
       '<p class="feature-note">总 token：'+h(r.result?.total_tokens??'未确认')+' · 供应商报告成本：'+h(r.result?.reported_cost==null?'未确认':'USD '+r.result.reported_cost)+'</p>'+
-      r.tools.map(t=>'<p class="feature-note">'+h((toolNames[t.tool_name]||t.tool_name)+' · '+(names[t.status]||t.status)+(Number.isInteger(t.receipt?.count)?' · '+t.receipt.count+' 轮':''))+'</p>').join('')+
+      r.tools.map(t=>'<p class="feature-note">'+h((toolNames[t.tool_name]||t.tool_name)+' · '+(names[t.status]||t.status)+(Number.isInteger(t.receipt?.count)?' · '+t.receipt.count+' 轮':''))+'</p>'+mediaLink(cid,t)).join('')+
       (r.result?.extra_scheduled?'<p class="feature-note">已保存额外预约。</p>':'')+
       (r.steps.some(s=>s.status==='claimed')?'<p class="feature-note">存在未确认请求，不会自动重放。</p>':''))).join('');
     return page('活动记录',(mediaId?'<p class="feature-note">作品来源 · '+h(mediaId)+'</p>':'')+(body||'<p class="feature-note">'+(mediaId?'未找到对应的活动记录。':'还没有活动记录。')+'</p>')+
