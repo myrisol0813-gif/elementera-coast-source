@@ -67,6 +67,18 @@ internal class LocalDreamArchive(private val store:LocalPersistence){
             draft?.let{store.put(draftKey(cid),json.encodeToString(DreamSettings.serializer(),it))}
         }
     }
+    fun validateCandidateOrigin(archive:JsonObject?,row:JsonObject){
+        if(row.str("source_type")!="dream_tide"&&!row.str("id").startsWith("pocket_dream_"))return
+        require(row.str("source_type")=="dream_tide")
+        val ref=json.parseToJsonElement(row.str("source_ref_json")).jsonObject
+        require(ref.str("source")=="dream_tide"&&ref.str("conversation_id")==row.str("conversation_id")&&ref.str("suggested_destination") in setOf("memory","seed")&&"turn_id" !in ref)
+        val parent=requireNotNull(archive){"自主记忆候选所属活动缺失。"}
+        val event=parent.rows("tools").firstOrNull{it.str("tool_name")=="dream_memory_candidate"&&it["claim_id"]==ref["claim_id"]&&it["step_index"]==ref["step_index"]&&it["call_index"]==ref["call_index"]&&row.str("id")=="pocket_dream_"+it.str("claim_id")+"_"+it.str("step_index")+"_"+it.str("call_index")}
+        val run=parent.rows("runs").firstOrNull{it["claim_id"]==event?.get("claim_id")&&it["conversation_id"]==row["conversation_id"]}
+        require(event!=null&&run!=null&&run["model_id"]==ref["model_label"]){"自主记忆候选来源不匹配。"}
+        val recorded=event["receipt_json"]?.jsonPrimitive?.contentOrNull?.let{json.parseToJsonElement(it).jsonObject["record_id"]?.jsonPrimitive?.contentOrNull}
+        require(recorded==null||recorded==row.str("id")){"自主记忆候选回执不一致。"}
+    }
     fun validateMediaOrigin(archive:JsonObject?,row:JsonObject,kind:String){
         val prefix=if(kind=="voice")"voice_dream_" else "att_dream_"
         val mediaId=row.str("id")
