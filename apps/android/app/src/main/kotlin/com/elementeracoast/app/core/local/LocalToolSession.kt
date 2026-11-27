@@ -66,7 +66,7 @@ internal class LocalToolSession private constructor(
         }
         if(writeAllowed){
             if(image!=null)add(Spec("image_generate","image.generate","绘制图片","自行决定是否绘制一张图，使用已选生图模型、正常API计费。本轮至多一次；只发送必要绘图提示。收到原件像素才可声称看见。",schema(mapOf("prompt" to string(4000)),listOf("prompt"))))
-            if(voice?.configured()==true) add(Spec("voice_create","voice.create","留下语音","把自己写的一小段文字念成真实MP3，普通聊天保存在当前轮次，自主活动保存在该次活动下。使用已授权的独立ElevenLabs额度，每次活动至多一次；只发送待朗读文字。",schema(mapOf("text" to string(2400)),listOf("text"))))
+            if(voice?.configured()==true) add(Spec("voice_create","voice.create","留下语音","把自己写的一小段文字念成真实MP3，普通聊天保存在当前轮次，自主活动保存在该次活动下。使用已授权的独立ElevenLabs额度，遵守当前活动的语音尝试上限；只发送待朗读文字。",schema(mapOf("text" to string(2400)),listOf("text"))))
             if(base.thinkingSoil.enabled && LocalPortraitStore(store).read("self_portrait")?.root?.get("write_enabled")?.jsonPrimitive?.int != 0)
                 add(Spec("global_excerpt_propose","memory.global_excerpt_propose","提出自我画像修改稿","仅在自动整理和画像写入均开启时提出整篇完整修改稿，说明长期价值；只进入待确认区，不覆盖正式正文。本机单次工具参数最多12000字符；不要提交截断的正文。",schema(mapOf("proposed_body" to string(10000),"reason" to string(4000),"change_kind" to string(40)),listOf("proposed_body","reason"))))
             if(base.thinkingSoil.enabled && LocalPortraitStore(store).read("user_portrait")?.root?.get("write_enabled")?.jsonPrimitive?.int != 0)
@@ -256,7 +256,7 @@ internal class LocalToolSession private constructor(
         reports.add(RemoteDeskToolResult(name=spec.name,delivered=true,content=output.toString()))
         return RemoteNativeToolResult(ok=success,output=output.toString(),deskSlip=receipt,furnitureRuns=listOf(RemoteFurnitureRun(id=id,toolKey=spec.key,label=spec.title,status=if(success)"success"else "error")))
     }
-    private var voiceAttempted=false
+    private var voiceAttempts=0
     private fun executeVoice(spec:Spec,arguments:String,start:Long,callId:String):RemoteNativeToolResult {
         val auditId=UUID.randomUUID().toString()
         val output=try{
@@ -269,9 +269,9 @@ internal class LocalToolSession private constructor(
             fun allowed(s:LocalPersistence)=allowedNow(s,spec)&&if(autonomousClaim!=null){
                 LocalDreamLedger(s).toolClaimed(autonomousClaim,callId,"voice_create")&&LocalSideRecords(s).clips(cid).none{it["id"]?.jsonPrimitive?.contentOrNull==independentId}
             }else LocalSideRecords(s).clips(cid).none{it["turn_id"]?.jsonPrimitive?.contentOrNull==turn&&it["source"]?.jsonPrimitive?.contentOrNull=="coast_chat"}
-            if(voiceAttempted||!store.readConsistent{allowed(it)}||!provider.configured())throw LocalToolFailure("permission_revoked","本轮已有语音尝试或授权已关闭。")
+            if(voiceAttempts>=(autonomousClaim?.config?.execution?.voiceLimit?:1)||!store.readConsistent{allowed(it)}||!provider.configured())throw LocalToolFailure("permission_revoked","本轮已有语音尝试或授权已关闭。")
             if(estimated+estimate(arguments)+512>toolBudget)throw LocalToolFailure("budget_exceeded","本轮工具预算不足，未发起语音生成。")
-            voiceAttempted=true
+            voiceAttempts++
             val audio=provider.generate(text)
             store.atomic{s->
                 if(!allowed(s)||!provider.configured())throw LocalToolFailure("permission_revoked","原窗口或语音授权已变化；未保存。")
