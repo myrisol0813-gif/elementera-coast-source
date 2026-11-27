@@ -74,6 +74,7 @@ export function createDreamTideViews({router,chat,toast}){
       '<p class="feature-note">总 token：'+h(r.result?.total_tokens??'未确认')+' · 供应商报告成本：'+h(r.result?.reported_cost==null?'未确认':'USD '+r.result.reported_cost)+'</p>'+
       r.tools.map(t=>'<p class="feature-note">'+h((toolNames[t.tool_name]||t.tool_name)+' · '+(names[t.status]||t.status)+(Number.isInteger(t.receipt?.count)?' · '+t.receipt.count+' 轮':''))+'</p>'+mediaLink(cid,r.claim_id,t)).join('')+
       (r.result?.extra_scheduled?'<p class="feature-note">已保存额外预约。</p>':'')+
+      r.steps.map(s=>'<p class="feature-note">'+h(Array.isArray(s.receipt?.image_readback_accepted)?'图像回读请求已获得响应 · '+s.receipt.image_readback_accepted.length+' 张':Array.isArray(s.receipt?.image_readback_unconfirmed)?'图像回读请求结果未确认 · '+s.receipt.image_readback_unconfirmed.length+' 张':'')+'</p>').filter(x=>x!=='<p class="feature-note"></p>').join('')+
       (r.steps.some(s=>s.status==='claimed')?'<p class="feature-note">存在未确认请求，不会自动重放。</p>':''))).join('');
     return page('活动记录',(mediaId?'<p class="feature-note">作品来源 · '+h(mediaId)+'</p>':'')+(body||'<p class="feature-note">'+(mediaId?'未找到对应的活动记录。':'还没有活动记录。')+'</p>')+
       (mediaId?button('查看全部活动','activity'):(activityOffset?button('上一页','activity-prev'):'')+(d.nextOffset!==null?button('下一页','activity-next'):'')));
