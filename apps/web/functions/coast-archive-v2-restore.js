@@ -1,3 +1,4 @@
+import {prepareDreamArchive} from './dream-tide-archive.js';
 import { validatedChat } from './coast-transfer-store.js';
 import { prepareArchiveVoice,prepareArchiveSoil } from './coast-archive-v2-restore-extra.js';
 import { ensureChatSchema, normalizeState } from './chat-store.js';
@@ -37,7 +38,7 @@ export async function prepareArchiveChatGroup(db,sessionId,manifest,conversation
   let canonical=entry.data;
   if(manifest.workspace==='local'){
     check(entry.kind==='local_chat','invalid local chat record kind');
-    const {c,state,storageUpdatedAt}=validatedChat(entry.data,{verifiedMediaGroup:true});
+    const {c,state,storageUpdatedAt}=validatedChat(Object.fromEntries(Object.entries(entry.data).filter(([k])=>k!=='dream_tide')),{verifiedMediaGroup:true});
     const ms=v=>typeof v==='number'?v:Date.parse(v);
     canonical={conversation:{id:c.id,title:c.title,room_type:c.room_type,created_at:ms(c.created_at),updated_at:ms(c.updated_at),deleted_at:null,title_manual:c.title_manual?1:0,title_generated_at:c.title_generated_at==null?null:ms(c.title_generated_at),title_model_id:c.title_model_id??null,source:c.source||'coast',source_window_id:c.source_window_id??null},history_json:JSON.stringify(state),history_updated_at:storageUpdatedAt};
   }else check(entry.kind==='chat','invalid backend chat record kind');
@@ -65,6 +66,10 @@ export async function prepareArchiveChatGroup(db,sessionId,manifest,conversation
     db.prepare("INSERT INTO conversations (id,user_id,title,created_at,updated_at,deleted_at,title_manual,title_generated_at,title_model_id,conversation_kind,room_type,source,source_window_id) VALUES (?,'owner',?,?,?,NULL,?,?,?,'chat',?,?,?)").bind(c.id,c.title,c.created_at,c.updated_at,c.title_manual,c.title_generated_at??null,c.title_model_id??null,c.room_type,c.source,c.source_window_id??null),
     db.prepare('INSERT INTO conversation_states (conversation_id,state_json,updated_at) VALUES (?,?,?)').bind(c.id,raw,updated)
   ];
+  if(entry.data.dream_tide!=null){
+    check(c.room_type==='main'&&c.source==='coast','invalid autonomous wake parent');
+    statements.push(...await prepareDreamArchive(db,c.id,entry.data.dream_tide));
+  }
   const conversationIds=new Set([c.id]),foundAttachments=new Set(),parents=[],snapshots=[];let voices=0,soils=0;
   for(const r of group.filter(r=>r!==root)){
     const {kind,data}=await read(r);
