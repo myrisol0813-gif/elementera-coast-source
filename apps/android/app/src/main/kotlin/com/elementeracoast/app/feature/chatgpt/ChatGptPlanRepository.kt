@@ -270,6 +270,7 @@ class ChatGptPlanRepository(
 
     suspend fun disconnect(): Boolean = mutex.withLock {
         val current = store.load() ?: return@withLock true
+        store.invalidateWakeConnection()
         val revoked = withContext(Dispatchers.IO) {
             runCatching {
                 val discovery = http.newCall(Request.Builder()
@@ -313,7 +314,7 @@ class ChatGptPlanRepository(
             scopes = scopes,
             expiresAtEpochSeconds = System.currentTimeMillis() / 1000 +
                 (renewed["expires_in"]?.jsonPrimitive?.longOrNull ?: 3600L)
-        ).also(store::save)
+        ).also{store.save(it)}
     }
 
     private fun postToken(body: FormBody): JsonObject =
