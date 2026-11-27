@@ -44,6 +44,8 @@ internal fun WorldbookScreen(
     var testResult by remember { mutableStateOf<List<WorldbookEntry>>(emptyList()) }
     var editing by remember { mutableStateOf<WorldbookEntry?>(null) }
     var creating by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf<WorldbookEntry?>(null) }
+    var deletingBusy by remember { mutableStateOf(false) }
 
     LaunchedEffect(createRequested) {
         if (createRequested) {
@@ -103,11 +105,36 @@ internal fun WorldbookScreen(
                             }
                         }, color = MaterialTheme.colorScheme.primary)
                         Text("编辑", modifier = Modifier.clickable { editing = entry }, color = MaterialTheme.colorScheme.primary)
+                        TextButton(enabled = !deletingBusy, onClick = { deleting = entry }) { Text("删除", color = MaterialTheme.colorScheme.error) }
                     }
                 }
             }
         }
         item { Spacer(Modifier.height(24.dp)) }
+    }
+
+    deleting?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { if (!deletingBusy) deleting = null },
+            title = { Text("永久删除词条？") },
+            text = { Text("「${entry.title}」将从世界书移除，不再参与匹配。已有聊天和备份不会改变。") },
+            confirmButton = {
+                TextButton(enabled = !deletingBusy, onClick = {
+                    deletingBusy = true
+                    scope.launch {
+                        try {
+                            repository.deleteWorldbook(entry.id)
+                            testResult = testResult.filterNot { it.id == entry.id }
+                            deleting = null
+                            onSnackbar("词条已删除")
+                        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                        catch (e: Exception) { onSnackbar(e.message ?: "删除词条失败") }
+                        finally { deletingBusy = false }
+                    }
+                }) { Text("永久删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(enabled = !deletingBusy, onClick = { deleting = null }) { Text("取消") } }
+        )
     }
 
     if (creating) WorldbookEditor(null, { creating = false }) { draft ->

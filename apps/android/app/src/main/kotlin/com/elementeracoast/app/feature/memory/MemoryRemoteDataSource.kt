@@ -175,7 +175,8 @@ class MemoryRemoteDataSource(
     ).entry
 
     suspend fun deleteWorldbook(id: String) {
-        requestElement(Request.Builder().url(config.url("/api/worldbook/${path(id)}")).delete().build())
+        requestElement(Request.Builder().url(config.url("/api/worldbook/${path(id)}/permanent")).delete().build())
+        check(listWorldbook().none { it.id == id }) { "未确认词条已删除，请刷新后检查。" }
     }
 
     suspend fun testWorldbook(input: String): List<RemoteWorldbookEntry> = request(

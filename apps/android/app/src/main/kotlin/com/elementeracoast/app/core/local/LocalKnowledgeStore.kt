@@ -35,6 +35,11 @@ internal class LocalKnowledgeStore(private val store:LocalPersistence,private va
         require(all.any{it.id==id}){"词条不存在。"}
         cache.putWorldbookEntries(all.map{if(it.id==id)it.copy(enabled=false,updatedAt=Instant.ofEpochMilli(System.currentTimeMillis()).toString())else it})
     }
+    fun purgeWorldbook(id:String) {
+        val all=entries()
+        require(all.any{it.id==id}){"词条不存在。"}
+        cache.putWorldbookEntries(all.filterNot{it.id==id})
+    }
     data class Match(val entry:RemoteWorldbookEntry,val keywords:List<String>,val by:String)
     fun match(input:String,messages:List<RemoteChatMessage>,surface:String="main_chat",limit:Int=6,allowedScopes:List<String> = emptyList()):List<Match> {
         // No visitor endpoint in local mode; never use a caller-controlled scope to expose visitor content.
