@@ -48,6 +48,8 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
     var toolsText by remember(cid){mutableStateOf("4")}
     var readText by remember(cid){mutableStateOf("10")}
     var extraText by remember(cid){mutableStateOf("0")}
+    var voiceLimitText by remember(cid){mutableStateOf("1")}
+    var imageLimitText by remember(cid){mutableStateOf("1")}
     var consent by remember(cid){mutableStateOf(false)}
     var notePage by remember(cid){mutableStateOf(DreamNotesResponse())}
     var activityPage by remember(cid){mutableStateOf(DreamActivityResponse())}
@@ -61,7 +63,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
         quiet=cfg.quietHours!=null
         quietStart=cfg.quietHours?.start?:"23:00";quietEnd=cfg.quietHours?.end?:"07:00"
         tokenText=execution.tokenBudget.toString();outputText=execution.outputLimit.toString()
-        toolsText=execution.toolBudget.toString();readText=execution.readTurns.toString();extraText=execution.extraPerDay.toString()
+        toolsText=execution.toolBudget.toString();readText=execution.readTurns.toString();extraText=execution.extraPerDay.toString();voiceLimitText=execution.voiceLimit.toString();imageLimitText=execution.imageLimit.toString()
         consent=false;loaded=true
     }
     suspend fun load(){
@@ -82,10 +84,11 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
         val e=if(action=="disarm")null else {
             val t=tokenText.toIntOrNull();val o=outputText.toIntOrNull();val u=toolsText.toIntOrNull()
             val r=readText.toIntOrNull();val x=extraText.toIntOrNull()
-            if(t==null||t !in 1..1000000||o==null||o !in 1..65536||u==null||u !in 0..128||r==null||r !in 1..400||x==null||x !in 0..128||execution.invitation.isBlank()||model.isBlank()){
+            val v=voiceLimitText.toIntOrNull();val i=imageLimitText.toIntOrNull()
+            if(t==null||t !in 1..1000000||o==null||o !in 1..65536||u==null||u !in 0..128||r==null||r !in 1..400||x==null||x !in 0..128||v==null||v !in 0..128||i==null||i !in 0..128||execution.invitation.isBlank()||model.isBlank()){
                 error="请填写模型、邀请词和有效整数预算。";return
             }
-            execution.copy(tokenBudget=t,outputLimit=o,toolBudget=u,readTurns=r,extraPerDay=x)
+            execution.copy(tokenBudget=t,outputLimit=o,toolBudget=u,readTurns=r,extraPerDay=x,voiceLimit=v,imageLimit=i)
         }
         if(action=="arm"&&(!canArm||!consent))return
         val request=DreamSettingsRequest(cid,response.settings.revision,action,
@@ -137,6 +140,8 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
                 DreamField("每次请求输出上限",outputText,{outputText=it},!busy)
                 DreamField("单次工具调用上限",toolsText,{toolsText=it},!busy)
                 DreamField("每次阅读最大轮数",readText,{readText=it},!busy)
+                DreamField("每次活动语音尝试上限",voiceLimitText,{voiceLimitText=it},!busy)
+                DreamField("每次活动生图尝试上限",imageLimitText,{imageLimitText=it},!busy)
                 OutlinedTextField(execution.invitation,{execution=execution.copy(invitation=it.take(16000))},label={Text("唤醒邀请词")},modifier=Modifier.fillMaxWidth(),minLines=4,enabled=!busy)
                 Text("可以什么也不做。输入 token 为估算，实际费用以供应商为准。",style=MaterialTheme.typography.bodySmall)
                 DreamSwitch("当前时间",execution.includeTime,!busy){execution=execution.copy(includeTime=it)}
