@@ -39,6 +39,8 @@ export function createDreamTideViews({router,chat,toast}){
       row('每次请求输出上限',input('dreamOutput',e.outputLimit??1000,'number','min="1" max="65536" step="1"'))+
       row('单次工具调用上限',input('dreamTools',e.toolBudget??4,'number','min="0" max="128" step="1"'))+
       row('每次阅读最大轮数',input('dreamReadTurns',e.readTurns??10,'number','min="1" max="400" step="1"'))+
+       row('每次活动语音尝试上限',input('dreamVoiceLimit',e.voiceLimit??1,'number','min="0" max="128" step="1"'))+
+       row('每次活动生图尝试上限',input('dreamImageLimit',e.imageLimit??1,'number','min="0" max="128" step="1"'))+
       row('唤醒邀请词','<textarea id="dreamInvitation" maxlength="16000" rows="7">'+h(e.invitation||'')+'</textarea>')+
       '<p class="feature-note">邀请词由你书写。模型可以什么也不做。输入 token 为估算，实际收费以供应商为准。</p></div>')
       +section('注入与工具','<div class="form-stack">'+modules.map(([key,label])=>checkbox('dream-'+key,label,e[key]===true)).join('')+'</div>')
@@ -97,7 +99,7 @@ export function createDreamTideViews({router,chat,toast}){
         data.modelId=value('dreamModel').trim();data.confirmExecution=checked('dreamConsent');
         data.config={timeZone:value('dreamZone').trim(),dailyTime:value('dreamTime'),allowExtra:checked('dreamExtra'),
           quietHours:checked('dreamQuiet')?{start:value('dreamQuietStart'),end:value('dreamQuietEnd')}:null,
-          execution:{invitation:value('dreamInvitation'),tokenBudget:number('dreamTokens'),outputLimit:number('dreamOutput'),toolBudget:number('dreamTools'),readTurns:number('dreamReadTurns'),extraPerDay:number('dreamExtraLimit'),
+          execution:{invitation:value('dreamInvitation'),tokenBudget:number('dreamTokens'),outputLimit:number('dreamOutput'),toolBudget:number('dreamTools'),readTurns:number('dreamReadTurns'),extraPerDay:number('dreamExtraLimit'),voiceLimit:number('dreamVoiceLimit'),imageLimit:number('dreamImageLimit'),
             ...Object.fromEntries(modules.map(([key])=>[key,checked('dream-'+key)]))}};
       }
       await post('',data);toast(name==='arm'?'已授权自主唤醒':name==='disarm'?'已撤回授权':'设置已保存 · 未启用');return router.refresh();
