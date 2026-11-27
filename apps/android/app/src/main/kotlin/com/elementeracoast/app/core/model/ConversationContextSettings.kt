@@ -23,6 +23,8 @@ data class ConversationContextSettings(
     @SerialName("reality_enabled") val realityEnabled: Boolean = false,
     @SerialName("reality_fields") val realityFields: List<String> = emptyList(),
     @SerialName("short_reply_mode") val shortReplyMode: Boolean = false,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("dream_readback_enabled") val dreamReadbackEnabled: Boolean = false,
     @SerialName("weather_city") val weatherCity: String = "",
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     @SerialName("cross_window_auto") val crossWindowAuto: Boolean = false,
