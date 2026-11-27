@@ -144,6 +144,19 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
                 DreamSwitch("自主手记与回复",execution.includeReplies,!busy){execution=execution.copy(includeReplies=it)}
                 DreamSwitch("允许自主选读窗口历史",execution.readHistory,!busy){execution=execution.copy(readHistory=it)}
                 DreamSwitch("允许写自主手记",execution.writeNote,!busy){execution=execution.copy(writeNote=it)}
+                DreamSwitch("核心自定义",execution.includeCustom,!busy){execution=execution.copy(includeCustom=it)}
+                DreamSwitch("用户画像",execution.includeUserPortrait,!busy){execution=execution.copy(includeUserPortrait=it)}
+                DreamSwitch("自我画像",execution.includeSelfPortrait,!busy){execution=execution.copy(includeSelfPortrait=it)}
+                DreamSwitch("期间新增对话轮数",execution.includeConversationCount,!busy){execution=execution.copy(includeConversationCount=it)}
+                DreamSwitch("天气（需窗口现实权限）",execution.includeWeather,!busy){execution=execution.copy(includeWeather=it)}
+                DreamSwitch("未来日历（需窗口现实权限）",execution.includeCalendar,!busy){execution=execution.copy(includeCalendar=it)}
+                Text("通用工具（同时遵循现有窗口权限）",style=MaterialTheme.typography.titleMedium)
+                DreamSwitch("独立联网",execution.allowWeb,!busy){execution=execution.copy(allowWeb=it)}
+                DreamSwitch("书房阅读",execution.allowLibrary,!busy){execution=execution.copy(allowLibrary=it)}
+                DreamSwitch("按需检索正式记忆",execution.allowMemory,!busy){execution=execution.copy(allowMemory=it)}
+                DreamSwitch("查阅日历",execution.allowCalendar,!busy){execution=execution.copy(allowCalendar=it)}
+                DreamSwitch("查阅收藏",execution.allowCollection,!busy){execution=execution.copy(allowCollection=it)}
+                DreamSwitch("创建自己的书房笔记",execution.allowLibraryWrite,!busy){execution=execution.copy(allowLibraryWrite=it)}
                 Button(onClick={save("save")},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text("保存设置（不启用）")}
                 if(canArm){
                     DreamSwitch("确认按上述设置进行模型调用并产生相应费用",consent,!busy){consent=it}
