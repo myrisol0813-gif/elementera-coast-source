@@ -22,7 +22,7 @@ const detailKeys={
 };
 const detailId=async(kind,row)=>kind+':'+await sha(utf8.encode(JSON.stringify((detailKeys[kind]||['id']).map(k=>{check(row[k]!=null,'missing detail identity: '+kind);return row[k];}))));
 const linkChat=r=>r.conversation_id?['chat/'+r.conversation_id]:[];
-export async function collectArchiveV2({sink,applicationId,transport=archiveV2Transport,onProgress=()=>{},deviceBasic=null,restStudio=null}){
+export async function collectArchiveV2({sink,applicationId,transport=archiveV2Transport,onProgress=()=>{},deviceBasic=null}){
   const zip=new ArchiveV2ZipWriter(sink);
   try{
     const caps=await transport.capabilities();
@@ -76,7 +76,7 @@ export async function collectArchiveV2({sink,applicationId,transport=archiveV2Tr
         else await record(module,key,kind,row,deps);
       }
     }
-    if(deviceBasic!==null)await record('appearance',DEVICE_SETTINGS_ID,'device_basic_settings',{basic_settings:captureDeviceBasic(deviceBasic),...(restStudio===null?{}:{rest_studio:restStudio})});
+    if(deviceBasic!==null)await record('appearance',DEVICE_SETTINGS_ID,'device_basic_settings',{basic_settings:captureDeviceBasic(deviceBasic)});
     // Fail closed rather than silently dropping dependencies that were not collected.
     check(manifest.records.every(r=>r.dependencies.every(d=>records.has(d))),'archive contains an uncollected dependency');
     await transport.validateManifest(manifest);

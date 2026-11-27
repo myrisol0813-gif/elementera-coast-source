@@ -78,33 +78,6 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - uses: actions/setup-node@v4
-        if: steps.version_gate.outputs.skip != 'true'
-        with:
-          node-version: 24
-      - name: Install build-only reference art compiler
-        if: steps.version_gate.outputs.skip != 'true'
-        run: |
-          npm install --prefix art-tools --no-audit --no-fund
-          # Hosted Ubuntu already supplies Chromium runtime libraries. Avoid refreshing
-          # unrelated third-party apt feeds unless the actual browser smoke test fails.
-          ./art-tools/node_modules/.bin/playwright install chromium
-          smoke='const {chromium}=require("./art-tools/node_modules/playwright"); (async()=>{const b=await chromium.launch({headless:true});try{const p=await b.newPage();await p.setContent("<p>coast</p>");if(await p.locator("p").textContent()!=="coast")throw Error("browser smoke test");}finally{await b.close()}})().catch(e=>{console.error(e);process.exit(1)})'
-          if ! node -e "$smoke"; then
-            ./art-tools/node_modules/.bin/playwright install-deps chromium
-            node -e "$smoke"
-          fi
-      - name: Prepare native SVG toolchain
-        if: steps.version_gate.outputs.skip != 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
-          cargo install cargo-ndk --version 3.5.4 --locked
-          ndk="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-}}"
-          if [[ ! -d "$ndk" ]]; then ndk="$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"; fi
-          test -d "$ndk/toolchains/llvm"
-          echo "ANDROID_NDK_HOME=$ndk" >> "$GITHUB_ENV"
       - name: Verify isolated Source build identity
         if: steps.version_gate.outputs.skip != 'true'
         shell: bash

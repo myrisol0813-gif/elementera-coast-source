@@ -216,31 +216,4 @@ class ArchiveV2LocalTest {
             assertTrue(runCatching{LocalDreamArchive(MemoryLocalPersistence()).restore(cid,unsafe,true)}.isFailure)
         }finally{root.deleteRecursively()}
     }
-
-
-    @Test fun studioIsAnOptionalDeviceEnvelopeAndOrdinaryAppearanceRestoreDoesNotApplyIt(){
-        val root=Files.createTempDirectory("coast-studio-envelope").toFile()
-        try{
-            val artRoot=sequenceOf(File("../../web/elementera-mcp/deploy-pages/public"),File("apps/web/elementera-mcp/deploy-pages/public")).first{it.isDirectory}
-            val repo=com.elementeracoast.app.core.restbox.RestArtRepository{artRoot.resolve(it).readText()}
-            val policy=com.elementeracoast.app.core.restbox.NativeStudioPolicy(com.elementeracoast.app.core.restbox.NativeSceneCatalogue.load(repo),repo.appearance())
-            val studio=Json.parseToJsonElement(policy.encode(policy.fresh().copy(room="study",reducedMotion=true))).jsonObject
-            val source=MemoryLocalPersistence();val target=MemoryLocalPersistence()
-            source.put("wolf.contextBudget","0");target.put("studio-test-sentinel","untouched")
-            val app="com.elementeracoast.source";val zip=File(root,"studio.zip")
-            val m=ArchiveV2Local.export(source,app,zip,root,studio)
-            val stage=ArchiveV2Stage(File(root,"stage"),"studio")
-            assertEquals(m,ArchiveV2ZipReader.stage(zip,stage))
-            assertEquals(studio,ArchiveV2Appearance.readStudio(m,stage))
-            assertEquals("0",ArchiveV2Appearance.readDeviceBasic(m,stage)?.get("contextBudget")?.jsonPrimitive?.content)
-            ArchiveV2Local.restore(m,stage,setOf("appearance"),app,target,true,root)
-            assertEquals("untouched",target.get("studio-test-sentinel"))
-            assertEquals("0",target.get("wolf.contextBudget"))
-            assertThrows(IllegalArgumentException::class.java){ArchiveV2Manifests.forRestore(m,"appearance",ArchiveV2Appearance.ID)}
-            val oldZip=File(root,"old.zip");val old=ArchiveV2Local.export(source,app,oldZip,root)
-            val oldStage=ArchiveV2Stage(File(root,"old-stage"),"old")
-            ArchiveV2ZipReader.stage(oldZip,oldStage)
-            assertNull(ArchiveV2Appearance.readStudio(old,oldStage))
-        }finally{root.deleteRecursively()}
-    }
 }

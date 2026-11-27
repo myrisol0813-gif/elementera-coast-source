@@ -132,18 +132,6 @@ internal object ArchiveV2Appearance {
         }
         return data["basic_settings"]?.jsonObject?.also(::checkBasic)
     }
-    fun readStudio(m:ArchiveV2Manifest,stage:ArchiveV2Stage):JsonObject? {
-        val rows=m.records.filter{it.module==MODULE}
-        require(rows.size<=1)
-        val r=rows.singleOrNull()?:return null
-        require(r.dependencies.isEmpty())
-        val raw=Json.parseToJsonElement(stage.verify(m.objects.single{it.objectSha256==r.recordObject},1800000).readBytes().decodeToString(throwOnInvalidSequence=true)).jsonObject
-        val data=raw.getValue("data").jsonObject
-        if("rest_studio" !in data)return null
-        // Reuse device-envelope identity/allowlist checks before exposing a studio choice.
-        readDeviceBasic(m,stage)
-        return data.getValue("rest_studio").jsonObject
-    }
     fun applyBasic(values:JsonObject,store:LocalPersistence,write:Boolean):LocalRestoreCount {
         checkBasic(values)
         if(basic(store)==values)return LocalRestoreCount(0,1,0)

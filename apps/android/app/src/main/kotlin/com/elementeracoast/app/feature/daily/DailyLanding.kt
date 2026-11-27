@@ -161,7 +161,7 @@ fun DailyLanding(
             DailyPage.Library -> Unit
             DailyPage.Pet -> FeaturePageTopBar(
                 "休憩箱",
-                "造物间 · 布置与捏人",
+                "休憩箱尚未展开",
                 { page = DailyPage.Home },
                 compact = true, guide = FeatureGuides.pets
             )
@@ -220,7 +220,7 @@ private fun DailyHome(onOpen: (DailyPage) -> Unit, onFutureWidgets: () -> Unit) 
         Triple(DailyPage.Vault, DailyLandingItem("文件库", "媒体归总与收藏"), Icons.Default.AutoStories),
         Triple(DailyPage.Calendar, DailyLandingItem("日历", "公历日程与纪念日"), Icons.Default.CalendarMonth),
         Triple(DailyPage.Library, DailyLandingItem("书房", "翻书、划线与批注"), Icons.Default.AutoStories),
-        Triple(DailyPage.Pet, DailyLandingItem("休憩箱", "造物间 · 布置与捏人"), Icons.Default.Pets)
+        Triple(DailyPage.Pet, DailyLandingItem("休憩箱", "休憩箱尚未展开"), Icons.Default.Pets)
     )
     LazyColumn(
         contentPadding = PaddingValues(horizontal = 28.dp, vertical = 30.dp),
@@ -267,5 +267,5 @@ internal fun dailyLandingItems(): List<DailyLandingItem> = listOf(
     DailyLandingItem("文件库", "媒体归总与收藏"),
     DailyLandingItem("日历", "公历日程与纪念日"),
     DailyLandingItem("书房", "翻书、划线与批注"),
-    DailyLandingItem("休憩箱", "造物间 · 布置与捏人")
+    DailyLandingItem("休憩箱", "休憩箱尚未展开")
 )
