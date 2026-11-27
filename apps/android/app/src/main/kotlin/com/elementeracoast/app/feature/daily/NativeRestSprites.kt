@@ -21,12 +21,40 @@ internal class NativeRestSprites(private val assets: AssetManager) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
     }
 
-    fun has(key: String) = key in entries
+    private val art by lazy { RestArtRepository(assets) }
+    private val catalogue by lazy { NativeSceneCatalogue.load(art) }
+    private val furnitureSvg by lazy { NativeFurnitureSvg(art) }
+    fun colorSlots(asset: NativeFurnitureAsset) = furnitureSvg.colorSlots(asset)
+    fun has(key: String) = key in entries || customFurniture(key) != null
     fun get(key: String): Bitmap? {
-        val path = entries[key] ?: return null
+        val path = entries[key] ?: return getCustomFurniture(key)
         cache.get(path)?.let { return it }
         val bitmap = assets.open(root+path).use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inScaled=false }) }
         return bitmap?.also { cache.put(path,it) }
+    }
+
+    private data class CustomFurniture(val asset: NativeFurnitureAsset,val part: NativePaintPart,val colors:Map<String,String>)
+    private fun customFurniture(key:String):CustomFurniture? = runCatching {
+        val p=key.split('|')
+        if(p.size!=4||p[0]!="f"||p[3].isEmpty())return null
+        val a=catalogue.assets[p[1]]?:return null
+        val part=NativePaintPart.entries.firstOrNull{it.name.lowercase()==p[2]}?:return null
+        if(part!=NativePaintPart.WHOLE&&!a.hasFront)return null
+        val colors=p[3].split(',').associate{entry->
+            val pair=entry.split('=')
+            require(pair.size==2&&pair[0] in a.colorSlots&&Regex("^#[0-9a-f]{6}$").matches(pair[1]))
+            pair[0] to pair[1]
+        }
+        CustomFurniture(a,part,colors)
+    }.getOrNull()
+    private fun getCustomFurniture(key:String):Bitmap? {
+        cache.get(key)?.let{return it}
+        val request=customFurniture(key)?:return null
+        val a=request.asset
+        return runCatching {
+            val svg=furnitureSvg.prepare(a,request.colors,request.part)
+            NativeSvgRaster.render(svg,kotlin.math.ceil(a.width*2).toInt().coerceIn(1,1536),kotlin.math.ceil(a.height*2).toInt().coerceIn(1,1536))
+        }.getOrNull()?.also{cache.put(key,it)}
     }
 
     /** Resolve explicitly; custom colors and accessories must not silently masquerade as complete. */
