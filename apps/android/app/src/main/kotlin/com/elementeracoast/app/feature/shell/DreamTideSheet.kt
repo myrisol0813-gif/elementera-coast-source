@@ -82,6 +82,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
     LaunchedEffect(cid,tab,offset){load()}
     previewId?.let{id->DreamMediaPreview(api,cid,id){previewId=null}}
     val canArm=response.executionAvailable&&response.schedulerConfigured
+    val planDraft=model.startsWith("chatgpt-plan:")
     fun save(action:String){
         if(busy||!loaded)return
         val e=if(action=="disarm")null else {
@@ -127,6 +128,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
                 response.settings.extraAt?.let{Text("下一次额外预约："+stamp(it))}
                 if(response.settings.enabled)Button(onClick={save("disarm")},enabled=!busy){Text("关闭唤醒授权")}
                 DreamField("绑定模型 ID",model,{model=it.take(180)},!busy)
+                if(planDraft)Text("套餐模型：仅保存草稿；独立账户授权和后台软预算尚未通过验收。套餐请求没有供应商强制输出 token 上限。",style=MaterialTheme.typography.bodySmall)
                 DreamField("时区（IANA）",cfg.timeZone,{cfg=cfg.copy(timeZone=it)},!busy)
                 DreamField("每日固定时间（HH:mm）",cfg.dailyTime,{cfg=cfg.copy(dailyTime=it)},!busy)
                 DreamSwitch("安静时段",quiet,!busy){quiet=it}
@@ -174,7 +176,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
                 DreamSwitch("自主生图（独立供应商费用）",execution.allowImage,!busy){execution=execution.copy(allowImage=it)}
                 DreamSwitch("允许将本次自主生图原件转交支持视觉的模型（计入推理预算）",execution.allowImageReadback,!busy){execution=execution.copy(allowImageReadback=it)}
                 Button(onClick={save("save")},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text("保存设置（不启用）")}
-                if(canArm){
+                if(canArm&&!planDraft){
                     DreamSwitch("确认按上述设置进行模型调用并产生相应费用",consent,!busy){consent=it}
                     Button(onClick={save("arm")},enabled=!busy&&consent,modifier=Modifier.fillMaxWidth()){Text("保存并授权唤醒")}
                 }
