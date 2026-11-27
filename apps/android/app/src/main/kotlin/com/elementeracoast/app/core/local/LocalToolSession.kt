@@ -9,7 +9,7 @@ internal class LocalToolSession private constructor(
     private val store:LocalPersistence,
     private val cid:String,
     private val turn:String,
-    private val sourceTurn:RemoteTurn,
+    private val sourceTurn:RemoteTurn?,
     private val crossAllowed:Boolean,
     private val readAllowed:Boolean,
     private val writeAllowed:Boolean,
@@ -23,7 +23,8 @@ internal class LocalToolSession private constructor(
     private val stickerSend:Boolean=false,
     private val stickerAdd:Boolean=false,
     private val sequenceId:String?=null,
-    private val groupMessageId:String?=null
+    private val groupMessageId:String?=null,
+    private val autonomousClaim:LocalDreamLedger.Claim?=null
 ) {
     private data class Spec(val name:String,val key:String,val title:String,val description:String,val parameters:JsonObject)
     private fun schema(fields:Map<String,JsonObject> = emptyMap(),required:List<String> = emptyList())=buildJsonObject {
@@ -76,7 +77,7 @@ internal class LocalToolSession private constructor(
             add(Spec("library_write","library.write","写书房笔记","action=create/edit/delete；创建批注 annotation、读后感 reflection 或划线 highlight。章节、段落从0开始；划线需指定 UTF-16 start_offset（含）与 end_offset（不含），不填正文；修改或删除仅限自己的笔记 id。",schema(mapOf("action" to string(8),"id" to string(),"book_id" to string(),"kind" to string(16),"body" to string(4000),"chapter_index" to integer(0,100000),"paragraph_index" to integer(0,100000),"start_offset" to integer(0,100000),"end_offset" to integer(0,100000)),listOf("action"))))
             add(Spec("memory_write_candidate","memory.write_candidate","放入待确认袋","提出记忆或种子候选，由屋主确认，不直接写入正式记忆。",schema(mapOf("title" to string(120),"content" to string(2000),"destination" to string(8)),listOf("title","content","destination"))))
         }
-    }
+    }.filter{autonomousClaim==null||LocalDreamToolPolicy.allowed(autonomousClaim,it.name)}
     val tools=JsonArray(specs.map{spec->buildJsonObject{
         put("type","function");put("name",spec.name);put("description",spec.description);put("parameters",spec.parameters)
     }})
@@ -87,7 +88,7 @@ internal class LocalToolSession private constructor(
     private val read=linkedSetOf<RemoteCrossWindowMessageSelection>()
     private val preciseRead=linkedSetOf<RemoteCrossWindowMessageSelection>()
     private val seenCalls=mutableSetOf<String>()
-    val maxCalls=com.elementeracoast.app.core.network.TurnToolPolicy.stored(store)
+    val maxCalls=autonomousClaim?.config?.execution?.toolBudget?:com.elementeracoast.app.core.network.TurnToolPolicy.stored(store)
     private var calls=0
     private var applyResult:()->Unit = {}
     private var estimated=base.contextBudget.estimatedTokens+estimate(tools.toString())
@@ -108,11 +109,14 @@ internal class LocalToolSession private constructor(
     private fun allowedNow(s:LocalPersistence,spec:Spec):Boolean {
         val cache=RemoteCacheStore(s,strictReads=true)
         val h=cache.history(cid)?:return false
+        if(autonomousClaim!=null)return LocalDreamLedger(s).authorized(autonomousClaim)&&LocalDreamToolPolicy.allowed(autonomousClaim,spec.name)&&
+            (if(spec.name=="library_write")h.contextSettings.localModelWriteEnabled else h.contextSettings.localModelToolsEnabled)
+        val origin=sourceTurn?:return false
         val now=h.turns.firstOrNull{it.id==turn}?:return false
-        if(sequenceId!=null&&!LocalReplyRunStore(s).allowsMedia(cid,turn,sourceTurn.user.variants[sourceTurn.user.active].id,groupMessageId.orEmpty(),sequenceId))return false
+        if(sequenceId!=null&&!LocalReplyRunStore(s).allowsMedia(cid,turn,requireNotNull(sourceTurn).let{it.user.variants[it.user.active].id},groupMessageId.orEmpty(),sequenceId))return false
         if(sequenceId==null&&LocalReplyRunStore(s).active(cid))return false
         fun withoutTarget(t:RemoteTurn)=t.copy(assistant=t.assistant.copy(variantsByUserVariant=t.assistant.variantsByUserVariant.mapValues{(_,v)->v.filterNot{it.id==stickerMessageId}}))
-        val same=if(stickerMessageId!=null)withoutTarget(sourceTurn)==withoutTarget(now) else image?.sameTurn(sourceTurn,now)?: (now==sourceTurn)
+        val same=if(stickerMessageId!=null)withoutTarget(origin)==withoutTarget(now) else image?.sameTurn(origin,now)?: (now==origin)
         if(cache.conversations().none{it.id==cid&&it.deletedAt==null}||!same)return false
         if(spec.name.startsWith("sticker_")){
             val v=now.assistant.variantsByUserVariant[now.user.active.toString()]?.singleOrNull{it.id==stickerMessageId}
@@ -180,7 +184,7 @@ internal class LocalToolSession private constructor(
         if(estimated>toolBudget)throw IllegalArgumentException("工具续请求超出预算。")
         val auditId=UUID.randomUUID().toString()
         try{
-            store.readConsistent{s->
+            if(autonomousClaim==null)store.readConsistent{s->
                 val audit=LocalToolAudit(s)
                 val room=RemoteCacheStore(s,strictReads=true).conversations().firstOrNull{it.id==cid}?.roomType?:error("窗口已删除")
                 audit.write(audit.read()+buildJsonObject{
@@ -287,7 +291,8 @@ internal class LocalToolSession private constructor(
             val input=parseInput(spec,arguments)
             store.atomic{s->
                 if(!allowedNow(s,spec))throw LocalToolFailure("permission_revoked","当前窗口写入权限已关闭或窗口已变化。")
-                val value=LocalToolWrites(s,cid,turn,modelId,auditId).execute(spec.name,input)
+                if(autonomousClaim!=null)require(spec.name=="library_write"&&input["action"]?.jsonPrimitive?.content=="create")
+                val value=LocalToolWrites(s,cid,if(autonomousClaim==null)turn else null,modelId,auditId).execute(spec.name,input)
                 if(estimated+estimate(arguments)+estimate(value.toString())+32>toolBudget)throw LocalToolFailure("budget_exceeded","本轮工具预算不足，未保存。")
                 auditWrite(s,auditId,spec.key,start,true)
                 value
@@ -307,6 +312,7 @@ internal class LocalToolSession private constructor(
             furnitureRuns=listOf(RemoteFurnitureRun(id=auditId,toolKey=spec.key,label=spec.title,status=if(success)"success"else "error")))
     }
     private fun auditWrite(s:LocalPersistence,id:String,key:String,start:Long,success:Boolean){
+        if(autonomousClaim!=null)return
         val audit=LocalToolAudit(s)
         val room=RemoteCacheStore(s,strictReads=true).conversations().first{it.id==cid}.roomType
         audit.write(audit.read()+buildJsonObject{
@@ -414,6 +420,17 @@ internal class LocalToolSession private constructor(
     companion object {
         const val MAX_CALLS=com.elementeracoast.app.core.network.TurnToolPolicy.MAX_CALLS
         private val WRITE_NAMES=setOf("image_generate","voice_create","create_moment","create_diary","moment_comment","moment_like","calendar_create","library_write","memory_write_candidate","global_excerpt_propose","user_portrait_propose")
+        fun openAutonomous(store:LocalPersistence,claim:LocalDreamLedger.Claim,web:LocalIndependentWeb?=null):LocalToolSession?{
+            val h=RemoteCacheStore(store,strictReads=true).history(claim.cid)?:return null
+            val e=requireNotNull(claim.config.execution)
+            val read=h.contextSettings.localModelToolsEnabled
+            val write=h.contextSettings.localModelWriteEnabled&&e.allowLibraryWrite
+            if(!read&&!write)return null
+            val session=LocalToolSession(store,claim.cid,"",null,false,read,write,claim.model,
+                RemoteDeskSlip(contextBudget=RemoteDeskContextBudget(comfortCeiling=e.tokenBudget)),web=web,
+                autonomousClaim=claim)
+            return session.takeIf{it.completionsTools.isNotEmpty()}
+        }
         fun open(store:LocalPersistence,cid:String,turn:String,request:RemoteCrossWindowRequest?,base:RemoteDeskSlip,modelId:String="",wireLimit:Int?=null,web:LocalIndependentWeb?=null,voice:LocalVoiceProvider?=null,image:LocalImageTool?=null,messageId:String?=null,sequenceId:String?=null):LocalToolSession?{
             val h=RemoteCacheStore(store,strictReads=true).history(cid)?:return null
             val cross=h.contextSettings.crossWindowAuto&&request?.mode=="model_decides"
