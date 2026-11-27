@@ -397,6 +397,31 @@ class CoastApiClient(
         return jsonRequest(Request.Builder().url(config.url("/api/chat/history?conversation_id=${encodeQuery(conversationId)}")).put(jsonBody(payload)).apply{deleteRevision?.let{header("X-Coast-Delete-Revision",it)}}.build(), RemoteHistoryResponse.serializer()).history
     }
 
+    private suspend fun nativeSingleAction(conversationId:String, action:String, claimId:String?=null):JsonObject {
+        require(config.localTransport==null) { "本机模式不访问云端任务账本。" }
+        val payload=buildJsonObject{
+            put("conversation_id",conversationId);put("action",action)
+            claimId?.let{put("claim_id",it)}
+        }
+        return jsonRequestElement(Request.Builder().url(config.url("/api/chat/native-single-run"))
+            .post(jsonBody(payload.toString())).build()).jsonObject
+    }
+
+    internal suspend fun startNativeSingleChat(conversationId:String):String? {
+        if(config.localTransport!=null)return null
+        val result=try{nativeSingleAction(conversationId,"start")}catch(error:CoastApiException){
+            // Backward compatibility with pre-ledger deployments only.
+            if(error.status==404 && error.type!="conversation_not_found")return null
+            throw error
+        }
+        return result["claim_id"]?.jsonPrimitive?.contentOrNull?.takeIf{it.isNotBlank()}
+            ?:throw CoastApiException(CoastApiErrorKind.Stream,"native_single_claim_missing","普通聊天执行预约未确认。")
+    }
+    internal suspend fun heartbeatNativeSingleChat(conversationId:String,claimId:String):Boolean =
+        nativeSingleAction(conversationId,"heartbeat",claimId)["ok"]?.jsonPrimitive?.contentOrNull=="true"
+    internal suspend fun releaseNativeSingleChat(conversationId:String,claimId:String):Boolean =
+        nativeSingleAction(conversationId,"release",claimId)["ok"]?.jsonPrimitive?.contentOrNull=="true"
+
     /** Authenticated context assembly; ChatGPT bearer tokens stay on this device. */
     suspend fun prepareNativeChatGpt(value: RemoteChatRequest): RemoteNativeChatContext {
         val payload = json.encodeToString(RemoteChatRequest.serializer(), value)
