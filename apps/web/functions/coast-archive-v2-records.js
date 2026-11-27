@@ -1,3 +1,4 @@
+import {readDreamArchive} from './dream-tide-archive.js';
 import { safeToolPage } from './coast-archive-v2-tool-audit.js';
 import { ensureChatSchema } from './chat-store.js';
 import {recoverStaleReplyRuns} from './chat-reply-run.js';
@@ -43,7 +44,8 @@ export async function readArchiveChat(db,conversationId){
   if(!row)throw Object.assign(Error('conversation history missing'),{status:409});
   if(row.reply_active)throw Object.assign(Error('该窗口正在连续回复，请结束本组后重新导出。'),{status:409,type:'archive_reply_run_active'});
   // Preserve the persisted JSON text, including historical receipt numeric tokens.
-  return {conversation,history_json:row.state_json,history_updated_at:row.updated_at};
+  const dream_tide=await readDreamArchive(db,conversationId);
+  return {conversation,history_json:row.state_json,history_updated_at:row.updated_at,...(dream_tide?{dream_tide}:{})};
 }
 export async function readArchiveVoice(db,clipId){
   check(id.test(clipId),'invalid voice clip id');await ensureVoiceSchema(db);
