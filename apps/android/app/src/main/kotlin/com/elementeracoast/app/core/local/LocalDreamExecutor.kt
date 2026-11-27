@@ -67,7 +67,7 @@ internal class LocalDreamExecutor(
             if(settings.realityEnabled&&fields.isNotEmpty()){
                 val scoped=settings.copy(realityFields=fields)
                 val actual=captureReality(scoped)
-                val real=localReality(store,scoped,actual)
+                val real=localReality(store,scoped,actual,Instant.ofEpochMilli(c.startedAt).atZone(ZoneId.of(c.config.timeZone)).toLocalDateTime())
                 if(real.delivered)parts.add("【已授权现实上下文】"+real.context)
             }
         }
@@ -122,7 +122,10 @@ internal class LocalDreamExecutor(
                         val f=t.getValue("function").jsonObject
                         if(f.str("name")!="library_write")t else {
                             val p=f.getValue("parameters").jsonObject;val props=p.getValue("properties").jsonObject
-                            JsonObject(t+("function" to JsonObject(f+mapOf("description" to JsonPrimitive("可选：创建自己的书房笔记，不修改或删除既有笔记。"),"parameters" to JsonObject(p+("properties" to JsonObject(props+("action" to buildJsonObject{put("type","string");put("enum",JsonArray(listOf(JsonPrimitive("create"))))}))))))))
+                            val action=buildJsonObject{put("type","string");put("enum",JsonArray(listOf(JsonPrimitive("create"))))}
+                            val parameters=JsonObject(p+("properties" to JsonObject(props+("action" to action))))
+                            val function=JsonObject(f+mapOf("description" to JsonPrimitive("可选：创建自己的书房笔记，不修改或删除既有笔记。"),"parameters" to parameters))
+                            JsonObject(t+("function" to function))
                         }
                     }
                     val commonNames=commonTools.map{it.getValue("function").jsonObject.str("name")}.toSet()
@@ -184,14 +187,14 @@ internal class LocalDreamExecutor(
                                         }
                                         name in commonNames&&common!=null->{
                                             val out=common.execute(c.id+":"+step+":"+index,name,fn.str("arguments"))
-                                            buildJsonObject{put("ok",out.ok);put("data",Json.parseToJsonElement(out.output))}
+                                            buildJsonObject{put("ok",out.ok);val data=Json.parseToJsonElement(out.output);put("data",data);if(name=="library_write"&&out.ok)(data as? JsonObject)?.get("id")?.let{put("record_id",it)}}
                                         }
                                         else->result
                                     }
                                 }catch(ex:CancellationException){throw ex}catch(_:Exception){buildJsonObject{put("ok",false);put("reason","tool_failed")}}
                                 val count=(result["turns"] as? JsonArray)?.size
                                 val ok=result["ok"]?.jsonPrimitive?.booleanOrNull==true||count!=null&&result["reason"]==null
-                                check(ledger.recordTool(c,step,index,ok,count,clock()))
+                                check(ledger.recordTool(c,step,index,ok,count,clock(),result["record_id"]?.jsonPrimitive?.contentOrNull))
                                 activities.add(buildJsonObject{put("kind",name);put("ok",ok);count?.let{put("count",it)}})
                             }
                             results.add(buildJsonObject{put("role","tool");put("tool_call_id",call.str("id"));put("name",name);put("content",result.toString())})
