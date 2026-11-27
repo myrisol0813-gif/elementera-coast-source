@@ -3,6 +3,7 @@ package com.elementeracoast.app.feature.daily
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -167,7 +169,7 @@ private fun NativeStudioPage(r: StudioResources) {
                 onSelect={selected=it},
                 onMove={id,x,y-> state=state.copy(layout=state.layout.copy(rooms=state.layout.rooms+(state.room to r.policy.items(state).map{if(it.id==id)it.copy(x=x,y=y)else it})))},
                 onMoveFinished={persist()})
-            if(missing>0)Text("正在准备场景素材；若持续缺失，请检查安装包。",style=MaterialTheme.typography.bodySmall)
+            if(missing>0)Text("正在准备场景素材；若持续缺失，当前自定义图层尚未正确绘制。",style=MaterialTheme.typography.bodySmall)
             if(unsupported>0 || incompleteAppearance)Text("此施工版暂按原稿显示尚未支持的自定义外观，原有设置保留。",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
                 FilterChip(selected=editing,onClick={editing=!editing;selected=null},label={Text(if(editing)"完成布置" else "布置房间")},modifier=Modifier.weight(1f))
@@ -206,7 +208,12 @@ private fun NativeStudioPage(r: StudioResources) {
                                 listOf("" to "原稿")+chosenAsset.presets.map{it.name to it.name}){ name->
                                 editItem{it.copy(colors=chosenAsset.presets.firstOrNull{p->p.name==name}?.colors.orEmpty())}
                             }
-                            Text("自由配色尚在迁移，已有自定义颜色不会自动清除。",style=MaterialTheme.typography.bodySmall)
+                            for((slot,meta) in r.atlas.colorSlots(chosenAsset)) {
+                                NativeStudioColor(meta.first,selectedItem.colors[slot]?:meta.second){ color->
+                                    editItem{it.copy(colors=it.colors+(slot to color))}
+                                }
+                            }
+                            TextButton(onClick={editItem{it.copy(colors=emptyMap())}}){Text("恢复原稿配色")}
                         }
                     }
                 }
@@ -292,5 +299,43 @@ private fun NativeStudioChoice(label:String,selected:String,options:List<Pair<St
                 for((id,name) in options)DropdownMenuItem(text={Text(name)},onClick={expanded=false;onChoose(id)})
             }
         }
+    }
+}
+
+@Composable
+private fun NativeStudioColor(label:String,value:String,onChoose:(String)->Unit) {
+    var open by remember { mutableStateOf(false) }
+    val color=runCatching{Color(android.graphics.Color.parseColor(value))}.getOrDefault(Color.Gray)
+    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+        Text(label,Modifier.weight(1f),style=MaterialTheme.typography.bodySmall)
+        OutlinedButton(onClick={open=true},contentPadding=PaddingValues(horizontal=10.dp,vertical=4.dp)) {
+            Box(Modifier.size(20.dp).background(color,RoundedCornerShape(5.dp)))
+            Spacer(Modifier.width(8.dp))
+            Text(value.uppercase(),style=MaterialTheme.typography.labelMedium)
+        }
+    }
+    if(open) {
+        var text by remember(value){mutableStateOf(value)}
+        val valid=Regex("^#[0-9a-fA-F]{6}$").matches(text)
+        val current=if(valid)Color(android.graphics.Color.parseColor(text))else color
+        fun component(channel:Int,f:Float) {
+            val old=android.graphics.Color.parseColor(if(valid)text else value)
+            val rgb=intArrayOf(android.graphics.Color.red(old),android.graphics.Color.green(old),android.graphics.Color.blue(old))
+            rgb[channel]=f.toInt().coerceIn(0,255)
+            text="#"+rgb.joinToString(""){it.toString(16).padStart(2,'0')}
+        }
+        AlertDialog(onDismissRequest={open=false},title={Text(label)},text={
+            Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                Box(Modifier.fillMaxWidth().height(48.dp).background(current,RoundedCornerShape(8.dp)))
+                OutlinedTextField(value=text,onValueChange={text=it.take(7)},singleLine=true,
+                    label={Text("HEX")},isError=!valid)
+                for((index,name) in listOf("红","绿","蓝").withIndex()) {
+                    Text(name,style=MaterialTheme.typography.labelSmall)
+                    val channels=listOf(current.red,current.green,current.blue)
+                    Slider(value=channels[index]*255f,onValueChange={component(index,it)},valueRange=0f..255f)
+                }
+            }
+        },confirmButton={TextButton(enabled=valid,onClick={onChoose(text.lowercase());open=false}){Text("应用")}},
+            dismissButton={TextButton(onClick={open=false}){Text("取消")}})
     }
 }
