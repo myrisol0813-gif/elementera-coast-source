@@ -109,10 +109,6 @@ try {
       const tracks=await page.evaluate(job=>globalThis.compileFurnitureMotion(job),job);
       if(tracks.length)motion[job.key]=tracks;
     }
-    if(!job.reference&&(job.kind==='environment'||job.kind==='furniture'&&Object.keys(job.colors??{}).length===0)){
-      const tracks=await page.evaluate(job=>globalThis.compileRoomMotion(job),job);
-      if(tracks.length)roomMotion[job.key]=tracks;
-    }
     if(job.kind==='creature'&&!job.reference){
       const templateFile='poses/'+hash+'.json';
       const template=await page.evaluate(job=>globalThis.compilePose(job),job);
