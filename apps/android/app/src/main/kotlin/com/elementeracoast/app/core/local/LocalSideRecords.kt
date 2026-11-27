@@ -138,7 +138,8 @@ internal class LocalSideRecords(private val store:LocalPersistence) {
             val origin=if(k=="audio")AttachmentOrigin("assistant",v.optional("message_id"),if(v.optional("message_id")!=null)"linked" else if(v.optional("source")=="dream_tide")"unlinked" else "turn_only")else attachmentOrigin(histories.getOrPut(cid){cache.history(cid)},v)
             buildJsonObject{
                 put("id",id);put("source_id",id);put("kind",k);put("conversation_id",cid);put("turn_id",v["turn_id"]?:JsonNull);put("message_id",origin.messageId?.let(::JsonPrimitive)?:JsonNull);put("role",origin.role?.let(::JsonPrimitive)?:JsonNull);put("origin_status",origin.status)
-                put("name",v.optional("name")?:"语音");put("display_name",labels[key]?.data?.optional("display_name")?:v.optional("name")?:"语音");put("source_text",v.optional("text").orEmpty());put("size",v["size"]?:v.getValue("audio_bytes"));put("created_at",v.getValue("created_at"));put("treasure_id",treasure?.get("id")?:JsonNull);put("notes",treasure?.get("notes")?:JsonPrimitive(""))
+                val mediaName=v.optional("name")?:if(v.optional("source")=="dream_tide")"自主活动语音" else "语音"
+                put("name",mediaName);put("display_name",labels[key]?.data?.optional("display_name")?:mediaName);put("source_text",v.optional("text").orEmpty());put("size",v["size"]?:v.getValue("audio_bytes"));put("created_at",v.getValue("created_at"));put("treasure_id",treasure?.get("id")?:JsonNull);put("notes",treasure?.get("notes")?:JsonPrimitive(""))
             }
         }.filter{(kind=="all"||it.str("kind")==kind)&&(q.isEmpty()||listOf(it.str("display_name"),it.str("source_text"),it.str("notes")).any{t->t.contains(q,true)})}.sortedByDescending{it.number("created_at")}
         return page(items,cursor)
