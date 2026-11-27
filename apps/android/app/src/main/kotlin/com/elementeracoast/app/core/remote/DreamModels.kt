@@ -25,7 +25,7 @@ data class DreamConfig(
 @Serializable
 data class DreamSettings(
     val revision:String?=null,val enabled:Boolean=false,val config:DreamConfig?=null,
-    val modelId:String?=null,val armedAt:Long?=null,val extraAt:Long?=null,val running:Boolean=false
+    val modelId:String?=null,val armedAt:Long?=null,val extraAt:Long?=null,val running:Boolean=false,val extraId:String?=null
 )
 
 @Serializable
