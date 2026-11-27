@@ -24,6 +24,8 @@ class LocalCoastTransport(private val store: LocalPersistence,
     private val voice:LocalVoiceProvider?=null,
     private val providerCatalog: () -> RemoteModelCatalogResponse = { RemoteModelCatalogResponse(ok = true) }
 ) : Interceptor {
+    internal var dreamCanArm:((String)->Boolean)?=null
+    internal var dreamChanged:(()->Unit)?=null
     internal var imageConfig:(String)->LocalProviderConfig?={null}
     private val cache = RemoteCacheStore(store)
     private val calendar = LocalCalendarStore(store)
@@ -110,14 +112,13 @@ class LocalCoastTransport(private val store: LocalPersistence,
         val path = r.url.encodedPath
         val method = r.method
         if (path == "/api/chat/dream-tide" || path == "/api/chat/dream-tide/notes" || path == "/api/chat/dream-tide/activity" || path == "/api/chat/dream-tide/reply") {
-            // Only draft persistence is supported locally in this slice. No
-            // cloud fallback, pretend activity, or automatic authorization.
             val b=if(method=="POST")body(r)else JsonObject(emptyMap())
             val cid=if(method=="POST")b.str("conversation_id").orEmpty()else r.url.queryParameter("conversation_id").orEmpty()
-            if(cache.conversations().none{it.id==cid&&it.roomType=="main"})return missing(r)
-            val key="local.dream.settings."+cid
-            val previous=store.get(key).takeIf{it.isNotBlank()}?.let{json.decodeFromString(DreamSettings.serializer(),it)}?:DreamSettings()
-            fun payload(settings:DreamSettings)=element(DreamSettingsResponse.serializer(),DreamSettingsResponse(ok=true,settings=settings)).jsonObject
+            if(cache.conversations().none{it.id==cid&&it.roomType=="main"&&it.source=="coast"&&it.deletedAt==null})return missing(r)
+            val ledger=LocalDreamLedger(store)
+            val previous=ledger.settings(cid)
+            val ready=BuildConfig.LOCAL_DREAM_EXECUTION_ENABLED&&dreamCanArm!=null
+            fun payload(settings:DreamSettings)=element(DreamSettingsResponse.serializer(),DreamSettingsResponse(ok=true,settings=settings,executionAvailable=ready,schedulerConfigured=ready)).jsonObject
             if(method=="GET"){
                 if(path=="/api/chat/dream-tide")return response(r,200,payload(previous))
                 val offset=r.url.queryParameter("offset")?.toIntOrNull()?:0
@@ -133,19 +134,10 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if(method!="POST"||path!="/api/chat/dream-tide")return unsupported(r)
             val request=json.decodeFromJsonElement(DreamSettingsRequest.serializer(),b)
             if(!b.containsKey("revision")||request.revision!=previous.revision)return failure(r,409,"dream_tide_conflict","设置已改变，请刷新。")
-            if(request.action=="arm")return failure(r,409,"dream_tide_not_available","本机自主唤醒执行尚未接入。")
-            if(request.action=="disarm")return response(r,200,payload(previous))
-            if(request.action!="save")return unsupported(r)
-            val cfg=requireNotNull(request.config)
-            val model=request.modelId.orEmpty().trim()
-            require(model.isNotBlank()&&model.length<=180){"请选择模型。"}
-            val clock=Regex("([01][0-9]|2[0-3]):[0-5][0-9]")
-            require(clock.matches(cfg.dailyTime)&&java.time.ZoneId.getAvailableZoneIds().contains(cfg.timeZone)){"时间或时区无效。"}
-            cfg.quietHours?.let{require(clock.matches(it.start)&&clock.matches(it.end)){"安静时段无效。"}}
-            val e=requireNotNull(cfg.execution)
-            require(e.tokenBudget in 1..1000000&&e.outputLimit in 1..65536&&e.toolBudget in 0..128&&e.readTurns in 1..400&&e.extraPerDay in 0..128&&e.invitation.isNotBlank()&&e.invitation.length<=16000){"邀请词或预算无效。"}
-            val saved=DreamSettings(revision=id(),enabled=false,config=cfg,modelId=model)
-            store.put(key,json.encodeToString(DreamSettings.serializer(),saved))
+            val mayArm=ready&&request.confirmExecution&&request.modelId?.let{dreamCanArm?.invoke(it)}==true
+            if(request.action=="arm"&&!mayArm)return failure(r,409,"dream_tide_not_available","本机自主唤醒尚未开放，或所选供应商不可用。")
+            val saved=ledger.configure(cid,request,mayArm)?:return failure(r,409,"dream_tide_conflict","设置已变化或活动尚未结束。")
+            dreamChanged?.invoke()
             return response(r,200,payload(saved))
         }
         if (path == "/api/chat/conversations") {
