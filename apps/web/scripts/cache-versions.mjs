@@ -43,6 +43,11 @@ const targets = Object.freeze([
     }),
   }),
   Object.freeze({
+    file: 'functions/dev-hands-version.js',
+    devHandsVersion: true,
+    assets: Object.freeze({}),
+  }),
+  Object.freeze({
     file: 'functions/mailbox-page.js',
     assets: Object.freeze({
       '/public/styles/tokens.css': MAILBOX_SHARED_CACHE_VERSION,
@@ -71,6 +76,11 @@ function synchronizedSource(source, target) {
     const pattern = /^const CACHE_NAME = '[^']+';$/m;
     if (!pattern.test(output)) throw new Error(`${target.file}: missing CACHE_NAME`);
     output = output.replace(pattern, `const CACHE_NAME = '${APP_CACHE_NAME}';`);
+  }
+  if (target.devHandsVersion) {
+    const pattern = /^export const PWA_CACHE_VERSION = '[^']+';$/m;
+    if (!pattern.test(output)) throw new Error(`${target.file}: missing PWA_CACHE_VERSION`);
+    output = output.replace(pattern, `export const PWA_CACHE_VERSION = '${APP_CACHE_VERSION}';`);
   }
   return output;
 }
