@@ -130,7 +130,7 @@ export async function runDailyFlow() {
       document.querySelector(`[data-action="daily:${action}"]`).click();
       await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'daily-placeholder'
         && document.querySelector('#overlayRoot').textContent.includes(title), `${title} destination`);
-      const studio = document.querySelector('#overlayRoot iframe[src="/public/rest-box/room-lab.html"]');
+      const studio = document.querySelector('#overlayRoot coast-room-studio');
       assert.equal(Boolean(studio), action === 'pets', 'only the rest-box entry mounts the editor');
     }
     document.querySelector('[data-action="daily:home"]').click();
