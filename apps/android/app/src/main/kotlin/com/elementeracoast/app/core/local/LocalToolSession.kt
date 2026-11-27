@@ -112,7 +112,7 @@ internal class LocalToolSession private constructor(
         val cache=RemoteCacheStore(s,strictReads=true)
         val h=cache.history(cid)?:return false
         if(autonomousClaim!=null)return LocalDreamLedger(s).authorized(autonomousClaim)&&LocalDreamToolPolicy.allowed(autonomousClaim,spec.name)&&
-            (if(spec.name=="library_write")h.contextSettings.localModelWriteEnabled else h.contextSettings.localModelToolsEnabled)
+            (if(spec.name in WRITE_NAMES)h.contextSettings.localModelWriteEnabled else h.contextSettings.localModelToolsEnabled)
         val origin=sourceTurn?:return false
         val now=h.turns.firstOrNull{it.id==turn}?:return false
         if(sequenceId!=null&&!LocalReplyRunStore(s).allowsMedia(cid,turn,requireNotNull(sourceTurn).let{it.user.variants[it.user.active].id},groupMessageId.orEmpty(),sequenceId))return false
@@ -155,7 +155,7 @@ internal class LocalToolSession private constructor(
         if(name.startsWith("sticker_"))return executeSticker(spec,arguments,start)
         if(name=="image_generate")return executeImage(spec,arguments,start)
         if(name=="voice_create")return executeVoice(spec,arguments,start)
-        if(name in WRITE_NAMES)return executeWrite(spec,arguments,start)
+        if(name in WRITE_NAMES)return executeWrite(spec,arguments,start,callId)
         var success=false
         var output=buildJsonObject{put("ok",false);put("message","工具没有执行。")}
         try {
@@ -287,15 +287,15 @@ internal class LocalToolSession private constructor(
         reports.add(RemoteDeskToolResult(name=spec.name,delivered=true,content=output.toString()))
         return RemoteNativeToolResult(ok=success,output=output.toString(),deskSlip=receipt,furnitureRuns=listOf(RemoteFurnitureRun(id=auditId,toolKey=spec.key,label=spec.title,status=if(success)"success"else "error")))
     }
-    private fun executeWrite(spec:Spec,arguments:String,start:Long):RemoteNativeToolResult {
+    private fun executeWrite(spec:Spec,arguments:String,start:Long,callId:String):RemoteNativeToolResult {
         val auditId=UUID.randomUUID().toString()
         val output=try {
             require(arguments.length<=12000)
             val input=parseInput(spec,arguments)
             store.atomic{s->
                 if(!allowedNow(s,spec))throw LocalToolFailure("permission_revoked","当前窗口写入权限已关闭或窗口已变化。")
-                if(autonomousClaim!=null)require(spec.name=="library_write"&&input["action"]?.jsonPrimitive?.content=="create")
-                val value=LocalToolWrites(s,cid,if(autonomousClaim==null)turn else null,modelId,auditId).execute(spec.name,input)
+                if(autonomousClaim!=null)require(spec.name in setOf("create_moment","create_diary","calendar_create")||spec.name=="library_write"&&input["action"]?.jsonPrimitive?.content=="create")
+                val value=LocalToolWrites(s,cid,if(autonomousClaim==null)turn else null,modelId,if(autonomousClaim==null)auditId else "dream:"+callId).execute(spec.name,input)
                 if(estimated+estimate(arguments)+estimate(value.toString())+32>toolBudget)throw LocalToolFailure("budget_exceeded","本轮工具预算不足，未保存。")
                 auditWrite(s,auditId,spec.key,start,true)
                 value
@@ -428,7 +428,7 @@ internal class LocalToolSession private constructor(
             val h=RemoteCacheStore(store,strictReads=true).history(claim.cid)?:return null
             val e=requireNotNull(claim.config.execution)
             val read=h.contextSettings.localModelToolsEnabled
-            val write=h.contextSettings.localModelWriteEnabled&&e.allowLibraryWrite
+            val write=h.contextSettings.localModelWriteEnabled&&(e.allowLibraryWrite||e.allowDailyWrite||e.allowCalendarWrite)
             if(!read&&!write)return null
             val session=LocalToolSession(store,claim.cid,"",null,false,read,write,claim.model,
                 RemoteDeskSlip(contextBudget=RemoteDeskContextBudget(comfortCeiling=e.tokenBudget)),web=web,
