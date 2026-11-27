@@ -55,7 +55,7 @@ function slotPicker(){
     select.value=(poseChoices[room]??{})[role]??'';select.onchange=()=>{poseChoices[room]={...poseChoices[room],[role]:select.value};saveStudio();savedStatus();slotPicker();draw()};label.append(select);root.append(label);
   }
 }
-async function draw(){if(disposed)return;try{await renderer.render(state,room,{occupants:occupancy(),selected,editing,household,reducedMotion})}catch(e){if(!disposed)message(e.message,true)}}
+async function draw(){if(disposed)return;try{const result=await renderer.render(state,room,{occupants:occupancy(),selected,editing,household,reducedMotion});if(!disposed&&!result.stale&&result.failures?.length)message(labels[room]+' · '+result.failures.length+' 件图层加载失败，其他家具已保留',true)}catch(e){if(!disposed)message(e.message,true)}}
 function refresh(){
   if(disposed)return;
   $('scene').style.aspectRatio=cat.rooms[room].width+'/'+cat.rooms[room].height;
