@@ -1,4 +1,5 @@
 import {ensureChatSchema,readConversationState} from './chat-store.js';
+import {localClock} from './dream-tide-schedule.js';
 
 const stmt=(db,sql,...args)=>db.prepare(sql).bind(...args);
 const live="EXISTS(SELECT 1 FROM conversations c WHERE c.id=r.conversation_id AND c.user_id='owner' AND c.deleted_at IS NULL AND c.room_type='main' AND c.source='coast' AND c.conversation_kind='chat')";
@@ -93,14 +94,24 @@ export async function finishDreamActivity(db,claim,status,result,now=Date.now())
   if(!['completed','failed','cancelled','interrupted'].includes(status))throw new TypeError('invalid activity status');
   await ensureChatSchema(db);
   const encoded=JSON.stringify(result);
-  // For success require still-valid authorization; failure/cancellation can
-  // settle a revoked claim. No output may be added to an interrupted run.
   const guard=status==='completed'?`AND EXISTS(SELECT 1 FROM dream_tide_arms a JOIN dream_tide_runs r ON r.conversation_id=a.conversation_id WHERE ${active})`:'';
   const values=status==='completed'?args(claim):[];
-  const r=await db.batch([
+  const at=result.proposed_extra_at;
+  const cfg=status==='completed'&&Number.isSafeInteger(at)&&at>now?await dreamExecutionConfig(db,claim.conversationId,claim.revision):null;
+  const day=cfg?.allowExtra&&cfg.execution.extraPerDay>0?localClock(at,cfg.timeZone).day:null;
+  const statements=[
     stmt(db,`UPDATE dream_tide_runs SET status=?,result_json=?,updated_at=MAX(updated_at,?) WHERE claim_id=? AND conversation_id=? AND arm_revision=? AND status='running' ${guard}`,status,encoded,now,...args(claim),...values),
     stmt(db,`UPDATE dream_tide_arms SET extra_id=NULL,extra_at=NULL WHERE conversation_id=? AND revision=? AND EXISTS(
-      SELECT 1 FROM dream_tide_runs WHERE claim_id=? AND kind='extra' AND status=? AND slot_key='extra:'||dream_tide_arms.extra_id)`,claim.conversationId,claim.revision,claim.claimId,status)
-  ]);
-  return r[0].meta.changes===1;
+      SELECT 1 FROM dream_tide_runs WHERE claim_id=? AND kind='extra' AND status=? AND result_json=? AND slot_key='extra:'||dream_tide_arms.extra_id)`,claim.conversationId,claim.revision,claim.claimId,status,encoded)
+  ];
+  if(day)statements.push(stmt(db,`UPDATE dream_tide_arms SET extra_id=?,extra_at=? WHERE conversation_id=? AND revision=? AND enabled=1 AND extra_id IS NULL
+    AND EXISTS(SELECT 1 FROM dream_tide_runs WHERE claim_id=? AND status='completed' AND result_json=?)
+    AND (SELECT COUNT(*) FROM dream_tide_runs WHERE conversation_id=? AND local_day=? AND kind='extra')<?`,
+    claim.claimId,at,claim.conversationId,claim.revision,claim.claimId,encoded,claim.conversationId,day,cfg.execution.extraPerDay));
+  // Set the actual outcome in the same transaction, including rejected proposals.
+  statements.push(stmt(db,`UPDATE dream_tide_runs SET result_json=json_set(result_json,'$.extra_scheduled',
+    json(CASE WHEN EXISTS(SELECT 1 FROM dream_tide_arms a WHERE a.conversation_id=? AND a.revision=? AND a.extra_id=?) THEN 'true' ELSE 'false' END))
+    WHERE claim_id=? AND status=? AND result_json=?`,claim.conversationId,claim.revision,claim.claimId,claim.claimId,status,encoded));
+  const r=await db.batch(statements);
+  return {finished:r[0].meta.changes===1,extraScheduled:Boolean(day&&r[2].meta.changes===1)};
 }
