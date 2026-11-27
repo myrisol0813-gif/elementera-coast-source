@@ -289,4 +289,48 @@ class LocalDreamExecutorTest {
         assertEquals(1,LocalAttachmentStore(store).entries().size)
     }
 
+
+    @Test fun autonomousMediaAndFavoritesSurviveCompleteNativeArchiveWithoutRearming(){
+        val dir=java.nio.file.Files.createTempDirectory("dream-media-v2").toFile()
+        try{
+            val (store,initial)=fixture();val cache=RemoteCacheStore(store);val ledger=LocalDreamLedger(store)
+            val history=cache.history(cid)!!
+            cache.putHistory(cid,history.copy(contextSettings=history.contextSettings.copy(localModelWriteEnabled=true)))
+            val cfg2=cfg.copy(execution=cfg.execution!!.copy(allowImage=true,allowVoice=true,tokenBudget=24000))
+            val settings=ledger.configure(cid,DreamSettingsRequest(cid,initial.revision,"arm",cfg2,model,true),true,at-86400000)!!
+            val claim=ledger.claim(cid,settings.revision!!,model,at)!!
+            assertTrue(ledger.reserveStep(claim,0,at));assertTrue(ledger.recordStep(claim,0,true,buildJsonObject{},at))
+            val pictureId="att_dream_"+claim.id+"_0_0";val voiceId="voice_dream_"+claim.id+"_0_1"
+            val png=ByteArray(24);byteArrayOf(137.toByte(),80,78,71,13,10,26,10).copyInto(png)
+            val mp3=byteArrayOf(73,68,51,4,0,0,0,0,0,0,1,2)
+            val meta=buildJsonObject{put("id",pictureId);put("conversation_id",cid);put("turn_id",JsonNull);put("kind","image");put("name","自主活动图像.png");put("mime","image/png");put("size",png.size);put("created_at",at);put("updated_at",at)}
+            assertTrue(ledger.reserveTool(claim,0,0,"image_generate",at))
+            store.atomic{s->LocalAttachmentStore(s).publish(LocalAttachmentStore.Original(meta,ArchiveV2Chunks.digest(png)),png)}
+            assertTrue(ledger.recordTool(claim,0,0,true,null,at,pictureId))
+            assertTrue(ledger.reserveTool(claim,0,1,"voice_create",at))
+            store.atomic{s->saveLocalVoice(s,cid,null,null,"dream_tide",model,LocalVoiceProvider.Generated("fixtureVoice","fixture speech",mp3),voiceId)}
+            assertTrue(ledger.recordTool(claim,0,1,true,null,at,voiceId))
+            assertTrue(ledger.finish(claim,"completed",buildJsonObject{},null,at))
+            val side=LocalSideRecords(store)
+            for((kind,id) in listOf("image" to pictureId,"audio" to voiceId)){
+                val favorite=side.saveTreasure(buildJsonObject{put("kind",kind);put("conversation_id",cid);put("source_id",id);put("notes","fixture favorite")})
+                assertEquals("assistant",favorite.getValue("role").jsonPrimitive.content)
+                assertEquals(JsonNull,favorite["message_id"])
+            }
+            val app="com.elementeracoast.source";val zip=java.io.File(dir,"complete.zip")
+            val manifest=ArchiveV2Local.export(store,app,zip)
+            val stage=ArchiveV2Stage(dir,"verified");ArchiveV2ZipReader.stage(zip,stage)
+            val dst=MemoryLocalPersistence();val selected=setOf("chat","attachments","voice","vault")
+            ArchiveV2Local.restore(manifest,stage,selected,app,dst,false)
+            assertTrue(RemoteCacheStore(dst).conversations().isEmpty())
+            ArchiveV2Local.restore(manifest,stage,selected,app,dst,true)
+            assertEquals(LocalDreamArchive(store).export(cid),LocalDreamArchive(dst).export(cid))
+            assertFalse(LocalDreamLedger(dst).settings(cid).enabled)
+            assertEquals(1,RemoteCacheStore(dst).history(cid)!!.turns.size)
+            val originals=LocalAttachmentStore(dst);assertArrayEquals(png,originals.bytes(originals.entries().single()))
+            val restored=LocalSideRecords(dst);assertArrayEquals(mp3,restored.bytes(restored.audio(voiceId)!!))
+            assertEquals(side.rows(),restored.rows())
+        }finally{dir.deleteRecursively()}
+    }
+
 }
