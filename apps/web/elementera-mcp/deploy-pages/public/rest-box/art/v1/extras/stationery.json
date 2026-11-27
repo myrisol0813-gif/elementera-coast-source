@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "source": "approved chat SVG stationery and corrected gramophone; paths transcribed",
+  "source": "Owner-recovered SVG source, approved brush-free pencilcup revision; exact archive ad18990d381bc7fd972d691d7790db4226db2c2a",
   "assets": [
     {
       "id": "extra-gramophone",
@@ -21,7 +21,8 @@
       },
       "anchors": [],
       "hasFront": false,
-      "provisional": true
+      "provisional": false,
+      "sourceBlob": "4cb9a150fac5b503b7b40777eec37b9339155c06"
     },
     {
       "id": "extra-laptop",
@@ -42,7 +43,8 @@
       },
       "anchors": [],
       "hasFront": false,
-      "provisional": true
+      "provisional": false,
+      "sourceBlob": "426da046c09ae8d2c11d11c426231453b3e36a5f"
     },
     {
       "id": "extra-computer",
@@ -63,7 +65,8 @@
       },
       "anchors": [],
       "hasFront": false,
-      "provisional": true
+      "provisional": false,
+      "sourceBlob": "0c9e043a1ed2df1d93c2abe908de2dbc89f93afd"
     },
     {
       "id": "extra-pen",
@@ -84,7 +87,8 @@
       },
       "anchors": [],
       "hasFront": false,
-      "provisional": true
+      "provisional": false,
+      "sourceBlob": "0d8e52245bd7c7814936ed650df6a97cf690fc04"
     },
     {
       "id": "extra-pencilcup",
@@ -105,7 +109,8 @@
       },
       "anchors": [],
       "hasFront": false,
-      "provisional": true
+      "provisional": false,
+      "sourceBlob": "06db8e42651ced99b4ad6abdbfa0c5e842baa17a"
     },
     {
       "id": "extra-notebook",
@@ -126,7 +131,8 @@
       },
       "anchors": [],
       "hasFront": false,
-      "provisional": true
+      "provisional": false,
+      "sourceBlob": "b76cad3e8d9b2f869748f43ae774a5113466d596"
     },
     {
       "id": "extra-typewriter",
@@ -147,7 +153,8 @@
       },
       "anchors": [],
       "hasFront": false,
-      "provisional": true
+      "provisional": false,
+      "sourceBlob": "8ec6f5033096c594211abc862e5ca488f238c241"
     },
     {
       "id": "extra-radio",
@@ -168,8 +175,9 @@
       },
       "anchors": [],
       "hasFront": false,
-      "provisional": true
+      "provisional": false,
+      "sourceBlob": "bf1a35d65cd2d6a9cae99a1d8dbe1b766218541d"
     }
   ],
-  "notes": "No default placement. Scale, color-slot runtime and interaction anchors pending visual check."
+  "notes": "Original SVG payload; visual alignment and interaction anchors still pending. No default placement."
 }

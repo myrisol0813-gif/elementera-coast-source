@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "source": "approved chat SVG afternoon shop; paths transcribed",
+  "source": "Owner-recovered SVG source, approved brush-free pencilcup revision; exact archive ad18990d381bc7fd972d691d7790db4226db2c2a",
   "assets": [
     {
       "id": "extra-rocker",
@@ -26,7 +26,8 @@
       },
       "anchors": [],
       "hasFront": false,
-      "provisional": true
+      "provisional": false,
+      "sourceBlob": "dc34fdd1229509e4dceddfd9efd64181cd07b42c"
     },
     {
       "id": "extra-telescope",
@@ -52,7 +53,8 @@
       },
       "anchors": [],
       "hasFront": false,
-      "provisional": true
+      "provisional": false,
+      "sourceBlob": "4df0e8c246af598ef356b80059bf8681596f3a80"
     },
     {
       "id": "extra-lace-table",
@@ -78,7 +80,8 @@
       },
       "anchors": [],
       "hasFront": false,
-      "provisional": true
+      "provisional": false,
+      "sourceBlob": "99d4eb9d30f5ce62ec35868175f66771edfff3ea"
     },
     {
       "id": "extra-teapot",
@@ -104,7 +107,8 @@
       },
       "anchors": [],
       "hasFront": false,
-      "provisional": true
+      "provisional": false,
+      "sourceBlob": "ca299de8ef1e66cf98531cf82635ff7f3470d21f"
     },
     {
       "id": "extra-letter-shelf",
@@ -130,7 +134,8 @@
       },
       "anchors": [],
       "hasFront": false,
-      "provisional": true
+      "provisional": false,
+      "sourceBlob": "be300afa5ebcdeefd5acb596065b4c017a7bd08a"
     },
     {
       "id": "extra-moon-cushion",
@@ -156,8 +161,9 @@
       },
       "anchors": [],
       "hasFront": false,
-      "provisional": true
+      "provisional": false,
+      "sourceBlob": "df75e35932d81812454f5ab3c0565fd2984a9680"
     }
   ],
-  "notes": "No default room placement. Scale and interaction anchors pending visual check."
+  "notes": "Original SVG payload; visual alignment and interaction anchors still pending. No default placement."
 }

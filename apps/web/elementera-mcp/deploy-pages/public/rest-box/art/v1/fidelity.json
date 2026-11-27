@@ -15,6 +15,11 @@
       "repo": "myrisol0813-gif/elementera-creature-workshop",
       "commit": "9012b6ebb81109a6cebd8d4eb22a68fc2ee0a1e1",
       "file": "originals/2026-11-26/props/"
+    },
+    "recovered": {
+      "repo": "myrisol0813-gif/elementera-creature-workshop",
+      "commit": "ad18990d381bc7fd972d691d7790db4226db2c2a",
+      "file": "furniture/recovered-original-v1/svg/"
     }
   },
   "expected": [
@@ -347,11 +352,78 @@
       "path": "props/letter.svg",
       "origin": "original-props",
       "blob": "6ecfdcc6eb434b862770e108197778a0abfdf67d"
+    },
+    {
+      "path": "assets/extra-rocker.svg",
+      "origin": "recovered",
+      "blob": "dc34fdd1229509e4dceddfd9efd64181cd07b42c"
+    },
+    {
+      "path": "assets/extra-telescope.svg",
+      "origin": "recovered",
+      "blob": "4df0e8c246af598ef356b80059bf8681596f3a80"
+    },
+    {
+      "path": "assets/extra-lace-table.svg",
+      "origin": "recovered",
+      "blob": "99d4eb9d30f5ce62ec35868175f66771edfff3ea"
+    },
+    {
+      "path": "assets/extra-teapot.svg",
+      "origin": "recovered",
+      "blob": "ca299de8ef1e66cf98531cf82635ff7f3470d21f"
+    },
+    {
+      "path": "assets/extra-letter-shelf.svg",
+      "origin": "recovered",
+      "blob": "be300afa5ebcdeefd5acb596065b4c017a7bd08a"
+    },
+    {
+      "path": "assets/extra-moon-cushion.svg",
+      "origin": "recovered",
+      "blob": "df75e35932d81812454f5ab3c0565fd2984a9680"
+    },
+    {
+      "path": "assets/extra-gramophone.svg",
+      "origin": "recovered",
+      "blob": "4cb9a150fac5b503b7b40777eec37b9339155c06"
+    },
+    {
+      "path": "assets/extra-laptop.svg",
+      "origin": "recovered",
+      "blob": "426da046c09ae8d2c11d11c426231453b3e36a5f"
+    },
+    {
+      "path": "assets/extra-computer.svg",
+      "origin": "recovered",
+      "blob": "0c9e043a1ed2df1d93c2abe908de2dbc89f93afd"
+    },
+    {
+      "path": "assets/extra-pen.svg",
+      "origin": "recovered",
+      "blob": "0d8e52245bd7c7814936ed650df6a97cf690fc04"
+    },
+    {
+      "path": "assets/extra-pencilcup.svg",
+      "origin": "recovered",
+      "blob": "06db8e42651ced99b4ad6abdbfa0c5e842baa17a"
+    },
+    {
+      "path": "assets/extra-notebook.svg",
+      "origin": "recovered",
+      "blob": "b76cad3e8d9b2f869748f43ae774a5113466d596"
+    },
+    {
+      "path": "assets/extra-typewriter.svg",
+      "origin": "recovered",
+      "blob": "8ec6f5033096c594211abc862e5ca488f238c241"
+    },
+    {
+      "path": "assets/extra-radio.svg",
+      "origin": "recovered",
+      "blob": "bf1a35d65cd2d6a9cae99a1d8dbe1b766218541d"
     }
   ],
-  "unverifiedExtras": [
-    "extras/afternoon.json",
-    "extras/stationery.json"
-  ],
-  "note": "Expected Git blob SHA-1 from archived originals; offline V3 bundle all matched, five Source files directly checked. Run regression on checkout for full verification. 14 extra assets are reconstructed candidates, not recovered approved originals."
+  "unverifiedExtras": [],
+  "note": "Expected Git blob SHA-1 from archived SVG masters, including owner-recovered 14 extras. Rendering equivalence still requires visual tests."
 }
