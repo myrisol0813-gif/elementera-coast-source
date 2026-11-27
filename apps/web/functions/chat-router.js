@@ -32,7 +32,7 @@ import {
 import { estimateContextTokens as estimateTokens } from './context-comfort-range.js';
 import { executeRegisteredTool } from './tool-registry.js';
 import { encodeSseEvent } from './stream-format.js';
-import { prepareNativeChatGpt, executeNativeChatGptTool, saveNativeChatGptEcho, routeNativeReplySequence } from './native-chatgpt-chat.js';
+import { prepareNativeChatGpt, executeNativeChatGptTool, saveNativeChatGptEcho, routeNativeReplySequence, routeNativeSingleChatRun } from './native-chatgpt-chat.js';
 import {
   ModelRequestError,
   modelErrorResponse,
@@ -878,6 +878,7 @@ export function isChatApiPath(pathname) {
     || pathname === LANDING_LETTER_PATH
     || pathname === MODEL_METADATA_PATH
     || pathname === '/api/chat/image-generate'
+    || pathname === '/api/chat/native-single-run'
     || pathname === '/api/chat/native-reply-sequence'
     || pathname === '/api/chat/native-context'
     || pathname === '/api/chat/native-tool'
@@ -904,6 +905,7 @@ export async function routeChatApi(request, env) {
     if (pathname === ATTACHMENTS_PATH || pathname.startsWith(`${ATTACHMENTS_PATH}/`)) return await attachments(request, env, pathname);
     if (pathname === LANDING_LETTER_PATH) return await landingLetter(request, env);
     if (pathname === MODEL_METADATA_PATH) return await modelMetadataApi(request, env);
+    if (pathname === '/api/chat/native-single-run') return await routeNativeSingleChatRun(request,env);
     if (pathname === '/api/chat/native-reply-sequence') return await routeNativeReplySequence(request, env);
     if (pathname === '/api/chat/native-context') return await prepareNativeChatGpt(request, env);
     if (pathname === '/api/chat/native-tool') return await executeNativeChatGptTool(request, env);
