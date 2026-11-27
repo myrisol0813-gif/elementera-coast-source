@@ -22,8 +22,9 @@ data class NativeAnchor(val id: String, val x: Double, val y: Double, val action
 data class NativeFurnitureAsset(
     val id: String, val name: String, val file: String, val width: Double, val height: Double,
     val hasFront: Boolean, val anchors: List<NativeAnchor>, val default: NativeFurniture?,
-    val colorSlots: Set<String>,
+    val colorSlots: Set<String>, val family: String, val presets: List<NativeFurniturePreset>,
 )
+data class NativeFurniturePreset(val name: String, val colors: Map<String, String>)
 data class NativeRoom(
     val id: String, val width: Double, val height: Double, val environment: String,
     val overlay: String?, val order: List<String>,
@@ -49,10 +50,14 @@ data class NativeSceneCatalogue(val rooms: Map<String, NativeRoom>, val assets: 
                         NativeAnchor(an.str("id"), an.num("x"), an.num("y"), an.str("action"))
                     }
                     val slots = (palettes[id]?.jsonObject?.get("slots") ?: a["colorSlots"])?.jsonObject?.keys.orEmpty()
+                    val presets = palettes[id]?.jsonObject?.get("presets")?.jsonArray.orEmpty().map { v ->
+                        val preset = v.jsonObject
+                        NativeFurniturePreset(preset.str("name"), preset.getValue("values").jsonObject.mapValues { it.value.jsonPrimitive.content.lowercase() })
+                    }
                     val asset = NativeFurnitureAsset(id, a.str("name"), a.str("file"), box[2], box[3],
                         a["hasFront"]?.jsonPrimitive?.booleanOrNull ?: false, anchors,
                         p?.let { NativeFurniture("", id, it.num("x"), it.num("y"), it.num("scale"),
-                            it.getValue("mirror").jsonPrimitive.boolean, it.getValue("visible").jsonPrimitive.boolean) }, slots)
+                            it.getValue("mirror").jsonPrimitive.boolean, it.getValue("visible").jsonPrimitive.boolean) }, slots, d["id"]?.jsonPrimitive?.contentOrNull ?: "extras", presets)
                     require(assets.put(id, asset) == null) { "Duplicate furniture: $id" }
                 }
             }
