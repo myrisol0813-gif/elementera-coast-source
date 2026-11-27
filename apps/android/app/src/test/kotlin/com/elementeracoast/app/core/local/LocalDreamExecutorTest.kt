@@ -19,9 +19,10 @@ class LocalDreamExecutorTest {
         execution=DreamExecutionConfig(invitation="自在活动",tokenBudget=12000,outputLimit=500,toolBudget=4,readTurns=5,extraPerDay=1,readHistory=true,writeNote=true,includeReplies=true))
     private fun fixture():Pair<MemoryLocalPersistence,DreamSettings>{
         val store=MemoryLocalPersistence();val cache=RemoteCacheStore(store)
-        cache.putConversations(listOf(RemoteConversation(cid,"wake","main"),RemoteConversation("other","other","main")))
-        cache.putHistory(cid,RemoteHistory(conversationId=cid,turns=listOf(RemoteTurn("t",user=RemoteUserBranch(variants=listOf(RemoteVariant("u","window-original")))))))
-        cache.putHistory("other",RemoteHistory(conversationId="other",turns=listOf(RemoteTurn("secret",user=RemoteUserBranch(variants=listOf(RemoteVariant("s","other-window-secret")))))))
+        val stamp=Instant.ofEpochMilli(at-86400000).toString()
+        cache.putConversations(listOf(RemoteConversation(cid,"wake","main",createdAt=stamp,updatedAt=stamp),RemoteConversation("other","other","main",createdAt=stamp,updatedAt=stamp)))
+        cache.putHistory(cid,RemoteHistory(conversationId=cid,updatedAt=stamp,turns=listOf(RemoteTurn("t",user=RemoteUserBranch(variants=listOf(RemoteVariant("u","window-original")))))))
+        cache.putHistory("other",RemoteHistory(conversationId="other",updatedAt=stamp,turns=listOf(RemoteTurn("secret",user=RemoteUserBranch(variants=listOf(RemoteVariant("s","other-window-secret")))))))
         val ledger=LocalDreamLedger(store)
         val draft=ledger.configure(cid,DreamSettingsRequest(cid,null,"save",cfg,model),false,at-86400000)!!
         assertFalse(draft.enabled)
