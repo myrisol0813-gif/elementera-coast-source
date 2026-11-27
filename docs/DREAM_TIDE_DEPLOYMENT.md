@@ -67,3 +67,18 @@ actual write; no edit/delete or fake turn. Core custom instructions, portraits,
 window message count and separately authorized reality fields can be injected;
 server wakes do not claim device step or usage data. Subscription models and
 other write/media tools still require their own provenance and acceptance. No scheduled execution occurs in the normal build.
+
+
+## Independent online voice — additional disabled gate
+
+The online voice path additionally requires COAST_DREAM_MEDIA_ENABLED=true,
+a configured ElevenLabs provider, and per-window execution.allowVoice=true.
+Leave the deployment gate unset: the user-facing permission switch, native
+local parity and full archive/restore acceptance are not finished. This code
+does not enable a deployment or perform a provider call in CI. The existing
+voice store holds the real bytes with source=dream_tide, stable activity-derived
+clip ID and null chat turn/message IDs. A single D1 batch fences metadata
+and chunks against the still-authorized tool claim. A saved claim is not
+generated again. Revocation during a provider call can still incur provider
+charges even when saving is refused; do not automatically retry. Separate
+voice/media costs are not included in reported chat-provider token costs.
