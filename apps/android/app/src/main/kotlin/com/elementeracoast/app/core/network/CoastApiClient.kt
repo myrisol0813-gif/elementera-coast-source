@@ -432,6 +432,19 @@ class CoastApiClient(
     }
     suspend fun dreamNotes(cid:String,offset:Int=0):com.elementeracoast.app.core.remote.DreamNotesResponse =
         jsonRequest(Request.Builder().url(config.url("/api/chat/dream-tide/notes?conversation_id=${encodeQuery(cid)}&offset=$offset")).get().build(),com.elementeracoast.app.core.remote.DreamNotesResponse.serializer())
+    suspend fun dreamMediaBytes(cid:String,id:String):ByteArray {
+        require(id.matches(Regex("(att|voice)_dream_[A-Za-z0-9_.:-]{1,149}")))
+        val audio=id.startsWith("voice_dream_")
+        val limit=if(audio)4*1024*1024 else 8*1024*1024
+        val path=if(audio)"/api/voice/clips/"+encodePath(id)+"/audio" else "/api/chat/attachments/"+encodePath(id)+"?conversation_id="+encodeQuery(cid)+"&inline=1"
+        return execute(Request.Builder().url(config.url(path)).get().build()){response->
+            if(!response.isSuccessful)throw responseError(response)
+            val body=requireNotNull(response.body);require(body.contentLength()<=limit)
+            val output=java.io.ByteArrayOutputStream();val buffer=ByteArray(8192)
+            body.byteStream().use{input->while(true){val n=input.read(buffer);if(n<0)break;require(output.size()+n<=limit){"原件超过预览大小上限。"};output.write(buffer,0,n)}}
+            output.toByteArray().also{require(it.isNotEmpty()){"原件为空。"}}
+        }
+    }
     suspend fun dreamActivity(cid:String,offset:Int=0):com.elementeracoast.app.core.remote.DreamActivityResponse =
         jsonRequest(Request.Builder().url(config.url("/api/chat/dream-tide/activity?conversation_id=${encodeQuery(cid)}&offset=$offset")).get().build(),com.elementeracoast.app.core.remote.DreamActivityResponse.serializer())
     suspend fun replyDreamNote(cid:String,claim:String,replyId:String,body:String) {
