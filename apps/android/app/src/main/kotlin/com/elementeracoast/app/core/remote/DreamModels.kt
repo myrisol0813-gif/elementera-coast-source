@@ -19,7 +19,7 @@ data class DreamExecutionConfig(
     val includeSteps:Boolean=false,val includeAppUsage:Boolean=false,
     val allowWeb:Boolean=false,val allowLibrary:Boolean=false,val allowMemory:Boolean=false,val allowCalendar:Boolean=false,
     val allowCollection:Boolean=false,val allowLibraryWrite:Boolean=false,
-    val allowDailyWrite:Boolean=false,val allowCalendarWrite:Boolean=false,val allowVoice:Boolean=false
+    val allowDailyWrite:Boolean=false,val allowCalendarWrite:Boolean=false,val allowVoice:Boolean=false,val allowImage:Boolean=false
 )
 
 @Serializable
