@@ -100,4 +100,30 @@ class LocalDreamExecutorTest {
         try{assertNull(LocalDreamRuntime.acquire())}finally{lease.close()}
         LocalDreamRuntime.acquire()!!.close()
     }
+    @Test fun ordinaryPermissionsAndWakePermissionBothRequiredForLibraryTools()=runBlocking{
+        val (store,initial)=fixture();val ledger=LocalDreamLedger(store);val cache=RemoteCacheStore(store)
+        val cfg2=cfg.copy(execution=cfg.execution!!.copy(allowLibrary=true,allowLibraryWrite=true,includeCustom=true,tokenBudget=22000))
+        val settings=ledger.configure(cid,DreamSettingsRequest(cid,initial.revision,"arm",cfg2,model,true),true,at-86400000)!!
+        val book=LocalSideRecords(store).importBook(buildJsonObject{put("title","wake book");put("format","txt");putJsonArray("chapters"){add(buildJsonObject{put("title","one");put("body","real page fixture")})}}).getValue("id").jsonPrimitive.content
+        val claim=ledger.claim(cid,settings.revision!!,model,at)!!
+        assertNull(LocalToolSession.openAutonomous(store,claim))
+        cache.putHistory(cid,cache.history(cid)!!.copy(contextSettings=com.elementeracoast.app.core.model.ConversationContextSettings(localModelToolsEnabled=true,localModelWriteEnabled=true)))
+        val session=LocalToolSession.openAutonomous(store,claim)!!
+        val names=session.completionsTools.map{it.jsonObject.getValue("function").jsonObject.getValue("name").jsonPrimitive.content}
+        assertTrue("library_read" in names&&"library_write" in names)
+        assertFalse("memory_search" in names||"read_mystic_dogtalk" in names)
+        val page=session.execute("read","library_read",buildJsonObject{put("book_id",book);put("chapter_index",0)}.toString())
+        assertTrue(page.output,page.ok);assertTrue(page.output.contains("real page fixture"))
+        val write=session.execute("write","library_write",buildJsonObject{put("action","create");put("book_id",book);put("kind","reflection");put("body","independent note")}.toString())
+        assertTrue(write.output,write.ok)
+        val note=LocalSideRecords(store).rows().single{it.kind=="library_notes"}.data
+        assertEquals(JsonNull,note["source_turn_id"]);assertEquals("assistant",note["author"]!!.jsonPrimitive.content)
+        assertFalse(session.execute("delete","library_write",buildJsonObject{put("action","delete");put("id",note.getValue("id"))}.toString()).ok)
+        assertTrue(LocalToolAudit(store).read().isEmpty())
+        ledger.configure(cid,DreamSettingsRequest(cid,settings.revision,"disarm"),false,at)
+        assertFalse(session.execute("revoked","library_read",buildJsonObject{put("book_id",book);put("chapter_index",0)}.toString()).ok)
+        ledger.finish(claim,"cancelled",buildJsonObject{},null,at)
+        assertEquals(1,cache.history(cid)!!.turns.size)
+    }
+
 }
