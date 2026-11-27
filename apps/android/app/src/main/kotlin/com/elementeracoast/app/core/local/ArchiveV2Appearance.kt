@@ -127,7 +127,7 @@ internal object ArchiveV2Appearance {
         val data=raw.getValue("data").jsonObject
         when(r.id){
             DEVICE_ID->require(m.workspace=="backend"&&raw.str("kind")=="device_basic_settings"&&r.mediaObjects.isEmpty()&&data.keys.contains("basic_settings")&&data.keys.all{it in setOf("basic_settings","rest_studio")})
-            ID->require(m.workspace=="local"&&raw.str("kind")==MODULE&&(data.keys==setOf("settings","files")||data.keys==setOf("settings","files","basic_settings")))
+            ID->require(m.workspace=="local"&&raw.str("kind")==MODULE&&data.keys.containsAll(setOf("settings","files"))&&data.keys.all{it in setOf("settings","files","basic_settings","rest_studio")})
             else->error("未知设备设置记录。")
         }
         return data["basic_settings"]?.jsonObject?.also(::checkBasic)
