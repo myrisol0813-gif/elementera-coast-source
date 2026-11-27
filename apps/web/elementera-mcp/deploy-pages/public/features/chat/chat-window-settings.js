@@ -113,6 +113,7 @@ export function createChatWindowSettings({
           </section>
 
           <section class="window-context-card">
+            ${activeConversation()?.room_type==='main'?switchRow({title:'允许回读自主活动',note:'普通聊天可按需阅读本窗口自主手记与活动摘要；不启动唤醒。',checked:settings.dream_readback_enabled,enabled:!locked,action:!locked?'chat:window-dream-readback':''}):''}
             ${switchRow({title:'允许发送表情包',note:'模型可自主查找和发送已启用的素材，不调用生图 API。',checked:settings.sticker_send_enabled,enabled:!mediaLocked,action:!mediaLocked?'chat:window-sticker-send':''})}
             ${switchRow({title:'允许添加表情包',note:'模型可登记自己在本窗口生成并保存的图片。',checked:settings.sticker_add_enabled,enabled:!mediaLocked,action:!mediaLocked?'chat:window-sticker-add':''})}
           </section>
@@ -209,6 +210,10 @@ export function createChatWindowSettings({
     }
     if (name === 'window-reality-master') {
       return writeSettings({ ...settings, reality_enabled: !settings.reality_enabled });
+    }
+    if(name==='window-dream-readback'){
+      if(isUnavailableConversation()||activeConversation()?.room_type!=='main')return;
+      return writeSettings({...settings,dream_readback_enabled:!settings.dream_readback_enabled});
     }
     if(name==='window-sticker-send')return writeSettings({...settings,sticker_send_enabled:!settings.sticker_send_enabled});
     if(name==='window-sticker-add')return writeSettings({...settings,sticker_add_enabled:!settings.sticker_add_enabled});
