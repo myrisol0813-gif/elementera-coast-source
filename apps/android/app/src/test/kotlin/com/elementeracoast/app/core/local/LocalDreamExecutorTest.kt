@@ -198,7 +198,7 @@ class LocalDreamExecutorTest {
         val (store,initial)=fixture();val cache=RemoteCacheStore(store);val ledger=LocalDreamLedger(store)
         val history=cache.history(cid)!!
         cache.putHistory(cid,history.copy(contextSettings=history.contextSettings.copy(localModelWriteEnabled=true)))
-        val cfg2=cfg.copy(execution=cfg.execution!!.copy(allowVoice=true,tokenBudget=24000))
+        val cfg2=cfg.copy(execution=cfg.execution!!.copy(allowVoice=true,voiceLimit=2,tokenBudget=24000))
         val settings=ledger.configure(cid,DreamSettingsRequest(cid,initial.revision,"arm",cfg2,model,true),true,at-86400000)!!
         val bytes=byteArrayOf(73,68,51,4,0,0,0,0,0,0,1,2)
         var generated=0
@@ -232,7 +232,7 @@ class LocalDreamExecutorTest {
         val (store,initial)=fixture();val cache=RemoteCacheStore(store);val ledger=LocalDreamLedger(store)
         val history=cache.history(cid)!!
         cache.putHistory(cid,history.copy(contextSettings=history.contextSettings.copy(localModelWriteEnabled=true)))
-        val cfg2=cfg.copy(execution=cfg.execution!!.copy(allowVoice=true,tokenBudget=24000))
+        val cfg2=cfg.copy(execution=cfg.execution!!.copy(allowVoice=true,voiceLimit=2,tokenBudget=24000))
         val settings=ledger.configure(cid,DreamSettingsRequest(cid,initial.revision,"arm",cfg2,model,true),true,at-86400000)!!
         val claim=ledger.claim(cid,settings.revision!!,model,at)!!
         var generated=0
@@ -258,7 +258,7 @@ class LocalDreamExecutorTest {
         val (store,initial)=fixture();val cache=RemoteCacheStore(store);val ledger=LocalDreamLedger(store)
         val history=cache.history(cid)!!
         cache.putHistory(cid,history.copy(contextSettings=history.contextSettings.copy(localModelWriteEnabled=true)))
-        val cfg2=cfg.copy(execution=cfg.execution!!.copy(allowImage=true,tokenBudget=24000))
+        val cfg2=cfg.copy(execution=cfg.execution!!.copy(allowImage=true,imageLimit=2,tokenBudget=24000))
         val settings=ledger.configure(cid,DreamSettingsRequest(cid,initial.revision,"arm",cfg2,model,true),true,at-86400000)!!
         val imageConfig=LocalProviderConfig("image-fixture","fixture","https://openrouter.ai/api/v1","fixture-only",listOf("fixture/paid"))
         val selected=imageConfig.modelId("fixture/paid")
