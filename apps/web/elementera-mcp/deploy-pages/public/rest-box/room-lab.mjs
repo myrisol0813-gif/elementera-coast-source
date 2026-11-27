@@ -1,21 +1,32 @@
 import {newHousehold,restoreHousehold} from './creature-state.mjs';
 import {mountCreatureEditor} from './creature-editor.mjs';
 import {loadArt,createRoomRenderer} from './room-renderer.mjs';
-import {newLayout,editLayout,restoreLayout} from './room-state.mjs';
+import {newLayout,editLayout,restoreLayout,roomPreviewSlots,previewOccupants} from './room-state.mjs';
 const $=id=>document.getElementById(id);
 const labels={living:'客厅',study:'书房',bedroom:'卧室',extras:'新家具'};
 const btn=(label,fn,pressed)=>{const b=document.createElement('button');b.type='button';b.textContent=label;if(pressed!==undefined)b.setAttribute('aria-pressed',String(pressed));b.addEventListener('click',fn);return b};
-let art,cat,state,renderer,household,creatureEditor,room='living',family='living',editing=false,selected=null,pets=false,drag=null;
+let art,cat,state,renderer,household,creatureEditor,room='living',family='living',editing=false,selected=null,pets=false,drag=null,reducedMotion=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches??false,poseChoices={};
 function message(s,error=false){$('status').textContent=s;$('status').classList.toggle('error',error)}
 function chosen(){return state.rooms[room].find(i=>i.id===selected)}
 function uid(){return 'i-'+crypto.randomUUID()}
 function edit(op){try{state=editLayout(state,cat,room,op);if(op.type==='delete'||op.type==='reset')selected=null;if(op.type==='copy')selected=op.newId;if(op.type==='add')selected=op.id;refresh()}catch(e){message(e.message,true)}}
-function occupancy(){const b=state.rooms[room].find(i=>i.assetId==='bedroom-bed'&&i.visible);return pets&&b?[{role:'model',creatureId:household.model.bodyId,instanceId:b.id,anchorId:'sleep-left'},...(household.humanEnabled?[{role:'human',creatureId:household.human.bodyId,instanceId:b.id,anchorId:'sleep-right'}]:[])]:[]}
-async function draw(){try{await renderer.render(state,room,{occupants:occupancy(),selected,editing,household})}catch(e){message(e.message,true)}}
+function occupancy(){return pets?previewOccupants(state,cat,room,household,poseChoices[room]??{}):[]}
+function slotPicker(){
+  const root=$('poseSlots');root.hidden=!pets;root.replaceChildren();if(!pets)return;
+  const slots=roomPreviewSlots(state,cat,room),used=occupancy();
+  for(const role of ['model','human']){
+    if(role==='human'&&!household.humanEnabled)continue;
+    const label=document.createElement('label');label.textContent=role==='model'?'模型动物 ':'我的动物 ';
+    const select=document.createElement('select');const opts=[['','自动选择'],['none','不展示'],...slots.map(s=>[s.key,s.name+' · '+(s.action==='sleep'?'睡觉':'坐坐')+' · '+s.anchorId])];
+    for(const [value,name] of opts){const option=document.createElement('option');option.value=value;option.textContent=name;select.append(option)}
+    select.value=(poseChoices[room]??{})[role]??'';select.onchange=()=>{poseChoices[room]={...poseChoices[room],[role]:select.value};slotPicker();draw()};label.append(select);root.append(label);
+  }
+}
+async function draw(){try{await renderer.render(state,room,{occupants:occupancy(),selected,editing,household,reducedMotion})}catch(e){message(e.message,true)}}
 function refresh(){
   $('rooms').replaceChildren(...Object.keys(cat.rooms).map(id=>btn(labels[id],()=>{room=id;selected=null;refresh()},room===id)));
   $('editor').hidden=!editing;$('edit').textContent=editing?'完成':'布置房间';$('scene').classList.toggle('editing',editing);
-  $('pets').setAttribute('aria-pressed',String(pets));
+  $('pets').setAttribute('aria-pressed',String(pets));$('motion').setAttribute('aria-pressed',String(reducedMotion));slotPicker();
   const item=chosen(),a=item&&cat.assets[item.assetId];$('selected').textContent=a?.name??(item?'素材缺失':'未选中家具');
   for(const e of document.querySelectorAll('[data-op],[data-layer],#scale'))e.disabled=!item;
   if(item)$('scale').value=item.scale;
@@ -28,15 +39,15 @@ function refresh(){
     if(Object.keys(a.slots).length)colors.append(btn('恢复原色',()=>edit({type:'original',id:item.id})));
   }
   $('families').replaceChildren(...Object.keys(labels).map(id=>btn(labels[id],()=>{family=id;refresh()},family===id)));
-  $('catalog').replaceChildren(...Object.values(cat.assets).filter(a=>a.family===family).map(a=>{const b=btn(a.name,()=>edit({type:'add',assetId:a.id,id:uid()}));const img=document.createElement('img');img.src=new URL('art/v1/'+a.file,import.meta.url).href;img.alt='';img.loading='lazy';b.prepend(img);return b}));
+  $('catalog').replaceChildren(...Object.values(cat.assets).filter(a=>a.family===family).map(a=>{const b=btn(a.name+(a.provisional?'（待核原稿）':''),()=>edit({type:'add',assetId:a.id,id:uid()}));const img=document.createElement('img');img.src=new URL('art/v1/'+a.file,import.meta.url).href;img.alt='';img.loading='lazy';b.prepend(img);return b}));
   message(labels[room]+' · '+state.rooms[room].length+' 件家具');draw();
 }
 try{
  art=await loadArt();cat=art.catalogue;state=newLayout(cat);household=newHousehold(art.appearance);renderer=createRoomRenderer($('scene'),art);
- creatureEditor=mountCreatureEditor($('creatureEditor'),art,()=>household,next=>{household=next;draw()});
+ creatureEditor=mountCreatureEditor($('creatureEditor'),art,()=>household,next=>{household=next;slotPicker();draw()});
  $('appearance').onclick=()=>{const show=$('creatureEditor').hidden;$('creatureEditor').hidden=!show;if(show)creatureEditor.refresh();};
  $('edit').onclick=()=>{editing=!editing;selected=null;refresh()};
- $('pets').onclick=()=>{pets=!pets;if(pets){room='bedroom';selected=null}refresh()};
+ $('pets').onclick=()=>{pets=!pets;refresh()};$('motion').onclick=()=>{reducedMotion=!reducedMotion;refresh()};
  $('reset').onclick=()=>{if(confirm('恢复当前房间默认布局？'))edit({type:'reset'})};
  $('scale').onchange=e=>{if(chosen())edit({type:'scale',id:selected,scale:Number(e.target.value)})};
  for(const b of document.querySelectorAll('[data-op]'))b.onclick=()=>{if(chosen()&&(b.dataset.op!=='delete'||confirm('移除这件家具？')))edit({type:b.dataset.op,id:selected,newId:uid()})};

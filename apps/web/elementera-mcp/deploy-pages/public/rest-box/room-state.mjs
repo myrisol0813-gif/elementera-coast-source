@@ -31,3 +31,23 @@ function anchorPosition(cat,item,anchorId){const a=cat.assets[item.assetId];if(!
 
 function sceneLayers(state,cat,roomId,occupants=[]){ensure(Array.isArray(occupants)&&occupants.length<=2&&new Set(occupants.map(o=>o.role)).size===occupants.length&&occupants.every(o=>["model","human"].includes(o.role)),"invalid occupants");const list=getRoom(state,cat,roomId),out=[],assigned=new Set(),placed=new Set();for(const i of list){if(!i.visible)continue;const a=cat.assets[i.assetId];out.push({kind:a?"furniture":"missing",part:a?.hasFront?"back":"whole",item:i});for(const o of occupants){if(o.instanceId!==i.id)continue;const p=anchorPosition(cat,i,o.anchorId);const key=i.id+":"+o.anchorId;if(p&&!assigned.has(key)){assigned.add(key);placed.add(o.role);out.push({kind:"creature",role:o.role,creatureId:o.creatureId,...p})}}if(a?.hasFront)out.push({kind:"furniture",part:"front",item:i})}return {layers:out,unplaced:occupants.filter(o=>!placed.has(o.role)).map(o=>o.role)}}
 export {assetSize,buildCatalogue,newLayout,editLayout,restoreLayout,anchorPosition,sceneLayers};
+
+// Preview only: choose real authored furniture anchors; never synthesize geometry or model actions.
+export function roomPreviewSlots(state,cat,roomId){
+  return getRoom(state,cat,roomId).flatMap(item=>{
+    const asset=cat.assets[item.assetId];if(!item.visible||!asset)return [];
+    return (asset.anchors??[]).map(anchor=>({key:item.id+':'+anchor.id,instanceId:item.id,anchorId:anchor.id,assetId:asset.id,name:asset.name,action:anchor.action}));
+  });
+}
+export function previewOccupants(state,cat,roomId,household,choices={}){
+  const slots=roomPreviewSlots(state,cat,roomId),used=new Set(),out=[];
+  const prefer=roomId==='bedroom'?['bedroom-bed','bedroom-nest']:roomId==='living'?['living-nest','living-sofa']:['study-chair','study-cushion'];
+  const ranked=[...slots].sort((a,b)=>(prefer.includes(a.assetId)?prefer.indexOf(a.assetId):100)-(prefer.includes(b.assetId)?prefer.indexOf(b.assetId):100));
+  for(const role of ['model','human']){
+    if(role==='human'&&!household.humanEnabled)continue;
+    if(choices[role]==='none')continue;
+    const slot=slots.find(x=>x.key===choices[role]&&!used.has(x.key))??ranked.find(x=>!used.has(x.key));
+    if(!slot)continue;used.add(slot.key);out.push({role,creatureId:household[role].bodyId,instanceId:slot.instanceId,anchorId:slot.anchorId});
+  }
+  return out;
+}

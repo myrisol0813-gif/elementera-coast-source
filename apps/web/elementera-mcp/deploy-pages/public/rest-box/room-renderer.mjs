@@ -26,7 +26,7 @@ export async function loadArt({base=new URL('./art/v1/',import.meta.url),fetcher
 // Only bundled assets, never arbitrary imported SVG. Images isolate internal IDs and CSS.
 export function shiftInk(original,base,target){if(base.toLowerCase()===target.toLowerCase())return original;return '#'+[1,3,5].map(i=>Math.max(0,Math.min(255,parseInt(original.slice(i,i+2),16)+parseInt(target.slice(i,i+2),16)-parseInt(base.slice(i,i+2),16))).toString(16).padStart(2,'0')).join('')}
 
-export function prepareSvg(source,asset={},colors={},part='whole'){
+export function prepareSvg(source,asset={},colors={},part='whole',{reducedMotion=false}={}){
   if(!['whole','back','front'].includes(part))throw Error('unknown paint layer');
   const doc=new DOMParser().parseFromString(source,'image/svg+xml'),svg=doc.documentElement;
   if(svg.localName!=='svg'||doc.querySelector('parsererror,script,foreignObject'))throw Error('invalid SVG');
@@ -64,16 +64,17 @@ export function prepareSvg(source,asset={},colors={},part='whole'){
     if(!layers.some(n=>n.getAttribute('data-part')===part))throw Error('missing furniture layer');
     for(const n of layers)if(n.getAttribute('data-part')!==part)n.remove();
   }
+  if(reducedMotion){const style=doc.createElementNS('http://www.w3.org/2000/svg','style');style.textContent='*{animation-play-state:paused!important;transition:none!important}';svg.append(style)}
   return new XMLSerializer().serializeToString(svg);
 }
 
 export function createRoomRenderer(container,art){
   let generation=0;
   const {catalogue:cat}=art,cache=new Map(),paintCreature=createCreatureRenderer(art);
-  const paint=async (asset,colors={},part='whole')=>{
-    const key=JSON.stringify([asset.file,Object.entries(colors).sort(),part]);
+  const paint=async (asset,colors={},part='whole',reducedMotion=false)=>{
+    const key=JSON.stringify([asset.file,Object.entries(colors).sort(),part,reducedMotion]);
     if(!cache.has(key)){
-      const task=art.read(asset.file).then(s=>dataUri(prepareSvg(s,asset,colors,part)));
+      const task=art.read(asset.file).then(s=>dataUri(prepareSvg(s,asset,colors,part,{reducedMotion})));
       cache.set(key,task);task.catch(()=>{if(cache.get(key)===task)cache.delete(key)});
       if(cache.size>256)cache.delete(cache.keys().next().value);
     }
@@ -90,7 +91,7 @@ export function createRoomRenderer(container,art){
     const token=++generation,r=cat.rooms[roomId];if(!r)throw Error('unknown room');
     const {layers,unplaced}=sceneLayers(layout,cat,roomId,occupants);
     const pct=(x,y,w,h)=>[x*100/r.width,y*100/r.height,w*100/r.width,h*100/r.height];
-    const bg=await paint({file:r.environment});
+    const bg=await paint({file:r.environment},{},'whole',reducedMotion);
     const nodes=await Promise.all(layers.map(async l=>{
       if(l.kind==='creature'){
         const appearance=household?.[l.role]??newAppearance(art.appearance,l.creatureId);const body=Object.hasOwn(art.creatures,appearance.bodyId)?art.creatures[appearance.bodyId]:null;if(!body)return null;
@@ -102,10 +103,10 @@ export function createRoomRenderer(container,art){
         const n=document.createElement('button');n.type='button';n.textContent='素材缺失';n.dataset.instance=i.id;
         Object.assign(n.style,{position:'absolute',left:i.x*100/r.width+'%',top:i.y*100/r.height+'%',fontSize:'10px'});return n;
       }
-      const {width,height}=assetSize(a),uri=await paint(a,i.colors,l.part);
+      const {width,height}=assetSize(a),uri=await paint(a,i.colors,l.part,reducedMotion);
       return image(uri,...pct(i.x,i.y,width*i.scale,height*i.scale),{id:i.id,mirror:i.mirror,selectable:editing,selected:editing&&selected===i.id&&l.part!=='front',label:a.name});
     }));
-    const overlay=r.overlay?await paint({file:r.overlay}):null;
+    const overlay=r.overlay?await paint({file:r.overlay},{},'whole',reducedMotion):null;
     if(token!==generation)return {stale:true};
     const frag=document.createDocumentFragment();frag.append(image(bg,0,0,100,100));
     for(const n of nodes)if(n)frag.append(n);
