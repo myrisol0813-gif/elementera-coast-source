@@ -305,10 +305,17 @@ test('autonomous media and activity receipts restore atomically without arming a
   assert.equal(favorite.role,'assistant');assert.equal(favorite.message_id,null);
   assert.throws(()=>validateDreamCandidateOrigin(null,candidate),/activity missing/);
   assert.throws(()=>validateDreamCandidateOrigin(chat.dream_tide,{...candidate,source_ref_json:JSON.stringify({...JSON.parse(candidate.source_ref_json),step_index:99})}),/activity missing/);
+  const {archiveDetailPage}=await import('../functions/coast-archive-v2-details.js');
+  const {digestBytes}=await import('../functions/coast-archive-v2-chunks.js');
+  const favorites=(await archiveDetailPage(db,'vault_treasures')).items;
   const records=[],objects=[];
   for(const [module,id,kind,data,media] of [['chat',cid,'chat',chat,null],['attachments',picture.id,'attachment',image.metadata,image],['voice',clip.id,'voice',voice.metadata,voice],['memory_pockets',candidate.id,'memory_pockets',candidate,null]]){
     const o=await encodeRecordObject({kind,data});objects.push(o);if(media)objects.push(media);
     records.push({module,id,record_object:o.descriptor.object_sha256,media_objects:media?[media.descriptor.object_sha256]:[],dependencies:module==='chat'?[]:['chat/'+cid]});
+  }
+  for(const data of favorites){
+    const o=await encodeRecordObject({kind:'vault_treasures',data});objects.push(o);
+    records.push({module:'vault',id:'vault_treasures:'+await digestBytes(new TextEncoder().encode(JSON.stringify([data.id]))),record_object:o.descriptor.object_sha256,media_objects:[],dependencies:['chat/'+cid,'attachments/'+picture.id]});
   }
   const manifest={format:'elementera-coast-archive',version:2,workspace:'backend',application_id:'com.elementeracoast.source',exported_at:new Date(due).toISOString(),modules:MODULES.map(module=>({module,coverage:records.some(r=>r.module===module)?'partial':'unavailable',count:records.filter(r=>r.module===module).length})),records,objects:objects.map(o=>o.descriptor)};
   const target=new D1Database(),session=await createArchiveSession(target);
@@ -327,6 +334,8 @@ test('autonomous media and activity receipts restore atomically without arming a
   assert.equal((await target.prepare('SELECT enabled FROM dream_tide_arms WHERE conversation_id=?').bind(cid).first()).enabled,0);
   await restoreArchiveRecord(target,session.id,manifest,'memory_pockets',candidate.id,true);
   assert.deepEqual((await archiveRecordPage(target,'memory_pockets')).items,[candidate]);
+  for(const record of records.filter(r=>r.module==='vault'))await restoreArchiveRecord(target,session.id,manifest,'vault',record.id,true);
+  assert.deepEqual((await archiveDetailPage(target,'vault_treasures')).items,favorites);
   // Repackage the same persisted originals in the Native archive wire shape.
   const current=await readArchiveChat(target,cid),iso=v=>v==null?null:new Date(v).toISOString();
   const local=await encodeRecordObject({kind:'local_chat',data:{conversation:{...current.conversation,created_at:iso(current.conversation.created_at),updated_at:iso(current.conversation.updated_at),title_manual:!!current.conversation.title_manual,title_generated_at:iso(current.conversation.title_generated_at)},history:{...JSON.parse(current.history_json),conversation_id:cid,archive_storage_updated_at:current.history_updated_at},dream_tide:current.dream_tide}});
@@ -339,6 +348,8 @@ test('autonomous media and activity receipts restore atomically without arming a
   await restoreArchiveRecord(returned,next.id,localManifest,'memory_pockets',candidate.id,true);
   assert.deepEqual((await readArchiveChat(returned,cid)).dream_tide,chat.dream_tide);
   assert.deepEqual((await archiveRecordPage(returned,'memory_pockets')).items,[candidate]);
+  for(const record of records.filter(r=>r.module==='vault'))await restoreArchiveRecord(returned,next.id,localManifest,'vault',record.id,true);
+  assert.deepEqual((await archiveDetailPage(returned,'vault_treasures')).items,favorites);
   assert.deepEqual(new Uint8Array((await getChatAttachmentRecord(returned,cid,picture.id)).data),png);
   assert.deepEqual(await voiceClipAudio(returned,clip.id),audio);
   assert.equal((await readDreamNotes(returned,cid))[0].replies[0].body,'archive reply');
