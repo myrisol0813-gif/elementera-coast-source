@@ -135,9 +135,9 @@ internal class LocalDreamLedger(private val store:LocalPersistence){
         val row=buildJsonObject{put("claim_id",c.id);put("step_index",step);put("call_index",index);put("tool_name",name);put("status","claimed");put("receipt_json",JsonNull);put("started_at",now);put("finished_at",JsonNull)}
         JsonObject(h+("tools" to JsonArray(rows+row)))
     }
-    fun recordTool(c:Claim,step:Int,index:Int,ok:Boolean,count:Int?,now:Long)=mutate(c,false){h->
+    fun recordTool(c:Claim,step:Int,index:Int,ok:Boolean,count:Int?,now:Long,recordId:String?=null)=mutate(c,false){h->
         val rows=h.rows("tools");val old=rows.singleOrNull{it.str("claim_id")==c.id&&it.str("step_index")==step.toString()&&it.str("call_index")==index.toString()&&it.str("status")=="claimed"}?:return@mutate null
-        val receipt=buildJsonObject{put("ok",ok);count?.let{put("count",it)}}
+        val receipt=buildJsonObject{put("ok",ok);count?.let{put("count",it)};recordId?.takeIf{it.matches(Regex("[A-Za-z0-9_.:-]{1,160}"))}?.let{put("record_id",it)}}
         val row=JsonObject(old+mapOf("status" to JsonPrimitive(if(ok)"completed"else "failed"),"receipt_json" to JsonPrimitive(receipt.toString()),"finished_at" to JsonPrimitive(now)))
         JsonObject(h+("tools" to JsonArray(rows.map{if(it==old)row else it})))
     }
