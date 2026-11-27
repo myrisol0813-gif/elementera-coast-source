@@ -153,3 +153,16 @@ Subscription wake remains unavailable until the supported account transport,
 separate owner consent, provider usage semantics, cancellation and background
 eligibility are established and tested. No account token is copied into cloud
 settings or archives.
+
+## Activity and original navigation
+
+The owner activity list accepts a media_id filter. It matches the actual
+historical tool name, claim, step and call index within the owning window,
+not a guessed chat turn or a user-supplied activity ID. Both basic media and
+favorites can open the matching activity. Web uses the scoped activity page;
+Native uses a read-only activity detail dialog. Activity receipts with the
+exact stable media ID link back to the original; Native reuses the existing
+audio player and a bounded sampled image preview on the same workspace
+transport. Missing originals are not regenerated. This is owner-facing
+navigation, not automatic model vision readback. Interrupted saves without a
+settled receipt can still be traced from the original to its activity.
