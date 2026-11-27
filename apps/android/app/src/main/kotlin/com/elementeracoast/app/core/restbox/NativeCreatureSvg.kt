@@ -60,7 +60,7 @@ class NativeCreatureSvg(private val appearance:RestAppearanceCatalogue) {
         val doc=NativeSvgXml.parse(t.svg)
         val root=doc.documentElement
         val colors=RestAppearancePolicy.colors(appearance,a)
-        val palette=t.slots.mapValues{(slot,_)->colors.getValue(slot)}.mapKeys{(slot,_)->t.slots.getValue(slot).lowercase()}
+        val palette=t.slots.mapValues{(slot,_)->colors[slot]?:appearance.bodies.getValue(a.bodyId).slots.getValue(slot).base}.mapKeys{(slot,_)->t.slots.getValue(slot).lowercase()}
         fun recolor(element:Element,map:Map<String,String>) {
             for(e in NativeSvgXml.elements(element))for(attr in listOf("fill","stroke","stop-color","color")){
                 map[e.getAttribute(attr).lowercase()]?.let{e.setAttribute(attr,it)}
