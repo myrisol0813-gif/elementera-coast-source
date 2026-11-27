@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 155" role="img" aria-label="铜花留声机"><defs><filter id="paper" x="-8%" y="-8%" width="116%" height="116%"><feTurbulence type="fractalNoise" baseFrequency=".64" numOctaves="3" seed="32" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 .41 0 0 0 0 .30 0 0 0 0 .23 .20 .20 .20 0 -.14" result="p"/><feComposite in="p" in2="SourceGraphic" operator="in" result="t"/><feBlend in="SourceGraphic" in2="t" mode="multiply"/></filter><filter id="edge" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency=".085" numOctaves="3" seed="14" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="1.25" xChannelSelector="R" yChannelSelector="G"/></filter></defs><g data-part="back" filter="url(#paper) url(#edge)">
+<ellipse cx="91" cy="140" rx="64" ry="9" fill="#968268" opacity=".15"/>
+<path d="M30 102Q82 91 144 101L153 115L149 136Q89 153 33 138Z" fill="#9c7355"/>
+<path d="M33 115Q91 128 151 114L149 136Q93 149 33 138Z" fill="#805d46"/>
+<path d="M29 101Q85 87 144 98L155 112Q94 130 28 114Z" fill="#ba9571"/>
+<ellipse cx="84" cy="108" rx="36" ry="11" fill="#575650"/><ellipse cx="84" cy="108" rx="29" ry="8" fill="#79756b"/><ellipse cx="84" cy="108" rx="10" ry="3.9" fill="#d2b78c"/>
+<path d="M63 105Q83 100 107 106M56 109Q84 118 113 109" stroke="#b2a595" stroke-width="1.2" opacity=".55" fill="none"/>
+<path d="M122 106C130 85 123 66 113 61Q107 57 96 62" stroke="#9f8760" stroke-width="12" stroke-linecap="round" fill="none"/>
+<path d="M124 102C129 84 122 67 113 63Q107 60 97 63" stroke="#ddc69c" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+<ellipse cx="122" cy="104" rx="9" ry="5" fill="#9f8760"/>
+<path d="M103 55Q88 56 67 36Q47 20 27 22Q18 36 30 64Q43 87 61 92Q79 73 103 68Z" fill="#c3a471"/>
+<path d="M96 59Q68 54 46 32Q35 25 27 23M89 67Q57 63 36 47M77 77Q51 72 33 61" stroke="#ddc69c" stroke-width="3.4" fill="none" opacity=".8" stroke-linecap="round"/>
+<path d="M30 21Q13 25 24 57Q35 84 60 93Q74 88 63 64Q52 33 30 21Z" fill="#ddc69c"/>
+<path d="M31 28Q20 31 30 57Q42 81 57 85Q65 77 55 56Q43 35 31 28Z" fill="#9f8760"/>
+<path d="M32 28Q46 37 55 57Q67 78 58 85" stroke="#c3a471" stroke-width="3" stroke-linecap="round" fill="none"/>
+<g transform="translate(101 62) rotate(-10)"><path d="M-5 -7Q0 -9 5 -6L6 6Q1 9 -5 7Z" fill="#9f8760"/><path d="M-3 -7L-2 7" stroke="#ddc69c" stroke-width="2.3" stroke-linecap="round"/></g>
+<path d="M66 130Q94 134 115 127" stroke="#c2a27c" stroke-width="1.8" opacity=".7" fill="none"/><circle cx="126" cy="128" r="3.2" fill="#d6bc80"/></g></svg>
