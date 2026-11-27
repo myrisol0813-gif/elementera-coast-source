@@ -99,6 +99,21 @@ async function createLatestSchema(db) {
     PRIMARY KEY(conversation_id,slot_key)
   )`);
   await run(db, "CREATE UNIQUE INDEX IF NOT EXISTS dream_tide_one_active ON dream_tide_runs(conversation_id) WHERE status='running'");
+  await ensureColumn(db,'dream_tide_runs','result_json','TEXT DEFAULT NULL');
+  await run(db, `CREATE TABLE IF NOT EXISTS dream_tide_steps (
+    claim_id TEXT NOT NULL, step_index INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('claimed','completed','failed')),
+    receipt_json TEXT, started_at INTEGER NOT NULL, finished_at INTEGER,
+    PRIMARY KEY(claim_id,step_index)
+  )`);
+  await run(db, `CREATE TABLE IF NOT EXISTS dream_tide_notes (
+    claim_id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, model_id TEXT NOT NULL,
+    body TEXT NOT NULL, created_at INTEGER NOT NULL
+  )`);
+  await run(db, `CREATE TABLE IF NOT EXISTS dream_tide_replies (
+    id TEXT PRIMARY KEY, claim_id TEXT NOT NULL, conversation_id TEXT NOT NULL,
+    body TEXT NOT NULL, created_at INTEGER NOT NULL
+  )`);
   await run(db, `CREATE TABLE IF NOT EXISTS chat_single_runs (
     conversation_id TEXT PRIMARY KEY, claim_id TEXT NOT NULL UNIQUE,
     started_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
