@@ -1,5 +1,6 @@
 package com.elementeracoast.app.feature.wolf
 
+import com.elementeracoast.app.core.model.ReplySegments
 import kotlinx.serialization.json.*
 import java.io.OutputStream
 import java.util.Base64
@@ -63,7 +64,7 @@ internal object OfflineHtmlArchive {
                 val title=conversation.str("title").ifEmpty { conversation.str("id") };val path="chats/"+(i+1)+".html"
                 nav.add("""<li><a href="$path">"""+esc(title)+"</a></li>")
                 fun article(v: JsonObject,role: String,label: String): String = buildString {
-                    append("""<article class="$role"><small>"""+esc(label)+" · "+esc(v.str("created_at"))+"""</small><div style="white-space:pre-wrap;overflow-wrap:anywhere">"""+esc(v.str("content"))+"</div>")
+                    append("""<article class="$role"><small>"""+esc(label)+" · "+esc(v.str("created_at"))+"""</small><div style="white-space:pre-wrap;overflow-wrap:anywhere">"""+esc(if(role=="assistant")ReplySegments.plain(v.str("content")) else v.str("content"))+"</div>")
                     v["attachments"].arr().forEach { a -> val item=a.obj();val m=attachments[conversation.str("id")+":"+item.str("id")]
                         append(if(m!=null)mediaHtml(m,"../") else "<p>原件未归档："+esc(item.str("name"))+"</p>") }
                     v["desk_slip"]?.takeUnless { it==JsonNull }?.let { append("<details><summary>历史回执</summary><pre>"+esc(it.toString())+"</pre></details>") }

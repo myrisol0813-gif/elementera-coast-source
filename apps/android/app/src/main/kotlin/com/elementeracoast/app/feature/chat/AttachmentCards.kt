@@ -134,7 +134,7 @@ private fun InlineMessageImage(
             bitmap = preview,
             contentDescription = attachment.name,
             modifier = Modifier
-                .width(if(attachment.isSticker)stickerSize.coerceIn(64,256).dp else 238.dp)
+                .width(if(attachment.isSticker)(stickerSize.coerceIn(64,256)*minOf(1f,aspect)).dp else 238.dp)
                 .aspectRatio(aspect)
                 .clip(RoundedCornerShape(18.dp)),
             contentScale = ContentScale.Fit
