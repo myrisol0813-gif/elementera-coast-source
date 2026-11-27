@@ -7,7 +7,7 @@ const toolNames={dream_read_history:'阅读历史',dream_write_note:'写小笺',
 const row=(label,body)=>'<label>'+h(label)+body+'</label>';
 const input=(id,value,type='text',extra='')=>'<input id="'+id+'" type="'+type+'" value="'+a(String(value??''))+'" '+extra+'>';
 const checkbox=(id,label,checked)=>'<label><input type="checkbox" id="'+id+'" '+(checked?'checked':'')+'> '+h(label)+'</label>';
-const button=(label,action,extra='')=>'<button type="button" class="feature-row" data-action="settings:dream-'+action+'" '+extra+'><span><strong>'+h(label)+'</strong></span></button>';
+const button=(label,action,extra='')=>'<button type="button" class="feature-row" data-action="dream-tide:'+action+'" '+extra+'><span><strong>'+h(label)+'</strong></span></button>';
 const section=(title,body)=>'<section class="feature-group"><h2>'+h(title)+'</h2><div class="feature-card">'+body+'</div></section>';
 const stamp=v=>Number.isFinite(v)?new Date(v).toLocaleString():'未记录';
 const query=(path,cid,offset=0)=>BASE+path+'?'+new URLSearchParams({conversation_id:cid,limit:'20',offset:String(offset)});
@@ -15,11 +15,12 @@ const post=(path,data)=>requestJson(BASE+path,{method:'POST',body:JSON.stringify
 export function createDreamTideViews({router,chat,toast}){
   let configState=null,busy=false,notesOffset=0,activityOffset=0,notesWindow=null,activityWindow=null;
   const current=()=>chat.getCurrentConversationId();
+  const pinned=()=>router.current()?.params?.conversationId||null;
+  const open=cid=>router.open('dream-tide',{conversationId:cid});
   const nav=()=>'<div class="feature-card">'+button('梦醒设置','open')+button('小笺','notes')+button('潮痕','activity')+'</div>';
   const page=(title,body)=>({title,subtitle:'当前窗口 · 独立于普通聊天',className:'settings-form',body:nav()+body});
   const noWindow=()=>page('梦醒潮','<p class="feature-note">请先打开支持梦醒潮的普通聊天窗口。</p>');
-  router.register('dream-tide',async()=>{
-    const cid=current();if(!cid)return noWindow();
+  router.register('dream-tide',async({conversationId:cid}={})=>{if(!cid)return noWindow();
     const data=await requestJson(query('',cid)),s=data.settings,c=s.config||{},e=c.execution||{};
     configState={cid,s,available:data.executionAvailable&&data.schedulerConfigured};
     const model=s.modelId||chat.getProfile().current_chat_model||'';
@@ -45,8 +46,7 @@ export function createDreamTideViews({router,chat,toast}){
       button('保存设置（不启用）','save')+checkbox('dreamConsent','我确认允许按上述设置进行模型调用并产生相应费用',false)+
       (configState.available?button('保存并授权唤醒','arm'):'<p class="feature-note">实际调度尚未开通。</p>')));
   });
-  router.register('dream-tide-notes',async()=>{
-    const cid=current();if(!cid)return noWindow();
+  router.register('dream-tide-notes',async({conversationId:cid}={})=>{if(!cid)return noWindow();
     if(notesWindow!==cid){notesWindow=cid;notesOffset=0;}
     const d=await requestJson(query('/notes',cid,notesOffset));
     const body=d.items.map(n=>'<article class="feature-group"><h2>'+h(stamp(n.created_at)+' · '+n.model_id)+'</h2><div class="feature-card">'+
@@ -56,8 +56,7 @@ export function createDreamTideViews({router,chat,toast}){
     return page('小笺',(body||'<p class="feature-note">还没有小笺。</p>')+'<p class="feature-note">回笺只保存文字，不立即唤醒模型。</p>'+
       (notesOffset?button('上一页','notes-prev'):'')+(d.nextOffset!==null?button('下一页','notes-next'):''));
   });
-  router.register('dream-tide-activity',async()=>{
-    const cid=current();if(!cid)return noWindow();
+  router.register('dream-tide-activity',async({conversationId:cid}={})=>{if(!cid)return noWindow();
     if(activityWindow!==cid){activityWindow=cid;activityOffset=0;}
     const d=await requestJson(query('/activity',cid,activityOffset));
     const body=d.items.map(r=>section(stamp(r.started_at)+' · '+(r.kind==='daily'?'固定唤醒':'额外唤醒'),
@@ -73,22 +72,24 @@ export function createDreamTideViews({router,chat,toast}){
   const checked=id=>q('#'+id)?.checked===true;
   const number=id=>{const v=value(id);if(!v.trim()||!Number.isSafeInteger(Number(v)))throw Error('请填写完整整数预算。');return Number(v);};
   async function handle(name,target){
-    if(name==='open')return router.open('dream-tide');
-    if(name==='notes'){notesOffset=0;return router.open('dream-tide-notes');}
-    if(name==='activity'){activityOffset=0;return router.open('dream-tide-activity');}
+    const cid=pinned();
+    if(!cid||cid!==current())return toast('窗口已切换，请从当前窗口重新打开梦醒潮。');
+    if(name==='open')return open(cid);
+    if(name==='notes'){notesOffset=0;return router.open('dream-tide-notes',{conversationId:cid});}
+    if(name==='activity'){activityOffset=0;return router.open('dream-tide-activity',{conversationId:cid});}
     if(name==='notes-prev'||name==='notes-next'){notesOffset=Math.max(0,notesOffset+(name.endsWith('next')?20:-20));return router.refresh();}
     if(name==='activity-prev'||name==='activity-next'){activityOffset=Math.max(0,activityOffset+(name.endsWith('next')?20:-20));return router.refresh();}
     if(busy)return;busy=true;
     try{
       if(name==='reply'){
         const cid=target.dataset.cid,claim=target.dataset.claim,box=target.closest('.form-stack')?.querySelector('textarea'),body=box?.value;
-        if(cid!==current()||!body?.trim())throw Error('请填写回笺。');
+        if(cid!==pinned()||cid!==current()||!body?.trim())throw Error('请填写回笺。');
         // Keep the ID for a network-ambiguous retry of the same text.
         if(box.dataset.replyBody!==body){box.dataset.replyId=crypto.randomUUID();box.dataset.replyBody=body;}
         await post('/reply',{conversation_id:cid,claim_id:claim,reply_id:box.dataset.replyId,body});
         toast('回笺已保存');return router.refresh();
       }
-      if(!configState||configState.cid!==current())throw Error('窗口已切换，请重新打开。');
+      if(!configState||configState.cid!==pinned()||configState.cid!==current())throw Error('窗口已切换，请重新打开。');
       const data={conversation_id:configState.cid,revision:configState.s.revision,action:name};
       if(name!=='disarm'){
         if(!['save','arm'].includes(name))return;
@@ -102,5 +103,5 @@ export function createDreamTideViews({router,chat,toast}){
       await post('',data);toast(name==='arm'?'已授权梦醒潮':name==='disarm'?'已撤回授权':'设置已保存 · 未启用');return router.refresh();
     }catch(e){toast(e.message||'操作未完成',4500);}finally{busy=false;}
   }
-  return {handle};
+  return {open,handleAction:handle};
 }
