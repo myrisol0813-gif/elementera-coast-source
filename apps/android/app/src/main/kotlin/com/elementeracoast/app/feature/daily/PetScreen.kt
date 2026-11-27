@@ -22,6 +22,9 @@ import com.elementeracoast.app.core.restbox.*
 import com.elementeracoast.app.ui.theme.SnowLetterSurface
 import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import android.os.SystemClock
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
@@ -29,6 +32,7 @@ import kotlinx.serialization.json.*
 private const val MAX_STUDIO_JSON = 1_000_000
 private val roomNames = mapOf("living" to "客厅", "study" to "书房", "bedroom" to "卧室", "extras" to "其他家具")
 private val actionNames = mapOf("idle" to "待机", "cling" to "贴贴", "cheer" to "开心", "sad" to "低落", "sit" to "坐下", "sleep" to "睡觉")
+private data class StudioMotionRequest(val id:String,val appearance:RestAppearance,val action:String,val prop:String?)
 private data class StudioResources(
     val cat: NativeSceneCatalogue, val appearance: RestAppearanceCatalogue,
     val names: Map<String,String>, val policy: NativeStudioPolicy, val atlas: NativeRestSprites,
@@ -144,7 +148,28 @@ private fun NativeStudioPage(r: StudioResources) {
     val bitmaps by produceState<Map<String,android.graphics.Bitmap>>(emptyMap(),r.atlas,keys) {
         value=withContext(Dispatchers.IO){r.atlas.load(keys)}
     }
-    val images=remember(r.atlas,bitmaps,state.household){NativeRestSpriteSnapshot(r.atlas,bitmaps,state.household)}
+    val motionRequests=remember(panel,role,action,prop,state.household,occupants,scene){
+        if(panel=="appearance")listOf(StudioMotionRequest("preview",if(role=="model")state.household.model else state.household.human,action,prop))
+        else scene.filterIsInstance<NativeSceneLayer.Occupant>().map{layer->
+            StudioMotionRequest(layer.role,if(layer.role=="model")state.household.model else state.household.human,layer.anchor.action,null)
+        }
+    }
+    val moving by produceState<Map<String,android.graphics.Bitmap>>(emptyMap(),r.atlas,motionRequests,state.reducedMotion,panel){
+        value=emptyMap()
+        if(state.reducedMotion||motionRequests.isEmpty())return@produceState
+        val start=SystemClock.uptimeMillis()
+        while(isActive) {
+            val elapsed=SystemClock.uptimeMillis()-start
+            val frames=withContext(Dispatchers.Default){
+                motionRequests.mapNotNull{req->
+                    r.atlas.motionFrame(req.appearance,req.action,req.prop,elapsed,if(req.id=="preview")384 else 192)?.let{req.id to it}
+                }.toMap()
+            }
+            value=frames
+            delay(125)
+        }
+    }
+    val images=remember(r.atlas,bitmaps,state.household,moving){NativeRestSpriteSnapshot(r.atlas,bitmaps,state.household,moving)}
     val unsupported = items.count { item -> item.visible && r.cat.assets[item.assetId]?.let {
         !r.atlas.has(r.atlas.furnitureKey(it,NativePaintPart.WHOLE,item.colors))
     } != false }
@@ -165,6 +190,7 @@ private fun NativeStudioPage(r: StudioResources) {
                     DropdownMenuItem(text={Text("导出房间与形象")},onClick={menu=false;pendingExport=r.policy.export(state);save.launch("rest-box-layout.json")})
                     DropdownMenuItem(text={Text("导入房间与形象")},onClick={menu=false;pick.launch(arrayOf("application/json","text/plain","application/octet-stream"))})
                     if(recovery && raw!=null)DropdownMenuItem(text={Text("导出旧存档原件")},onClick={menu=false;pendingExport=raw;save.launch("rest-box-recovery.json")})
+                    DropdownMenuItem(text={Text(if(state.reducedMotion)"播放动画" else "暂停动画")},onClick={menu=false;change(state.copy(reducedMotion=!state.reducedMotion))})
                     DropdownMenuItem(text={Text("恢复当前房间")},onClick={menu=false;confirmation="reset"})
                 }
             }
@@ -257,7 +283,7 @@ private fun NativeStudioPage(r: StudioResources) {
             }
             val a=if(role=="model")state.household.model else state.household.human
             val def=r.appearance.bodies.getValue(a.bodyId)
-            val bitmap=bitmaps[r.atlas.creatureKey(a,action,prop)]?:bitmaps[r.atlas.baseCreatureKey(a,action)]
+            val bitmap=moving["preview"]?:bitmaps[r.atlas.creatureKey(a,action,prop)]?:bitmaps[r.atlas.baseCreatureKey(a,action)]
             Box(Modifier.fillMaxWidth().height(220.dp),contentAlignment=Alignment.Center) {
                 if(bitmap!=null)Image(bitmap.asImageBitmap(),contentDescription=r.names[a.bodyId],modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Fit)
             }
@@ -269,7 +295,8 @@ private fun NativeStudioPage(r: StudioResources) {
                 val props=remember(a.bodyId,a.palette,action){r.atlas.propOptions(a,action)}
                 if(props.isNotEmpty())NativeStudioChoice("手持道具",prop.orEmpty(),listOf("" to "不拿道具")+props.map{it to (mapOf("book" to "书","flower" to "花","cookie" to "饼干","tea" to "茶","letter" to "信")[it]?:it)}){prop=it.takeIf{v->v.isNotEmpty()}}
                 if(incompleteAppearance)Text("正在绘制自定义形象，失败时保留原稿与设置。",color=MaterialTheme.colorScheme.error)
-                Text("姿态预览使用原稿；连续动画另行验收。",style=MaterialTheme.typography.bodySmall)
+                NativeStudioSwitch("播放动画",!state.reducedMotion){change(state.copy(reducedMotion=!it))}
+                Text("原稿动画轨道以节能频率预览，连续动作保真仍待验收。",style=MaterialTheme.typography.bodySmall)
             }
             StudioSection {
                 Text("身体配色",style=MaterialTheme.typography.titleSmall)
