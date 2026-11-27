@@ -120,7 +120,7 @@ assert.deepEqual(
 );
 
 const homeWhileLoading = router.renderers.get('daily-home')();
-for (const label of ['碳硅圈', '日记', '宠物系统', '未来小组件']) {
+for (const label of ['碳硅圈', '日记', '休憩箱', '未来小组件']) {
   assert.match(homeWhileLoading.body, new RegExp(label), `Daily shell misses ${label} while syncing`);
 }
 for (const retired of ['一日总结', '相册', '草稿']) {
@@ -177,6 +177,9 @@ for (const name of ['moments', 'diary', 'pets', 'widgets']) {
 }
 assert.deepEqual(router.opens.slice(-4).map((entry) => entry.name), ['moments', 'diary', 'daily-placeholder', 'daily-placeholder']);
 assert.equal(router.opens.at(-2).params.title, '宠物系统');
+const studio = router.renderers.get('daily-placeholder')({ title: '宠物系统' });
+assert.match(studio.body, /<iframe[^>]+src="\/public\/rest-box\/room-lab\.html"/);
+assert.doesNotMatch(router.renderers.get('daily-placeholder')({ title: '未来小组件' }).body, /<iframe/);
 assert.equal(router.opens.at(-1).params.title, '未来小组件');
 
 router.setCurrent({ name: 'outside-view' });
@@ -195,7 +198,7 @@ const offlineInitial = offlineRouter.renderers.get('daily-home')();
 for (const retired of ['海岸日历', '一日总结', '相册', '草稿']) assert.doesNotMatch(offlineInitial.body, new RegExp(retired));
 await offlineDaily.startLoad();
 const offlineHome = offlineRouter.renderers.get('daily-home')();
-for (const label of ['碳硅圈', '日记', '宠物系统', '未来小组件']) {
+for (const label of ['碳硅圈', '日记', '休憩箱', '未来小组件']) {
   assert.match(offlineHome.body, new RegExp(label), `offline Daily shell loses ${label}`);
 }
 assert.match(offlineHome.body, /当前显示本机缓存/);
