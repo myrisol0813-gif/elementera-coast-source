@@ -102,6 +102,7 @@ class NativeRestSceneDeviceTest {
             for(y in 1..19)for(x in 1..19)add(bitmap.getPixel(bitmap.width*x/20,bitmap.height*y/20))
         }
         assertNotEquals(signature(base),signature(color))
+        assertReferenceFidelity(atlas.get("reference|furniture|window")!!,color,"window recolor")
         val appearance=repo.appearance()
         val wolf=RestAppearancePolicy.fresh(appearance,"wolf")
         val custom=wolf.copy(colors=mapOf("fur" to "#7389b0"),glasses="round",neck="scarf",
@@ -110,10 +111,34 @@ class NativeRestSceneDeviceTest {
         val edited=atlas.get(atlas.creatureKey(custom,"idle","book"))
         assertNotNull("Body colors, glasses, scarf, badge and prop must compose natively",edited)
         assertNotEquals(signature(original),signature(edited!!))
+        assertReferenceFidelity(atlas.get("reference|creature|wolf")!!,edited,"wolf wardrobe composition")
         val f1=atlas.motionFrame(custom,"idle",null,100,256)
         val f2=atlas.motionFrame(custom,"idle",null,900,256)
         assertNotNull("Native authored animation should paint",f1)
         assertNotNull(f2)
         assertNotEquals("Animation must actually change pixels",signature(f1!!),signature(f2!!))
+    }
+
+    /** Catch gross shape, occlusion or color regression; owner still decides visual parity. */
+    private fun assertReferenceFidelity(reference:android.graphics.Bitmap,actual:android.graphics.Bitmap,label:String){
+        assertEquals("$label width",reference.width,actual.width)
+        assertEquals("$label height",reference.height,actual.height)
+        var union=0L;var overlap=0L;var colorError=0L
+        for(y in 0 until reference.height step 2)for(x in 0 until reference.width step 2){
+            val a=reference.getPixel(x,y);val b=actual.getPixel(x,y)
+            val aa=android.graphics.Color.alpha(a);val ab=android.graphics.Color.alpha(b)
+            if(aa>32||ab>32)union++
+            if(aa>32&&ab>32)overlap++
+            if(aa>32&&ab>32){
+                colorError+=kotlin.math.abs(android.graphics.Color.red(a)-android.graphics.Color.red(b))
+                colorError+=kotlin.math.abs(android.graphics.Color.green(a)-android.graphics.Color.green(b))
+                colorError+=kotlin.math.abs(android.graphics.Color.blue(a)-android.graphics.Color.blue(b))
+            }
+        }
+        assertTrue("$label is not empty",union>100&&overlap>100)
+        val silhouette=overlap.toDouble()/union
+        val mean=colorError.toDouble()/(overlap*3)
+        assertTrue("$label silhouette IoU $silhouette",silhouette>=.85)
+        assertTrue("$label mean RGB error $mean",mean<=30.0)
     }
 }
