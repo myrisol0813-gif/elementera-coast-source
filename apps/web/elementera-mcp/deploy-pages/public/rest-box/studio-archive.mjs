@@ -20,15 +20,15 @@ export async function verifyStudio(raw,art=null){
   }
   return {version:1,layout,household,room:v.room,pets:v.pets,reducedMotion:v.reducedMotion,poseChoices};
 }
-export async function captureStudio(storage=globalThis.localStorage){
+export async function captureStudio(storage=globalThis.localStorage,art=null){
   const raw=storage.getItem(STUDIO_KEY);
   if(raw===null)return null;
-  return verifyStudio(raw);
+  return verifyStudio(raw,art);
 }
-export async function restoreStudioArchive(value,confirm,storage=globalThis.localStorage){
-  const next=await verifyStudio(value),old=storage.getItem(STUDIO_KEY);
+export async function restoreStudioArchive(value,confirm,storage=globalThis.localStorage,art=null){
+  const next=await verifyStudio(value,art),old=storage.getItem(STUDIO_KEY);
   let same=false;
-  if(old!==null)try{same=JSON.stringify(await verifyStudio(old))===JSON.stringify(next)}catch{}
+  if(old!==null)try{same=JSON.stringify(await verifyStudio(old,art))===JSON.stringify(next)}catch{}
   if(confirm&&!same){
     // Preserve the previous raw bytes, including malformed legacy saves.
     if(old!==null)storage.setItem(STUDIO_KEY+'.archive-previous',old);
