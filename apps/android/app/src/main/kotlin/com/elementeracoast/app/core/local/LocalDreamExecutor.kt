@@ -61,12 +61,14 @@ internal class LocalDreamExecutor(
             val n=h.turns.count{t->val u=t.user.variants.getOrNull(t.user.active);val at=runCatching{Instant.parse(u?.createdAt).toEpochMilli()}.getOrNull();u!=null&&!u.hidden&&at!=null&&at>since&&at<=c.startedAt}
             parts.add("【期间新增对话轮数】"+n+"（当前窗口）")
         }
-        if(h!=null&&(e.includeWeather||e.includeCalendar)){
+        if(h!=null&&(e.includeWeather||e.includeCalendar||e.includeSteps||e.includeAppUsage)){
             val settings=h.contextSettings
-            val fields=settings.realityFields.filter{(it=="weather"&&e.includeWeather)||(it=="calendar"&&e.includeCalendar)}
+            val fields=settings.realityFields.filter{(it=="weather"&&e.includeWeather)||(it=="calendar"&&e.includeCalendar)||(it=="steps"&&e.includeSteps)||(it in setOf("recent_app","app_usage")&&e.includeAppUsage)}
             if(settings.realityEnabled&&fields.isNotEmpty()){
                 val scoped=settings.copy(realityFields=fields)
+                permitted(c)
                 val actual=captureReality(scoped)
+                permitted(c)
                 val real=localReality(store,scoped,actual,Instant.ofEpochMilli(c.startedAt).atZone(ZoneId.of(c.config.timeZone)).toLocalDateTime())
                 if(real.delivered)parts.add("【已授权现实上下文】"+real.context)
             }
