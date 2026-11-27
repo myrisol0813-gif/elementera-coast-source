@@ -12,7 +12,7 @@ export async function dreamExecutionConfig(db,cid,revision=null){
   const row=await stmt(db,"SELECT revision,model_id,config_json FROM dream_tide_arms WHERE conversation_id=? AND enabled=1 AND (? IS NULL OR revision=?)",cid,revision,revision).first();
   if(!row)return null;
   const config=JSON.parse(row.config_json);
-  return config.execution?{revision:row.revision,modelId:row.model_id,...config}:null;
+  return config.execution?{revision:row.revision,modelId:row.model_id,...config,execution:{voiceLimit:1,imageLimit:1,...config.execution}}:null;
 }
 export async function reserveDreamStep(db,claim,index,now=Date.now()){
   await ensureChatSchema(db);
