@@ -34,7 +34,7 @@ class LocalDreamWorker(context:Context,params:WorkerParameters):CoroutineWorker(
             val client=LocalProviderClient()
             val executor=LocalDreamExecutor(store,provider::resolve,client::dreamRequest,workspaceActive={
                 NativeWorkspace.localSelected(applicationContext)&&NativeWorkspace.isLocal&&NativeWorkspace.persistence(applicationContext)===store
-            },web=LocalIndependentWeb(applicationContext),captureReality={settings->com.elementeracoast.app.feature.chat.AndroidRealityContextSource(applicationContext,store,true).capture(settings)},voice=LocalVoiceProvider(applicationContext))
+            },web=LocalIndependentWeb(applicationContext),captureReality={settings->com.elementeracoast.app.feature.chat.AndroidRealityContextSource(applicationContext,store,true).capture(settings)},voice=LocalVoiceProvider(applicationContext),imageProvider=provider::resolveImageProvider)
             val windows=RemoteCacheStore(store,strictReads=true).conversations().filter{it.roomType=="main"&&it.source=="coast"&&it.deletedAt==null}
             val now=System.currentTimeMillis()
             // No previous in-flight wake can be alive while this lease is held.
