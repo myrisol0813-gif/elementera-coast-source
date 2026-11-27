@@ -46,6 +46,11 @@ internal class NativeDreamPlanGrants(private val store:LocalPersistence){
         if(r.str("fence")!=s.get(pauseKey(identity),"0"))return@readConsistent "paused"
         if(resolve(window,revision.orEmpty(),modelId.orEmpty(),account,epoch)==null)"not_authorized" else "authorized"
     }
+    fun requestLimit(window:String,revision:String?,modelId:String?):Int?=store.readConsistent{s->
+        val r=row(window,s)?:return@readConsistent null
+        if(r.str("revision")!=revision||r.str("model")!=modelId?.let(NativeDreamPlanProtocol::slug))return@readConsistent null
+        (r["request_limit"] as? JsonPrimitive)?.intOrNull?.takeIf{it in 1..129}
+    }
     fun revoke(window:String)=store.remove(key(window))
     /** Invalidate all grants belonging to the same account connection. A new
      * explicit grant reopens only its own window, never all older windows. */
