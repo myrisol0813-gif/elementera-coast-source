@@ -23,9 +23,16 @@ import com.elementeracoast.app.feature.shell.MainShell
 import com.elementeracoast.app.ui.theme.CoastTheme
 
 class MainActivity : ComponentActivity() {
+    private var dreamNotice by mutableStateOf<com.elementeracoast.app.core.local.LocalDreamNotifications.Target?>(null)
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        com.elementeracoast.app.core.local.LocalDreamNotifications.target(intent)?.let{dreamNotice=it}
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         NativeWorkspace.initialize(applicationContext)
+        if(savedInstanceState==null) dreamNotice=com.elementeracoast.app.core.local.LocalDreamNotifications.target(intent)
         com.elementeracoast.app.core.local.LocalDreamWorker.sync(applicationContext)
         if (NativeWorkspace.isLocal) SourceVisitGate.leave()
         setContent {
@@ -130,6 +137,19 @@ class MainActivity : ComponentActivity() {
                         onPlaceholder = vm::showPlaceholder,
                         onSnackbarShown = vm::clearSnackbar
                     )
+                    val target=dreamNotice
+                    if(target!=null){
+                        if(state.localMode && state.conversations.any{it.id==target.cid}){
+                            androidx.compose.runtime.key(target){
+                                com.elementeracoast.app.feature.shell.DreamTideSheet(target.cid,state.currentModel,true,vm.dreamApi,initialTab=target.tab,onDismiss={dreamNotice=null})
+                            }
+                        }else if(!state.localMode){
+                            LaunchedEffect(target){
+                                vm.showPlaceholder("这是一条本机活动通知。请切回本机模式查看。")
+                                dreamNotice=null
+                            }
+                        }
+                    }
                 }
             }
         }

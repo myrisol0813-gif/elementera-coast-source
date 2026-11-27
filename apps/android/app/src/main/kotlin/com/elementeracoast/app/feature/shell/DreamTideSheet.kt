@@ -30,9 +30,9 @@ private fun JsonElement?.field(key:String):String?=((this as? JsonObject)?.get(k
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,api:CoastApiClient,onDismiss:()->Unit){
+internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,api:CoastApiClient,initialTab:Int=0,onDismiss:()->Unit){
     val scope=rememberCoroutineScope()
-    var tab by remember(cid){mutableStateOf(0)}
+    var tab by remember(cid,initialTab){mutableStateOf(initialTab.coerceIn(0,2))}
     var loaded by remember(cid){mutableStateOf(false)}
     var busy by remember(cid){mutableStateOf(false)}
     var error by remember(cid){mutableStateOf("")}
@@ -128,6 +128,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
             if(error.isNotBlank())Text(error,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
             if(notice.isNotBlank())Text(notice,style=MaterialTheme.typography.bodySmall)
             if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
+            if(tab==0&&localMode) DreamNotificationControls(cid)
             if(tab==0&&loaded){
                 Text(when{
                     !response.settings.enabled->"未授权"
