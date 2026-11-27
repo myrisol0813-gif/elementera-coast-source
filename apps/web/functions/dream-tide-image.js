@@ -10,6 +10,15 @@ export async function autonomousImageModel(db,env){
   const model=(await readProfile(db)).current_image_model;
   return modelPattern.test(model)?model:null;
 }
+export async function prepareDreamImageReadback(db,cid,id,visionSupported){
+  if(visionSupported!==true)return null;
+  if(!id.startsWith('att_dream_'))throw Error('invalid autonomous image identity');
+  const row=await getChatAttachmentRecord(db,cid,id);
+  if(row.turn_id!==null||row.kind!=='image')throw Error('not an independent original');
+  const bytes=new Uint8Array(row.data);
+  const readback=prepareGeneratedImageReadback({attachmentId:id,bytes,mime:row.mime,visionSupported:true});
+  return {id,bytes:bytes.length,message:readback.continuationMessage};
+}
 export async function generateDreamImage(db,env,input,context,{expectedModel,discover=discoverImageModels,generate=generateIndependentImage}={}){
   if(!context.autonomous_claim||context.autonomous_activity!==true||!input||Object.keys(input).length!==1||typeof input.prompt!=='string'||!input.prompt.trim()||input.prompt.trim().length>4000)
     throw Error('invalid autonomous image request');
