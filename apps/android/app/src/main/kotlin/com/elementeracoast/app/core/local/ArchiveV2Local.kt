@@ -166,7 +166,7 @@ internal object ArchiveV2Local {
             val parents=bytes?.let{LocalTransferRestore.plannedParents(it,applicationId,base,target,attachmentMeta,snapshots)}
             val cache=RemoteCacheStore(target,strictReads=true)
             val existing=cache.conversations().map{it.id}.toSet()
-            require(existing.none{LocalReplyRunStore(target).active(it)}){"本机有窗口正在连续回复，请结束本组后再恢复归档。"}
+            require(existing.none{LocalReplyRunStore(target).active(it)||LocalDreamLedger(target).active(it)}){"本机有窗口正在连续回复，请结束本组后再恢复归档。"}
             val histories=if(extra.any{it in LocalSoilStore.modules}||"attachments" in selection||selection.any{it in LocalSideRecords.modules||it in LocalDogtalkStore.modules})bytes?.let{LocalTransferRestore.plannedHistories(it,applicationId,base,target,attachmentMeta,snapshots)}?:existing.associateWith{requireNotNull(cache.history(it))} else emptyMap()
             val report=bytes?.let{if(write)LocalTransferRestore.restoreStaged(it,applicationId,base,target,attachmentMeta,snapshots) else LocalTransferRestore.preview(it,applicationId,base,target,attachmentMeta,snapshots)}
             for((cid,value) in dreams){
