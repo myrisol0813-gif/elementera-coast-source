@@ -137,6 +137,7 @@ internal class LocalDreamExecutor(
                     val selectedImage=RemoteCacheStore(store,strictReads=true).profile()?.currentImageModel.orEmpty()
                     val dreamImage=if(e.allowImage&&e.imageLimit>0&&imageProvider!=null&&RemoteCacheStore(store,strictReads=true).history(cid)?.contextSettings?.localModelWriteEnabled==true)LocalDreamImage(store,c,selectedImage,imageProvider).takeIf{it.configured()}else null
                     val allowed=tools(c)+commonTools+listOfNotNull(dreamImage?.let{tool("image_generate","可选：生成并保存独立活动图像，使用已授权生图供应商额度。只发送必要提示，不返回像素。",mapOf("prompt" to "string"))})
+                    var voiceReservations=0;var imageReservations=0
                     for(step in 0..e.toolBudget){
                         ensureActive();permitted(c)
                         val exposed=if(calls>=e.toolBudget||step==e.toolBudget)emptyList()else allowed
@@ -181,8 +182,10 @@ internal class LocalDreamExecutor(
                         for((index,item) in requested.withIndex()){
                             permitted(c);val call=item.jsonObject;val fn=call.getValue("function").jsonObject;val name=fn.str("name")
                             var result=buildJsonObject{put("ok",false);put("reason","unavailable_or_invalid")}
-                            if(calls<e.toolBudget&&name in exposedNames){
+                            if(calls<e.toolBudget&&name in exposedNames&&(name!="voice_create"||voiceReservations<e.voiceLimit)&&(name!="image_generate"||imageReservations<e.imageLimit)){
                                 check(ledger.reserveTool(c,step,index,name,clock()));calls++
+                                if(name=="voice_create")voiceReservations++
+                                if(name=="image_generate")imageReservations++
                                 val args=runCatching{Json.parseToJsonElement(fn.str("arguments")).jsonObject}.getOrNull()
                                 result=try{
                                     when{
