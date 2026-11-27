@@ -6,6 +6,10 @@ import kotlinx.serialization.json.*
 import org.junit.Assert.*
 import org.junit.Test
 import java.time.Instant
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 
 class LocalDreamExecutorTest {
     private val cid="wake-window"
@@ -187,6 +191,66 @@ class LocalDreamExecutorTest {
             Json.parseToJsonElement(it.jsonObject.getValue("receipt_json").jsonPrimitive.content).jsonObject.getValue("record_id").jsonPrimitive.content
         })
         assertEquals(1,cache.history(cid)!!.turns.size)
+    }
+
+
+    @Test fun autonomousVoiceUsesRealOriginalAndClaimWithoutChatTurn()=runBlocking{
+        val (store,initial)=fixture();val cache=RemoteCacheStore(store);val ledger=LocalDreamLedger(store)
+        val history=cache.history(cid)!!
+        cache.putHistory(cid,history.copy(contextSettings=history.contextSettings.copy(localModelWriteEnabled=true)))
+        val cfg2=cfg.copy(execution=cfg.execution!!.copy(allowVoice=true,tokenBudget=24000))
+        val settings=ledger.configure(cid,DreamSettingsRequest(cid,initial.revision,"arm",cfg2,model,true),true,at-86400000)!!
+        val bytes=byteArrayOf(73,68,51,4,0,0,0,0,0,0,1,2)
+        var generated=0
+        val http=OkHttpClient.Builder().addInterceptor{chain->
+            generated++
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("ok").body(bytes.toResponseBody()).build()
+        }.build()
+        val speech=LocalVoiceProvider({LocalProviderConfig("elevenlabs","ElevenLabs","https://api.elevenlabs.io","fixture-only",listOf("fixtureVoice"))},http)
+        var requests=0
+        val engine=LocalDreamExecutor(store,{provider to "fixture/model"},{_,_,_,tools,_->
+            requests++
+            if(requests==1){
+                assertTrue(tools.toString().contains("voice_create"))
+                response(call("v","voice_create",buildJsonObject{put("text","independent speech")}))
+            }else response()
+        },clock={at},voice=speech)
+        assertEquals("completed",engine.run(cid,settings.revision!!,model,at))
+        assertEquals(2,requests);assertEquals(1,generated)
+        val side=LocalSideRecords(store);val row=side.clips(cid).single()
+        assertEquals("dream_tide",row.getValue("source").jsonPrimitive.content)
+        assertEquals(JsonNull,row["turn_id"]);assertEquals(JsonNull,row["message_id"])
+        val id=row.getValue("id").jsonPrimitive.content
+        assertTrue(id.startsWith("voice_dream_"))
+        assertArrayEquals(bytes,side.bytes(side.audio(id)!!))
+        assertEquals(1,cache.history(cid)!!.turns.size)
+        val event=LocalDreamArchive(store).export(cid)!!.getValue("tools").jsonArray.single().jsonObject
+        assertEquals(id,Json.parseToJsonElement(event.getValue("receipt_json").jsonPrimitive.content).jsonObject.getValue("record_id").jsonPrimitive.content)
+    }
+
+    @Test fun autonomousVoiceRequiresClaimAndRefusesSaveAfterRevocation(){
+        val (store,initial)=fixture();val cache=RemoteCacheStore(store);val ledger=LocalDreamLedger(store)
+        val history=cache.history(cid)!!
+        cache.putHistory(cid,history.copy(contextSettings=history.contextSettings.copy(localModelWriteEnabled=true)))
+        val cfg2=cfg.copy(execution=cfg.execution!!.copy(allowVoice=true,tokenBudget=24000))
+        val settings=ledger.configure(cid,DreamSettingsRequest(cid,initial.revision,"arm",cfg2,model,true),true,at-86400000)!!
+        val claim=ledger.claim(cid,settings.revision!!,model,at)!!
+        var generated=0
+        val bytes=byteArrayOf(73,68,51,4,0,0,0,0,0,0,1,2)
+        val http=OkHttpClient.Builder().addInterceptor{chain->
+            generated++
+            assertNotNull(ledger.configure(cid,DreamSettingsRequest(cid,settings.revision,"disarm"),false,at))
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("ok").body(bytes.toResponseBody()).build()
+        }.build()
+        val speech=LocalVoiceProvider({LocalProviderConfig("elevenlabs","ElevenLabs","https://api.elevenlabs.io","fixture-only",listOf("fixtureVoice"))},http)
+        val session=LocalToolSession.openAutonomous(store,claim,voice=speech)!!
+        val args=buildJsonObject{put("text","revoked speech")}.toString()
+        assertFalse(session.execute("unclaimed","voice_create",args).ok);assertEquals(0,generated)
+        assertTrue(ledger.reserveStep(claim,0,at))
+        assertTrue(ledger.recordStep(claim,0,true,buildJsonObject{},at))
+        assertTrue(ledger.reserveTool(claim,0,0,"voice_create",at))
+        assertFalse(session.execute(claim.id+":0:0","voice_create",args).ok)
+        assertEquals(1,generated);assertTrue(LocalSideRecords(store).clips(cid).isEmpty())
     }
 
 }
