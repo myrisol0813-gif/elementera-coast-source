@@ -126,4 +126,27 @@ class LocalDreamExecutorTest {
         assertEquals(1,cache.history(cid)!!.turns.size)
     }
 
+    @Test fun ordinaryReadbackIsSeparatelyAuthorizedAndDoesNotWake()=runBlocking{
+        val (store,a)=fixture();val ledger=LocalDreamLedger(store);val cache=RemoteCacheStore(store)
+        val claim=ledger.claim(cid,a.revision!!,model,at)!!
+        assertTrue(ledger.note(claim,"private readback fixture",at))
+        assertTrue(ledger.finish(claim,"completed",buildJsonObject{},null,at))
+        ledger.configure(cid,DreamSettingsRequest(cid,a.revision,"disarm"),false,at)
+        val history=cache.history(cid)!!
+        val base=history.contextSettings.copy(localModelToolsEnabled=true)
+        cache.putHistory(cid,history.copy(contextSettings=base))
+        val desk=RemoteDeskSlip(contextBudget=RemoteDeskContextBudget(comfortCeiling=10000))
+        fun session()=LocalToolSession.open(store,cid,"t",null,desk,model)!!
+        assertFalse(session().completionsTools.toString().contains("dream_readback"))
+        cache.putHistory(cid,history.copy(contextSettings=base.copy(dreamReadbackEnabled=true)))
+        val reader=session()
+        val result=reader.execute("readback","dream_readback","""{"kind":"notes"}""")
+        assertTrue(result.output,result.ok);assertTrue(result.output.contains("private readback fixture"))
+        assertFalse(reader.execute("cross","dream_readback","""{"kind":"notes","conversation_id":"other"}""").ok)
+        cache.putHistory(cid,history.copy(contextSettings=base))
+        assertFalse(reader.execute("revoked","dream_readback","""{"kind":"notes"}""").ok)
+        assertFalse(ledger.settings(cid).enabled)
+        assertEquals(1,LocalDreamArchive(store).export(cid)!!.getValue("runs").jsonArray.size)
+    }
+
 }
