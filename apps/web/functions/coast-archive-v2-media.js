@@ -54,6 +54,7 @@ export async function listArchiveDogtalk(db,{kind='snapshots',cursor='',limit=50
 export async function prepareArchiveAttachment(db,metadata,descriptor,source,{conversationIds}={}){
   const m=metadata;
   check(m&&validId(m.id)&&validId(m.conversation_id)&&(m.turn_id==null||validId(m.turn_id)),'invalid attachment reference');
+  check(!m.id.startsWith('att_dream_')||m.turn_id==null&&m.kind==='image','invalid autonomous image origin');
   check(conversationIds instanceof Set&&conversationIds.has(m.conversation_id),'attachment conversation not in verified restore plan');
   check(['image','file'].includes(m.kind)&&typeof m.name==='string'&&m.name.length>0&&m.name.length<=180&&typeof m.mime==='string'&&/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(m.mime)&&m.mime.length<=120,'invalid attachment metadata');
   check(Number.isSafeInteger(m.created_at)&&m.created_at>=0&&Number.isSafeInteger(m.updated_at)&&m.updated_at>=0&&m.size===descriptor?.size&&m.size>0,'invalid attachment timestamps or size');
