@@ -1,3 +1,4 @@
+import {apiModelPartnerIdentity} from './coast-identity.js';
 import { readDreamChatHistory } from './dream-tide-readback.js';
 import { independentWebAllowed, independentSearch, independentRead } from './independent-web.js';
 import { listLibraryBooks, getLibraryBook, readLibraryChapter, listLibraryNotes, writeLibraryNote, editLibraryNote, deleteLibraryNote } from './tidal-library.js';
@@ -93,6 +94,16 @@ function parseArguments(value) {
 
 function dailyHandler(kind) {
   return async (db, input, context) => {
+    if(context.autonomous_activity===true){
+      if(!context.autonomous_claim||!['moment','diary'].includes(kind))throw new ToolRegistryError('tool_forbidden','自主活动只可新建已授权的日常记录。',403);
+      const args=parseArguments(input?.function?.arguments??input);
+      const trusted={author:'api',source:'chat_tool',conversation_id:context.conversation_id,source_turn_id:null,
+        tool_call_id:context.tool_call_id,identity:apiModelPartnerIdentity({model_label:context.model_label}),
+        autonomous_claim:context.autonomous_claim,autonomous_event:context.autonomous_event};
+      const value={...args,date:args.date||context.local_date};
+      return kind==='moment'?dailyWriteReceipt('moment',await createMoment(db,value,trusted)):
+        dailyWriteReceipt('diary',await createDiary(db,{...value,conflict_mode:'append'},trusted));
+    }
     if (context.surface !== 'official_mcp') return executeDailyModelTool(db, input, context);
     const args = parseArguments(input?.function?.arguments ?? input?.arguments ?? input);
     const trusted = {
@@ -404,6 +415,8 @@ const REGISTRY = Object.freeze([
       source_turn_id: context.source_turn_id || input.source_turn_id || null,
       tool_call_id: context.tool_call_id || input.tool_call_id || null,
       model_label: context.model_label || input.model_label || context.identity?.model_label || null,
+      autonomous_claim:context.autonomous_activity===true?context.autonomous_claim:null,
+      autonomous_event:context.autonomous_activity===true?context.autonomous_event:null,
     }),
   }),
   entry({
@@ -655,7 +668,7 @@ export async function executeModelTool(db, toolCall, context = {}) {
   const definition = BY_MODEL_NAME.get(name);
   if (!definition) throw new ToolRegistryError('unknown_model_tool', '模型调用了未注册工具。', 400);
   let input = parseArguments(toolCall?.function?.arguments ?? toolCall?.arguments);
-  if (definition.tool_key.startsWith('library.')) {
+  if (context.autonomous_activity===true || definition.tool_key.startsWith('library.')) {
     const schema = definition.model_tool.function.parameters;
     if (Object.keys(input).some(key => !Object.hasOwn(schema.properties, key))) throw new ToolRegistryError('invalid_arguments', '书房工具包含未声明字段。');
     if (schema.required.some(key => input[key] == null || input[key] === '')) throw new ToolRegistryError('invalid_arguments', '缺少书房工具必填字段，请先使用书架返回的真实 ID。');
