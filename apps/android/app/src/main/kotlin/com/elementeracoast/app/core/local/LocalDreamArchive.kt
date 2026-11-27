@@ -85,6 +85,25 @@ internal class LocalDreamArchive(private val store:LocalPersistence){
         }
         return buildJsonObject{put("ok",true);put("items",JsonArray(page));put("nextOffset",if(offset+page.size<all.size)JsonPrimitive(offset+page.size)else JsonNull)}
     }
+    fun chatReadback(cid:String,kind:String,offset:Int,limit:Int):JsonObject{
+        require(kind in setOf("notes","activity")&&offset in 0..100000&&limit in 1..5)
+        val h=history(cid)
+        val all=if(kind=="notes")h.rows("notes").sortedWith(compareByDescending<JsonObject>{it.getValue("created_at").jsonPrimitive.long}.thenBy{it.str("claim_id")})
+            else h.rows("runs").sortedWith(compareByDescending<JsonObject>{it.getValue("started_at").jsonPrimitive.long}.thenBy{it.str("claim_id")})
+        val selected=all.drop(offset).take(limit).map{r->
+            val claim=r.str("claim_id")
+            if(kind=="notes")JsonObject(r.filterKeys{it in setOf("claim_id","model_id","body","created_at")}+("replies" to JsonArray(h.rows("replies").filter{it.str("claim_id")==claim}.map{JsonObject(it.filterKeys{k->k in setOf("body","created_at")})})))
+            else buildJsonObject{
+                for(k in listOf("claim_id","kind","model_id","status","started_at","updated_at"))put(k,r.getValue(k))
+                val result=r["result_json"]?.jsonPrimitive?.contentOrNull?.let{json.parseToJsonElement(it).jsonObject}
+                put("result",result?.let{JsonObject(it.filterKeys{k->k in setOf("total_tokens","reported_cost","extra_scheduled")})}?:JsonNull)
+                put("tools",JsonArray(h.rows("tools").filter{it.str("claim_id")==claim}.map{JsonObject(it.filterKeys{k->k in setOf("tool_name","status")})}))
+            }
+        }
+        val out=buildJsonObject{put("ok",true);put("kind",kind);put("reference_only",true);put("items",JsonArray(selected));put("nextOffset",if(offset+selected.size<all.size)JsonPrimitive(offset+selected.size)else JsonNull)}
+        require(out.toString().length<=10000){"资料超出单次阅读容量，请减少条数。"}
+        return out
+    }
     fun reply(cid:String,claim:String,rid:String,body:String):Boolean=store.readConsistent{s->LocalDreamArchive(s).replyLocked(cid,claim,rid,body)}
     private fun replyLocked(cid:String,claim:String,rid:String,body:String):Boolean{
         require(id(rid)&&body.isNotBlank()&&body.length<=16000)
