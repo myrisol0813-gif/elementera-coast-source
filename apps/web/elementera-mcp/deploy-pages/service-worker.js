@@ -1,5 +1,5 @@
 // PWA shell cache for the current Coast application surface.
-const CACHE_NAME = 'elementera-coast-source-app-44';
+const CACHE_NAME = 'elementera-coast-source-app-45';
 const CORE = Object.freeze([
   '/',
   '/index.html',
