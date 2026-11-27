@@ -109,9 +109,9 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
     const common=resolveToolSelection(toolContext).modelVisibleTools.map(t=>t.function.name==='create_diary'?{...t,function:{...t.function,description:'可选：创建自己的日记，追加而不替换既有日记。',parameters:{...t.function.parameters,properties:Object.fromEntries(Object.entries(t.function.parameters.properties).filter(([k])=>!['replace_id','conflict_mode'].includes(k)))}}}:t.function.name==='create_moment'?{...t,function:{...t.function,description:'可选：在海岸内部新增自己的动态，不外发。'}}:t.function.name==='library_write'?{
       ...t,function:{...t.function,description:'可选：创建自己的书房批注、划线或读后感。此次活动不修改或删除既有笔记。',parameters:{...t.function.parameters,properties:{...t.function.parameters.properties,action:{type:'string',enum:['create']}}}}
     }:t);
-    const imageModel=e.allowImage?await autonomousImageModel(db,env):null;
+    const imageModel=e.allowImage&&e.imageLimit>0?await autonomousImageModel(db,env):null;
     const imageTool=imageModel?tool('image_generate','可选：生成并保存一张独立活动图像，使用已授权生图供应商额度。只发送必要绘图提示。不返回像素，不要假称看见。', {prompt:{type:'string',minLength:1,maxLength:4000}},['prompt']):null;
-    let imageAttempted=false,voiceAttempted=false;
+    let imageAttempts=0,voiceAttempts=0;
     const commonNames=new Set(common.map(t=>t.function.name));
     const allowed=[...toolsFor(e,actual.allowExtra&&e.extraPerDay>0),...common,...(imageTool?[imageTool]:[])];
     const prepared=await prepare(env,{model:currentModelId,messages:context.messages,tools:e.toolBudget?allowed:[],settings:{max_tokens:e.outputLimit}},true);
@@ -157,7 +157,7 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
       for(const [callIndex,call] of requested.entries()){
         const name=call.function.name,a=parseArgs(call);
         let result={ok:false,reason:'unavailable_or_invalid'};
-        if(calls<e.toolBudget&&exposed.has(name)){
+        if(calls<e.toolBudget&&exposed.has(name)&&!(name==='voice_create'&&voiceAttempts>=e.voiceLimit)&&!(name==='image_generate'&&imageAttempts>=e.imageLimit)){
           await authorize();
           if(!await reserveDreamTool(db,claim,index,callIndex,name,clock()))throw new DOMException('Aborted','AbortError');
           calls++;
@@ -171,15 +171,15 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
               const at=Date.parse(a.at);
               if(Number.isSafeInteger(at)&&at>clock()){extraAt=at;result={ok:true,status:'proposed_pending_completion'};}
               activities.push({kind:'extra_requested',ok:result.ok});
-            }else if(name==='image_generate'&&imageModel&&!imageAttempted&&exact(a,['prompt'])){
-              imageAttempted=true;
+            }else if(name==='image_generate'&&imageModel&&imageAttempts<e.imageLimit&&exact(a,['prompt'])){
+              imageAttempts++;
               const value=await generateDreamImage(db,env,a,{...toolContext,autonomous_event:{step:index,index:callIndex}},{expectedModel:imageModel});
               result={ok:true,record_id:value.id,data:value};activities.push({kind:name,ok:true});
-            }else if(commonNames.has(name)&&a&&!(name==='voice_create'&&voiceAttempted)&&!(name==='library_write'&&a.action!=='create')&&!(name==='create_diary'&&('replace_id' in a||'conflict_mode' in a))){
+            }else if(commonNames.has(name)&&a&&!(name==='voice_create'&&voiceAttempts>=e.voiceLimit)&&!(name==='library_write'&&a.action!=='create')&&!(name==='create_diary'&&('replace_id' in a||'conflict_mode' in a))){
               // Recheck revision and current registry permission immediately
               // before dispatch; the registry still validates its own arguments.
               await authorize();
-              if(name==='voice_create')voiceAttempted=true;
+              if(name==='voice_create')voiceAttempts++;
               const callId='dream:'+claim.claimId+':'+index+':'+callIndex;
               const value=await executeModelTool(db,{...call,id:callId},{...toolContext,tool_call_id:callId,autonomous_event:{step:index,index:callIndex}});
               if(name==='library_write'&&value?.note?.id)result.record_id=value.note.id;
