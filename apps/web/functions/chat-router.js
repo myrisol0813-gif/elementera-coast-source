@@ -1,3 +1,4 @@
+import {isDreamTidePath,routeDreamTide} from './dream-tide-api.js';
 import { attachImageTool } from './chat-image-tool.js';
 import { attachStickerTools } from './chat-sticker-tool.js';
 import { prepareReplyGroupDogtalk } from './dogtalk-store.js';
@@ -871,7 +872,8 @@ async function landingLetter(request, env) {
 }
 
 export function isChatApiPath(pathname) {
-  return pathname === FORMAL_CHAT_PATH
+  return isDreamTidePath(pathname)
+    || pathname === FORMAL_CHAT_PATH
     || pathname === REPLY_SEQUENCE_PATH
     || pathname === ATTACHMENTS_PATH
     || pathname.startsWith(`${ATTACHMENTS_PATH}/`)
@@ -895,6 +897,7 @@ export async function routeChatApi(request, env) {
   if (!hasChatDatabase(env)) return apiError('chat_db_not_configured', '主聊天 D1 存储未配置。', 503);
   const pathname = new URL(request.url).pathname;
   try {
+    if(isDreamTidePath(pathname))return await routeDreamTide(request,env);
     if (pathname === FORMAL_CHAT_PATH) return await formalChat(request, env);
     if (pathname === REPLY_SEQUENCE_PATH) return await replySequenceChat(request, env);
     if (pathname === '/api/chat/image-generate') {
