@@ -87,4 +87,33 @@ class NativeRestSceneDeviceTest {
             assertTrue(key,bitmap!!.width>0&&bitmap.height>0)
         }
     }
+
+    @Test fun nativeCustomFurnitureAndAnimalAppearanceActuallyPaint() {
+        val repo=RestArtRepository(context.assets)
+        val cat=NativeSceneCatalogue.load(repo)
+        val atlas=NativeRestSprites(context.assets)
+        val window=cat.assets.getValue("living-window")
+        val base=atlas.get(atlas.furnitureKey(window,NativePaintPart.WHOLE,emptyMap()))!!
+        val color=atlas.get(atlas.furnitureKey(window,NativePaintPart.WHOLE,mapOf("wood" to "#7389b0")))
+        assertNotNull("Native free recolor must render, not fall back",color)
+        assertEquals(base.width,color!!.width)
+        assertEquals(base.height,color.height)
+        fun signature(bitmap:android.graphics.Bitmap):List<Int> = buildList {
+            for(y in 1..19)for(x in 1..19)add(bitmap.getPixel(bitmap.width*x/20,bitmap.height*y/20))
+        }
+        assertNotEquals(signature(base),signature(color))
+        val appearance=repo.appearance()
+        val wolf=RestAppearancePolicy.fresh(appearance,"wolf")
+        val custom=wolf.copy(colors=mapOf("fur" to "#7389b0"),glasses="round",neck="scarf",
+            badge="gpt",badgePlace="head",badgeMode="custom",badgeColor="#ba8371",badgeX=3.0,badgeY=-2.0)
+        val original=atlas.get(atlas.baseCreatureKey(wolf,"idle"))!!
+        val edited=atlas.get(atlas.creatureKey(custom,"idle","book"))
+        assertNotNull("Body colors, glasses, scarf, badge and prop must compose natively",edited)
+        assertNotEquals(signature(original),signature(edited!!))
+        val f1=atlas.motionFrame(custom,"idle",null,100,256)
+        val f2=atlas.motionFrame(custom,"idle",null,900,256)
+        assertNotNull("Native authored animation should paint",f1)
+        assertNotNull(f2)
+        assertNotEquals("Animation must actually change pixels",signature(f1!!),signature(f2!!))
+    }
 }
