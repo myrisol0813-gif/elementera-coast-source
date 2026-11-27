@@ -127,3 +127,29 @@ default 1 for old drafts). Each is subject to its separate authorization and
 the total tool budget. Zero disables the tool. The ledger counts reservations,
 not just successful outputs, so failed or interrupted attempts consume their
 allowance. This is not a currency cap. Normal chat media limits are unchanged.
+
+## Pending memory proposals
+
+The independent allowMemoryCandidate flag defaults false. Local execution
+also requires the ordinary window write permission. dream_memory_candidate
+accepts title (1–120), content (1–2000), destination (memory or seed).
+It inserts into the existing pending pocket store with source_type=dream_tide,
+real claim/step/call provenance, no synthetic turn, and a stable pocket ID.
+A content fingerprint suppresses duplicates, including previously discarded
+or confirmed candidates, without updating the existing record. It cannot
+promote a candidate or modify formal memory; only the usual owner confirmation
+flow can do that. Native and cloud fixtures use mocked inference. Portable
+pocket records accept the new provenance type; full cross-workspace acceptance
+remains pending.
+
+## Subscription-route boundary
+
+Native account inference currently uses a separate Responses transport and
+its sequence token budget is explicitly soft; the API wake executor assumes
+an exact selected provider and a caller-set output cap. Do not silently send
+subscription model IDs to an API provider, reuse a chat turn as a wake, or
+convert an API wake authorization into subscription background permission.
+Subscription wake remains unavailable until the supported account transport,
+separate owner consent, provider usage semantics, cancellation and background
+eligibility are established and tested. No account token is copied into cloud
+settings or archives.
