@@ -232,5 +232,6 @@ export async function buildRealityContext(env, {
 
 export function responseModeContext(settings = {}) {
   const enabled = settings?.short_reply_mode === true;
-  return { short_reply_mode: enabled, text: enabled ? SHORT_REPLY_PROMPT : '' };
+  const segmented = settings?.segmented_bubbles === true;
+  return { short_reply_mode: enabled, ...(segmented ? {segmented_bubbles:true} : {}), text: [enabled ? SHORT_REPLY_PROMPT : '', segmented ? "当前窗口开启了分隔气泡。你可以自主决定是否将同一次回复分成几个紧邻的气泡。需要分隔时，只在完整段落之间单独一行输出 <!--tideloom:split-->，前后保留换行；不要在代码块、引用、列表、公式或其他完整结构内使用。无需固定数量，不分隔也可以。这个标记只是显示断点，不会触发新的模型请求。" : ''].filter(Boolean).join('\n\n') };
 }

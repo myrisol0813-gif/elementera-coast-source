@@ -1401,3 +1401,17 @@
 /* A completed attachment-only reply has no decorative empty text bubble.
    Keep the node in DOM so streaming patches can still populate it. */
 .message.assistant .assistant-text:empty { display: none; }
+
+/* One formal message, several adjacent presentation surfaces. */
+.assistant-segments { display: grid; gap: 4px; }
+.assistant-segment { min-width: 0; padding: 10px 14px; border-radius: 16px; background: var(--surface-soft); }
+:root[data-theme="paper"] .message.assistant:has(.assistant-segments) { padding: 0; }
+:root[data-theme="paper"] .message.assistant:has(.assistant-segments)::before,
+:root[data-theme="paper"] .message.assistant:has(.assistant-segments)::after { display: none; }
+:root[data-theme="paper"] .assistant-segment {
+  border-radius: 0; padding: 21px clamp(19px, 4vw, 29px) 23px;
+  background: linear-gradient(147deg, var(--coast-letter-ink), #fcfefa 65%, #f7fbfb);
+  clip-path: var(--coast-letter-cut);
+}
+.chat-sticker-image { display:block; width:min(100%,var(--sticker-size,144px)); }
+.chat-sticker-image img { display:block; width:100%; height:auto; max-height:var(--sticker-size,144px); object-fit:contain; }

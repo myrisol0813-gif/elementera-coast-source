@@ -155,6 +155,8 @@ export function normalizeContextSettings(value = {}) {
     reality_enabled: raw.reality_enabled === true,
     reality_fields: fields,
     short_reply_mode: raw.short_reply_mode === true,
+    ...(raw.segmented_bubbles === true ? { segmented_bubbles: true } : {}),
+    ...(Number.isSafeInteger(raw.sticker_display_size) && raw.sticker_display_size >= 64 && raw.sticker_display_size <= 256 ? { sticker_display_size: raw.sticker_display_size } : {}),
     ...(typeof raw.workbench_prompt === 'string' ? { workbench_prompt: raw.workbench_prompt.slice(0, 4000) } : {}),
     ...(raw.cross_window_auto === true ? { cross_window_auto: true } : {}),
     ...(raw.local_model_tools_enabled === true ? { local_model_tools_enabled: true } : {}),
