@@ -3,14 +3,14 @@ const CONVERSATION_ACCESS = Object.freeze({
   soil: 'conversation',
   memory: 'conversation_and_global',
   worldbook: ['owner', 'both'],
-  backendTools: ['web.independent_search', 'web.independent_read', 'daily.*', 'dogtalk.*', 'memory.*', 'cross_window.*', 'calendar.*', 'library.*', 'voice.create', 'vault.*', 'dream.readback'],
+  backendTools: ['web.independent_search', 'web.independent_read', 'daily.*', 'dogtalk.*', 'memory.*', 'cross_window.*', 'calendar.*', 'library.*', 'voice.create', 'vault.*'],
   modelVisibleTools: [
     'web.independent_search', 'web.independent_read',
     'daily.create_moment',
     'daily.create_diary',
     'daily.moment_comment',
     'daily.moment_like',
-    'dogtalk.read', 'dream.readback',
+    'dogtalk.read',
     'vault.search',
     'vault.read',
     'memory.search',
@@ -28,7 +28,7 @@ const CONVERSATION_ACCESS = Object.freeze({
 });
 
 const VALUES = {
-  main_chat: CONVERSATION_ACCESS,
+  main_chat: {...CONVERSATION_ACCESS,backendTools:[...CONVERSATION_ACCESS.backendTools,'dream.readback'],modelVisibleTools:[...CONVERSATION_ACCESS.modelVisibleTools,'dream.readback']},
   radio: CONVERSATION_ACCESS,
   lighthouse: CONVERSATION_ACCESS,
   landing: {
