@@ -48,4 +48,36 @@ class NativeDreamPlanProtocolTest {
         assertEquals("plan_usage_limit",NativeDreamPlanProtocol.failure(429,null))
         assertEquals("plan_authorization_unavailable",NativeDreamPlanProtocol.failure(403,"subscription_sharing_user_not_eligible"))
     }
+
+    @Test fun streamRequiresExplicitCompletionAndKeepsCompletedToolFrames(){
+        val stream=NativeDreamPlanStream(setOf("dream_write_note"))
+        assertNull(stream.line("data: "+"""{"type":"response.output_text.delta","delta":"partial"}"""))
+        assertNull(stream.line(""));assertNull(stream.finish())
+        val done=NativeDreamPlanStream(emptySet())
+        assertNull(done.line("data: "+"""{"type":"response.completed","response":{"status":"completed","usage":{"total_tokens":10},"output":[]}}"""))
+        val step=done.line("")!!
+        assertEquals(JsonPrimitive(10),step.normalized.getValue("usage").jsonObject["total_tokens"])
+        val denied=NativeDreamPlanStream(emptySet())
+        denied.line("data: "+"""{"type":"response.failed","response":{"error":{"code":"subscription_sharing_usage_limit_exceeded"}}}""")
+        val failure=runCatching{denied.line("")}.exceptionOrNull() as NativeDreamPlanFailure
+        assertEquals("plan_usage_limit",failure.reason)
+    }
+    @Test fun sessionDoesNotReplayFailedReservationOrSpendAfterMissingUsage()=kotlinx.coroutines.runBlocking{
+        val tool=Json.parseToJsonElement("""{"type":"function","function":{"name":"dream_write_note","description":"optional note","parameters":{"type":"object"}}}""")
+        val tools=JsonArray(listOf(tool))
+        var attempts=0;var reservations=0
+        val broken=NativeDreamPlanSession(grant,"invitation",10000,500){_,_->attempts++;throw NativeDreamPlanFailure("plan_usage_limit")}
+        assertTrue(runCatching{broken.step(0,tools,emptyList(),reserve={reservations++;true},authorize={true})}.isFailure)
+        assertFalse(broken.canContinue())
+        assertTrue(runCatching{broken.step(0,tools,emptyList(),reserve={reservations++;true},authorize={true})}.isFailure)
+        assertEquals(1,attempts);assertEquals(1,reservations)
+        val unknown=NativeDreamPlanSession(grant,"invitation",10000,500){_,exposed->
+            NativeDreamPlanProtocol.complete(Json.parseToJsonElement("""{"status":"completed","output":[{"type":"function_call","namespace":"coast","name":"dream_write_note","call_id":"c1","arguments":"{}"}]}""").jsonObject,emptyMap(),exposed)
+        }
+        val step=unknown.step(0,tools,emptyList(),reserve={true},authorize={true})
+        assertEquals(JsonNull,step.normalized["usage"]);assertFalse(unknown.canContinue())
+        val small=NativeDreamPlanSession(grant,"invitation",1,500){_,_->error("must not send")}
+        assertTrue(runCatching{small.step(0,tools,emptyList(),reserve={error("must not reserve")},authorize={true})}.isFailure)
+    }
+
 }
