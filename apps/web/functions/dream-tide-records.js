@@ -37,11 +37,13 @@ export async function reserveDreamTool(db,claim,step,index,name,now=Date.now()){
   await ensureChatSchema(db);
   const config=await dreamExecutionConfig(db,claim.conversationId,claim.revision);
   if(!config||!dreamToolAllowed(config,name))return false;
+  const mediaLimit=name==='voice_create'?config.execution.voiceLimit:name==='image_generate'?config.execution.imageLimit:config.execution.toolBudget;
   const r=await stmt(db,`INSERT OR IGNORE INTO dream_tide_tool_events(claim_id,step_index,call_index,tool_name,status,started_at)
     SELECT ?,?,?,?,'claimed',? WHERE EXISTS(SELECT 1 FROM dream_tide_runs r JOIN dream_tide_arms a ON a.conversation_id=r.conversation_id WHERE ${active})
     AND EXISTS(SELECT 1 FROM dream_tide_steps WHERE claim_id=? AND step_index=? AND status='completed')
-    AND (SELECT COUNT(*) FROM dream_tide_tool_events WHERE claim_id=?) < (SELECT json_extract(config_json,'$.execution.toolBudget') FROM dream_tide_arms WHERE conversation_id=? AND revision=?)`,
-    claim.claimId,step,index,name,now,...args(claim),claim.claimId,step,claim.claimId,claim.conversationId,claim.revision).run();
+    AND (SELECT COUNT(*) FROM dream_tide_tool_events WHERE claim_id=?) < (SELECT json_extract(config_json,'$.execution.toolBudget') FROM dream_tide_arms WHERE conversation_id=? AND revision=?)
+     AND (SELECT COUNT(*) FROM dream_tide_tool_events WHERE claim_id=? AND tool_name=?) < ?`,
+    claim.claimId,step,index,name,now,...args(claim),claim.claimId,step,claim.claimId,claim.conversationId,claim.revision,claim.claimId,name,mediaLimit).run();
   return r.meta.changes===1;
 }
 export async function recordDreamTool(db,claim,step,index,receipt,now=Date.now()){
