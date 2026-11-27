@@ -52,7 +52,7 @@ internal class LocalDreamLedger(private val store:LocalPersistence){
     private fun active(h:JsonObject)=h.rows("runs").firstOrNull{it.str("status")=="running"}
     fun active(cid:String)=store.readConsistent{s->active(LocalDreamArchive(s).runtimeHistory(cid))!=null}
     fun settings(cid:String)=store.readConsistent{s->draft(s,cid).copy(running=active(LocalDreamArchive(s).runtimeHistory(cid))!=null)}
-    fun configure(cid:String,request:DreamSettingsRequest,enableAllowed:Boolean,now:Long=System.currentTimeMillis()):DreamSettings?=store.readConsistent{s->
+    fun configure(cid:String,request:DreamSettingsRequest,enableAllowed:Boolean,now:Long=System.currentTimeMillis(),planRevision:String?=null):DreamSettings?=store.readConsistent{s->
         if(!live(s,cid))return@readConsistent null
         val old=draft(s,cid)
         if(old.revision!=request.revision)return@readConsistent null
@@ -70,8 +70,9 @@ internal class LocalDreamLedger(private val store:LocalPersistence){
         cfg.quietHours?.let{require(clock.matches(it.start)&&clock.matches(it.end))}
         require(e.tokenBudget in 1..1000000&&e.outputLimit in 1..65536&&e.toolBudget in 0..128&&e.readTurns in 1..400&&e.extraPerDay in 0..128&&e.voiceLimit in 0..128&&e.imageLimit in 0..128&&e.invitation.isNotBlank()&&e.invitation.length<=16000)
         val arm=request.action=="arm"
-        if(arm&&(!enableAllowed||!request.confirmExecution||!model.startsWith("local:")||'/' !in model))return@readConsistent null
-        val next=DreamSettings(revision=UUID.randomUUID().toString(),enabled=arm,config=cfg,modelId=model,armedAt=if(arm)now else null)
+        val plan=com.elementeracoast.app.feature.chatgpt.NativeDreamPlanProtocol.slug(model)!=null
+        if(arm&&(!enableAllowed||!request.confirmExecution||if(plan)planRevision==null||!request.confirmPlanSoftBudget else !model.startsWith("local:")||'/' !in model))return@readConsistent null
+        val next=DreamSettings(revision=if(arm&&plan)requireNotNull(planRevision)else UUID.randomUUID().toString(),enabled=arm,config=cfg,modelId=model,armedAt=if(arm)now else null)
         save(s,cid,next);next
     }
     private fun authorized(s:LocalPersistence,c:Claim,h:JsonObject):Boolean{
