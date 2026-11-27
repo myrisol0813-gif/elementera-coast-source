@@ -48,16 +48,16 @@ export async function buildDreamContext(db,claim,settings,now){
 // Internal executor, not a public API. The deployment gate must be explicitly
 // enabled and the caller must be trusted. Native plan models are intentionally
 // not sent to OpenRouter. No scheduler is installed by this module.
-export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,now=Date.now(),
+export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,expectedRevision=null,now=Date.now(),
   prepare=prepareFormalChat,invoke=requestOpenRouter,clock=Date.now}={}){
   const db=env.COAST_CHAT_DB;
   if(env.COAST_DREAM_TIDE_ENABLED!=='true'||busy!==false||signal?.aborted)return {status:'disabled_or_busy'};
-  const config=await dreamExecutionConfig(db,cid);
+  const config=await dreamExecutionConfig(db,cid,expectedRevision);
   if(!config||currentModelId!==config.modelId||!/^[-\w.]+\/.+/.test(currentModelId))return {status:'not_authorized'};
   await recoverSingleChatRuns(db,now);
   await recoverStaleReplyRuns(db,now,cid);
   await recoverDreamTide(db,now);
-  const claim=await claimDreamTide(db,cid,{now,currentModelId,busy:false});
+  const claim=await claimDreamTide(db,cid,{now,currentModelId,busy:false,expectedRevision:config.revision});
   if(!claim)return {status:'not_due'};
   const controller=new AbortController(),abort=()=>controller.abort();
   if(signal?.aborted)abort();else signal?.addEventListener('abort',abort,{once:true});
