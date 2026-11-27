@@ -179,8 +179,7 @@ tasks.matching { it.name in setOf("preBuild", "preDebugBuild", "preReleaseBuild"
 val restStudioAssets = layout.buildDirectory.dir("generated/rest-studio-assets")
 val prepareRestStudio by tasks.registering(Sync::class) {
     from(rootProject.file("../web/elementera-mcp/deploy-pages/public/rest-box")) {
-        include("room-lab.html", "room-lab.mjs", "room-state.mjs", "room-renderer.mjs",
-            "creature-state.mjs", "creature-renderer.mjs", "creature-editor.mjs", "art/v1/**")
+        include("art/v1/**")
         into("rest-box")
     }
     into(restStudioAssets)
@@ -188,4 +187,21 @@ val prepareRestStudio by tasks.registering(Sync::class) {
 android.sourceSets.getByName("main").assets.srcDir(restStudioAssets)
 tasks.matching { it.name in setOf("preBuild", "preDebugBuild", "preReleaseBuild") }.configureEach {
     dependsOn(prepareRestStudio)
+}
+
+ // Reference rasterization is a BUILD tool only. Android receives PNG layers and JSON, not a web app.
+val restNativeSprites = layout.buildDirectory.dir("generated/rest-native-sprites")
+val compileRestNativeSprites by tasks.registering(Exec::class) {
+    val toolsDir = rootProject.file("art-tools")
+    val originalArt = rootProject.file("../web/elementera-mcp/deploy-pages/public/rest-box")
+    inputs.dir(originalArt)
+    inputs.file(toolsDir.resolve("compile.mjs"))
+    inputs.file(toolsDir.resolve("package.json"))
+    outputs.dir(restNativeSprites)
+    workingDir(toolsDir)
+    commandLine("node", "compile.mjs", restNativeSprites.get().asFile.resolve("rest-box/native/v1").absolutePath)
+}
+android.sourceSets.getByName("main").assets.srcDir(restNativeSprites)
+tasks.matching { it.name in setOf("preBuild", "preDebugBuild", "preReleaseBuild") }.configureEach {
+    dependsOn(compileRestNativeSprites)
 }
