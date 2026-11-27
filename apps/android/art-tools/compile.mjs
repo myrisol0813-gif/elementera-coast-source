@@ -15,6 +15,7 @@ await mkdir(temp,{recursive:true});
 const server = createServer(async (req,res)=>{
   try {
     const pathname = new URL(req.url,'http://localhost').pathname;
+    if(pathname==='/__native-pose-templates.mjs'){res.setHeader('Content-Type','text/javascript');res.end(await readFile(new URL('./pose-templates.mjs',import.meta.url)));return;}
     if(pathname==='/'){res.setHeader('Content-Type','text/html');res.end('<!doctype html><meta charset="utf-8"><title>Art compiler</title>');return;}
     const rel=decodeURIComponent(pathname.slice(1)), file=resolve(root,rel);
     if(!file.startsWith(root.endsWith(sep)?root:root+sep)||!(/\.(mjs|json|svg)$/.test(rel)))throw Error('path');
@@ -53,6 +54,8 @@ try {
         push('c|'+b.id+'|'+palette+'|'+action,b.file,w,h,{kind:'creature',id:b.id,palette,action});
       }
     }
+    const {compilePoseTemplate}=await import('/__native-pose-templates.mjs');
+    globalThis.compilePose=job=>compilePoseTemplate(art,creature,state,job);
     globalThis.compileSprite=async job=>{
       const source=await art.read(job.file);
       let svg;
@@ -77,7 +80,7 @@ try {
     };
     return work;
   });
-  const entries={};
+  const entries={},templates={};
   for(const job of jobs){
     if(entries[job.key])continue;
     const hash=createHash('sha256').update(job.key).digest('hex').slice(0,24);
@@ -86,11 +89,18 @@ try {
     await mkdir(dirname(resolve(temp,file)),{recursive:true});
     await writeFile(resolve(temp,file),Buffer.from(data,'base64'));
     entries[job.key]=file;
+    if(job.kind==='creature'){
+      const templateFile='poses/'+hash+'.json';
+      const template=await page.evaluate(job=>globalThis.compilePose(job),job);
+      await mkdir(dirname(resolve(temp,templateFile)),{recursive:true});
+      await writeFile(resolve(temp,templateFile),JSON.stringify(template));
+      templates[job.key]=templateFile;
+    }
   }
-  await writeFile(resolve(temp,'index.json'),JSON.stringify({version:1,entries},null,2));
+  await writeFile(resolve(temp,'index.json'),JSON.stringify({version:1,entries,templates},null,2));
   await rm(output,{recursive:true,force:true});
   await rename(temp,output);
-  console.log('Compiled '+Object.keys(entries).length+' non-empty transparent native art layers');
+  console.log('Compiled '+Object.keys(entries).length+' non-empty transparent native art layers; '+Object.keys(templates).length+' editable pose templates');
 }finally{
   await browser?.close();
   await new Promise(ok=>server.close(ok));
