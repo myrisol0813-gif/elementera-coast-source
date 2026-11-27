@@ -347,4 +347,39 @@ class LocalDreamExecutorTest {
         assertTrue(ledger.reserveTool(claim,0,4,"dream_write_note",at))
     }
 
+
+    @Test fun dreamMemoryCandidateStaysPendingAndDoesNotReviveDiscardedCandidate()=runBlocking{
+        val (store,initial)=fixture();val ledger=LocalDreamLedger(store);val cache=RemoteCacheStore(store)
+        val history=cache.history(cid)!!
+        cache.putHistory(cid,history.copy(contextSettings=history.contextSettings.copy(localModelWriteEnabled=true)))
+        val config=cfg.copy(execution=cfg.execution!!.copy(allowMemoryCandidate=true,tokenBudget=24000))
+        val settings=ledger.configure(cid,DreamSettingsRequest(cid,initial.revision,"arm",config,model,true),true,at-86400000)!!
+        val input=buildJsonObject{put("title","一颗候选");put("content","fixture memory candidate");put("destination","memory")}
+        var requests=0
+        val engine=LocalDreamExecutor(store,{provider to "fixture/model"},{_,_,_,tools,_->
+            requests++
+            if(requests==1){
+                assertTrue(tools.toString().contains("dream_memory_candidate"))
+                response(call("m1","dream_memory_candidate",input),call("m2","dream_memory_candidate",input))
+            }else response()
+        },clock={at})
+        assertEquals("completed",engine.run(cid,settings.revision!!,model,at))
+        val memory=LocalMemoryStore(store);val candidate=memory.snapshot().pockets.single()
+        assertEquals(JsonPrimitive("dream_tide"),candidate["source_type"])
+        assertEquals(JsonPrimitive("pending"),candidate["status"])
+        assertTrue(memory.snapshot().entries.isEmpty())
+        assertEquals(1,cache.history(cid)!!.turns.size)
+        val id=candidate.getValue("id").jsonPrimitive.content
+        memory.resolve(id,RemoteMemoryPocketResolveRequest(action="discard"))
+        val later=at+86400000
+        val claim=ledger.claim(cid,settings.revision!!,model,later)!!
+        assertTrue(ledger.reserveStep(claim,0,later));assertTrue(ledger.recordStep(claim,0,true,buildJsonObject{},later))
+        assertTrue(ledger.reserveTool(claim,0,0,"dream_memory_candidate",later))
+        assertEquals(JsonPrimitive("duplicate_suppressed"),memory.proposeDreamCandidate(claim,0,0,input,later)["status"])
+        assertTrue(memory.pockets(cid).isEmpty())
+        assertNotNull(ledger.configure(cid,DreamSettingsRequest(cid,settings.revision,"disarm"),false,later))
+        assertTrue(runCatching{memory.proposeDreamCandidate(claim,0,0,JsonObject(input+("content" to JsonPrimitive("revoked"))),later)}.isFailure)
+        assertEquals(1,memory.snapshot().pockets.size)
+    }
+
 }
