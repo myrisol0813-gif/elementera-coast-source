@@ -1,7 +1,7 @@
 import {claimDreamTide,dreamTideClaimAuthorized,heartbeatDreamTide,settleDreamTide,recoverDreamTide} from './dream-tide-ledger.js';
 import {recoverSingleChatRuns} from './chat-single-run.js';
 import {recoverStaleReplyRuns} from './chat-reply-run.js';
-import {dreamExecutionConfig,reserveDreamStep,recordDreamStep,writeDreamNote,readDreamNotes,readDreamHistory,previousDream,finishDreamActivity} from './dream-tide-records.js';
+import {dreamExecutionConfig,reserveDreamStep,recordDreamStep,reserveDreamTool,recordDreamTool,writeDreamNote,readDreamNotes,readDreamHistory,previousDream,finishDreamActivity} from './dream-tide-records.js';
 import {prepareFormalChat} from './models/model-payload.js';
 import {requestOpenRouter} from './models/model-formal-chat.js';
 import {normalizeUsage,normalizeToolCalls} from './models/model-validation.js';
@@ -115,11 +115,13 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
       }
       if(choice.finish_reason!=='tool_calls'||!payload.tools?.length){reason='unexpected_tool_request';break;}
       const exposed=new Set(payload.tools.map(t=>t.function?.name)),results=[];
-      for(const call of requested){
+      for(const [callIndex,call] of requested.entries()){
         const name=call.function.name,a=parseArgs(call);
         let result={ok:false,reason:'unavailable_or_invalid'};
         if(calls<e.toolBudget&&exposed.has(name)){
-          calls++;await authorize();
+          await authorize();
+          if(!await reserveDreamTool(db,claim,index,callIndex,name,clock()))throw new DOMException('Aborted','AbortError');
+          calls++;
           try{
             if(name==='dream_read_history'&&exact(a,['mode','start','count'])){
               result=await readDreamHistory(db,cid,{...a,since:context.previous?.started_at??null,until:now,maxTurns:e.readTurns});
@@ -132,6 +134,8 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
               activities.push({kind:'extra_requested',ok:result.ok});
             }
           }catch{result={ok:false,reason:'tool_failed'};activities.push({kind:name,ok:false});}
+          const receipt={ok:result.ok===true||(name==='dream_read_history'&&Array.isArray(result.turns)&&!result.reason),...(Array.isArray(result.turns)?{count:result.turns.length}:{})};
+          if(!await recordDreamTool(db,claim,index,callIndex,receipt,clock()))throw new DOMException('Aborted','AbortError');
         }
         results.push({role:'tool',tool_call_id:call.id,name,content:JSON.stringify(result)});
       }
