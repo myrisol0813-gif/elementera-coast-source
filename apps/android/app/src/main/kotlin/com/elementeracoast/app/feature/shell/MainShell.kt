@@ -7,6 +7,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.Card
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.Alignment
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import com.elementeracoast.app.BuildConfig
+import com.elementeracoast.app.feature.wolf.LocalGithubUpdater
+import com.elementeracoast.app.feature.wolf.LocalRelease
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
@@ -145,6 +158,55 @@ fun MainShell(
             }
         }
     }
+    // Device-only, shared by both workspace modes. Never interrupt a conversation or install automatically.
+    val noticePrefs = remember(headerContext) { headerContext.getSharedPreferences("source_release_notice_v1", android.content.Context.MODE_PRIVATE) }
+    val noticeLifecycle = (LocalContext.current as? LifecycleOwner)?.lifecycle
+    var pendingRelease by remember { mutableStateOf<LocalRelease?>(null) }
+    var shownRelease by remember { mutableStateOf<LocalRelease?>(null) }
+    val canShowRelease = state.activeFeature == null && state.activeRoomType == RoomType.Main &&
+        state.activeConversationId.isBlank() && state.composerDraft.isBlank() &&
+        state.messages.isEmpty() && state.pendingAttachments.isEmpty() &&
+        !state.isStreaming && !state.isFinalizing && !state.backgroundGeneration &&
+        !state.attachmentUploading && !state.historyLoading && !state.showModelPicker &&
+        !drawerState.isOpen && !showWindowContext && !showManual && !showThemeWardrobe &&
+        guideRequest == null && state.snackbarMessage == null && !SourceVisitGate.isActive
+    LaunchedEffect(noticeLifecycle) {
+        suspend fun checkRelease() {
+            try {
+                val release = LocalGithubUpdater().latest()
+                if (release.code > BuildConfig.VERSION_CODE &&
+                    release.code > noticePrefs.getInt("shown_version_code", 0)) {
+                    pendingRelease = release
+                } else pendingRelease = null
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) { /* Optional notice: offline and rate limits must stay silent. */ }
+        }
+        if (noticeLifecycle == null) checkRelease()
+        else noticeLifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            // Throttle resumes as well as long foreground sessions.
+            while (true) {
+                val now = android.os.SystemClock.elapsedRealtime()
+                val last = noticePrefs.getLong("last_check_elapsed", -1L)
+                if (last < 0L || now < last || now - last >= 15 * 60 * 1000L) {
+                    noticePrefs.edit().putLong("last_check_elapsed", now).apply()
+                    checkRelease()
+                }
+                delay(15 * 60 * 1000L)
+            }
+        }
+    }
+    LaunchedEffect(canShowRelease, pendingRelease?.code) {
+        if (!canShowRelease) {
+            shownRelease = null
+        } else {
+            val release = pendingRelease
+            if (release != null && release.code > noticePrefs.getInt("shown_version_code", 0)) {
+                noticePrefs.edit().putInt("shown_version_code", release.code).apply()
+                shownRelease = release
+                pendingRelease = null
+            }
+        }
+    }
     val defaultSnowLetterVisuals = remember { SnowLetterVisualSettings() }
     var snowLetterBackgroundAlpha by rememberSaveable { mutableStateOf(defaultSnowLetterVisuals.chatBackgroundAlpha) }
     var snowLetterDecorationAlpha by rememberSaveable { mutableStateOf(defaultSnowLetterVisuals.decorationAlpha) }
@@ -213,6 +275,23 @@ fun MainShell(
                                 onNewConversation = onNewConversation,
                                 onMore = { showWindowContext = true }
                             )
+                        }
+                        if (canShowRelease) shownRelease?.let { release ->
+                            Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+                                Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                                    Text("发现新版本 · ${release.version}", style = MaterialTheme.typography.titleSmall)
+                                    Text("可以现在查看，也可以稍后在「版本与更新」里安装。",
+                                        style = MaterialTheme.typography.bodySmall)
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End,
+                                        verticalAlignment = Alignment.CenterVertically) {
+                                        TextButton(onClick = { shownRelease = null }) { Text("稍后") }
+                                        TextButton(onClick = {
+                                            shownRelease = null
+                                            navigateGuide("update")
+                                        }) { Text("查看更新") }
+                                    }
+                                }
+                            }
                         }
                         if (SourceVisitGate.isActive) {
                             Text(
