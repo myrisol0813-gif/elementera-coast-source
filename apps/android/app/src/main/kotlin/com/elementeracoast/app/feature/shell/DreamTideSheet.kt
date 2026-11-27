@@ -23,7 +23,7 @@ private fun status(value:String)=when(value){
     "running"->"活动中";"completed"->"已结束";"failed"->"未完成";"cancelled"->"已取消";"interrupted"->"已中断";"claimed"->"结果未确认";else->value
 }
 private fun toolName(value:String)=when(value){
-    "dream_read_history"->"阅读历史";"dream_write_note"->"写自主手记";"dream_schedule_extra"->"提议额外唤醒";else->value
+    "voice_create"->"自主语音";"image_generate"->"自主生图";"dream_memory_candidate"->"提议记忆候选";"dream_read_history"->"阅读历史";"dream_write_note"->"写自主手记";"dream_schedule_extra"->"提议额外唤醒";else->value
 }
 private fun JsonElement?.field(key:String):String?=((this as? JsonObject)?.get(key) as? JsonPrimitive)?.contentOrNull
 
@@ -53,6 +53,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
     var consent by remember(cid){mutableStateOf(false)}
     var notePage by remember(cid){mutableStateOf(DreamNotesResponse())}
     var activityPage by remember(cid){mutableStateOf(DreamActivityResponse())}
+    var previewId by remember(cid){mutableStateOf<String?>(null)}
     var offset by remember(cid){mutableStateOf(0)}
     val sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)
     fun hydrate(value:DreamSettingsResponse){
@@ -78,6 +79,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
         finally{busy=false}
     }
     LaunchedEffect(cid,tab,offset){load()}
+    previewId?.let{id->DreamMediaPreview(api,cid,id){previewId=null}}
     val canArm=response.executionAvailable&&response.schedulerConfigured
     fun save(action:String){
         if(busy||!loaded)return
@@ -209,7 +211,12 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
                         Text(stamp(r.startedAt)+" · "+if(r.kind=="daily")"固定唤醒" else "额外唤醒")
                         Text(status(r.status)+" · "+r.modelId,style=MaterialTheme.typography.bodySmall)
                         Text("总 token："+(r.result.field("total_tokens")?:"未确认")+" · 成本："+(r.result.field("reported_cost")?.let{"USD "+it}?:"未确认"),style=MaterialTheme.typography.bodySmall)
-                        r.tools.forEach{t->Text(toolName(t.field("tool_name").orEmpty())+" · "+status(t.field("status").orEmpty()),style=MaterialTheme.typography.bodySmall)}
+                        r.tools.forEach{t->
+                            val name=t.field("tool_name").orEmpty()
+                            Text(toolName(name)+" · "+status(t.field("status").orEmpty()),style=MaterialTheme.typography.bodySmall)
+                            val id=(t as? JsonObject)?.get("receipt").field("record_id")
+                            if(id!=null&&((name=="voice_create"&&id.startsWith("voice_dream_"))||(name=="image_generate"&&id.startsWith("att_dream_"))))TextButton(onClick={previewId=id}){Text(if(name=="voice_create")"查看原声" else "查看原图")}
+                        }
                         if(r.result.field("extra_scheduled")=="true")Text("已保存额外预约。",style=MaterialTheme.typography.bodySmall)
                         if(r.steps.any{it.field("status")=="claimed"})Text("存在未确认请求，不会自动重放。",style=MaterialTheme.typography.bodySmall)
                     }
