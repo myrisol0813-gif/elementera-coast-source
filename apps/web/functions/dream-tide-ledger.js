@@ -26,9 +26,9 @@ export function normalizeDreamConfig(config){
   if(config.execution!=null){
     const e=config.execution, int=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
     if(!int(e.tokenBudget,1,1000000)||!int(e.outputLimit,1,65536)||!int(e.toolBudget,0,128)||!int(e.readTurns,1,400)
-      ||!int(e.extraPerDay??0,0,128)||typeof e.invitation!=='string'||e.invitation.length>16000||!e.invitation.trim())throw new TypeError('invalid dream tide execution settings');
+      ||!int(e.voiceLimit??1,0,128)||!int(e.imageLimit??1,0,128)||!int(e.extraPerDay??0,0,128)||typeof e.invitation!=='string'||e.invitation.length>16000||!e.invitation.trim())throw new TypeError('invalid dream tide execution settings');
     execution={tokenBudget:e.tokenBudget,outputLimit:e.outputLimit,toolBudget:e.toolBudget,readTurns:e.readTurns,
-      extraPerDay:e.extraPerDay??0,invitation:e.invitation,includeTime:e.includeTime===true,includePrevious:e.includePrevious===true,
+      extraPerDay:e.extraPerDay??0,voiceLimit:e.voiceLimit??1,imageLimit:e.imageLimit??1,invitation:e.invitation,includeTime:e.includeTime===true,includePrevious:e.includePrevious===true,
       includeReplies:e.includeReplies===true,readHistory:e.readHistory===true,writeNote:e.writeNote===true,
       ...Object.fromEntries([...DREAM_CONTEXT_FLAGS,...DREAM_TOOL_FLAGS].map(key=>[key,e[key]===true]))};
   }
