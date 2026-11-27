@@ -212,3 +212,47 @@ test('autonomous voice is not exposed without the separate deployment gate',asyn
   }});
   assert.equal(out.status,'completed');
 });
+
+
+test('independent image preserves exact original, is not a chat attachment, and fences revocation',async()=>{
+  const {db,cid,env,rev}=await fixture({allowImage:true,toolBudget:5});
+  const {writeProfile}=await import('../functions/chat-store.js');
+  const {claimDreamTide}=await import('../functions/dream-tide-ledger.js');
+  const {reserveDreamStep,recordDreamStep,reserveDreamTool}=await import('../functions/dream-tide-records.js');
+  const {generateDreamImage}=await import('../functions/dream-tide-image.js');
+  const {getChatAttachmentRecord,bindChatAttachmentsToTurn,deleteChatAttachment}=await import('../functions/chat-attachments.js');
+  const {readArchiveAttachment,prepareArchiveAttachment}=await import('../functions/coast-archive-v2-media.js');
+  const {listMediaLibrary}=await import('../functions/coast-vault-media.js');
+  const imageModel='fixture/paid';
+  await writeProfile(db,{current_image_model:imageModel,model_box:{image:[imageModel]}});
+  const claim=await claimDreamTide(db,cid,{now:due,currentModelId:model,busy:false});
+  assert.ok(claim);
+  assert.ok(await reserveDreamStep(db,claim,0,due));
+  assert.ok(await recordDreamStep(db,claim,0,'completed',{},due));
+  assert.ok(await reserveDreamTool(db,claim,0,0,'image_generate',due));
+  const cfg={...env,COAST_DREAM_MEDIA_ENABLED:'true',OPENROUTER_API_KEY:'fixture-only'};
+  const ctx={autonomous_activity:true,autonomous_claim:claim,autonomous_event:{step:0,index:0},conversation_id:cid};
+  const original=new Uint8Array(1500005);original.set([137,80,78,71,13,10,26,10]);
+  const fake={bytes:original,mime:'image/png',provider:'openrouter',requested_model:imageModel,reported_model:imageModel,cost_usd:null};
+  let calls=0;
+  const options={expectedModel:imageModel,discover:async()=>[{id:imageModel}],generate:async()=>{calls++;return fake;}};
+  await assert.rejects(()=>generateDreamImage(db,env,{prompt:'fixture'},ctx,options));
+  assert.equal(calls,0);
+  const result=await generateDreamImage(db,cfg,{prompt:'fixture'},ctx,options);
+  assert.equal(result.id,'att_dream_'+claim.claimId+'_0_0');
+  const row=await getChatAttachmentRecord(db,cid,result.id);
+  assert.equal(row.turn_id,null);assert.deepEqual(new Uint8Array(row.data),original);
+  const media=(await listMediaLibrary(db,{kind:'image'})).items[0];
+  assert.equal(media.id,result.id);assert.equal(media.origin_status,'unlinked');assert.equal(media.role,'assistant');
+  await assert.rejects(()=>bindChatAttachmentsToTurn(db,cid,'turn-one',[result.id]),/不能改绑/);
+  await assert.rejects(()=>deleteChatAttachment(db,cid,result.id));
+  await assert.rejects(()=>generateDreamImage(db,cfg,{prompt:'repeat'},ctx,options));
+  assert.equal(calls,1);
+  const archive=await readArchiveAttachment(db,cid,result.id);
+  const dest=new D1Database();
+  await assert.rejects(()=>prepareArchiveAttachment(dest,{...archive.metadata,turn_id:'turn-one'},archive.descriptor,()=>null,{conversationIds:new Set([cid])}),/invalid autonomous image origin/);
+  assert.ok(await reserveDreamTool(db,claim,0,1,'image_generate',due));
+  await assert.rejects(()=>generateDreamImage(db,cfg,{prompt:'revoked'},{...ctx,autonomous_event:{step:0,index:1}},{...options,generate:async()=>{await disarmDreamTide(db,cid,rev);return fake;}}),/权限已撤回/);
+  assert.equal((await listMediaLibrary(db,{kind:'image'})).items.length,1);
+  assert.equal((await readConversationState(db,cid)).turns.length,1);
+});
