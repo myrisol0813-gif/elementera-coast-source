@@ -31,6 +31,24 @@ export async function recordDreamStep(db,claim,index,status,receipt,now=Date.now
     status,JSON.stringify(receipt),now,claim.claimId,index,...args(claim)).run();
   return r.meta.changes===1;
 }
+export async function reserveDreamTool(db,claim,step,index,name,now=Date.now()){
+  if(!Number.isSafeInteger(step)||step<0||!Number.isSafeInteger(index)||index<0||!['dream_read_history','dream_write_note','dream_schedule_extra'].includes(name))return false;
+  await ensureChatSchema(db);
+  const r=await stmt(db,`INSERT OR IGNORE INTO dream_tide_tool_events(claim_id,step_index,call_index,tool_name,status,started_at)
+    SELECT ?,?,?,?,'claimed',? WHERE EXISTS(SELECT 1 FROM dream_tide_runs r JOIN dream_tide_arms a ON a.conversation_id=r.conversation_id WHERE ${active})
+    AND EXISTS(SELECT 1 FROM dream_tide_steps WHERE claim_id=? AND step_index=? AND status='completed')
+    AND (SELECT COUNT(*) FROM dream_tide_tool_events WHERE claim_id=?) < (SELECT json_extract(config_json,'$.execution.toolBudget') FROM dream_tide_arms WHERE conversation_id=? AND revision=?)`,
+    claim.claimId,step,index,name,now,...args(claim),claim.claimId,step,claim.claimId,claim.conversationId,claim.revision).run();
+  return r.meta.changes===1;
+}
+export async function recordDreamTool(db,claim,step,index,receipt,now=Date.now()){
+  await ensureChatSchema(db);
+  const safe={ok:receipt?.ok===true,...(Number.isSafeInteger(receipt?.count)&&receipt.count>=0?{count:receipt.count}:{})};
+  const r=await stmt(db,`UPDATE dream_tide_tool_events SET status=?,receipt_json=?,finished_at=? WHERE claim_id=? AND step_index=? AND call_index=? AND status='claimed'
+    AND EXISTS(SELECT 1 FROM dream_tide_runs r WHERE r.claim_id=? AND r.conversation_id=? AND r.arm_revision=? AND r.status='running')`,
+    safe.ok?'completed':'failed',JSON.stringify(safe),now,claim.claimId,step,index,...args(claim)).run();
+  return r.meta.changes===1;
+}
 export async function writeDreamNote(db,claim,body,now=Date.now()){
   if(!validBody(body))return false;
   await ensureChatSchema(db);
@@ -63,6 +81,7 @@ export async function readDreamActivity(db,cid,limit=20){
     WHERE r.conversation_id=? AND c.user_id='owner' AND c.deleted_at IS NULL ORDER BY r.started_at DESC,r.claim_id LIMIT ?`,cid,n).all()).results||[];
   for(const row of rows){
     row.result=row.result_json?JSON.parse(row.result_json):null;delete row.result_json;
+    row.tools=(await stmt(db,"SELECT step_index,call_index,tool_name,status,receipt_json,started_at,finished_at FROM dream_tide_tool_events WHERE claim_id=? ORDER BY step_index,call_index",row.claim_id).all()).results.map(s=>({...s,receipt:s.receipt_json?JSON.parse(s.receipt_json):null,receipt_json:undefined}));
     row.steps=(await stmt(db,"SELECT step_index,status,receipt_json,started_at,finished_at FROM dream_tide_steps WHERE claim_id=? ORDER BY step_index",row.claim_id).all()).results.map(s=>({...s,receipt:s.receipt_json?JSON.parse(s.receipt_json):null,receipt_json:undefined}));
   }
   return rows;
