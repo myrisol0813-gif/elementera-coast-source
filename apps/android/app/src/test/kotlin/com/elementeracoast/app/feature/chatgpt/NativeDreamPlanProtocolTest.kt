@@ -80,4 +80,32 @@ class NativeDreamPlanProtocolTest {
         assertTrue(runCatching{small.step(0,tools,emptyList(),reserve={error("must not reserve")},authorize={true})}.isFailure)
     }
 
+
+    @Test fun deviceGrantFencePausesEveryExistingWindowAndRearmOnlyRestoresOne(){
+        val store=com.elementeracoast.app.core.local.MemoryLocalPersistence()
+        val grants=NativeDreamPlanGrants(store)
+        val m="chatgpt-plan:fixture-model";val names=setOf("fixture-model")
+        assertFalse(grants.grant("window","revision",m,account,"epoch",names,false,3))
+        assertFalse(grants.grant("window","revision",m,account,"epoch",emptySet(),true,3))
+        assertTrue(grants.grant("window","revision",m,account,"epoch",names,true,3))
+        assertTrue(grants.grant("other","other-revision",m,account,"epoch",names,true,2))
+        assertEquals(grant,grants.resolve("window","revision",m,account,"epoch"))
+        assertNull(grants.resolve("window","revision",m,account,"new-epoch"))
+        assertNull(grants.resolve("window","revision",m,account.copy(hostId="other-host"),"epoch"))
+        assertNull(grants.resolve("window","revision",m,account.copy(scopes=emptyList()),"epoch"))
+        assertNull(grants.resolve("window","revision",m,null,null))
+        val stored=store.get("local.dream.plan.grant.window")
+        for(secret in listOf(account.email,account.accessToken,account.refreshToken,"\"subject\"","\"client\""))assertFalse(stored.contains(secret))
+        grants.pause(account,"epoch")
+        assertEquals("paused",grants.status("window","revision",m,account,"epoch"))
+        assertNull(grants.resolve("other","other-revision",m,account,"epoch"))
+        assertTrue(grants.grant("window","next-revision",m,account,"epoch",names,true,3))
+        assertNull(grants.resolve("window","revision",m,account,"epoch"))
+        assertNotNull(grants.resolve("window","next-revision",m,account,"epoch"))
+        assertNull(grants.resolve("other","other-revision",m,account,"epoch"))
+        grants.revoke("window")
+        assertNull(grants.resolve("window","next-revision",m,account,"epoch"))
+        assertEquals("plan_usage_unavailable",NativeDreamPlanProtocol.failure(503,"subscription_sharing_usage_unavailable"))
+    }
+
 }
