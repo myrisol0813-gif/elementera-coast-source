@@ -24,8 +24,15 @@ class NativeFurnitureSvg(private val art: RestArtRepository) {
             it.getValue("id").jsonPrimitive.content to (it["colorSlots"]?.jsonObject ?: JsonObject(emptyMap()))
         }
     }
+    private fun slots(asset: NativeFurnitureAsset): Map<String,JsonElement> =
+        presets[asset.id]?.jsonObject?.get("slots")?.jsonObject ?: fallbackSlots[asset.id].orEmpty()
+    fun colorSlots(asset: NativeFurnitureAsset): Map<String,Pair<String,String>> =
+        slots(asset).mapValues { (key,raw) ->
+            val s=raw.jsonObject
+            (s["label"]?.jsonPrimitive?.contentOrNull ?: key) to s.getValue("base").jsonPrimitive.content
+        }
     fun prepare(asset: NativeFurnitureAsset, colors: Map<String,String>, part: NativePaintPart): String {
-        val slots=presets[asset.id]?.jsonObject?.get("slots")?.jsonObject ?: fallbackSlots[asset.id].orEmpty()
+        val slots=slots(asset)
         val doc=NativeSvgXml.parse(art.svg(asset.file))
         val all=NativeSvgXml.elements(doc.documentElement)
         val global=linkedMapOf<String,String>()
