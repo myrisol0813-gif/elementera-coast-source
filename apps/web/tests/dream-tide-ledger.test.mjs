@@ -61,3 +61,16 @@ test('extra appointment is optional and consumed without rewriting daily slot',a
   assert.equal(await setDreamTideExtra(db,cid,rev,'extra-one',due+100,due+64),false);
   assert.equal(await claimDreamTide(db,cid,{now:due+100,currentModelId:model,busy:false}),null);
 });
+
+test('missed extra appointment is not replayed and cannot block future appointments',async()=>{
+  const {db,cid,rev}=await fixture();
+  assert.equal(await setDreamTideExtra(db,cid,rev,'missed',due+60,armedAt),true);
+  const tomorrow=due+86400000;
+  const daily=await claimDreamTide(db,cid,{now:tomorrow,currentModelId:model,busy:false});
+  assert.equal(daily.kind,'daily');
+  await settleDreamTide(db,daily,'completed',tomorrow+1);
+  assert.equal(await claimDreamTide(db,cid,{now:tomorrow+2,currentModelId:model,busy:false}),null);
+  assert.equal(await setDreamTideExtra(db,cid,rev,'new',tomorrow+100,tomorrow+2),true);
+  const extra=await claimDreamTide(db,cid,{now:tomorrow+100,currentModelId:model,busy:false});
+  assert.equal(extra.key,'extra:new');
+});
