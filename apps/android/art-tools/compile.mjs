@@ -54,14 +54,25 @@ try {
         push('c|'+b.id+'|'+palette+'|'+action,b.file,w,h,{kind:'creature',id:b.id,palette,action});
       }
     }
+    // Independent reference renderings for device-side fidelity regression.
+    const window=art.catalogue.assets['living-window'];
+    const [,,ww,wh]=window.box??window.viewBox;
+    push('reference|furniture|window',window.file,ww,wh,{kind:'furniture',id:window.id,colors:{wood:'#7389b0'},part:'whole',reference:true});
+    const wolf=art.creatures.wolf;
+    const [,,pw,ph]=wolf.viewBox.split(/\s+/).map(Number);
+    push('reference|creature|wolf',wolf.file,pw,ph,{kind:'creature',id:'wolf',palette:art.appearance.wolf.defaultPalette,action:'idle',reference:true,
+      appearance:{colors:{fur:'#7389b0'},glasses:'round',neck:'scarf',badge:'gpt',badgePlace:'head',badgeMode:'custom',badgeColor:'#ba8371',badgeX:3,badgeY:-2},prop:'book'});
     const {compilePoseTemplate}=await import('/__native-pose-templates.mjs');
     globalThis.compilePose=job=>compilePoseTemplate(art,creature,state,job);
     globalThis.compileSprite=async job=>{
       const source=await art.read(job.file);
       let svg;
       if(job.kind==='creature'){
-        const input={...state.newAppearance(art.appearance,job.id),palette:job.palette};
-        svg=creature.creatureSvg(source,art.creatures[job.id],art.appearance,art.accessories,input,job.action,{reducedMotion:true,badges:art.badges});
+        const input={...state.newAppearance(art.appearance,job.id),palette:job.palette,...job.appearance};
+        const prop=job.prop?art.props.props.find(p=>p.id===job.prop):null;
+        const mount=prop?art.props.mounts[job.id]:null;
+        svg=creature.creatureSvg(source,art.creatures[job.id],art.appearance,art.accessories,input,job.action,{reducedMotion:true,badges:art.badges,
+          prop,mount,propSource:prop?await art.read(prop.file):null});
       }else{
         svg=room.prepareSvg(source,job.kind==='furniture'?art.catalogue.assets[job.id]:{},job.colors??{},job.part??'whole',{reducedMotion:true});
       }
@@ -89,7 +100,7 @@ try {
     await mkdir(dirname(resolve(temp,file)),{recursive:true});
     await writeFile(resolve(temp,file),Buffer.from(data,'base64'));
     entries[job.key]=file;
-    if(job.kind==='creature'){
+    if(job.kind==='creature'&&!job.reference){
       const templateFile='poses/'+hash+'.json';
       const template=await page.evaluate(job=>globalThis.compilePose(job),job);
       await mkdir(dirname(resolve(temp,templateFile)),{recursive:true});
