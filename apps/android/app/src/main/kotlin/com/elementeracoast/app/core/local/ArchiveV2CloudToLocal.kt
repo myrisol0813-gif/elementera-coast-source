@@ -30,7 +30,7 @@ internal object ArchiveV2CloudToLocal {
             when(r.module){
                 "daily"->dailyRows.add(ArchiveV2Daily.Row(r,raw.string("kind"),data))
                 "chat"->{
-                    verifyKeys(data,setOf("conversation","history_json","history_updated_at"))
+                    verifyKeys(JsonObject(data.filterKeys{it!="dream_tide"}),setOf("conversation","history_json","history_updated_at"))
                     val c=data.getValue("conversation").jsonObject
                     verifyKeys(c,setOf("id","title","room_type","created_at","updated_at","deleted_at","title_manual","title_generated_at","title_model_id","source","source_window_id"))
                     require(c.string("id")==r.id&&c["deleted_at"]==JsonNull)
