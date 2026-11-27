@@ -8,7 +8,7 @@ import kotlinx.serialization.json.*
 internal object NativeDreamPlanProtocol {
     const val PREFIX="chatgpt-plan:"
     const val ENDPOINT="https://api.openai.com/v1/responses"
-    const val USAGE_URL="https://chatgpt.com/#settings/Usage"
+    const val USAGE_URL="https://chatgpt.com/settings/usage"
     private fun JsonObject.str(key:String)=(get(key) as? JsonPrimitive)?.contentOrNull.orEmpty()
     fun slug(modelId:String):String?=modelId.takeIf{it.startsWith(PREFIX)}?.removePrefix(PREFIX)
         ?.takeIf{it.matches(Regex("[A-Za-z0-9_.:-]{1,160}"))}
@@ -103,7 +103,8 @@ internal object NativeDreamPlanProtocol {
         }
     }
     fun failure(http:Int,code:String?):String=when{
-        code in setOf("subscription_sharing_usage_limit_exceeded","subscription_sharing_usage_unavailable")||http==429->"plan_usage_limit"
+        code=="subscription_sharing_usage_unavailable"->"plan_usage_unavailable"
+        code=="subscription_sharing_usage_limit_exceeded"||http==429->"plan_usage_limit"
         code in setOf("subscription_sharing_user_not_eligible","chatpass_v2_scope_not_authorized","chatpass_v2_invalid_authorization_context")||http in setOf(401,403)->"plan_authorization_unavailable"
         code=="subscription_sharing_unsupported_capability"||http==400->"plan_capability_unavailable"
         else->"plan_request_unconfirmed"
