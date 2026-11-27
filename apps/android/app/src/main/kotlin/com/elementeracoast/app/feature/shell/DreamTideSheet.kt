@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import com.elementeracoast.app.core.network.CoastApiClient
 import com.elementeracoast.app.core.remote.*
@@ -244,4 +245,35 @@ private fun DreamSwitch(label:String,checked:Boolean,enabled:Boolean,change:(Boo
         Text(label,Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
         Switch(checked=checked,onCheckedChange=change,enabled=enabled)
     }
+}
+
+@Composable
+private fun DreamMediaPreview(api:CoastApiClient,cid:String,id:String,onDismiss:()->Unit){
+    var error by remember(id){mutableStateOf("")}
+    var bitmap by remember(id){mutableStateOf<android.graphics.Bitmap?>(null)}
+    val audio=id.startsWith("voice_dream_")
+    LaunchedEffect(cid,id){
+        if(!audio)try{
+            val bytes=api.dreamMediaBytes(cid,id)
+            bitmap=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default){
+                val bounds=android.graphics.BitmapFactory.Options().apply{inJustDecodeBounds=true}
+                android.graphics.BitmapFactory.decodeByteArray(bytes,0,bytes.size,bounds)
+                require(bounds.outWidth>0&&bounds.outHeight>0){"图像原件无法解码。"}
+                var sample=1
+                while(maxOf(bounds.outWidth,bounds.outHeight)/sample>2048)sample*=2
+                android.graphics.BitmapFactory.decodeByteArray(bytes,0,bytes.size,android.graphics.BitmapFactory.Options().apply{inSampleSize=sample})
+                    ?:error("图像原件无法解码。")
+            }
+        }catch(c:CancellationException){throw c}catch(e:Exception){error=e.message?:"原件已删除或暂不可访问。"}
+    }
+    AlertDialog(onDismissRequest=onDismiss,title={Text(if(audio)"自主活动语音" else "自主活动图像")},text={
+        Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+            if(audio)com.elementeracoast.app.feature.daily.CoastMediaAudio(id,{api.dreamMediaBytes(cid,id)},{error=it})
+            else if(bitmap!=null)androidx.compose.foundation.Image(
+                bitmap=bitmap!!.asImageBitmap(),contentDescription="自主活动原图预览",
+                modifier=Modifier.fillMaxWidth().heightIn(max=420.dp),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
+            else if(error.isBlank())Text("正在读取原件……")
+            if(error.isNotBlank())Text(error,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)
+        }
+    },confirmButton={TextButton(onClick=onDismiss){Text("关闭")}})
 }
