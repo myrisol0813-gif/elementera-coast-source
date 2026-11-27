@@ -17,7 +17,8 @@ internal class LocalDreamExecutor(
     private val web:LocalIndependentWeb?=null,
     private val captureReality:suspend (com.elementeracoast.app.core.model.ConversationContextSettings)->RemoteRealityContext={RemoteRealityContext()},
     private val voice:LocalVoiceProvider?=null,
-    private val imageProvider:((String)->LocalProviderConfig?)?=null
+    private val imageProvider:((String)->LocalProviderConfig?)?=null,
+    private val modelBudget:suspend (LocalProviderConfig,String,Int)->LocalInputBudget?={_,_,_->null}
 ){
     private val ledger=LocalDreamLedger(store)
     private fun JsonObject.str(k:String)=(get(k) as? JsonPrimitive)?.contentOrNull.orEmpty()
@@ -137,21 +138,26 @@ internal class LocalDreamExecutor(
                     val commonNames=commonTools.map{it.getValue("function").jsonObject.str("name")}.toSet()
                     val selectedImage=RemoteCacheStore(store,strictReads=true).profile()?.currentImageModel.orEmpty()
                     val dreamImage=if(e.allowImage&&e.imageLimit>0&&imageProvider!=null&&RemoteCacheStore(store,strictReads=true).history(cid)?.contextSettings?.localModelWriteEnabled==true)LocalDreamImage(store,c,selectedImage,imageProvider).takeIf{it.configured()}else null
-                    val allowed=tools(c)+commonTools+listOfNotNull(dreamImage?.let{tool("image_generate","可选：生成并保存独立活动图像，使用已授权生图供应商额度。只发送必要提示，不返回像素。",mapOf("prompt" to "string"))})
+                    val allowed=tools(c)+commonTools+listOfNotNull(dreamImage?.let{tool("image_generate","可选：生成并保存独立活动图像，使用已授权生图供应商额度。只发送必要提示。若已单独授权且支持视觉，下一请求可收到系统转交原图；未收到像素不要假称看见。",mapOf("prompt" to "string"))})
+                    val visionBudget=if(e.allowImageReadback&&dreamImage!=null)modelBudget(initial.first,initial.second,e.outputLimit)else null
+                    val pendingImages=mutableListOf<DreamImageReadback>()
                     var voiceReservations=0;var imageReservations=0
                     for(step in 0..e.toolBudget){
                         ensureActive();permitted(c)
                         val exposed=if(calls>=e.toolBudget||step==e.toolBudget)emptyList()else allowed
-                        val estimate=LocalContextPolicy.estimate(JsonArray(messages).toString())+LocalContextPolicy.estimate(JsonArray(exposed).toString())
+                        val images=pendingImages.toList();pendingImages.clear()
+                        val wireMessages=JsonArray(messages+images.map{it.message})
+                        val estimate=LocalContextPolicy.estimate(JsonArray(messages).toString())+LocalContextPolicy.estimate(JsonArray(exposed).toString())+images.size*2048+LocalContextPolicy.estimate(images.joinToString(" "){it.id})
+                        if(visionBudget?.wireLimit?.let{estimate>it}==true){reason="context_window_estimate_exceeded";break}
                         val cap=minOf(e.outputLimit.toLong(),e.tokenBudget.toLong()-total-estimate).toInt()
                         if(!known||cap<1){reason="budget_or_usage_unknown";break}
                         val selected=resolve(modelId)
                         if(selected==null||selected.first!=initial.first||selected.second!=initial.second){reason="model_configuration_changed";break}
                         check(ledger.reserveStep(c,step,clock()))
-                        val raw=try{permitted(c);invoke(selected.first,selected.second,JsonArray(messages),JsonArray(exposed),cap)}
+                        val raw=try{permitted(c);invoke(selected.first,selected.second,wireMessages,JsonArray(exposed),cap)}
                         catch(ex:Exception){
                             known=false;costKnown=false
-                            withContext(NonCancellable){ledger.recordStep(c,step,false,buildJsonObject{put("error_type","provider_unconfirmed");put("usage",JsonNull);put("cost",JsonNull)},clock())}
+                            withContext(NonCancellable){ledger.recordStep(c,step,false,buildJsonObject{put("error_type","provider_unconfirmed");put("usage",JsonNull);put("cost",JsonNull);if(images.isNotEmpty())put("image_readback_unconfirmed",JsonArray(images.map{JsonPrimitive(it.id)}))},clock())}
                             throw ex
                         }
                         val usage=raw["usage"] as? JsonObject
@@ -170,6 +176,7 @@ internal class LocalDreamExecutor(
                         val receipt=buildJsonObject{
                             put("usage",if(reported==null)JsonNull else buildJsonObject{put("total_tokens",reported);for(k in listOf("prompt_tokens","completion_tokens"))usage?.get(k)?.jsonPrimitive?.longOrNull?.takeIf{it>=0}?.let{put(k,it)}})
                             put("cost",reportedCost?.let(::JsonPrimitive)?:JsonNull);put("model",raw.str("model").take(180));put("finish_reason",finish.take(80))
+                            if(images.isNotEmpty())put(if(valid&&choice!=null)"image_readback_accepted" else "image_readback_unconfirmed",JsonArray(images.map{JsonPrimitive(it.id)}))
                             put("requested_tools",JsonArray(if(valid)requested.map{JsonPrimitive(it.jsonObject.getValue("function").jsonObject.str("name"))}else emptyList()))
                         }
                         check(ledger.recordStep(c,step,valid&&choice!=null,receipt,clock()))
@@ -180,6 +187,7 @@ internal class LocalDreamExecutor(
                         if(finish!="tool_calls"||exposed.isEmpty()){reason="unexpected_tool_request";break}
                         val exposedNames=exposed.map{it.getValue("function").jsonObject.str("name")}.toSet()
                         val results=mutableListOf<JsonElement>()
+                        if(images.isNotEmpty())messages.add(msg("system","【系统记录】上一请求曾转交自主活动图像 "+images.joinToString("、"){it.id}+"；本请求不再附送这些像素。"))
                         for((index,item) in requested.withIndex()){
                             permitted(c);val call=item.jsonObject;val fn=call.getValue("function").jsonObject;val name=fn.str("name")
                             var result=buildJsonObject{put("ok",false);put("reason","unavailable_or_invalid")}
@@ -202,7 +210,13 @@ internal class LocalDreamExecutor(
                                         }
                                         name=="image_generate"&&dreamImage!=null&&args!=null->{
                                             val value=dreamImage.execute(c.id+":"+step+":"+index,args)
-                                            buildJsonObject{put("ok",true);put("record_id",value.getValue("id"));put("data",value)}
+                                            var readback="not_delivered"
+                                            if(visionBudget?.vision==true&&step<e.toolBudget)try{
+                                                permitted(c)
+                                                val next=prepareDreamImageReadback(store,cid,value.getValue("id").jsonPrimitive.content,true)
+                                                if(next!=null&&pendingImages.sumOf{it.bytes}+next.bytes<=8*1024*1024){pendingImages.add(next);readback="prepared_for_next_request"}
+                                            }catch(ex:CancellationException){throw ex}catch(_:Exception){/* original remains saved */}
+                                            buildJsonObject{put("ok",true);put("record_id",value.getValue("id"));put("data",JsonObject(value+("readback" to JsonPrimitive(readback))))}
                                         }
                                         name in commonNames&&common!=null->{
                                             val out=common.execute(c.id+":"+step+":"+index,name,fn.str("arguments"))
