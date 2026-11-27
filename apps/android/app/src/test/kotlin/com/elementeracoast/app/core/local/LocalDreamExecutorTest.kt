@@ -296,7 +296,7 @@ class LocalDreamExecutorTest {
             val (store,initial)=fixture();val cache=RemoteCacheStore(store);val ledger=LocalDreamLedger(store)
             val history=cache.history(cid)!!
             cache.putHistory(cid,history.copy(contextSettings=history.contextSettings.copy(localModelWriteEnabled=true)))
-            val cfg2=cfg.copy(execution=cfg.execution!!.copy(allowImage=true,allowVoice=true,tokenBudget=24000))
+            val cfg2=cfg.copy(execution=cfg.execution!!.copy(allowImage=true,allowVoice=true,allowMemoryCandidate=true,tokenBudget=24000))
             val settings=ledger.configure(cid,DreamSettingsRequest(cid,initial.revision,"arm",cfg2,model,true),true,at-86400000)!!
             val claim=ledger.claim(cid,settings.revision!!,model,at)!!
             assertTrue(ledger.reserveStep(claim,0,at));assertTrue(ledger.recordStep(claim,0,true,buildJsonObject{},at))
@@ -310,7 +310,18 @@ class LocalDreamExecutorTest {
             assertTrue(ledger.reserveTool(claim,0,1,"voice_create",at))
             store.atomic{s->saveLocalVoice(s,cid,null,null,"dream_tide",model,LocalVoiceProvider.Generated("fixtureVoice","fixture speech",mp3),voiceId)}
             assertTrue(ledger.recordTool(claim,0,1,true,null,at,voiceId))
+            assertTrue(ledger.reserveTool(claim,0,2,"dream_memory_candidate",at))
+            val memory=LocalMemoryStore(store)
+            val proposal=memory.proposeDreamCandidate(claim,0,2,buildJsonObject{put("title","archive candidate");put("content","candidate body");put("destination","seed")},at)
+            val pocketId=proposal.getValue("id").jsonPrimitive.content
+            assertTrue(ledger.recordTool(claim,0,2,true,null,at,pocketId))
+            assertTrue(ledger.reserveTool(claim,0,3,"dream_write_note",at))
+            assertTrue(ledger.note(claim,"archive note",at))
+            assertTrue(ledger.recordTool(claim,0,3,true,null,at))
             assertTrue(ledger.finish(claim,"completed",buildJsonObject{},null,at))
+            assertTrue(LocalDreamArchive(store).reply(cid,claim.id,"reply-archive","archive reply"))
+            val candidate=memory.snapshot().pockets.single()
+            assertTrue(runCatching{LocalDreamArchive(store).validateCandidateOrigin(null,candidate)}.isFailure)
             val side=LocalSideRecords(store)
             for((kind,id) in listOf("image" to pictureId,"audio" to voiceId)){
                 val favorite=side.saveTreasure(buildJsonObject{put("kind",kind);put("conversation_id",cid);put("source_id",id);put("notes","fixture favorite")})
@@ -320,7 +331,7 @@ class LocalDreamExecutorTest {
             val app="com.elementeracoast.source";val zip=java.io.File(dir,"complete.zip")
             val manifest=ArchiveV2Local.export(store,app,zip)
             val stage=ArchiveV2Stage(dir,"verified");ArchiveV2ZipReader.stage(zip,stage)
-            val dst=MemoryLocalPersistence();val selected=setOf("chat","attachments","voice","vault")
+            val dst=MemoryLocalPersistence();val selected=setOf("chat","attachments","voice","vault","memory_pockets")
             ArchiveV2Local.restore(manifest,stage,selected,app,dst,false)
             assertTrue(RemoteCacheStore(dst).conversations().isEmpty())
             ArchiveV2Local.restore(manifest,stage,selected,app,dst,true)
@@ -330,6 +341,57 @@ class LocalDreamExecutorTest {
             val originals=LocalAttachmentStore(dst);assertArrayEquals(png,originals.bytes(originals.entries().single()))
             val restored=LocalSideRecords(dst);assertArrayEquals(mp3,restored.bytes(restored.audio(voiceId)!!))
             assertEquals(side.rows(),restored.rows())
+            assertEquals(listOf(candidate),LocalMemoryStore(dst).snapshot().pockets)
+            assertTrue(LocalMemoryStore(dst).snapshot().entries.isEmpty())
+            // Exercise backend-shaped input through the real cloud converter.
+            val desc=manifest.objects.associateBy{it.objectSha256}
+            val replacements=mutableMapOf<String,Pair<ArchiveV2Object,ByteArray>>()
+            val cloudRecords=manifest.records.map{record->
+                if(record.module!="chat")record else{
+                    val raw=Json.parseToJsonElement(stage.verify(desc.getValue(record.recordObject),1800000).readBytes().decodeToString()).jsonObject.getValue("data").jsonObject
+                    val c=raw.getValue("conversation").jsonObject
+                    fun millis(key:String):JsonElement=c[key]?.takeIf{it!=JsonNull}?.let{JsonPrimitive(Instant.parse(it.jsonPrimitive.content).toEpochMilli())}?:JsonNull
+                    val cloudC=buildJsonObject{
+                        for(key in listOf("id","title","room_type"))put(key,c.getValue(key))
+                        for(key in listOf("created_at","updated_at","title_generated_at"))put(key,millis(key))
+                        put("deleted_at",JsonNull);put("title_manual",if(c["title_manual"]?.jsonPrimitive?.booleanOrNull==true)1 else 0)
+                        put("title_model_id",c["title_model_id"]?:JsonNull);put("source",c["source"]?:JsonPrimitive("coast"));put("source_window_id",c["source_window_id"]?:JsonNull)
+                    }
+                    val h=raw.getValue("history").jsonObject
+                    val storage=h["archive_storage_updated_at"]?.jsonPrimitive?.longOrNull?:Instant.parse(h.getValue("updated_at").jsonPrimitive.content).toEpochMilli()
+                    val cloudRaw=buildJsonObject{put("kind","chat");putJsonObject("data"){
+                        put("conversation",cloudC);put("history_json",JsonObject(h.filterKeys{it!="archive_storage_updated_at"}).toString());put("history_updated_at",storage)
+                        raw["dream_tide"]?.let{put("dream_tide",it)}
+                    }}.toString().encodeToByteArray()
+                    val hashes=(cloudRaw.indices step ArchiveV2Chunks.CHUNK_BYTES).map{ArchiveV2Chunks.digest(cloudRaw.copyOfRange(it,minOf(it+ArchiveV2Chunks.CHUNK_BYTES,cloudRaw.size)))}
+                    val d=ArchiveV2Object(cloudRaw.size.toLong(),hashes,ArchiveV2Chunks.fingerprint(cloudRaw.size.toLong(),hashes))
+                    replacements[record.recordObject]=d to cloudRaw
+                    record.copy(recordObject=d.objectSha256)
+                }
+            }
+            val cloudManifest=manifest.copy(workspace="backend",records=cloudRecords,objects=manifest.objects.map{replacements[it.objectSha256]?.first?:it})
+            val cloudZip=java.io.File(dir,"backend.zip")
+            ArchiveV2ZipWriter(cloudZip.outputStream()).use{writer->
+                for(d in manifest.objects){
+                    val changed=replacements[d.objectSha256]
+                    if(changed!=null)java.io.ByteArrayInputStream(changed.second).use{writer.objectEntry(changed.first,it)}
+                    else stage.verify(d,CoastTransferCodec.MAX_BYTES.toLong()).inputStream().use{writer.objectEntry(d,it)}
+                }
+                writer.finish(cloudManifest)
+            }
+            val cloudStage=ArchiveV2Stage(dir,"cloud");ArchiveV2ZipReader.stage(cloudZip,cloudStage)
+            val fromCloud=MemoryLocalPersistence()
+            ArchiveV2Local.restore(cloudManifest,cloudStage,selected,app,fromCloud,false)
+            assertTrue(RemoteCacheStore(fromCloud).conversations().isEmpty())
+            ArchiveV2Local.restore(cloudManifest,cloudStage,selected,app,fromCloud,true)
+            assertEquals(LocalDreamArchive(store).export(cid),LocalDreamArchive(fromCloud).export(cid))
+            assertFalse(LocalDreamLedger(fromCloud).settings(cid).enabled)
+            assertEquals(listOf(candidate),LocalMemoryStore(fromCloud).snapshot().pockets)
+            assertEquals(side.rows(),LocalSideRecords(fromCloud).rows())
+            val cloudOriginals=LocalAttachmentStore(fromCloud)
+            assertArrayEquals(png,cloudOriginals.bytes(cloudOriginals.entries().single()))
+            assertArrayEquals(mp3,LocalSideRecords(fromCloud).bytes(LocalSideRecords(fromCloud).audio(voiceId)!!))
+            assertEquals(1,RemoteCacheStore(fromCloud).history(cid)!!.turns.size)
             val archive=LocalDreamArchive(dst)
             for(id in listOf(pictureId,voiceId))assertEquals(JsonPrimitive(claim.id),archive.activity(cid,0,id).getValue("items").jsonArray.single().jsonObject["claim_id"])
             assertTrue(archive.activity(cid,0,pictureId+"_forged").getValue("items").jsonArray.isEmpty())
