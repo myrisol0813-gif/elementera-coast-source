@@ -165,3 +165,50 @@ test('autonomous daily and calendar writes are append-only, attributed and fence
     {author:'api',source:'chat_tool',conversation_id:cid,source_turn_id:null,identity:apiModelPartnerIdentity({model_label:model}),autonomous_claim:claim,autonomous_event:{step:0,index:0}}),/权限已撤回/);
   assert.equal((await listDiaries(db,{date:'2026-11-27'})).length,1);
 });
+
+
+test('autonomous voice preserves audio originals, rejects revoked and duplicate claims',async()=>{
+  const {db,cid,env,rev}=await fixture({allowVoice:true,toolBudget:5});
+  const {claimDreamTide}=await import('../functions/dream-tide-ledger.js');
+  const {reserveDreamStep,recordDreamStep,reserveDreamTool}=await import('../functions/dream-tide-records.js');
+  const {generateVoiceClip,voiceClipAudio,listVoiceClips}=await import('../functions/voice-clips.js');
+  const {listMediaLibrary}=await import('../functions/coast-vault-media.js');
+  const claim=await claimDreamTide(db,cid,{now:due,currentModelId:model,busy:false});
+  assert.ok(claim);
+  assert.ok(await reserveDreamStep(db,claim,0,due));
+  assert.ok(await recordDreamStep(db,claim,0,'completed',{},due));
+  assert.ok(await reserveDreamTool(db,claim,0,0,'voice_create',due));
+  const cfg={...env,COAST_DREAM_MEDIA_ENABLED:'true',ELEVENLABS_API_KEY:'test-only',ELEVENLABS_VOICE_ID:'fixture_voice'};
+  const ctx={autonomous_activity:true,autonomous_claim:claim,autonomous_event:{step:0,index:0},conversation_id:cid,model_label:model};
+  const original=new Uint8Array(180005).map((_,i)=>i%251);
+  let generated=0;
+  const fake=async()=>{generated++;return new Response(original,{headers:{'content-type':'audio/mpeg'}});};
+  await assert.rejects(()=>generateVoiceClip(db,env,{text:'fixture'},ctx,fake),/未授权/);
+  assert.equal(generated,0);
+  const clip=await generateVoiceClip(db,cfg,{text:'fixture'},ctx,fake);
+  assert.equal(clip.source,'dream_tide');assert.equal(clip.turn_id,null);assert.equal(clip.message_id,null);
+  assert.equal(clip.id,'voice_dream_'+claim.claimId+'_0_0');
+  assert.deepEqual(await voiceClipAudio(db,clip.id),original);
+  const library=await listMediaLibrary(db,{kind:'audio'});
+  assert.equal(library.items[0].id,clip.id);assert.equal(library.items[0].name,'自主活动语音');
+  assert.equal(library.items[0].origin_status,'unlinked');
+  await assert.rejects(()=>generateVoiceClip(db,cfg,{text:'fixture'},ctx,fake),/不重复生成/);
+  assert.equal(generated,1);
+  assert.ok(await reserveDreamTool(db,claim,0,1,'voice_create',due));
+  await assert.rejects(()=>generateVoiceClip(db,cfg,{text:'second'},{...ctx,autonomous_event:{step:0,index:1}},async()=>{
+    await disarmDreamTide(db,cid,rev);
+    return new Response(original);
+  }),/权限已撤回/);
+  assert.equal((await listVoiceClips(db,cid)).length,1);
+  const count=await db.prepare('SELECT COUNT(*) AS n FROM coast_voice_chunks').first();
+  assert.equal(count.n,2);
+  assert.equal((await readConversationState(db,cid)).turns.length,1);
+});
+test('autonomous voice is not exposed without the separate deployment gate',async()=>{
+  const {env,db,cid,opts}=await fixture({allowVoice:true});
+  const out=await executeDreamTide(env,cid,{...opts,invoke:async(_,payload)=>{
+    assert.ok(!payload.tools.some(t=>t.function.name==='voice_create'));
+    return response();
+  }});
+  assert.equal(out.status,'completed');
+});
