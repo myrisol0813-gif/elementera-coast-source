@@ -60,7 +60,10 @@ process recovery marks interrupted claims, and never automatically retries
 them. Explicit revocation invalidates the revision and cancels live work.
 Unknown usage prevents additional model requests; a remaining claimed step
 means billing is unconfirmed. The local input estimate is not a hard provider
-cost limit. Three independent tools are implemented (window history,
-optional autonomous note, optional extra appointment); existing general
-authorized tools, additional reality/context injection, and subscription
-models are not yet wired. No scheduled execution occurs in the normal build.
+cost limit. Window history, optional autonomous note and extra appointment are implemented.
+Explicit opt-in groups also reuse ordinary registered web, library, confirmed
+memory search, calendar and collection tools. Library creation is fenced at the
+actual write; no edit/delete or fake turn. Core custom instructions, portraits,
+window message count and separately authorized reality fields can be injected;
+server wakes do not claim device step or usage data. Subscription models and
+other write/media tools still require their own provenance and acceptance. No scheduled execution occurs in the normal build.
