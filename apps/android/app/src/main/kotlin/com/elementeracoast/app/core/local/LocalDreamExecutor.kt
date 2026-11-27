@@ -15,7 +15,8 @@ internal class LocalDreamExecutor(
     private val clock:()->Long={System.currentTimeMillis()},
     private val workspaceActive:()->Boolean={true},
     private val web:LocalIndependentWeb?=null,
-    private val captureReality:suspend (com.elementeracoast.app.core.model.ConversationContextSettings)->RemoteRealityContext={RemoteRealityContext()}
+    private val captureReality:suspend (com.elementeracoast.app.core.model.ConversationContextSettings)->RemoteRealityContext={RemoteRealityContext()},
+    private val voice:LocalVoiceProvider?=null
 ){
     private val ledger=LocalDreamLedger(store)
     private fun JsonObject.str(k:String)=(get(k) as? JsonPrimitive)?.contentOrNull.orEmpty()
@@ -120,7 +121,7 @@ internal class LocalDreamExecutor(
                 try{
                     val previous=ledger.previous(c)
                     val messages=mutableListOf<JsonElement>(msg("system",context(c,previous)))
-                    val common=LocalToolSession.openAutonomous(store,c,web)
+                    val common=LocalToolSession.openAutonomous(store,c,web,voice)
                     val commonTools=common?.completionsTools?.map{it.jsonObject}.orEmpty().map{t->
                         val f=t.getValue("function").jsonObject
                         if(f.str("name")!="library_write")t else {
@@ -190,7 +191,7 @@ internal class LocalDreamExecutor(
                                         }
                                         name in commonNames&&common!=null->{
                                             val out=common.execute(c.id+":"+step+":"+index,name,fn.str("arguments"))
-                                            buildJsonObject{put("ok",out.ok);val data=Json.parseToJsonElement(out.output);put("data",data);if(name in setOf("library_write","create_moment","create_diary","calendar_create")&&out.ok)(data as? JsonObject)?.get("id")?.let{put("record_id",it)}}
+                                            buildJsonObject{put("ok",out.ok);val data=Json.parseToJsonElement(out.output);put("data",data);if(name in setOf("library_write","create_moment","create_diary","calendar_create","voice_create")&&out.ok)(data as? JsonObject)?.get("id")?.let{put("record_id",it)}}
                                         }
                                         else->result
                                     }
