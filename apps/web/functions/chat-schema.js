@@ -106,6 +106,12 @@ async function createLatestSchema(db) {
     receipt_json TEXT, started_at INTEGER NOT NULL, finished_at INTEGER,
     PRIMARY KEY(claim_id,step_index)
   )`);
+  await run(db, `CREATE TABLE IF NOT EXISTS dream_tide_tool_events (
+    claim_id TEXT NOT NULL, step_index INTEGER NOT NULL, call_index INTEGER NOT NULL,
+    tool_name TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('claimed','completed','failed')),
+    receipt_json TEXT, started_at INTEGER NOT NULL, finished_at INTEGER,
+    PRIMARY KEY(claim_id,step_index,call_index)
+  )`);
   await run(db, `CREATE TABLE IF NOT EXISTS dream_tide_notes (
     claim_id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, model_id TEXT NOT NULL,
     body TEXT NOT NULL, created_at INTEGER NOT NULL
