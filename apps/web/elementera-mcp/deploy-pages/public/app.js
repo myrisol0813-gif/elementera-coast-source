@@ -106,7 +106,7 @@ const eventOwners = Object.freeze([
   memory,
   desk,
   createActionEventOwner({ id: 'settings', priority: 60, controller: settings }),
-  createActionEventOwner({ id: 'dream-tide', priority: 60, controller: dreamTide }),
+  dreamTide,
   devHands,
   dogtalk,
   tools,
