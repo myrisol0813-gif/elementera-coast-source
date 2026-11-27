@@ -30,6 +30,7 @@ internal object ArchiveV2Local {
         val dreamArchive=LocalDreamArchive(store)
         for(row in attachmentRows)if(row.metadata.getValue("id").jsonPrimitive.content.startsWith("att_dream_"))dreamArchive.validateMediaOrigin(dreamArchive.export(row.metadata.getValue("conversation_id").jsonPrimitive.content),row.metadata,"image")
         for(row in LocalSideRecords(store).rows().filter{it.kind=="voice"&&it.data["source"]==JsonPrimitive("dream_tide")})dreamArchive.validateMediaOrigin(dreamArchive.export(row.data.getValue("conversation_id").jsonPrimitive.content),row.data,"voice")
+        for(row in LocalMemoryStore(store).snapshot().pockets.filter{it["deleted_at"]==JsonNull&&(it["source_type"]==JsonPrimitive("dream_tide")||it.getValue("id").jsonPrimitive.content.startsWith("pocket_dream_"))})dreamArchive.validateCandidateOrigin(dreamArchive.export(row.getValue("conversation_id").jsonPrimitive.content),row)
         val records=mutableListOf<ArchiveV2Record>();val objects=linkedMapOf<String,ArchiveV2Object>()
         try {
             ArchiveV2ZipWriter(output.outputStream()).use { writer->
@@ -185,6 +186,10 @@ internal object ArchiveV2Local {
             for(row in side.map{it.row}.filter{it.kind=="voice"&&it.data["source"]==JsonPrimitive("dream_tide")}){
                 val cid=row.data.getValue("conversation_id").jsonPrimitive.content
                 dreamArchive.validateMediaOrigin(dreamByCid[cid]?:dreamArchive.export(cid),row.data,"voice")
+            }
+            for(row in rows.filter{it.module=="memory_pockets"&&(it.data["source_type"]==JsonPrimitive("dream_tide")||it.id.startsWith("pocket_dream_"))}){
+                val cid=row.data.getValue("conversation_id").jsonPrimitive.content
+                dreamArchive.validateCandidateOrigin(dreamByCid[cid]?:dreamArchive.export(cid),row.data)
             }
             val extras=ArchiveV2Knowledge.apply(rows,extra,target,write,parents?.first?:existing,parents?.second.orEmpty(),histories)
             val files=if("attachments" in selection)mapOf("attachments" to ArchiveV2Attachments.apply(attachments,target,histories,parents?.second.orEmpty(),write))else emptyMap()
