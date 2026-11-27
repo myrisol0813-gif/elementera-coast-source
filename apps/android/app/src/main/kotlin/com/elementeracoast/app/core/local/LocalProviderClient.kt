@@ -130,6 +130,12 @@ class LocalProviderClient(private val http: OkHttpClient = OkHttpClient.Builder(
         modelCatalog=ModelCatalog(p.id,p.baseUrl,now,fetched)
         return fetched
     }
+    internal suspend fun dreamVisionCapability(p:LocalProviderConfig,model:String):Boolean? {
+        val data=catalog(p)
+        val entry=(data?.get("data") as? JsonArray)?.mapNotNull{it as? JsonObject}?.firstOrNull{(it["id"] as? JsonPrimitive)?.contentOrNull==model}
+        val modalities=((entry?.get("architecture") as? JsonObject)?.get("input_modalities")?:entry?.get("input_modalities")) as? JsonArray
+        return modalities?.mapNotNull{(it as? JsonPrimitive)?.contentOrNull}?.takeIf{it.isNotEmpty()}?.contains("image")
+    }
     internal suspend fun inputBudget(p:LocalProviderConfig,model:String,requested:Int,output:Int,tools:Boolean):LocalInputBudget {
         val data=if(requested==0||LocalSoilPolicy.isOpenRouter(p))catalog(p) else modelCatalog?.takeIf{it.providerId==p.id&&it.baseUrl==p.baseUrl}?.body
         val entry=(data?.get("data") as? JsonArray)?.mapNotNull{it as? JsonObject}?.firstOrNull{(it["id"] as? JsonPrimitive)?.contentOrNull==model}
