@@ -24,9 +24,15 @@ const gradle=await readFile(new URL('../../android/app/build.gradle.kts',import.
 assert.match(gradle,/dependsOn\(prepareRestStudio\)/);
 assert.match(gradle,/art\/v1\/\*\*/);
 const native=await readFile(new URL('../../android/app/src/main/kotlin/com/elementeracoast/app/feature/daily/PetScreen.kt',import.meta.url),'utf8');
-assert.match(native,/rest-studio\.invalid/);
-assert.match(native,/shouldInterceptRequest/);
-assert.match(native,/settings\.allowFileAccess = false/);
+assert.doesNotMatch(native,/WebView|AndroidView|room-lab\.html|android\.webkit/);
+assert.match(native,/NativeRestScene\(/);
+assert.match(native,/SnowLetterSurface/);
+assert.match(native,/verticalScroll/);
+assert.match(gradle,/compileRestNativeSprites/);
+assert.doesNotMatch(gradle,/include\("room-lab\.html"/);
+const scene=await readFile(new URL('../../android/app/src/main/kotlin/com/elementeracoast/app/feature/daily/NativeRestScene.kt',import.meta.url),'utf8');
+assert.match(scene,/Canvas\(/);
+assert.match(scene,/catalogue\.hitTest/);
 assert.match(native,/ActivityResultContracts\.CreateDocument/);
 assert.match(native,/ActivityResultContracts\.OpenDocument/);
 console.log('rest studio offline asset and app entry contracts checked');
