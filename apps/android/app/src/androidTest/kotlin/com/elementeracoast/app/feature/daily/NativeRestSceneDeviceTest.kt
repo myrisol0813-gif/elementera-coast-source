@@ -141,4 +141,18 @@ class NativeRestSceneDeviceTest {
         assertTrue("$label silhouette IoU $silhouette",silhouette>=.85)
         assertTrue("$label mean RGB error $mean",mean<=30.0)
     }
+
+    @Test fun authoredFurnitureMotionChangesPixelsIndependently(){
+        val repo=RestArtRepository(context.assets)
+        val cat=NativeSceneCatalogue.load(repo)
+        val atlas=NativeRestSprites(context.assets)
+        val curtains=cat.assets.getValue("living-curtains")
+        val key=atlas.furnitureKey(curtains,NativePaintPart.WHOLE,emptyMap())
+        val motion=atlas.roomMotionKeys(cat.layers("living",cat.defaults("living"),emptyList()))
+        assertTrue("Original curtain should carry a motion track",key in motion)
+        val a=atlas.roomMotionFrame(key,0)
+        val b=atlas.roomMotionFrame(key,2700)
+        assertNotNull("First curtain frame",a);assertNotNull("Second curtain frame",b)
+        assertFalse("Curtain motion must change its own transparent pixels",a!!.sameAs(b))
+    }
 }
