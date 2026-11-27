@@ -16,7 +16,8 @@ internal class LocalDreamExecutor(
     private val workspaceActive:()->Boolean={true},
     private val web:LocalIndependentWeb?=null,
     private val captureReality:suspend (com.elementeracoast.app.core.model.ConversationContextSettings)->RemoteRealityContext={RemoteRealityContext()},
-    private val voice:LocalVoiceProvider?=null
+    private val voice:LocalVoiceProvider?=null,
+    private val imageProvider:((String)->LocalProviderConfig?)?=null
 ){
     private val ledger=LocalDreamLedger(store)
     private fun JsonObject.str(k:String)=(get(k) as? JsonPrimitive)?.contentOrNull.orEmpty()
@@ -133,7 +134,9 @@ internal class LocalDreamExecutor(
                         }
                     }
                     val commonNames=commonTools.map{it.getValue("function").jsonObject.str("name")}.toSet()
-                    val allowed=tools(c)+commonTools
+                    val selectedImage=RemoteCacheStore(store,strictReads=true).profile()?.currentImageModel.orEmpty()
+                    val dreamImage=if(e.allowImage&&imageProvider!=null&&RemoteCacheStore(store,strictReads=true).history(cid)?.contextSettings?.localModelWriteEnabled==true)LocalDreamImage(store,c,selectedImage,imageProvider).takeIf{it.configured()}else null
+                    val allowed=tools(c)+commonTools+listOfNotNull(dreamImage?.let{tool("image_generate","可选：生成并保存独立活动图像，使用已授权生图供应商额度。只发送必要提示，不返回像素。",mapOf("prompt" to "string"))})
                     for(step in 0..e.toolBudget){
                         ensureActive();permitted(c)
                         val exposed=if(calls>=e.toolBudget||step==e.toolBudget)emptyList()else allowed
@@ -188,6 +191,10 @@ internal class LocalDreamExecutor(
                                         name=="dream_schedule_extra"&&args?.keys==setOf("at")&&proposed==null->{
                                             val at=Instant.parse(args.str("at")).toEpochMilli()
                                             if(at>clock()){proposed=at;buildJsonObject{put("ok",true);put("status","proposed_pending_completion")}}else result
+                                        }
+                                        name=="image_generate"&&dreamImage!=null&&args!=null->{
+                                            val value=dreamImage.execute(c.id+":"+step+":"+index,args)
+                                            buildJsonObject{put("ok",true);put("record_id",value.getValue("id"));put("data",value)}
                                         }
                                         name in commonNames&&common!=null->{
                                             val out=common.execute(c.id+":"+step+":"+index,name,fn.str("arguments"))
