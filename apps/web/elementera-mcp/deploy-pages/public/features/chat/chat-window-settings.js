@@ -123,7 +123,7 @@ export function createChatWindowSettings({
           </section>
           <section class="window-context-card">
             <button class="window-context-link" type="button" data-action="chat:window-dream-tide" ${locked||activeConversation()?.room_type!=='main'?'disabled':''}>
-              <span><strong>梦醒潮</strong><small>仅本窗口 · 梦醒设置、小笺与潮痕</small></span><span>›</span>
+              <span><strong>自主唤醒</strong><small>仅本窗口 · 唤醒设置、自主手记与活动记录</small></span><span>›</span>
             </button>
           </section>
           <section class="window-context-card window-context-note">
