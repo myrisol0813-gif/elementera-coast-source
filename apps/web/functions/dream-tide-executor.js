@@ -161,6 +161,8 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
           await authorize();
           if(!await reserveDreamTool(db,claim,index,callIndex,name,clock()))throw new DOMException('Aborted','AbortError');
           calls++;
+          if(name==='voice_create')voiceAttempts++;
+          if(name==='image_generate')imageAttempts++;
           try{
             if(name==='dream_read_history'&&exact(a,['mode','start','count'])){
               result=await readDreamHistory(db,cid,{...a,since:context.previous?.started_at??null,until:now,maxTurns:e.readTurns});
@@ -171,15 +173,13 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
               const at=Date.parse(a.at);
               if(Number.isSafeInteger(at)&&at>clock()){extraAt=at;result={ok:true,status:'proposed_pending_completion'};}
               activities.push({kind:'extra_requested',ok:result.ok});
-            }else if(name==='image_generate'&&imageModel&&imageAttempts<e.imageLimit&&exact(a,['prompt'])){
-              imageAttempts++;
+            }else if(name==='image_generate'&&imageModel&&exact(a,['prompt'])){
               const value=await generateDreamImage(db,env,a,{...toolContext,autonomous_event:{step:index,index:callIndex}},{expectedModel:imageModel});
               result={ok:true,record_id:value.id,data:value};activities.push({kind:name,ok:true});
-            }else if(commonNames.has(name)&&a&&!(name==='voice_create'&&voiceAttempts>=e.voiceLimit)&&!(name==='library_write'&&a.action!=='create')&&!(name==='create_diary'&&('replace_id' in a||'conflict_mode' in a))){
+            }else if(commonNames.has(name)&&a&&!(name==='library_write'&&a.action!=='create')&&!(name==='create_diary'&&('replace_id' in a||'conflict_mode' in a))){
               // Recheck revision and current registry permission immediately
               // before dispatch; the registry still validates its own arguments.
               await authorize();
-              if(name==='voice_create')voiceAttempts++;
               const callId='dream:'+claim.claimId+':'+index+':'+callIndex;
               const value=await executeModelTool(db,{...call,id:callId},{...toolContext,tool_call_id:callId,autonomous_event:{step:index,index:callIndex}});
               if(name==='library_write'&&value?.note?.id)result.record_id=value.note.id;
