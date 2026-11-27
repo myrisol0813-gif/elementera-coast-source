@@ -61,4 +61,14 @@ class NativeStudioPolicyTest {
         assertThrows(IllegalArgumentException::class.java){svg.prepare(window,mapOf("bad-slot" to "#777777"),NativePaintPart.WHOLE)}
         assertEquals("#ffffff",NativeFurnitureSvg.shiftInk("#eeeeee","#000000","#ffffff"))
     }
+
+    @Test fun portableBackupIncludesRoomMotionAndOccupantPreferences(){
+        val original=policy.fresh()
+        val study=original.copy(room="study",pets=false,reducedMotion=true,
+            poseChoices=mapOf("study" to mapOf("model" to "none")))
+        assertEquals(policy.validate(study),policy.import(policy.export(study),original))
+        // Old room-only exports remain accepted without resetting the household.
+        val old=kotlinx.serialization.json.Json.encodeToString(NativeRoomLayout.serializer(),study.layout)
+        assertEquals(original.household,policy.import(old,original).household)
+    }
 }
