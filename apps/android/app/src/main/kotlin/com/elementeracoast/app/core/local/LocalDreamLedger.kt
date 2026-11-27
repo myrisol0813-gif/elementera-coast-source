@@ -136,6 +136,8 @@ internal class LocalDreamLedger(private val store:LocalPersistence){
         val e=requireNotNull(c.config.execution)
         if(!LocalDreamToolPolicy.allowed(c,name))return@mutate null
         val rows=h.rows("tools")
+        val mediaLimit=when(name){"voice_create"->e.voiceLimit;"image_generate"->e.imageLimit;else->e.toolBudget}
+        if(rows.count{it.str("claim_id")==c.id&&it.str("tool_name")==name}>=mediaLimit)return@mutate null
         if(rows.count{it.str("claim_id")==c.id}>=e.toolBudget||rows.any{it.str("claim_id")==c.id&&it.str("step_index")==step.toString()&&it.str("call_index")==index.toString()}||
             h.rows("steps").none{it.str("claim_id")==c.id&&it.str("step_index")==step.toString()&&it.str("status")=="completed"})return@mutate null
         val row=buildJsonObject{put("claim_id",c.id);put("step_index",step);put("call_index",index);put("tool_name",name);put("status","claimed");put("receipt_json",JsonNull);put("started_at",now);put("finished_at",JsonNull)}
