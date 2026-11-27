@@ -5,6 +5,11 @@ on:
     paths:
       - '.github/workflows/android-bundled-memory-inference.yml'
       - '**/core/local/**'
+      - '**/core/restbox/**'
+      - '**/feature/daily/NativeRest*.kt'
+      - '**/feature/daily/PetScreen.kt'
+      - '**/art-tools/**'
+      - '**/rest-box/art/**'
       - '**/app/build.gradle.kts'
       - '**/coast-embedding/**'
   workflow_dispatch:
@@ -82,4 +87,8 @@ jobs:
             result="$(adb shell am instrument -w -r -e class com.elementeracoast.app.core.local.BundledEmbeddingDeviceTest com.elementeracoast.source.test/androidx.test.runner.AndroidJUnitRunner)";
             printf '%s\n' "$result";
             printf '%s\n' "$result" | grep -F 'OK (2 tests)';
-            if printf '%s\n' "$result" | grep -E 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process crashed'; then exit 1; fi
+            if printf '%s\n' "$result" | grep -E 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process crashed'; then exit 1; fi;
+            scene="$(adb shell am instrument -w -r -e class com.elementeracoast.app.feature.daily.NativeRestSceneDeviceTest com.elementeracoast.source.test/androidx.test.runner.AndroidJUnitRunner)";
+            printf '%s\n' "$scene";
+            printf '%s\n' "$scene" | grep -F 'OK (2 tests)';
+            if printf '%s\n' "$scene" | grep -E 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process crashed'; then exit 1; fi
