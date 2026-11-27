@@ -34,7 +34,7 @@ object NativeWorkspace {
             localStore = store
             // Fresh process: no previous live coroutine can own these claims.
             RemoteCacheRecovery.recoverWakeClaims(store)
-            current = LocalCoastTransport(store,LocalIndependentWeb(context.applicationContext),LocalVoiceProvider(context.applicationContext)) { LocalProviderStore(context).catalog() }.also{transport->transport.imageConfig={selected->LocalProviderStore(context.applicationContext).resolveImageProvider(selected)};transport.dreamCanArm={selected->com.elementeracoast.app.BuildConfig.LOCAL_DREAM_EXECUTION_ENABLED&&LocalProviderStore(context.applicationContext).resolve(selected)!=null};transport.dreamChanged={LocalDreamWorker.sync(context.applicationContext)}}
+            current = LocalCoastTransport(store,LocalIndependentWeb(context.applicationContext),LocalVoiceProvider(context.applicationContext)) { LocalProviderStore(context).catalog() }.also{transport->transport.imageConfig={selected->LocalProviderStore(context.applicationContext).resolveImageProvider(selected)};transport.dreamCanArm={selected->com.elementeracoast.app.BuildConfig.LOCAL_DREAM_EXECUTION_ENABLED&&LocalProviderStore(context.applicationContext).resolve(selected)!=null};transport.dreamChanged={LocalDreamWorker.sync(context.applicationContext)};if(com.elementeracoast.app.BuildConfig.LOCAL_DREAM_PLAN_EXECUTION_ENABLED)transport.dreamPlan=com.elementeracoast.app.feature.chatgpt.NativeDreamPlanRoute(store,com.elementeracoast.app.feature.chatgpt.ChatGptPlanRepository(com.elementeracoast.app.feature.chatgpt.ChatGptSecureStore(context.applicationContext,true)))}
         } else {
             (localStore as? FileLocalPersistence)?.semanticIndex?.close()
             current = null
