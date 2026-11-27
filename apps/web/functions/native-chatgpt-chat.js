@@ -7,6 +7,7 @@ import { json, methodNotAllowed, readJson, sameOrigin } from './http.js';
 import { saveModelEcho } from './model-metadata-api.js';
 import { acquireReplyRun,reserveReplyStep,claimReplyStep,reserveReplyMedia,commitReplyStep,settleReplyRun,recoverStaleReplyRuns,canonicalReplyContext,isReplyRunActive,nativePlanRun,nativePlanClaim,reserveNativePlanTool,finishNativePlanTool,refreshReplyClaim } from './chat-reply-run.js';
 import { prepareReplyGroupDogtalk } from './dogtalk-store.js';
+import {acquireSingleChatRun,heartbeatSingleChatRun,releaseSingleChatRun,recoverSingleChatRuns,hasSingleChatClaim,isSingleChatRunActive} from './chat-single-run.js';
 
 const BODY_BYTES = 2 * 1024 * 1024;
 import { normalizeToolCallLimit } from './turn-tool-policy.js';
@@ -60,6 +61,36 @@ function acceptedModel(value) {
   if (!/^[a-z0-9][a-z0-9._-]{1,127}$/i.test(model)) throw new ChatStoreError('invalid_model', 'ChatGPT 套餐模型名称格式无效。', 400);
   return model;
 }
+// Older clients may prepare ordinary context only while dream execution is
+// disabled and no competing single request holds the window. They must
+// upgrade before the deployment may enable autonomous execution.
+async function assertNativeSingleClaim(env,cid,claimId){
+  const db=env.COAST_CHAT_DB;
+  if(claimId){
+    if(!await hasSingleChatClaim(db,cid,claimId)||!await heartbeatSingleChatRun(db,{conversationId:cid,claimId}))
+      throw new ChatStoreError('native_single_claim_lost','套餐普通聊天的执行预约已失效。',409);
+    return;
+  }
+  if(env.COAST_DREAM_TIDE_ENABLED==='true'||await isSingleChatRunActive(db,cid))
+    throw new ChatStoreError('native_single_claim_required','请更新客户端，或等待本窗口当前任务结束。',409);
+}
+export async function routeNativeSingleChatRun(request,env){
+  const invalid=assertRequest(request);if(invalid)return invalid;
+  const value=await readJson(request,16*1024),db=env.COAST_CHAT_DB,cid=sanitizeId(value.conversation_id||'','conversation');
+  await getConversation(db,cid);
+  if(value.action==='start'){
+    await recoverSingleChatRuns(db);
+    await recoverStaleReplyRuns(db,Date.now(),cid);
+    const claim=await acquireSingleChatRun(db,cid);
+    if(!claim)throw new ChatStoreError('window_execution_busy','窗口已有运行任务。',409);
+    return json({ok:true,claim_id:claim.claimId});
+  }
+  const claimId=sanitizeId(value.claim_id||'','claim');
+  const claim={conversationId:cid,claimId};
+  if(value.action==='heartbeat')return json({ok:await heartbeatSingleChatRun(db,claim)});
+  if(value.action==='release')return json({ok:await releaseSingleChatRun(db,claim)});
+  throw new ChatStoreError('native_single_action_invalid','无效的普通聊天执行操作。',400);
+}
 async function contextFromRequest(env, value, { preview = false, group = null } = {}) {
   const conversationId = sanitizeId(value.conversation_id || '', 'conversation');
   const turnId = sanitizeId(value.source_turn_id || '', 'turn');
@@ -67,6 +98,7 @@ async function contextFromRequest(env, value, { preview = false, group = null } 
   if (room.room_type === 'lighthouse') throw new ChatStoreError('lighthouse_generation_disabled', '灯塔不触发聊天模型。', 409);
   const history = await readConversationState(env.COAST_CHAT_DB, conversationId);
   assertConversationTurn(history, turnId);
+  if(!group)await assertNativeSingleClaim(env,conversationId,value.native_single_claim);
   if(!group&&await isReplyRunActive(env.COAST_CHAT_DB,conversationId))throw new ChatStoreError('reply_run_active','当前窗口正在连续回复。',409);
   const messages = group?canonicalReplyContext(history,group.identity,chatSettings(value.settings).recentTurns):parsedMessages(value);
   const suppliedText = messages.at(-1).content.trim();
