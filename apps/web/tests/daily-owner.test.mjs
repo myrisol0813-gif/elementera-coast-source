@@ -178,8 +178,9 @@ for (const name of ['moments', 'diary', 'pets', 'widgets']) {
 assert.deepEqual(router.opens.slice(-4).map((entry) => entry.name), ['moments', 'diary', 'daily-placeholder', 'daily-placeholder']);
 assert.equal(router.opens.at(-2).params.title, '宠物系统');
 const studio = router.renderers.get('daily-placeholder')({ title: '宠物系统' });
-assert.match(studio.body, /<iframe[^>]+src="\/public\/rest-box\/room-lab\.html"/);
-assert.doesNotMatch(router.renderers.get('daily-placeholder')({ title: '未来小组件' }).body, /<iframe/);
+assert.match(studio.body, /<coast-room-studio><\/coast-room-studio>/);
+assert.doesNotMatch(studio.body, /<iframe/);
+assert.doesNotMatch(router.renderers.get('daily-placeholder')({ title: '未来小组件' }).body, /<iframe|coast-room-studio/);
 assert.equal(router.opens.at(-1).params.title, '未来小组件');
 
 router.setCurrent({ name: 'outside-view' });
