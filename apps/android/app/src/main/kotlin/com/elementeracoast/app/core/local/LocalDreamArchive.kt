@@ -73,7 +73,8 @@ internal class LocalDreamArchive(private val store:LocalPersistence){
         if(!mediaId.startsWith(prefix)&&!(kind=="voice"&&row["source"]==JsonPrimitive("dream_tide")))return
         require(row["turn_id"]==JsonNull&&(if(kind=="voice")row["message_id"]==JsonNull&&row["source"]==JsonPrimitive("dream_tide") else row["kind"]==JsonPrimitive("image"))){"自主媒体来源无效。"}
         val name=if(kind=="voice")"voice_create" else "image_generate"
-        val event=archive?.rows("tools")?.firstOrNull{it.str("tool_name")==name&&mediaId==prefix+it.str("claim_id")+"_"+it.str("step_index")+"_"+it.str("call_index")}
+        val parent=requireNotNull(archive){"自主媒体所属活动缺失。"}
+        val event=parent.rows("tools").firstOrNull{it.str("tool_name")==name&&mediaId==prefix+it.str("claim_id")+"_"+it.str("step_index")+"_"+it.str("call_index")}
         require(event!=null&&archive.rows("runs").any{it.str("claim_id")==event.str("claim_id")&&it.str("conversation_id")==row.str("conversation_id")}){"自主媒体所属活动缺失。"}
         val recorded=event["receipt_json"]?.jsonPrimitive?.contentOrNull?.let{json.parseToJsonElement(it).jsonObject["record_id"]?.jsonPrimitive?.contentOrNull}
         require(recorded==null||recorded==mediaId){"自主媒体回执不一致。"}
