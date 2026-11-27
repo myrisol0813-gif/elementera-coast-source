@@ -79,11 +79,15 @@ export async function readDreamNotes(db,cid,limit=20,offset=0){
   for(const row of rows)row.replies=(await stmt(db,"SELECT id,body,created_at FROM dream_tide_replies WHERE conversation_id=? AND claim_id=? ORDER BY created_at,id",cid,row.claim_id).all()).results||[];
   return rows;
 }
-export async function readDreamActivity(db,cid,limit=20,offset=0){
+export async function readDreamActivity(db,cid,limit=20,offset=0,mediaId=null){
   await ensureChatSchema(db);
   const n=Math.min(100,Math.max(1,Math.trunc(Number(limit)||20)));
   const rows=(await stmt(db,`SELECT r.claim_id,r.kind,r.local_day,r.model_id,r.status,r.started_at,r.updated_at,r.result_json FROM dream_tide_runs r JOIN conversations c ON c.id=r.conversation_id
-    WHERE r.conversation_id=? AND c.user_id='owner' AND c.deleted_at IS NULL ORDER BY r.started_at DESC,r.claim_id LIMIT ? OFFSET ?`,cid,n,Math.max(0,Math.trunc(Number(offset)||0))).all()).results||[];
+    WHERE r.conversation_id=? AND c.user_id='owner' AND c.deleted_at IS NULL
+    AND (? IS NULL OR EXISTS(SELECT 1 FROM dream_tide_tool_events t WHERE t.claim_id=r.claim_id AND
+      ((t.tool_name='voice_create' AND ?='voice_dream_'||t.claim_id||'_'||t.step_index||'_'||t.call_index) OR
+       (t.tool_name='image_generate' AND ?='att_dream_'||t.claim_id||'_'||t.step_index||'_'||t.call_index))))
+    ORDER BY r.started_at DESC,r.claim_id LIMIT ? OFFSET ?`,cid,mediaId,mediaId,mediaId,n,Math.max(0,Math.trunc(Number(offset)||0))).all()).results||[];
   for(const row of rows){
     row.result=row.result_json?JSON.parse(row.result_json):null;delete row.result_json;
     row.tools=(await stmt(db,"SELECT step_index,call_index,tool_name,status,receipt_json,started_at,finished_at FROM dream_tide_tool_events WHERE claim_id=? ORDER BY step_index,call_index",row.claim_id).all()).results.map(s=>({...s,receipt:s.receipt_json?JSON.parse(s.receipt_json):null,receipt_json:undefined}));
