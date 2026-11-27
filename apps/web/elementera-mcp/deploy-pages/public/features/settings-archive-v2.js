@@ -1,6 +1,7 @@
 import { openArchiveV2 } from '../core/archive-v2-read.js';
 import { archiveV2Transport as api } from '../core/archive-v2-transport.js';
 import { escapeHtml } from '../core/dom.js';
+import {studioFromEnvelope,verifyStudio,restoreStudioArchive} from '../rest-box/studio-archive.mjs';
 import {decodeDeviceBasic,restoreDeviceBasic} from '../core/archive-v2-device-settings.js';
 const APP='com.elementeracoast.source';
 const line=(title,body)=>'<div class="feature-row static"><span><strong>'+escapeHtml(title)+'</strong><small>'+escapeHtml(body)+'</small></span></div>';
@@ -55,10 +56,10 @@ export function createV2Transfer({router,toast,chat,storage}){
       html+=line('归档来源',m.workspace+' · '+m.records.length+' 项记录')+
         m.modules.map(v=>line(labels[v.module]||v.module,v.count+' 项 · '+(v.coverage==='unavailable'?'未采集':'已列入清单'))).join('');
       html+=choices.map(r=>'<button class="feature-row" type="button" data-action="settings:transfer-v2-select" data-id="'+escapeHtml(r.key)+'" aria-pressed="'+(selected===r.key)+'" '+(busy||preview||result?'disabled':'')+'><span><strong>'+escapeHtml(r.title)+'</strong><small>'+escapeHtml(r.kind==='chat'?'聊天窗口':r.kind==='book'?'书房':labels[r.kind])+'</small></span></button>').join('');
-      const deviceChoice=choices.find(r=>r.key===selected)?.deviceBasic;
-      html+=line('恢复范围',deviceChoice?'只替换当前浏览器的基本设置，不上传云端；不会修改外观、账户或模型密钥。':'仅上传所选项目及其归档依赖；确认后才写入所选资料。');
+      const choice=choices.find(r=>r.key===selected),deviceChoice=choice?.deviceBasic||choice?.studio;
+      html+=line('恢复范围',choice?.studio?'只替换当前浏览器造物间，保留上一份存档，不上传云端。':deviceChoice?'只替换当前浏览器的基本设置，不上传云端；不会修改外观、账户或模型密钥。':'仅上传所选项目及其归档依赖；确认后才写入所选资料。');
       if(!choices.length)html+=line('目标暂不支持','请保留原始归档。');
-      if(preview||result){const p=result||preview;html+=line(result?'已恢复资料':'预览通过',p.scope==='device_basic'?'基本设置 '+p.count+' 项 · 仅当前浏览器':p.scope==='daily_group'?'评论 '+p.comments+' · 点赞 '+p.likes:p.scope==='portrait_group'?'候选 '+p.candidates+' · 历史 '+p.revisions:p.scope==='record_only'?'新增 '+p.ready+' · 已有 '+p.existing:p.scope==='book_only'?'章节 '+p.chapters+' · 批注 '+p.notes:'轮次 '+p.turns+' · 附件 '+p.attachments+' · 语音 '+p.voices+' · 思维壤 '+p.soils+' · 快照 '+p.snapshots);}
+      if(preview||result){const p=result||preview;html+=line(result?'已恢复资料':'预览通过',p.scope==='device_studio'?'造物间 · 仅当前浏览器 · 冲突 '+p.conflicts:p.scope==='device_basic'?'基本设置 '+p.count+' 项 · 仅当前浏览器':p.scope==='daily_group'?'评论 '+p.comments+' · 点赞 '+p.likes:p.scope==='portrait_group'?'候选 '+p.candidates+' · 历史 '+p.revisions:p.scope==='record_only'?'新增 '+p.ready+' · 已有 '+p.existing:p.scope==='book_only'?'章节 '+p.chapters+' · 批注 '+p.notes:'轮次 '+p.turns+' · 附件 '+p.attachments+' · 语音 '+p.voices+' · 思维壤 '+p.soils+' · 快照 '+p.snapshots);}
       if(!result)html+=action(preview?'commit':'preview',preview?'确认恢复所选资料':deviceChoice?'预览设备设置':'上传并预览',busy||!selected);
       if(preview&&!result)html+=action('back','返回选择',busy);
       if(result)html+=action('next','继续恢复其他资料',busy);
@@ -82,7 +83,10 @@ export function createV2Transfer({router,toast,chat,storage}){
             if(r.module==='appearance'){
               const d=objects.get(r.record_object);if(!d||d.size>1800000)throw Error('设备设置记录不完整');
               const raw=new Uint8Array(d.size);let at=0;for await(const b of data.objectChunks(d)){raw.set(b,at);at+=b.length;}
-              const deviceBasic=decodeDeviceBasic(r,JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw)));
+              const envelope=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw));
+              const studio=studioFromEnvelope(r,envelope);
+              if(studio!==null)options.push({key:'studio:'+r.id,kind:'appearance',id:r.id,title:'造物间（仅当前浏览器，单独确认）',studio:await verifyStudio(studio)});
+              const deviceBasic=decodeDeviceBasic(r,envelope);
               if(deviceBasic&&storage)options.push({key:'device:'+r.id,kind:'appearance',id:r.id,title:'当前浏览器基本设置（需单独确认）',deviceBasic});
               continue;
             }
@@ -113,7 +117,7 @@ export function createV2Transfer({router,toast,chat,storage}){
           }
         }
         if(token!==revision)return;
-        incoming=data;choices=options;selected=options.find(r=>!r.deviceBasic)?.key||'';
+        incoming=data;choices=options;selected=options.find(r=>!r.deviceBasic&&!r.studio)?.key||'';
         preview=null;result=null;uploaded=false;progress='原件校验完成';
       });
   }
@@ -125,6 +129,11 @@ export function createV2Transfer({router,toast,chat,storage}){
     if(name==='v2-clear')return operate(async()=>{await reset();});
     if(name==='v2-preview'&&incoming&&selected&&!result)return operate(async token=>{
       const choice=choices.find(r=>r.key===selected);if(!choice)throw Error('请选择资料');
+      if(choice.studio){
+        if(session)await api.cancelSession(session);
+        session=null;stagedChoice='';stagedManifest=null;uploaded=false;
+        preview=await restoreStudioArchive(choice.studio,false);return;
+      }
       if(choice.deviceBasic){
         if(session)await api.cancelSession(session);
         session=null;stagedChoice='';stagedManifest=null;uploaded=false;
@@ -149,8 +158,11 @@ export function createV2Transfer({router,toast,chat,storage}){
       if(token!==revision)return;
       preview=await (choice.kind==='book'?api.restoreBook(session,stagedManifest,choice.id,false):choice.kind==='chat'&&(!choice.local||choice.grouped)?api.restoreChat(session,stagedManifest,choice.id,false):api.restoreRecord(session,stagedManifest,choice.kind,choice.id,false));
     });
-    if(name==='v2-commit'&&preview&&!result&&(session||preview.scope==='device_basic'))return operate(async token=>{
+    if(name==='v2-commit'&&preview&&!result&&(session||['device_basic','device_studio'].includes(preview.scope)))return operate(async token=>{
       const choice=choices.find(r=>r.key===selected);if(!choice)throw Error('请选择资料');
+      if(choice.studio){
+        result=await restoreStudioArchive(choice.studio,true);toast('造物间已恢复到当前浏览器。');return;
+      }
       if(choice.deviceBasic){
         restoreDeviceBasic(storage,choice.deviceBasic);
         result={scope:'device_basic',count:Object.keys(choice.deviceBasic).length};toast('当前浏览器基本设置已恢复。');return;

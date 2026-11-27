@@ -116,6 +116,7 @@ const CORE = Object.freeze([
   // Independent bundled studio, including every original SVG and its manifests.
   '/public/rest-box/room-lab.html',
   '/public/rest-box/room-lab.mjs',
+  '/public/rest-box/studio-archive.mjs',
   '/public/rest-box/room-state.mjs',
   '/public/rest-box/room-renderer.mjs',
   '/public/rest-box/creature-state.mjs',

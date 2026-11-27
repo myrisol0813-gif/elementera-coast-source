@@ -89,10 +89,12 @@ export function createRoomRenderer(container,art){
   }
   async function render(layout,roomId,{occupants=[],selected=null,editing=false,household=null,reducedMotion=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches??false}={}){
     const token=++generation,r=cat.rooms[roomId];if(!r)throw Error('unknown room');
+    Object.assign(container.style,{position:'relative',aspectRatio:r.width+'/'+r.height,overflow:'hidden'});
     const {layers,unplaced}=sceneLayers(layout,cat,roomId,occupants);
     const pct=(x,y,w,h)=>[x*100/r.width,y*100/r.height,w*100/r.width,h*100/r.height];
     const bg=await paint({file:r.environment},{},'whole',reducedMotion);
-    const nodes=await Promise.all(layers.map(async l=>{
+    const failures=[];
+    const nodes=await Promise.all(layers.map(async l=>{try{
       if(l.kind==='creature'){
         const appearance=household?.[l.role]??newAppearance(art.appearance,l.creatureId);const body=Object.hasOwn(art.creatures,appearance.bodyId)?art.creatures[appearance.bodyId]:null;if(!body)return null;
         const [, , bw,bh]=body.viewBox.split(/\s+/).map(Number),h=55,w=h*bw/bh;
@@ -105,14 +107,14 @@ export function createRoomRenderer(container,art){
       }
       const {width,height}=assetSize(a),uri=await paint(a,i.colors,l.part,reducedMotion);
       return image(uri,...pct(i.x,i.y,width*i.scale,height*i.scale),{id:i.id,mirror:i.mirror,selectable:editing,selected:editing&&selected===i.id&&l.part!=='front',label:a.name});
-    }));
+    }catch(error){failures.push({layer:l,error});return null}}));
     const overlay=r.overlay?await paint({file:r.overlay},{},'whole',reducedMotion):null;
     if(token!==generation)return {stale:true};
     const frag=document.createDocumentFragment();frag.append(image(bg,0,0,100,100));
     for(const n of nodes)if(n)frag.append(n);
     if(overlay)frag.append(image(overlay,0,0,100,100));
     Object.assign(container.style,{position:'relative',aspectRatio:r.width+'/'+r.height,overflow:'hidden'});
-    container.replaceChildren(frag);return {unplaced};
+    container.replaceChildren(frag);return {unplaced,failures};
   }
   return {render,dispose(){generation++;cache.clear();container.replaceChildren()}};
 }

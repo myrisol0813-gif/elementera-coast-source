@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.Card
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.ButtonDefaults
+import com.elementeracoast.app.ui.theme.SnowLetterSurface
+import com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
@@ -278,18 +281,26 @@ fun MainShell(
                             )
                         }
                         if (canShowRelease) shownRelease?.let { release ->
-                            Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-                                Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-                                    Text("发现新版本 · ${release.version}", style = MaterialTheme.typography.titleSmall)
+                            SnowLetterSurface(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                                role = SnowLetterSurfaceRole.StatusCard,
+                                fallbackColor = MaterialTheme.colorScheme.surface,
+                                fallbackBorder = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .65f))
+                            ) {
+                                Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                                    Text("发现新版本 · ${release.version}", style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.onSurface)
                                     Text("可以现在查看，也可以稍后在「版本与更新」里安装。",
-                                        style = MaterialTheme.typography.bodySmall)
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End,
                                         verticalAlignment = Alignment.CenterVertically) {
-                                        TextButton(onClick = { shownRelease = null }) { Text("稍后") }
+                                        TextButton(onClick = { shownRelease = null },
+                                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)) { Text("稍后") }
                                         TextButton(onClick = {
                                             shownRelease = null
                                             navigateGuide("update")
-                                        }) { Text("查看更新") }
+                                        }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)) { Text("查看更新") }
                                     }
                                 }
                             }

@@ -18,7 +18,7 @@ export function parseDeviceBasic(value){
 }
 export function decodeDeviceBasic(record,envelope){
  if(record.module!=='appearance'||record.dependencies.length)return null;
- if(record.id===DEVICE_SETTINGS_ID&&envelope.kind==='device_basic_settings'&&!record.media_objects.length&&Object.keys(envelope.data||{}).join()==='basic_settings')return parseDeviceBasic(envelope.data.basic_settings);
+ if(record.id===DEVICE_SETTINGS_ID&&envelope.kind==='device_basic_settings'&&!record.media_objects.length&&Object.hasOwn(envelope.data||{},'basic_settings')&&Object.keys(envelope.data).every(k=>['basic_settings','rest_studio'].includes(k)))return parseDeviceBasic(envelope.data.basic_settings);
  if(record.id==='native-appearance'&&envelope.kind==='appearance'&&envelope.data?.basic_settings)return parseDeviceBasic(envelope.data.basic_settings);
  return null;
 }

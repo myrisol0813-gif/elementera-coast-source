@@ -34,7 +34,7 @@ function mountNeck(doc,body,def,appearance,action,accessories){
   if(cfg.kind==='bird'){parent=action==='sleep'?$('sleepBody'):$('standingBody');before=action==='sleep'?null:$('wingL');if(action==='sleep')anchor=cfg.sleepN}
   if(cfg.kind==='snake'&&action==='sleep'){parent=head;before=$('eyes');anchor=cfg.sleepN}
   if(!parent||!anchor)return;
-  const [x,y,w,sz]=anchor,attrs={fill:appearance.neckColor};
+  const [x,y,w,sz]=anchor,attrs={fill:appearance.neckColor,'data-coast-mount':'neck'};
   let markup=accessories.neck[appearance.neck];
   if(appearance.neck==='scarf'&&cfg.kind==='quad'&&def.hasBodyClip){markup=markup.quadClipped}
   else{attrs.transform='translate('+x+' '+y+') scale('+(sz||1)+')';if(appearance.neck==='scarf')markup='<path d="M'+(-w)+' -10Q0 4 '+w+' -10L'+w+' 7Q0 20 '+(-w)+' 7Z"/><path d="M8 7L26 8L22 38L4 35Z"/><path d="M'+(-w)+' -1Q0 13 '+w+' -1M6 29L23 32" fill="none" stroke="#fff8e8" stroke-width="3" opacity=".6"/>'}
@@ -53,7 +53,7 @@ function mountBadge(doc,body,appearance,action,badges){
   else if(cfg.kind==='snake'){parent=sleep?head:pet;before=sleep?$('eyes'):head;if(sleep)anchor=cfg.sleepB}
   else if(cfg.kind==='fish')before=$('fin');else before=$('hands');
   if(!parent||!anchor)return;const [x,y,sz]=anchor;
-  const g=group(doc,parent,before,{transform:'translate('+(x+appearance.badgeX)+' '+(y+appearance.badgeY)+') scale('+((sz||1)*appearance.badgeSize/100)+')'});
+  const g=group(doc,parent,before,{'data-coast-mount':'badge',transform:'translate('+(x+appearance.badgeX)+' '+(y+appearance.badgeY)+') scale('+((sz||1)*appearance.badgeSize/100)+')'});
   appendMarkup(doc,g,badgeShape(appearance.badge,appearance.badgeColor,appearance.badgeMode,Object.fromEntries(badges.items.map(b=>[b.id,b.path]))));
 }
 function mountProp(doc,body,action,prop,mount,source){
@@ -65,7 +65,7 @@ function mountProp(doc,body,action,prop,mount,source){
   else{parent=$('hands');[x,y]=mount.normal}
   if(!parent)return;
   const [gx,gy]=prop.grip,sz=mount.scale;
-  const g=group(doc,parent,null,{transform:'translate('+x+' '+y+') scale('+sz+') translate('+(-gx)+' '+(-gy)+')'});
+  const g=group(doc,parent,null,{'data-coast-mount':'prop',transform:'translate('+x+' '+y+') scale('+sz+') translate('+(-gx)+' '+(-gy)+')'});
   const parsed=new DOMParser().parseFromString(source,'image/svg+xml');
   if(parsed.documentElement.localName!=='svg'||parsed.querySelector('parsererror,script,foreignObject'))throw Error('invalid bundled prop');
   for(const n of [...parsed.documentElement.querySelectorAll('*')])for(const a of [...n.attributes])if(/^on/i.test(a.name)||((a.localName==='href'||a.localName==='src')&&!a.value.startsWith('#')))throw Error('invalid prop reference');
@@ -93,7 +93,7 @@ export function creatureSvg(source,body,defs,accessories,input,action='idle',{re
   }
   if(!appearance.hat&&$('hat'))$('hat').style.setProperty('display','none','important');
   if(appearance.glasses!=='none'){
-    const parent=$(cfg.head);if(parent){const g=group(doc,parent,$('hat'),{transform:'translate('+cfg.x+' '+cfg.y+') scale('+(cfg.gs||1)+')',color:appearance.glassesColor,stroke:appearance.glassesColor,'stroke-width':2.7,'stroke-linecap':'round',fill:'none'});appendMarkup(doc,g,accessories.glasses[appearance.glasses])}
+    const parent=$(cfg.head);if(parent){const g=group(doc,parent,$('hat'),{'data-coast-mount':'glasses',transform:'translate('+cfg.x+' '+cfg.y+') scale('+(cfg.gs||1)+')',color:appearance.glassesColor,stroke:appearance.glassesColor,'stroke-width':2.7,'stroke-linecap':'round',fill:'none'});appendMarkup(doc,g,accessories.glasses[appearance.glasses])}
   }
   mountNeck(doc,body,def,appearance,action,accessories);mountBadge(doc,body,appearance,action,badges);
   if(prop&&mount&&propSource)mountProp(doc,body,action,prop,mount,propSource);

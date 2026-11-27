@@ -1,3 +1,4 @@
+import '../rest-box/room-lab.mjs';
 import { escapeHtml } from '../core/dom.js';
 import { icon } from '../core/icons.js';
 import { createDailyClient } from './daily-client.js';
@@ -172,7 +173,7 @@ export function createDaily({ storage, router, toast, chat }) {
   function placeholderView({ title = '未上线' } = {}) {
     if (title === '宠物系统') return {
       title: '休憩箱', subtitle: '造物间', className: 'daily-panel',
-      body: '<iframe title="休憩箱造物间" src="/public/rest-box/room-lab.html" sandbox="allow-scripts allow-same-origin allow-downloads allow-modals" style="display:block;width:100%;height:78dvh;min-height:300px;border:0;border-radius:12px"></iframe>',
+      body: '<coast-room-studio></coast-room-studio>',
     };
     return {
       title,

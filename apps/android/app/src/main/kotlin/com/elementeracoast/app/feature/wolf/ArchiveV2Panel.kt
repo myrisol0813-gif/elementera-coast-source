@@ -19,7 +19,7 @@ import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-private val v2Labels=mapOf("chat" to "聊天","calendar" to "日历","daily" to "日常","model_profile" to "模型资料","attachments" to "附件","voice" to "语音","thinking_soil" to "思维壤","thinking_soil_history" to "思维壤历史","dogtalk_records" to "私人草稿","dogtalk_snapshots" to "历史快照","memory_entries" to "记忆","memory_pockets" to "候选","user_portrait" to "用户画像","self_portrait" to "自我画像","worldbook" to "世界书","custom_instructions" to "自定义","vault" to "拾潮","library" to "书房","appearance" to "设备外观与基本设置","tools" to "工具")
+private val v2Labels=mapOf("chat" to "聊天","calendar" to "日历","daily" to "日常","model_profile" to "模型资料","attachments" to "附件","voice" to "语音","thinking_soil" to "思维壤","thinking_soil_history" to "思维壤历史","dogtalk_records" to "私人草稿","dogtalk_snapshots" to "历史快照","memory_entries" to "记忆","memory_pockets" to "候选","user_portrait" to "用户画像","self_portrait" to "自我画像","worldbook" to "世界书","custom_instructions" to "自定义","vault" to "拾潮","library" to "书房","appearance" to "设备外观与基本设置","device_studio" to "造物间","tools" to "工具")
 @Composable
 internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchiveRepository,localMode:Boolean,allowed:Boolean,onSnackbar:(String)->Unit,htmlBusy:Boolean,onExportHtml:()->Unit){
     val context=LocalContext.current;val scope=rememberCoroutineScope()
@@ -29,6 +29,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchive
     var pendingFile by remember { mutableStateOf<File?>(null) }
     var incoming by remember { mutableStateOf<ArchiveV2Operations.Imported?>(null) }
     var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var studioAvailable by remember { mutableStateOf(false) }
     var choices by remember { mutableStateOf<List<ArchiveV2Operations.Choice>>(emptyList()) }
     var chosen by remember { mutableStateOf<ArchiveV2Operations.Choice?>(null) }
     var session by remember { mutableStateOf<String?>(null) }
@@ -61,6 +62,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchive
                 if(!isZip){legacyUri=uri;return@launch}
                 val input=operations.open(uri)
                 choices=operations.cloudChoices(input);chosen=choices.firstOrNull()
+                studioAvailable=operations.studioChoice(input)
                 incoming=input;selected=operations.localModules(input.manifest)-"appearance"
                 session=null;stagedChoice=null;uploaded=false;preview=null;committed=false;failure=""
             }catch(e:CancellationException){throw e}catch(e:Exception){onSnackbar("无法读取 V2 ZIP：格式、空间或完整性校验失败。")}
@@ -112,8 +114,12 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchive
                 input.manifest.modules.forEach { m->
                     val label=v2Labels[m.module]?:m.module
                     if(m.module in available) Row(verticalAlignment=Alignment.CenterVertically){
-                        Checkbox(m.module in selected,enabled=!busy&&preview==null,onCheckedChange={selected=if(it)selected+m.module else selected-m.module});Text("$label · "+m.count)
+                        Checkbox(m.module in selected,enabled=!busy&&preview==null,onCheckedChange={selected=if(it)(selected-"device_studio")+m.module else selected-m.module});Text("$label · "+m.count)
                     } else Text("$label · "+m.count+" · "+if(m.coverage=="unavailable")"未采集" else if(m.module=="chat"&&choices.any { it.kind=="chat" })"可逐窗口恢复" else if(m.module=="library"&&choices.any { it.kind=="book" })"可逐本恢复" else if(choices.any { it.kind==m.module })"可逐项恢复" else "本次不恢复")
+                }
+                if(localMode&&studioAvailable)Row(verticalAlignment=Alignment.CenterVertically){
+                    Checkbox("device_studio" in selected,enabled=!busy&&preview==null,onCheckedChange={selected=if(it)setOf("device_studio")else emptySet()})
+                    Text("造物间 · 独立恢复到当前设备")
                 }
                 if(!localMode&&choices.isNotEmpty()) {
                     Text("选择一项资料：云端资料仅上传所选项目及其归档依赖；设备基本设置只写本机。")
@@ -123,7 +129,8 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchive
                 }
                 preview?.let { p->
                     Text(if(committed)"已确认写入；请重新打开海岸刷新资料及外观。" else "预检通过。只写入所选记录；外观为明确选择后的设置替换，其他记录不覆盖。")
-                    if(localMode)p.forEach { (k,v)->if(v is JsonObject){
+                    if(p["scope"]?.jsonPrimitive?.contentOrNull=="device_studio")Text("只替换当前设备的造物间布局、形象及预览设置，保留上一份原生存档；不上传。")
+                    else if(localMode)p.forEach { (k,v)->if(v is JsonObject){
                         Text((v2Labels[k]?:k)+" · 新增 "+v["ready"]+" · 已有 "+v["existing"]+" · 冲突 "+v["conflicts"])
                         v["archived_only"]?.let{Text("其中 "+it+" 条旧快照仅保留历史原件，不重新关联消息或注入上下文。")}
                     } }
@@ -145,10 +152,12 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchive
                 scope.launch{
                     try{
                         val confirm=preview!=null
-                        if(localMode)preview=operations.localRestore(input,selected,confirm)
+                        if(localMode)preview=if(selected==setOf("device_studio"))operations.restoreStudio(input,confirm)else operations.localRestore(input,selected,confirm)
                         else {
                             val choice=requireNotNull(chosen)
-                            if(choice.kind=="appearance"){
+                            if(choice.kind=="device_studio"){
+                                preview=operations.restoreStudio(input,confirm)
+                            }else if(choice.kind=="appearance"){
                                 preview=operations.restoreDeviceBasic(input,confirm)
                             }else{
                             if(session!=null&&stagedChoice!=choice){
@@ -170,7 +179,7 @@ internal fun ArchiveV2Panel(operations:ArchiveV2Operations,archive:GlobalArchive
                     }catch(e:CancellationException){throw e}catch(e:Exception){failure="操作未完成："+(e.message?.take(160)?:"资料校验或写入失败。")}
                     finally{busy=false}
                 }
-            }){Text(if(committed)"关闭并清理暂存" else if(preview!=null)"确认恢复" else if(localMode||chosen?.kind=="appearance")"预览" else "上传并预览")}
+            }){Text(if(committed)"关闭并清理暂存" else if(preview!=null)"确认恢复" else if(localMode||chosen?.kind in setOf("appearance","device_studio"))"预览" else "上传并预览")}
         },
         dismissButton={if(committed&&!localMode)TextButton(enabled=!busy,onClick={choices=choices.filter { it!=chosen };chosen=choices.firstOrNull();committed=false;preview=null;failure=""}){Text("继续恢复其他资料")} else if(!committed)TextButton(enabled=!busy,onClick={if(preview!=null){preview=null;failure=""}else dismiss()}){Text(if(preview!=null)"返回选择" else "取消并清理")}}
     )
