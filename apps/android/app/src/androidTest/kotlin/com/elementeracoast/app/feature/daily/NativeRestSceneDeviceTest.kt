@@ -126,7 +126,11 @@ class NativeRestSceneDeviceTest {
         val repo=RestArtRepository(context.assets)
         val cat=NativeSceneCatalogue.load(repo)
         val atlas=NativeRestSprites(context.assets)
+        val smoke=NativeSvgRaster.renderChecked("""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#cc8844"/></svg>""",20,20)
+        assertEquals(0xffcc8844.toInt(),smoke.getPixel(10,10));smoke.recycle()
         val window=cat.assets.getValue("living-window")
+        val prepared=NativeFurnitureSvg(repo).prepare(window,mapOf("wood" to "#7389b0"),NativePaintPart.WHOLE)
+        val direct=NativeSvgRaster.renderChecked(prepared,kotlin.math.ceil(window.width*2).toInt(),kotlin.math.ceil(window.height*2).toInt());direct.recycle()
         val base=atlas.get(atlas.furnitureKey(window,NativePaintPart.WHOLE,emptyMap()))!!
         val color=atlas.get(atlas.furnitureKey(window,NativePaintPart.WHOLE,mapOf("wood" to "#7389b0")))
         assertNotNull("Native free recolor must render, not fall back",color)
