@@ -128,7 +128,7 @@ internal class LocalDreamLedger(private val store:LocalPersistence){
     }
     fun reserveTool(c:Claim,step:Int,index:Int,name:String,now:Long)=mutate(c){h->
         val e=requireNotNull(c.config.execution)
-        if(!when(name){"dream_read_history"->e.readHistory;"dream_write_note"->e.writeNote;"dream_schedule_extra"->c.config.allowExtra&&e.extraPerDay>0;else->false})return@mutate null
+        if(!LocalDreamToolPolicy.allowed(c,name))return@mutate null
         val rows=h.rows("tools")
         if(rows.count{it.str("claim_id")==c.id}>=e.toolBudget||rows.any{it.str("claim_id")==c.id&&it.str("step_index")==step.toString()&&it.str("call_index")==index.toString()}||
             h.rows("steps").none{it.str("claim_id")==c.id&&it.str("step_index")==step.toString()&&it.str("status")=="completed"})return@mutate null
