@@ -133,7 +133,7 @@ internal class LocalCalendarStore(private val persistence: LocalPersistence) {
                     val item = row[field] ?: continue
                     // Independent model activity has a real window and tool claim, but no chat turn.
                     if (field == "source_turn_id" && item == JsonNull) {
-                        require(row["source"] == JsonPrimitive("chat_tool") &&
+                        require(row["source"] in setOf(JsonPrimitive("chat_tool"), JsonPrimitive("coast_chat")) &&
                             row["tool_call_id"]?.jsonPrimitive?.contentOrNull.orEmpty().startsWith("dream:"))
                         continue
                     }
