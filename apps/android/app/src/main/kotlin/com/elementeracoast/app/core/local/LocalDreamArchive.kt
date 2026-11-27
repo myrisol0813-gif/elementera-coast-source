@@ -86,9 +86,13 @@ internal class LocalDreamArchive(private val store:LocalPersistence){
         val page=all.drop(offset).take(20).map{n->JsonObject(n+("replies" to JsonArray(h.rows("replies").filter{it.str("claim_id")==n.str("claim_id")})))}
         return buildJsonObject{put("ok",true);put("items",JsonArray(page));put("nextOffset",if(offset+page.size<all.size)JsonPrimitive(offset+page.size)else JsonNull)}
     }
-    fun activity(cid:String,offset:Int):JsonObject{
+    fun activity(cid:String,offset:Int,mediaId:String?=null):JsonObject{
         val h=history(cid)
-        val all=h.rows("runs").sortedByDescending{it.getValue("started_at").jsonPrimitive.long}
+        val all=h.rows("runs").filter{run->mediaId==null||h.rows("tools").any{t->t.str("claim_id")==run.str("claim_id")&&when(t.str("tool_name")){
+            "voice_create"->mediaId=="voice_dream_"+t.str("claim_id")+"_"+t.str("step_index")+"_"+t.str("call_index")
+            "image_generate"->mediaId=="att_dream_"+t.str("claim_id")+"_"+t.str("step_index")+"_"+t.str("call_index")
+            else->false
+        }}}.sortedWith(compareByDescending<JsonObject>{it.getValue("started_at").jsonPrimitive.long}.thenBy{it.str("claim_id")})
         val page=all.drop(offset).take(20).map{r->
             val claim=r.str("claim_id")
             JsonObject(receipt(r,"result_json","result")+mapOf(
