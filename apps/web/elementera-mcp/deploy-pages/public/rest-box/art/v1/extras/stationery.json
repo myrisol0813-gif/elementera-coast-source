@@ -1,0 +1,183 @@
+{
+  "version": 1,
+  "source": "Owner-recovered SVG source, approved brush-free pencilcup revision; exact archive ad18990d381bc7fd972d691d7790db4226db2c2a",
+  "assets": [
+    {
+      "id": "extra-gramophone",
+      "name": "铜花留声机",
+      "file": "assets/extra-gramophone.svg",
+      "viewBox": [
+        0,
+        0,
+        180,
+        155
+      ],
+      "colorSlots": {
+        "primary": {
+          "base": "#c3a471",
+          "light": "#ddc69c",
+          "dark": "#9f8760"
+        }
+      },
+      "anchors": [],
+      "hasFront": false,
+      "provisional": false,
+      "sourceBlob": "4cb9a150fac5b503b7b40777eec37b9339155c06"
+    },
+    {
+      "id": "extra-laptop",
+      "name": "贝壳便携电脑",
+      "file": "assets/extra-laptop.svg",
+      "viewBox": [
+        0,
+        0,
+        180,
+        155
+      ],
+      "colorSlots": {
+        "primary": {
+          "base": "#e1ceb0",
+          "light": "#eeddbf",
+          "dark": "#b3a48b"
+        }
+      },
+      "anchors": [],
+      "hasFront": false,
+      "provisional": false,
+      "sourceBlob": "426da046c09ae8d2c11d11c426231453b3e36a5f"
+    },
+    {
+      "id": "extra-computer",
+      "name": "小小台式电脑",
+      "file": "assets/extra-computer.svg",
+      "viewBox": [
+        0,
+        0,
+        180,
+        155
+      ],
+      "colorSlots": {
+        "primary": {
+          "base": "#e1ceb0",
+          "light": "#eeddbf",
+          "dark": "#b3a48b"
+        }
+      },
+      "anchors": [],
+      "hasFront": false,
+      "provisional": false,
+      "sourceBlob": "0c9e043a1ed2df1d93c2abe908de2dbc89f93afd"
+    },
+    {
+      "id": "extra-pen",
+      "name": "钢笔与墨水",
+      "file": "assets/extra-pen.svg",
+      "viewBox": [
+        0,
+        0,
+        180,
+        155
+      ],
+      "colorSlots": {
+        "primary": {
+          "base": "#829e97",
+          "light": "#b9c3b1",
+          "dark": "#72837a"
+        }
+      },
+      "anchors": [],
+      "hasFront": false,
+      "provisional": false,
+      "sourceBlob": "0d8e52245bd7c7814936ed650df6a97cf690fc04"
+    },
+    {
+      "id": "extra-pencilcup",
+      "name": "花枝笔筒",
+      "file": "assets/extra-pencilcup.svg",
+      "viewBox": [
+        0,
+        0,
+        180,
+        155
+      ],
+      "colorSlots": {
+        "primary": {
+          "base": "#bca47a",
+          "light": "#d9c6a1",
+          "dark": "#9a8766"
+        }
+      },
+      "anchors": [],
+      "hasFront": false,
+      "provisional": false,
+      "sourceBlob": "06db8e42651ced99b4ad6abdbfa0c5e842baa17a"
+    },
+    {
+      "id": "extra-notebook",
+      "name": "皮面旅行手记",
+      "file": "assets/extra-notebook.svg",
+      "viewBox": [
+        0,
+        0,
+        180,
+        155
+      ],
+      "colorSlots": {
+        "primary": {
+          "base": "#a5ad89",
+          "light": "#cdcba9",
+          "dark": "#8a8d71"
+        }
+      },
+      "anchors": [],
+      "hasFront": false,
+      "provisional": false,
+      "sourceBlob": "b76cad3e8d9b2f869748f43ae774a5113466d596"
+    },
+    {
+      "id": "extra-typewriter",
+      "name": "奶油打字机",
+      "file": "assets/extra-typewriter.svg",
+      "viewBox": [
+        0,
+        0,
+        180,
+        155
+      ],
+      "colorSlots": {
+        "primary": {
+          "base": "#9bb1a3",
+          "light": "#c7cdb8",
+          "dark": "#839082"
+        }
+      },
+      "anchors": [],
+      "hasFront": false,
+      "provisional": false,
+      "sourceBlob": "8ec6f5033096c594211abc862e5ca488f238c241"
+    },
+    {
+      "id": "extra-radio",
+      "name": "床头小收音机",
+      "file": "assets/extra-radio.svg",
+      "viewBox": [
+        0,
+        0,
+        180,
+        155
+      ],
+      "colorSlots": {
+        "primary": {
+          "base": "#c5a67c",
+          "light": "#dfc7a2",
+          "dark": "#a08968"
+        }
+      },
+      "anchors": [],
+      "hasFront": false,
+      "provisional": false,
+      "sourceBlob": "bf1a35d65cd2d6a9cae99a1d8dbe1b766218541d"
+    }
+  ],
+  "notes": "Original SVG payload; visual alignment and interaction anchors still pending. No default placement."
+}

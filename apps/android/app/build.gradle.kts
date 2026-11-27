@@ -170,3 +170,18 @@ android.sourceSets.getByName("main").assets.srcDir(coastEmbeddingAssets)
 tasks.matching { it.name in setOf("preBuild", "preDebugBuild", "preReleaseBuild") }.configureEach {
     dependsOn(prepareCoastEmbedding)
 }
+
+ // One canonical art/editor source; no duplicate handwritten Android SVG assets.
+val restStudioAssets = layout.buildDirectory.dir("generated/rest-studio-assets")
+val prepareRestStudio by tasks.registering(Sync::class) {
+    from(rootProject.file("../web/elementera-mcp/deploy-pages/public/rest-box")) {
+        include("room-lab.html", "room-lab.mjs", "room-state.mjs", "room-renderer.mjs",
+            "creature-state.mjs", "creature-renderer.mjs", "creature-editor.mjs", "art/v1/**")
+        into("rest-box")
+    }
+    into(restStudioAssets)
+}
+android.sourceSets.getByName("main").assets.srcDir(restStudioAssets)
+tasks.matching { it.name in setOf("preBuild", "preDebugBuild", "preReleaseBuild") }.configureEach {
+    dependsOn(prepareRestStudio)
+}

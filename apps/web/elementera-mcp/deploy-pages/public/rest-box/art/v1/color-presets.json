@@ -1,0 +1,1377 @@
+{
+  "version": 1,
+  "assets": {
+    "bedroom-slippers": {
+      "slots": {
+        "upper": {
+          "base": "#c18e89",
+          "members": [
+            "#c18e89"
+          ],
+          "label": "鞋面"
+        },
+        "sole": {
+          "base": "#d4b89d",
+          "members": [
+            "#d4b89d"
+          ],
+          "label": "鞋底"
+        },
+        "lining": {
+          "base": "#f2dbc0",
+          "label": "内衬",
+          "members": [
+            "#f2dbc0"
+          ]
+        }
+      },
+      "presets": [
+        {
+          "id": "original",
+          "name": "原色",
+          "values": {
+            "upper": "#c18e89",
+            "sole": "#d4b89d"
+          }
+        },
+        {
+          "id": "apricot",
+          "name": "杏黄",
+          "values": {
+            "upper": "#d7b166",
+            "sole": "#d4b89d"
+          }
+        }
+      ]
+    },
+    "living-window": {
+      "slots": {
+        "wood": {
+          "label": "窗框",
+          "base": "#aa8252",
+          "members": [
+            "#aa8252",
+            "#b28b60",
+            "#8d6b47",
+            "#9d744b"
+          ]
+        },
+        "sky": {
+          "label": "窗外光",
+          "base": "#f5e4c1",
+          "members": [
+            "#f5e4c1",
+            "#f3dca0",
+            "#fbefda",
+            "#e4e3c9",
+            "#f9f2dc",
+            "#e9d4ad"
+          ]
+        },
+        "sea": {
+          "label": "海景",
+          "base": "#8da9a0",
+          "members": [
+            "#8da9a0",
+            "#6d989a",
+            "#82aaa5"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "living-curtains": {
+      "slots": {
+        "cloth": {
+          "label": "布面",
+          "base": "#ead4ae",
+          "members": [
+            "#bf9f78",
+            "#c59f7a",
+            "#f6e8cb",
+            "#b89b75"
+          ],
+          "patterns": {
+            "curtaincloth": [
+              "#ead4ae"
+            ]
+          }
+        },
+        "ties": {
+          "label": "系带",
+          "base": "#c8896b",
+          "members": [
+            "#c8896b"
+          ]
+        },
+        "flowers": {
+          "label": "花纹",
+          "base": "#c77e72",
+          "members": [],
+          "patterns": {
+            "curtaincloth": [
+              "#c77e72"
+            ]
+          }
+        },
+        "leaves": {
+          "label": "叶纹",
+          "base": "#9ba17a",
+          "members": [],
+          "patterns": {
+            "curtaincloth": [
+              "#9ba17a",
+              "#c7ad7b"
+            ]
+          }
+        }
+      },
+      "presets": [
+        {
+          "id": "sage",
+          "name": "浅绿",
+          "values": {
+            "cloth": "#b7c2a8",
+            "flowers": "#c88f88"
+          }
+        }
+      ]
+    },
+    "living-chime": {
+      "slots": {
+        "wood": {
+          "label": "挂杆",
+          "base": "#a88c67",
+          "members": [
+            "#a88c67",
+            "#ba986a",
+            "#af9f84"
+          ]
+        },
+        "glass": {
+          "label": "海玻璃",
+          "base": "#8fb7ae",
+          "members": [
+            "#8fb7ae",
+            "#dbe9d7"
+          ]
+        },
+        "gold": {
+          "label": "暖色玻璃",
+          "base": "#d6b575",
+          "members": [
+            "#d6b575",
+            "#f1deb1"
+          ]
+        },
+        "lilac": {
+          "label": "紫色玻璃",
+          "base": "#b1abc9",
+          "members": [
+            "#b1abc9",
+            "#ece3ed"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "living-picture": {
+      "slots": {
+        "frame": {
+          "label": "画框",
+          "base": "#a67a48",
+          "members": [
+            "#a67a48"
+          ]
+        },
+        "paper": {
+          "label": "画纸",
+          "base": "#f4e6c6",
+          "members": [
+            "#f4e6c6"
+          ]
+        },
+        "forest": {
+          "label": "山林",
+          "base": "#a2aa7a",
+          "members": [
+            "#a2aa7a",
+            "#73875d",
+            "#536c4e"
+          ]
+        },
+        "sun": {
+          "label": "日光",
+          "base": "#d9af66",
+          "members": [
+            "#d9af66"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "living-bookcase": {
+      "slots": {
+        "wood": {
+          "label": "柜体",
+          "base": "#795332",
+          "members": [
+            "#795332",
+            "#bb9364",
+            "#765134",
+            "#b88a5c",
+            "#8b623e",
+            "#795130"
+          ]
+        },
+        "books": {
+          "label": "书脊",
+          "base": "#c38b78",
+          "members": [
+            "#c38b78",
+            "#b3b98b",
+            "#e1c47e",
+            "#89a6a8",
+            "#e5d8b5",
+            "#c28b80",
+            "#d7ac79"
+          ]
+        },
+        "paper": {
+          "label": "书页",
+          "base": "#f4dfba",
+          "members": [
+            "#f4dfba",
+            "#c9aa73",
+            "#f4e4bc",
+            "#d9b97d",
+            "#c3bda0",
+            "#e3d9b6"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "living-vase": {
+      "slots": {
+        "ceramic": {
+          "label": "瓶身",
+          "base": "#b7c6bd",
+          "members": [
+            "#b7c6bd",
+            "#ecedda"
+          ]
+        },
+        "leaves": {
+          "label": "枝叶",
+          "base": "#7c9569",
+          "members": [
+            "#7c9569",
+            "#96a673"
+          ]
+        },
+        "flowers": {
+          "label": "花朵",
+          "base": "#d59782",
+          "members": [
+            "#d59782",
+            "#e0b25b",
+            "#d8a3a0",
+            "#e9d6a3"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "living-lamp": {
+      "slots": {
+        "wood": {
+          "label": "灯架",
+          "base": "#9d774c",
+          "members": [
+            "#9d774c",
+            "#927044"
+          ]
+        },
+        "shade": {
+          "label": "灯罩",
+          "base": "#e7c684",
+          "members": [
+            "#e7c684",
+            "#c39b5c",
+            "#f5deb0"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "living-sofa": {
+      "slots": {
+        "cloth": {
+          "label": "沙发布",
+          "base": "#83935c",
+          "members": [
+            "#86965e",
+            "#a1ae76",
+            "#788a51",
+            "#7d8f57",
+            "#83945b",
+            "#c0c78f"
+          ],
+          "patterns": {
+            "flowercloth": [
+              "#83935c",
+              "#b6bd83"
+            ]
+          }
+        },
+        "flowers": {
+          "label": "碎花",
+          "base": "#e9dbb0",
+          "members": [],
+          "patterns": {
+            "flowercloth": [
+              "#e9dbb0",
+              "#d9a15c",
+              "#d1cb92"
+            ]
+          }
+        },
+        "wood": {
+          "label": "木脚",
+          "base": "#795338",
+          "members": [
+            "#795338"
+          ]
+        },
+        "cushion": {
+          "label": "格纹抱枕",
+          "base": "#f6e4b3",
+          "members": [
+            "#f6e4b3"
+          ],
+          "patterns": {
+            "check": [
+              "#d7a34d",
+              "#f5e6b0",
+              "#fff5d0",
+              "#f6d385"
+            ]
+          }
+        },
+        "flower-pillow": {
+          "label": "花形抱枕",
+          "base": "#d8a099",
+          "members": [
+            "#d8a099",
+            "#eed3a3"
+          ]
+        }
+      },
+      "presets": [
+        {
+          "id": "blue",
+          "name": "雾蓝",
+          "values": {
+            "cloth": "#859bad",
+            "flowers": "#e9dbb0"
+          }
+        },
+        {
+          "id": "rose",
+          "name": "旧玫瑰",
+          "values": {
+            "cloth": "#b58e91",
+            "flowers": "#eadac6"
+          }
+        }
+      ]
+    },
+    "living-rug": {
+      "slots": {
+        "cloth": {
+          "label": "毯面",
+          "base": "#b5c1a2",
+          "members": [
+            "#91a38a",
+            "#a9b798"
+          ],
+          "patterns": {
+            "rug": [
+              "#b5c1a2",
+              "#d7dbc0"
+            ]
+          }
+        },
+        "trim": {
+          "label": "织纹",
+          "base": "#f3e4bd",
+          "members": [
+            "#f3e4bd",
+            "#cd9f86"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "living-table": {
+      "slots": {
+        "wood": {
+          "label": "桌身",
+          "base": "#986e46",
+          "members": [
+            "#986e46",
+            "#ac8054",
+            "#dfc698",
+            "#bc9766"
+          ]
+        },
+        "cloth": {
+          "label": "桌布",
+          "base": "#f2e5c8",
+          "members": [
+            "#f2e5c8",
+            "#d9a05a",
+            "#b77d44"
+          ]
+        },
+        "ceramic": {
+          "label": "茶具",
+          "base": "#8ca9b0",
+          "members": [
+            "#8ca9b0",
+            "#9db7bb",
+            "#a9c0bf",
+            "#e7e3cd"
+          ]
+        },
+        "book": {
+          "label": "桌上小物",
+          "base": "#966847",
+          "members": [
+            "#966847",
+            "#ede6c9",
+            "#f5edd5",
+            "#bda88a"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "living-plant": {
+      "slots": {
+        "leaves": {
+          "label": "绿叶",
+          "base": "#758458",
+          "members": [
+            "#758458",
+            "#82945d",
+            "#bac390",
+            "#9ba66f",
+            "#6b8656"
+          ]
+        },
+        "pot": {
+          "label": "花盆",
+          "base": "#c59663",
+          "members": [
+            "#c59663",
+            "#dfb57d",
+            "#e5bf88"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "living-nest": {
+      "slots": {
+        "basket": {
+          "label": "藤编",
+          "base": "#aa814f",
+          "members": [
+            "#aa814f",
+            "#d5b279",
+            "#876b4c",
+            "#e4c68f",
+            "#b78f59",
+            "#d9ba83",
+            "#94754c",
+            "#d9b781",
+            "#ebce98"
+          ],
+          "patterns": {
+            "basket": [
+              "#b58d55",
+              "#e0c28b",
+              "#947349"
+            ]
+          }
+        },
+        "cushion": {
+          "label": "软垫",
+          "base": "#c9ac92",
+          "members": [
+            "#c9ac92",
+            "#e7d1b9",
+            "#f8e8d0"
+          ]
+        },
+        "blanket": {
+          "label": "毯角",
+          "base": "#a0b7b4",
+          "members": [
+            "#a0b7b4",
+            "#dce3d7"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "living-books": {
+      "slots": {
+        "cover": {
+          "label": "书封",
+          "base": "#ac7669",
+          "members": [
+            "#ac7669",
+            "#819e91",
+            "#d2a45f"
+          ]
+        },
+        "paper": {
+          "label": "书页",
+          "base": "#e8d9b5",
+          "members": [
+            "#e8d9b5",
+            "#eddec1",
+            "#f2e2ba"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "study-bookcase": {
+      "slots": {
+        "wood": {
+          "label": "柜体",
+          "base": "#9e7959",
+          "members": [
+            "#9e7959",
+            "#805d46",
+            "#bc956a",
+            "#765b49",
+            "#bd956c",
+            "#b28960",
+            "#896247"
+          ]
+        },
+        "books": {
+          "label": "书脊",
+          "base": "#a9b29a",
+          "members": [
+            "#a9b29a",
+            "#d3b47d",
+            "#ba8a80",
+            "#8caaa9",
+            "#b49872",
+            "#a8b4a3",
+            "#a2b2b1",
+            "#d5b68b",
+            "#b7b9a3",
+            "#d5b38c"
+          ]
+        },
+        "paper": {
+          "label": "书页",
+          "base": "#d4c7a7",
+          "members": [
+            "#d4c7a7",
+            "#e9d8bc",
+            "#eee0c0",
+            "#e6d7b8",
+            "#e1d5b6"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "study-globe": {
+      "slots": {
+        "stand": {
+          "label": "支架",
+          "base": "#a08b62",
+          "members": [
+            "#a08b62",
+            "#ae8c5d",
+            "#ad8c5b"
+          ]
+        },
+        "sea": {
+          "label": "海洋",
+          "base": "#91acac",
+          "members": [
+            "#91acac"
+          ]
+        },
+        "land": {
+          "label": "陆地",
+          "base": "#c1c2a0",
+          "members": [
+            "#c1c2a0",
+            "#d2d8c4"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "study-window": {
+      "slots": {
+        "wood": {
+          "label": "窗框",
+          "base": "#ad9873",
+          "members": [
+            "#ad9873",
+            "#b49a73"
+          ]
+        },
+        "sky": {
+          "label": "天光",
+          "base": "#e8d9b8",
+          "members": [
+            "#e8d9b8",
+            "#f4e0a7",
+            "#e9e7cb",
+            "#eadbbb"
+          ]
+        },
+        "view": {
+          "label": "窗景",
+          "base": "#8ca9a4",
+          "members": [
+            "#8ca9a4",
+            "#8fb0ae"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "study-curtain": {
+      "slots": {
+        "rod": {
+          "label": "挂杆",
+          "base": "#8d7658",
+          "members": [
+            "#8d7658",
+            "#a28a63",
+            "#be9b69"
+          ]
+        },
+        "cloth": {
+          "label": "布面",
+          "base": "#8ea99a",
+          "members": [
+            "#8ea99a",
+            "#c1c9a7",
+            "#b7c3a1",
+            "#b5c3a7"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "study-picture": {
+      "slots": {
+        "frame": {
+          "label": "画框",
+          "base": "#ae8e65",
+          "members": [
+            "#ae8e65"
+          ]
+        },
+        "paper": {
+          "label": "画纸",
+          "base": "#ebdec0",
+          "members": [
+            "#ebdec0"
+          ]
+        },
+        "leaves": {
+          "label": "标本",
+          "base": "#94a087",
+          "members": [
+            "#94a087",
+            "#879675"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "study-clock": {
+      "slots": {
+        "wood": {
+          "label": "钟框",
+          "base": "#a2825b",
+          "members": [
+            "#a2825b",
+            "#c0a17a",
+            "#9b896b",
+            "#967b58"
+          ]
+        },
+        "dial": {
+          "label": "钟面",
+          "base": "#f1e5cb",
+          "members": [
+            "#f1e5cb"
+          ]
+        },
+        "metal": {
+          "label": "装饰",
+          "base": "#d4b67c",
+          "members": [
+            "#d4b67c",
+            "#dcc18a"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "study-rug": {
+      "slots": {
+        "cloth": {
+          "label": "毯面",
+          "base": "#a3ad88",
+          "members": [
+            "#a3ad88",
+            "#a7b69b",
+            "#b2bb96"
+          ]
+        },
+        "trim": {
+          "label": "织纹",
+          "base": "#d2c5a0",
+          "members": [
+            "#d2c5a0",
+            "#dcd4b1"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "study-desk": {
+      "slots": {
+        "wood": {
+          "label": "木材",
+          "base": "#9b6f50",
+          "members": [
+            "#9b6f50",
+            "#ac8260",
+            "#ad805c",
+            "#b88c63",
+            "#a77c56",
+            "#d9b87e",
+            "#c09a70",
+            "#dfb98d",
+            "#956d50"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "study-lamp": {
+      "slots": {
+        "metal": {
+          "label": "灯架",
+          "base": "#a38a62",
+          "members": [
+            "#a38a62",
+            "#c1a270",
+            "#ae8e5e"
+          ]
+        },
+        "shade": {
+          "label": "灯罩",
+          "base": "#74978e",
+          "members": [
+            "#74978e",
+            "#aac0ad",
+            "#bfd0b6"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "study-open-book": {
+      "slots": {
+        "cover": {
+          "label": "封面",
+          "base": "#9e8668",
+          "members": [
+            "#9e8668",
+            "#b78678"
+          ]
+        },
+        "paper": {
+          "label": "书页",
+          "base": "#f0e4c9",
+          "members": [
+            "#f0e4c9",
+            "#c3b394"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "study-ink": {
+      "slots": {
+        "glass": {
+          "label": "墨水瓶",
+          "base": "#819e9d",
+          "members": [
+            "#819e9d",
+            "#557c7e",
+            "#557571"
+          ]
+        },
+        "metal": {
+          "label": "笔与瓶盖",
+          "base": "#b8a37b",
+          "members": [
+            "#b8a37b",
+            "#c5a576"
+          ]
+        },
+        "label": {
+          "label": "标签",
+          "base": "#e0d4b6",
+          "members": [
+            "#e0d4b6"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "study-cup": {
+      "slots": {
+        "ceramic": {
+          "label": "杯身",
+          "base": "#8ba7a6",
+          "members": [
+            "#8ba7a6",
+            "#a1bcb7",
+            "#b1c6bf"
+          ]
+        },
+        "saucer": {
+          "label": "茶碟",
+          "base": "#f2e3c9",
+          "members": [
+            "#f2e3c9",
+            "#b9aa91"
+          ]
+        },
+        "tea": {
+          "label": "茶水",
+          "base": "#95694c",
+          "members": [
+            "#95694c"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "study-chair": {
+      "slots": {
+        "wood": {
+          "label": "椅架",
+          "base": "#94674c",
+          "members": [
+            "#94674c",
+            "#9e7654",
+            "#a07855",
+            "#d0aa7f"
+          ]
+        },
+        "cloth": {
+          "label": "软背",
+          "base": "#c0c8a4",
+          "members": [
+            "#c0c8a4",
+            "#6e9384",
+            "#a5b99f",
+            "#c1c9a9"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "study-cushion": {
+      "slots": {
+        "cloth": {
+          "label": "坐垫",
+          "base": "#b28672",
+          "members": [
+            "#b28672",
+            "#d5ae91",
+            "#e0c3a0",
+            "#f1d8ae",
+            "#c49c7b"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "study-plant": {
+      "slots": {
+        "pot": {
+          "label": "花盆",
+          "base": "#b89c70",
+          "members": [
+            "#b89c70",
+            "#d3b68a",
+            "#e5c79a"
+          ]
+        },
+        "leaves": {
+          "label": "叶片",
+          "base": "#718d6e",
+          "members": [
+            "#718d6e",
+            "#8ba17c",
+            "#a5b28a",
+            "#789873",
+            "#c1c89e"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "study-scrolls": {
+      "slots": {
+        "paper": {
+          "label": "卷纸",
+          "base": "#e2cfa9",
+          "members": [
+            "#e2cfa9",
+            "#b7aa8c",
+            "#efdbb6"
+          ]
+        },
+        "ties": {
+          "label": "系绳",
+          "base": "#c3a47c",
+          "members": [
+            "#c3a47c"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "bedroom-picture": {
+      "slots": {
+        "frame": {
+          "label": "画框",
+          "base": "#a28160",
+          "members": [
+            "#a28160",
+            "#e7d8bd",
+            "#c9a77d"
+          ]
+        },
+        "sky": {
+          "label": "夜空",
+          "base": "#9299af",
+          "members": [
+            "#9299af",
+            "#707f98"
+          ]
+        },
+        "stars": {
+          "label": "月光",
+          "base": "#f2deb0",
+          "members": [
+            "#f2deb0",
+            "#e4d7b6",
+            "#f1e4c9"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "bedroom-mobile": {
+      "slots": {
+        "wood": {
+          "label": "挂架",
+          "base": "#b09a75",
+          "members": [
+            "#b09a75",
+            "#b99d76",
+            "#b8a88e"
+          ]
+        },
+        "gold": {
+          "label": "星月",
+          "base": "#d5b578",
+          "members": [
+            "#d5b578"
+          ]
+        },
+        "ornaments": {
+          "label": "挂饰",
+          "base": "#b3a9c1",
+          "members": [
+            "#b3a9c1",
+            "#b2c0b5"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "bedroom-window": {
+      "slots": {
+        "wood": {
+          "label": "窗框",
+          "base": "#a78a64",
+          "members": [
+            "#a78a64",
+            "#b49870",
+            "#947653",
+            "#a98a61"
+          ]
+        },
+        "sky": {
+          "label": "夜色",
+          "base": "#a1a4b9",
+          "members": [
+            "#a1a4b9",
+            "#8b9fac"
+          ]
+        },
+        "light": {
+          "label": "月光",
+          "base": "#e8d5b1",
+          "members": [
+            "#e8d5b1",
+            "#f5e1b3",
+            "#e9dec9",
+            "#f3e5ce",
+            "#ecdab6"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "bedroom-curtains": {
+      "slots": {
+        "cloth": {
+          "label": "布面",
+          "base": "#ead2a3",
+          "members": [
+            "#bca073",
+            "#d4ba8c"
+          ],
+          "patterns": {
+            "stars": [
+              "#ead2a3"
+            ]
+          }
+        },
+        "stars": {
+          "label": "星纹",
+          "base": "#b58e60",
+          "members": [],
+          "patterns": {
+            "stars": [
+              "#b58e60",
+              "#c5a479"
+            ]
+          }
+        },
+        "ties": {
+          "label": "系带",
+          "base": "#bb8579",
+          "members": [
+            "#bb8579"
+          ]
+        }
+      },
+      "presets": [
+        {
+          "id": "moon",
+          "name": "月雾",
+          "values": {
+            "cloth": "#c1c5d7",
+            "stars": "#a5a2b3"
+          }
+        }
+      ]
+    },
+    "bedroom-chest": {
+      "slots": {
+        "wood": {
+          "label": "柜体",
+          "base": "#b28b70",
+          "members": [
+            "#b28b70",
+            "#987052",
+            "#c69d78",
+            "#be9978",
+            "#9b7358",
+            "#967052"
+          ]
+        },
+        "metal": {
+          "label": "拉手",
+          "base": "#e4ca9e",
+          "members": [
+            "#e4ca9e",
+            "#e3b994"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "bedroom-lamp": {
+      "slots": {
+        "ceramic": {
+          "label": "瓷座",
+          "base": "#a0a3ba",
+          "members": [
+            "#a0a3ba",
+            "#d8d8de"
+          ]
+        },
+        "shade": {
+          "label": "灯罩",
+          "base": "#dfbc88",
+          "members": [
+            "#dfbc88",
+            "#ba9a6a",
+            "#f2d8aa",
+            "#efd7ac"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "bedroom-books": {
+      "slots": {
+        "cover": {
+          "label": "书封",
+          "base": "#999fb6",
+          "members": [
+            "#999fb6",
+            "#bc8c80"
+          ]
+        },
+        "paper": {
+          "label": "书页",
+          "base": "#e8dac3",
+          "members": [
+            "#e8dac3",
+            "#f2dfc3"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "bedroom-rug": {
+      "slots": {
+        "cloth": {
+          "label": "毯面",
+          "base": "#969eb8",
+          "members": [
+            "#8b95ae",
+            "#a9afbe"
+          ],
+          "patterns": {
+            "rug": [
+              "#969eb8"
+            ]
+          }
+        },
+        "trim": {
+          "label": "织纹",
+          "base": "#ded2bf",
+          "members": [
+            "#ded2bf"
+          ],
+          "patterns": {
+            "rug": [
+              "#d3d0d8"
+            ]
+          }
+        }
+      },
+      "presets": [
+        {
+          "id": "sage",
+          "name": "苔绿",
+          "values": {
+            "cloth": "#a0b39b"
+          }
+        },
+        {
+          "id": "rose",
+          "name": "旧玫瑰",
+          "values": {
+            "cloth": "#c5a2ae"
+          }
+        }
+      ]
+    },
+    "bedroom-bed": {
+      "slots": {
+        "wood": {
+          "label": "床架",
+          "base": "#b38365",
+          "members": [
+            "#855b43",
+            "#95694e",
+            "#b38365",
+            "#d0a783",
+            "#c39470",
+            "#986b4d",
+            "#b38862",
+            "#987054",
+            "#a67b59",
+            "#c59b72",
+            "#9b6d50",
+            "#b58967",
+            "#d4ad87",
+            "#c89973",
+            "#946345",
+            "#b3835e"
+          ]
+        },
+        "mattress": {
+          "label": "床垫",
+          "base": "#dacbb1",
+          "members": [
+            "#dacbb1",
+            "#f3ead6",
+            "#e3d5bd",
+            "#cdbfa5"
+          ]
+        },
+        "pillow-left": {
+          "label": "左枕",
+          "base": "#ded4bd",
+          "members": [
+            "#ded4bd",
+            "#faf1dd",
+            "#d7c9b0"
+          ]
+        },
+        "pillow-right": {
+          "label": "右枕",
+          "base": "#979bb3",
+          "members": [
+            "#979bb3",
+            "#c3c1cf",
+            "#e3dcdf"
+          ]
+        },
+        "blanket": {
+          "label": "被面",
+          "base": "#dca9a0",
+          "members": [
+            "#dca9a0",
+            "#b67e79",
+            "#cb958d",
+            "#ae7974",
+            "#d09a92",
+            "#b47b72"
+          ]
+        },
+        "check": {
+          "label": "格纹",
+          "base": "#f0dcc0",
+          "members": [
+            "#f0dcc0",
+            "#f9e2c7",
+            "#efd0b6",
+            "#f0d5b8"
+          ]
+        }
+      },
+      "presets": [
+        {
+          "id": "moss",
+          "name": "苔绿",
+          "values": {
+            "blanket": "#a4b29a",
+            "check": "#e5dec4"
+          }
+        },
+        {
+          "id": "sea",
+          "name": "雾蓝",
+          "values": {
+            "blanket": "#95a8bc",
+            "check": "#e7e3d5"
+          }
+        }
+      ]
+    },
+    "bedroom-nest": {
+      "slots": {
+        "basket": {
+          "label": "藤编",
+          "base": "#b89568",
+          "members": [
+            "#b89568",
+            "#a2835e",
+            "#debc8a"
+          ],
+          "patterns": {
+            "basket": [
+              "#b58d55",
+              "#e0c28b",
+              "#947349"
+            ]
+          }
+        },
+        "cushion": {
+          "label": "软垫",
+          "base": "#e4c9b2",
+          "members": [
+            "#e4c9b2",
+            "#f5e1c7"
+          ]
+        },
+        "blanket": {
+          "label": "毯角",
+          "base": "#a3a5be",
+          "members": [
+            "#a3a5be",
+            "#e0d7da"
+          ]
+        }
+      },
+      "presets": []
+    },
+    "bedroom-plant": {
+      "slots": {
+        "leaves": {
+          "label": "叶片",
+          "base": "#819071",
+          "members": [
+            "#819071",
+            "#98a588"
+          ]
+        },
+        "pot": {
+          "label": "花盆",
+          "base": "#bb937a",
+          "members": [
+            "#bb937a",
+            "#d6b29a"
+          ]
+        }
+      },
+      "presets": []
+    }
+  },
+  "notes": "Authored per-asset coordinated color groups. Original geometry unchanged. Body and referenced pattern colors only; shadows and unrelated filters stay unchanged. Provisional groups need visual review."
+}

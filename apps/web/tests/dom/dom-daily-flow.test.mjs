@@ -124,12 +124,14 @@ export async function runDailyFlow() {
       && !document.querySelector('#overlayRoot').textContent.includes('第一条统一服务器碳硅圈'), 'confirmed Daily moment delete');
     assert.equal(dailyLoadRequests, momentLoadsBeforeDelete, 'moment delete must not immediately re-fetch Daily');
 
-    for (const [action, title] of [['pets', '宠物系统'], ['widgets', '未来小组件']]) {
+    for (const [action, title] of [['pets', '休憩箱'], ['widgets', '未来小组件']]) {
       document.querySelector('[data-action="daily:home"]').click();
       await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'daily-home', `Daily home before ${action}`);
       document.querySelector(`[data-action="daily:${action}"]`).click();
       await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'daily-placeholder'
-        && document.querySelector('#overlayRoot').textContent.includes(title), `${title} placeholder`);
+        && document.querySelector('#overlayRoot').textContent.includes(title), `${title} destination`);
+      const studio = document.querySelector('#overlayRoot iframe[src="/public/rest-box/room-lab.html"]');
+      assert.equal(Boolean(studio), action === 'pets', 'only the rest-box entry mounts the editor');
     }
     document.querySelector('[data-action="daily:home"]').click();
     await waitFor(() => document.querySelector('#overlayRoot')?.dataset.route === 'daily-home', 'Daily home after placeholders');

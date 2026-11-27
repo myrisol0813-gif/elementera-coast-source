@@ -1,0 +1,299 @@
+{
+  "version": 1,
+  "id": "bedroom",
+  "width": 420,
+  "height": 390,
+  "environment": "rooms/bedroom-environment.svg",
+  "overlay": null,
+  "order": [
+    "bedroom-picture",
+    "bedroom-mobile",
+    "bedroom-window",
+    "bedroom-curtains",
+    "bedroom-chest",
+    "bedroom-lamp",
+    "bedroom-books",
+    "bedroom-rug",
+    "bedroom-bed",
+    "bedroom-nest",
+    "bedroom-slippers",
+    "bedroom-plant"
+  ],
+  "assets": [
+    {
+      "id": "bedroom-picture",
+      "name": "夜航挂画",
+      "box": [
+        57,
+        25,
+        86,
+        90
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/bedroom-picture.svg",
+      "defaultPlacement": {
+        "x": 57,
+        "y": 25,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "bedroom"
+    },
+    {
+      "id": "bedroom-mobile",
+      "name": "星月吊饰",
+      "box": [
+        160,
+        5,
+        66,
+        88
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/bedroom-mobile.svg",
+      "defaultPlacement": {
+        "x": 160,
+        "y": 5,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "bedroom"
+    },
+    {
+      "id": "bedroom-window",
+      "name": "夜航方窗",
+      "box": [
+        227,
+        8,
+        176,
+        143
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/bedroom-window.svg",
+      "defaultPlacement": {
+        "x": 227,
+        "y": 8,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "bedroom"
+    },
+    {
+      "id": "bedroom-curtains",
+      "name": "杏黄星纹窗帘",
+      "box": [
+        224,
+        10,
+        182,
+        158
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/bedroom-curtains.svg",
+      "defaultPlacement": {
+        "x": 224,
+        "y": 10,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "bedroom"
+    },
+    {
+      "id": "bedroom-chest",
+      "name": "圆弧双屉柜",
+      "box": [
+        263,
+        168,
+        139,
+        122
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/bedroom-chest.svg",
+      "defaultPlacement": {
+        "x": 263,
+        "y": 168,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "bedroom"
+    },
+    {
+      "id": "bedroom-lamp",
+      "name": "紫蓝瓷座台灯",
+      "box": [
+        271,
+        73,
+        132,
+        140
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/bedroom-lamp.svg",
+      "defaultPlacement": {
+        "x": 271,
+        "y": 73,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "bedroom"
+    },
+    {
+      "id": "bedroom-books",
+      "name": "枕边旧书",
+      "box": [
+        275,
+        153,
+        55,
+        37
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/bedroom-books.svg",
+      "defaultPlacement": {
+        "x": 275,
+        "y": 153,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "bedroom"
+    },
+    {
+      "id": "bedroom-rug",
+      "name": "紫蓝编织地毯",
+      "box": [
+        15,
+        252,
+        384,
+        133
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/bedroom-rug.svg",
+      "defaultPlacement": {
+        "x": 15,
+        "y": 252,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "bedroom"
+    },
+    {
+      "id": "bedroom-bed",
+      "name": "旧玫瑰双人木床",
+      "box": [
+        11,
+        96,
+        281,
+        260
+      ],
+      "anchors": [
+        {
+          "id": "sleep-left",
+          "x": 121,
+          "y": 136,
+          "action": "sleep",
+          "provisional": true
+        },
+        {
+          "id": "sleep-right",
+          "x": 175,
+          "y": 119,
+          "action": "sleep",
+          "provisional": true
+        }
+      ],
+      "hasFront": true,
+      "file": "assets/bedroom-bed.svg",
+      "defaultPlacement": {
+        "x": 3,
+        "y": 106,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "bedroom"
+    },
+    {
+      "id": "bedroom-nest",
+      "name": "紫蓝毯角藤窝",
+      "box": [
+        258,
+        287,
+        143,
+        89
+      ],
+      "anchors": [
+        {
+          "id": "nest",
+          "x": 73,
+          "y": 25,
+          "action": "sleep",
+          "provisional": true
+        }
+      ],
+      "hasFront": true,
+      "file": "assets/bedroom-nest.svg",
+      "defaultPlacement": {
+        "x": 258,
+        "y": 287,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "bedroom"
+    },
+    {
+      "id": "bedroom-slippers",
+      "name": "一双软拖鞋",
+      "box": [
+        177,
+        328,
+        75,
+        46
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/bedroom-slippers.svg",
+      "defaultPlacement": {
+        "x": 177,
+        "y": 328,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "bedroom"
+    },
+    {
+      "id": "bedroom-plant",
+      "name": "床边小盆栽",
+      "box": [
+        360,
+        217,
+        60,
+        86
+      ],
+      "anchors": [],
+      "hasFront": false,
+      "file": "assets/bedroom-plant.svg",
+      "defaultPlacement": {
+        "x": 360,
+        "y": 217,
+        "scale": 1,
+        "mirror": false,
+        "visible": true
+      },
+      "room": "bedroom"
+    }
+  ]
+}
