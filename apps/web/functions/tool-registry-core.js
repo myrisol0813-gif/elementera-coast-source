@@ -561,6 +561,7 @@ function allowed(definition, context = {}) {
   if (visitor && !definition.visitor_allowed) return false;
   if (!visitor && definition.owner_only === false && definition.scope === 'visitor') return false;
   if (!roomAllowsTool(access, definition.tool_key)) return false;
+  if(context.autonomous_activity===true&&(!definition.model_tool||!context.autonomous_tool_names?.includes(definition.model_tool.function.name)))return false;
   if (typeof definition.turn_gate === 'function' && !definition.turn_gate(context)) return false;
   const scopes = authScopeSet(authScope);
   if (scopes && definition.auth_scopes?.some((scope) => !scopes.has(scope))) return false;
@@ -612,7 +613,9 @@ export async function executeRegisteredTool(db, toolKey, input, context = {}) {
   if (!allowed(definition, context)) throw new ToolRegistryError('tool_forbidden', '当前房间或权限无法使用这件工具。', 403);
   if (definition.requires_confirmation && context.confirmed_by_owner !== true && context.surface !== 'official_mcp') throw new ToolRegistryError('tool_confirmation_required', '这个操作需要屋主明确确认。', 409);
   let runId = null;
-  try { runId = await startToolRun(db, definition, input, context); } catch (error) { safeLogError('tool-run-log:start', error, { operation: definition.tool_key }); }
+  // Autonomous executor owns its own content-redacted durable receipt; never
+  // duplicate private arguments/outputs into ordinary tool-run logs.
+  try { if(context.autonomous_activity!==true)runId = await startToolRun(db, definition, input, context); } catch (error) { safeLogError('tool-run-log:start', error, { operation: definition.tool_key }); }
   try {
     const output = await definition.handler(db, input, context);
     if (typeof context.on_tool_used === 'function') context.on_tool_used(definition.display_name);
