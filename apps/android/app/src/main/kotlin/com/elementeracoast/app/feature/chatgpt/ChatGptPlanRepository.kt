@@ -43,8 +43,11 @@ class ChatGptPlanRepository(
     private val http: OkHttpClient = OkHttpClient()
 ) {
     private val json = Json { ignoreUnknownKeys = true }
-    private val mutex = Mutex()
+    // Sign-in and refresh for the same protected session must not race even across repositories.
+    private val mutex = sessionMutex
+    private companion object { val sessionMutex=Mutex() }
     @Volatile private var latestModels = emptyList<ChatGptAccountModel>()
+    @Volatile private var catalogIdentity:Pair<String,String>?=null
 
     fun reasoningEffortsFor(slug: String): List<String> =
         latestModels.firstOrNull { it.slug == slug }?.reasoningEfforts.orEmpty()
@@ -62,7 +65,8 @@ class ChatGptPlanRepository(
      * have been read on this repository; credential refresh cannot change identity. */
     internal suspend fun accessTokenForDream(grant:NativeDreamPlanProtocol.Grant,window:String,revision:String,modelId:String):String=mutex.withLock{
         withContext(Dispatchers.IO){
-            val advertised=latestModels.map{it.slug}.toSet()
+            val current=currentAccount()
+            val advertised=if(current!=null&&catalogIdentity==(current.subject to current.clientId))latestModels.map{it.slug}.toSet()else emptySet()
             if(!NativeDreamPlanProtocol.permitted(grant,window,revision,currentAccount(),modelId,advertised))
                 throw NativeDreamPlanFailure("plan_authorization_unavailable")
             val account=activeCredentials()
@@ -155,7 +159,9 @@ class ChatGptPlanRepository(
     }
 
     suspend fun models(): List<ChatGptAccountModel> = mutex.withLock {
-        val access = withContext(Dispatchers.IO) { activeCredentials().accessToken }
+        catalogIdentity=null
+        val credentials = withContext(Dispatchers.IO) { activeCredentials() }
+        val access=credentials.accessToken
         withContext(Dispatchers.IO) {
             val request = Request.Builder()
                 .url("https://api.openai.com/v1/models")
@@ -174,6 +180,7 @@ class ChatGptPlanRepository(
                 )
             }
             latestModels = models
+            catalogIdentity=credentials.subject to credentials.clientId
             models
         }
     }
