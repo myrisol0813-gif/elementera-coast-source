@@ -183,7 +183,7 @@ internal fun WindowContextSheet(
             }
 
             SoftSettingsCard {
-                SettingSwitchRow(title="真实连续回复（实验）",note=when{
+                SettingSwitchRow(title="真实连续回复",note=when{
                     roomType !in setOf("main","radio")->"当前窗口不执行连续回复。"
                     localMode->"模型可主动追加独立回复。套餐 token 为软预算，单次可能超额；未报告用量则停止追加。"
                     selectedModel.startsWith("chatgpt-plan:")->"在线套餐需已更新服务端；token 为软预算，单次可能超额，缺失用量则停止。"
