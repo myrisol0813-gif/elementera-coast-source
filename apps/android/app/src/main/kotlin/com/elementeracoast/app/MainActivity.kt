@@ -138,10 +138,11 @@ class MainActivity : ComponentActivity() {
                         onSnackbarShown = vm::clearSnackbar
                     )
                     val target=dreamNotice
-                    if(target!=null){
+                    val noticeApi=vm.dreamApi
+                    if(target!=null && noticeApi!=null){
                         if(state.localMode && state.conversations.any{it.id==target.cid}){
                             androidx.compose.runtime.key(target){
-                                com.elementeracoast.app.feature.shell.DreamTideSheet(target.cid,state.currentModel,true,vm.dreamApi,initialTab=target.tab,onDismiss={dreamNotice=null})
+                                com.elementeracoast.app.feature.shell.DreamTideSheet(target.cid,state.currentModel,true,noticeApi,initialTab=target.tab,onDismiss={dreamNotice=null})
                             }
                         }else if(!state.localMode){
                             LaunchedEffect(target){
