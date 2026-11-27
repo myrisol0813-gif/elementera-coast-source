@@ -103,7 +103,7 @@ internal object NativeDreamPlanProtocol {
         }
     }
     fun failure(http:Int,code:String?):String=when{
-        code=="subscription_sharing_usage_limit_exceeded"||http==429->"plan_usage_limit"
+        code in setOf("subscription_sharing_usage_limit_exceeded","subscription_sharing_usage_unavailable")||http==429->"plan_usage_limit"
         code in setOf("subscription_sharing_user_not_eligible","chatpass_v2_scope_not_authorized","chatpass_v2_invalid_authorization_context")||http in setOf(401,403)->"plan_authorization_unavailable"
         code=="subscription_sharing_unsupported_capability"||http==400->"plan_capability_unavailable"
         else->"plan_request_unconfirmed"
