@@ -11,6 +11,7 @@ export const DREAM_TOOL_GROUPS=Object.freeze({
   allowDailyWrite:['create_moment','create_diary'],
   allowCalendarWrite:['calendar_create'],
   allowVoice:['voice_create'],
+  allowImage:['image_generate'],
 });
 export const DREAM_CONTEXT_FLAGS=Object.freeze(['includeCustom','includeUserPortrait','includeSelfPortrait','includeConversationCount','includeWeather','includeCalendar','includeSteps','includeAppUsage']);
 export const DREAM_TOOL_FLAGS=Object.freeze(Object.keys(DREAM_TOOL_GROUPS));
