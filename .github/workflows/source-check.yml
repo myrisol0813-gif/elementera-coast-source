@@ -46,7 +46,14 @@ jobs:
       - name: Install build-only reference art compiler
         run: |
           npm install --prefix art-tools --no-audit --no-fund
-          ./art-tools/node_modules/.bin/playwright install --with-deps chromium
+          # Hosted Ubuntu already supplies Chromium runtime libraries. Avoid refreshing
+          # unrelated third-party apt feeds unless the actual browser smoke test fails.
+          ./art-tools/node_modules/.bin/playwright install chromium
+          smoke='const {chromium}=require("./art-tools/node_modules/playwright"); (async()=>{const b=await chromium.launch({headless:true});try{const p=await b.newPage();await p.setContent("<p>coast</p>");if(await p.locator("p").textContent()!=="coast")throw Error("browser smoke test");}finally{await b.close()}})().catch(e=>{console.error(e);process.exit(1)})'
+          if ! node -e "$smoke"; then
+            ./art-tools/node_modules/.bin/playwright install-deps chromium
+            node -e "$smoke"
+          fi
       - name: Prepare native SVG toolchain
         shell: bash
         run: |
