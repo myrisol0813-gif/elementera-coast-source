@@ -72,6 +72,7 @@ jobs:
                   assert hashlib.sha256(z.read(name)).hexdigest() == digest, name
               assert "assets/coast-embedding/NOTICE.txt" in z.namelist()
               assert "assets/rest-box/native/v1/index.json" in z.namelist()
+              assert {n.split('/')[1] for n in z.namelist() if n.endswith('/libcoast_native_art.so')} >= {"arm64-v8a", "armeabi-v7a", "x86_64", "x86"}
               assert not any(n.startswith("assets/rest-box/") and n.endswith((".html", ".mjs")) for n in z.namelist())
               native = [n for n in z.infolist() if n.filename.startswith("lib/") and "onnxruntime" in n.filename]
               assert native
@@ -100,5 +101,5 @@ jobs:
             if printf '%s\n' "$result" | grep -E 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process crashed'; then exit 1; fi;
             scene="$(adb shell am instrument -w -r -e class com.elementeracoast.app.feature.daily.NativeRestSceneDeviceTest com.elementeracoast.source.test/androidx.test.runner.AndroidJUnitRunner)";
             printf '%s\n' "$scene";
-            printf '%s\n' "$scene" | grep -F 'OK (2 tests)';
+            printf '%s\n' "$scene" | grep -F 'OK (3 tests)';
             if printf '%s\n' "$scene" | grep -E 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process crashed'; then exit 1; fi
