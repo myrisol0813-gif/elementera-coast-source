@@ -65,6 +65,8 @@ export async function buildDreamContext(db,claim,settings,now,env={COAST_CHAT_DB
       if(reality.missing?.length)modules.push('【未取得的现实资料】'+reality.missing.join('、'));
     }
   }
+  // A server worker has no device snapshot. Do not infer step counts or app use.
+  if(e.includeSteps||e.includeAppUsage)modules.push('【设备资料】本次服务端唤醒未取得设备步数或应用使用数据。');
   return {messages:[{role:'system',content:modules.join('\n\n')}],previous:prev};
 }
 
@@ -96,7 +98,9 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
   try{
     const actual=await dreamExecutionConfig(db,cid,claim.revision);
     if(!actual||actual.modelId!==currentModelId)throw new DOMException('Aborted','AbortError');
+    await authorize();
     const e=actual.execution,context=await buildDreamContext(db,claim,actual,now,env);
+    await authorize();
     const toolContext={permission:'owner',surface:'main_chat',env,conversation_id:cid,source_turn_id:null,
       model_label:currentModelId,autonomous_activity:true,autonomous_claim:claim,autonomous_tool_names:dreamToolNames(actual),
       independent_web_enabled:e.allowWeb===true};
