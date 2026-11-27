@@ -72,6 +72,7 @@ class LocalToolSessionTest {
             assertEquals("provider.example",r.url.host)
             val body=if(n++==0){
                 assertTrue(payload.getValue("tools").toString().contains("cross_window_keyword_search"))
+                assertTrue(payload.getValue("messages").jsonArray.first().jsonObject.getValue("content").jsonPrimitive.content.contains("希望你用得顺手，也用得开心。"))
                 val chunk=buildJsonObject{putJsonArray("choices"){add(buildJsonObject{
                     putJsonObject("delta"){putJsonArray("tool_calls"){add(buildJsonObject{
                         put("index",0);put("id","call1");putJsonObject("function"){put("name","cross_window_keyword_search");put("arguments","""{"query":"海岸"}""")}

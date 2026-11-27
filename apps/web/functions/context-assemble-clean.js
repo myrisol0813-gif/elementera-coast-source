@@ -168,7 +168,7 @@ function mergeModelReads(previous, next) {
 
 export async function assembleCleanContext(env, {
   surface, conversationId, roomId, visitorId, sourceTurnId = null, messages = [], lastUser, settings = {}, localDate = new Date().toISOString().slice(0, 10),
-  localDateTime = '', realityContext = null, realityAllowedFields = null, recentEntryIds = [], authScope = null, model = '', permission: requestedPermission, preview = false, baseSystemPrompt = '', exposeTools = true, initialFurniture = [], crossWindow = null, groupDogtalk = undefined,
+  localDateTime = '', realityContext = null, realityAllowedFields = null, recentEntryIds = [], authScope = null, model = '', permission: requestedPermission, preview = false, baseSystemPrompt = '', exposeTools = true, exposeOpenRouterSearch = true, initialFurniture = [], crossWindow = null, groupDogtalk = undefined,
 } = {}) {
   const permission = requestedPermission || (surface === 'mailbox_visitor' ? 'visitor' : 'owner');
   const access = roomAccess(surface, { permission, visitorId }); const request = requestSettings(settings);
@@ -192,7 +192,7 @@ export async function assembleCleanContext(env, {
     : { mode: 'off', sources: [] };
   const independentWebEnabled = exposeTools && permission === 'owner' && WEB_SEARCH_SURFACES.has(surface) && crossWindowRequest.mode !== 'keyword' && env.COAST_INDEPENDENT_WEB_ENABLED === 'true' && Boolean(env.TAVILY_API_KEY?.trim());
   const selection = exposeTools ? resolveToolSelection({ permission, surface, authScope, visitorId, env, independent_web_enabled: independentWebEnabled, cross_window_mode: crossWindowRequest.mode, global_excerpt_write_enabled: globalExcerpt?.write_enabled === true, user_portrait_write_enabled: userPortrait?.write_enabled === true && isThinkingSoilEnabled(papers.soil) }) : { backendTools: [], modelVisibleToolRecords: [], modelVisibleTools: [] };
-  const webSearchEnabled = Boolean(!independentWebEnabled && exposeTools && permission === 'owner' && WEB_SEARCH_SURFACES.has(surface)
+  const webSearchEnabled = Boolean(!independentWebEnabled && exposeTools && exposeOpenRouterSearch && permission === 'owner' && WEB_SEARCH_SURFACES.has(surface)
     && crossWindowRequest.mode !== 'keyword');
   const modelVisibleToolRecords = webSearchEnabled
     ? [...selection.modelVisibleToolRecords, WEB_SEARCH_TOOL_RECORD]

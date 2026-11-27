@@ -164,9 +164,9 @@ const savedWindow=await readConversationState(emptyDb,emptyConversation.id);
 const assembleWindow=()=>assembleCleanContext({COAST_CHAT_DB:emptyDb},{
   surface:'main_chat',conversationId:emptyConversation.id,messages:emptyMessages,lastUser:emptyMessages.at(-1),permission:'owner',preview:true,
 });
-await writeConversationState(emptyDb,emptyConversation.id,{...savedWindow,context_settings:{...savedWindow.context_settings,workbench_prompt:'WORKBENCH_CUSTOM_TEST_713'}});
+await writeConversationState(emptyDb,emptyConversation.id,{...savedWindow,context_settings:{...savedWindow.context_settings,workbench_prompt:'【我的邀请】\nWORKBENCH_CUSTOM_TEST_713'}});
 const edited=await assembleWindow();
-assert.ok(edited.modelMessages[0].content.includes('WORKBENCH_CUSTOM_TEST_713'));
+assert.ok(edited.modelMessages[0].content.includes('【我的邀请】\nWORKBENCH_CUSTOM_TEST_713'));
 assert.equal(edited.modelMessages[0].content.includes('希望你用得顺手，也用得开心。'),false);
 assert.equal(edited.deskSlip().workbench.prompt_delivered,true);
 const noTools=await assembleCleanContext({COAST_CHAT_DB:emptyDb},{surface:'main_chat',conversationId:emptyConversation.id,messages:emptyMessages,lastUser:emptyMessages.at(-1),permission:'owner',preview:true,exposeTools:false});

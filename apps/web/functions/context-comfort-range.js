@@ -97,7 +97,7 @@ function assembleText(value, messages) {
     itemBlock(SOURCE_GUIDES.worldbook, value.worldbookItems.map((item) => `- ${item}`)),
     sourceBlock(SOURCE_GUIDES.reality, value.realityText),
     sourceBlock(SOURCE_GUIDES.response_mode, value.responseModeText),
-    sourceBlock(SOURCE_GUIDES.workbench, value.workbenchText),
+    value.workbenchText ? `${SOURCE_GUIDES.workbench}\n${value.workbenchText}` : '',
     `${SOURCE_GUIDES.external}\n本轮没有递入外部材料。`,
     recent ? `${SOURCE_GUIDES.recent}\n以下 ${recent} 条消息属于最近上下文。` : '',
     hasCurrentMessage(messages) ? SOURCE_GUIDES.current : '',
