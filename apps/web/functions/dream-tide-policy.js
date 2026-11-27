@@ -9,7 +9,7 @@ export const DREAM_TOOL_GROUPS=Object.freeze({
   allowCollection:['vault_search_index','vault_read_selected'],
   allowLibraryWrite:['library_write'],
 });
-export const DREAM_CONTEXT_FLAGS=Object.freeze(['includeCustom','includeUserPortrait','includeSelfPortrait','includeConversationCount','includeWeather','includeCalendar']);
+export const DREAM_CONTEXT_FLAGS=Object.freeze(['includeCustom','includeUserPortrait','includeSelfPortrait','includeConversationCount','includeWeather','includeCalendar','includeSteps','includeAppUsage']);
 export const DREAM_TOOL_FLAGS=Object.freeze(Object.keys(DREAM_TOOL_GROUPS));
 export function dreamToolAllowed(config,name){
   const e=config?.execution||{};
