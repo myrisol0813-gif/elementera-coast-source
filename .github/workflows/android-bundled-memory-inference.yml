@@ -9,6 +9,7 @@ on:
       - '**/feature/daily/NativeRest*.kt'
       - '**/feature/daily/PetScreen.kt'
       - '**/art-tools/**'
+      - '**/native-art/**'
       - '**/rest-box/art/**'
       - '**/app/build.gradle.kts'
       - '**/coast-embedding/**'
@@ -101,5 +102,5 @@ jobs:
             if printf '%s\n' "$result" | grep -E 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process crashed'; then exit 1; fi;
             scene="$(adb shell am instrument -w -r -e class com.elementeracoast.app.feature.daily.NativeRestSceneDeviceTest com.elementeracoast.source.test/androidx.test.runner.AndroidJUnitRunner)";
             printf '%s\n' "$scene";
-            printf '%s\n' "$scene" | grep -F 'OK (3 tests)';
+            printf '%s\n' "$scene" | grep -F 'OK (4 tests)';
             if printf '%s\n' "$scene" | grep -E 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process crashed'; then exit 1; fi
