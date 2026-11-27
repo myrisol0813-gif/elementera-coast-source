@@ -36,6 +36,7 @@ private data class StudioMotionRequest(val id:String,val appearance:RestAppearan
 private data class StudioResources(
     val cat: NativeSceneCatalogue, val appearance: RestAppearanceCatalogue,
     val names: Map<String,String>, val policy: NativeStudioPolicy, val atlas: NativeRestSprites,
+    val loaded:NativeStudioLoad,
 )
 
 @Composable
@@ -52,7 +53,8 @@ internal fun PetScreen() {
                         val b=it.jsonObject
                         b.getValue("id").jsonPrimitive.content to b.getValue("name").jsonPrimitive.content
                     }
-                StudioResources(cat, appearance, names, NativeStudioPolicy(cat,appearance), NativeRestSprites(context.assets))
+                val policy=NativeStudioPolicy(cat,appearance)
+                StudioResources(cat,appearance,names,policy,NativeRestSprites(context.assets),NativeStudioStore(context).load(policy))
             }
         }
     }
@@ -70,10 +72,10 @@ private fun NativeStudioPage(r: StudioResources) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val store = remember(context) { NativeStudioStore(context) }
-    val raw = remember(store) { store.raw() }
+    val raw = r.loaded.raw
     val restored = remember(r,raw) { raw?.let { runCatching { r.policy.decode(it) } } }
     var state by remember(r) { mutableStateOf(restored?.getOrNull() ?: r.policy.fresh()) }
-    var recovery by remember(r) { mutableStateOf(restored?.isFailure==true) }
+    var recovery by remember(r) { mutableStateOf(restored?.isFailure==true||r.loaded.warning!=null) }
     var editing by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<String?>(null) }
     var family by remember { mutableStateOf(state.room) }
@@ -83,7 +85,7 @@ private fun NativeStudioPage(r: StudioResources) {
     var prop by remember { mutableStateOf<String?>(null) }
     var menu by remember { mutableStateOf(false) }
     var confirmation by remember { mutableStateOf<String?>(null) }
-    var message by remember { mutableStateOf<String?>(null) }
+    var message by remember { mutableStateOf<String?>(if(r.loaded.migrated)"已恢复旧版造物间资料" else null) }
     var pendingExport by remember { mutableStateOf<String?>(null) }
     var pendingImport by remember { mutableStateOf<NativeStudioState?>(null) }
     fun persist() {
@@ -220,12 +222,13 @@ private fun NativeStudioPage(r: StudioResources) {
                     DropdownMenuItem(text={Text("导出房间与形象")},onClick={menu=false;pendingExport=r.policy.export(state);save.launch("rest-box-layout.json")})
                     DropdownMenuItem(text={Text("导入房间与形象")},onClick={menu=false;pick.launch(arrayOf("application/json","text/plain","application/octet-stream"))})
                     if(recovery && raw!=null)DropdownMenuItem(text={Text("导出旧存档原件")},onClick={menu=false;pendingExport=raw;save.launch("rest-box-recovery.json")})
+                    if(recovery)DropdownMenuItem(text={Text("保留旧资料，启用新房间保存")},onClick={menu=false;confirmation="new-save"})
                     DropdownMenuItem(text={Text(if(state.reducedMotion)"播放动画" else "暂停动画")},onClick={menu=false;change(state.copy(reducedMotion=!state.reducedMotion))})
                     DropdownMenuItem(text={Text("恢复当前房间")},onClick={menu=false;confirmation="reset"})
                 }
             }
         }
-        if(recovery)Text("原生旧存档无法读取，自动保存已暂停。可导出原件或导入有效备份。",color=MaterialTheme.colorScheme.error)
+        if(recovery)Text(r.loaded.warning?:"原生旧存档无法读取，自动保存已暂停。可导出原件或导入有效备份。",color=MaterialTheme.colorScheme.error)
         if(panel=="room") {
             // The scene is directly in the native page; no independent themed document.
             NativeRestScene(r.cat,state.room,items,occupants,images,editing,selected,
@@ -363,13 +366,14 @@ private fun NativeStudioPage(r: StudioResources) {
         Spacer(Modifier.height(20.dp))
     }
     if(confirmation!=null)AlertDialog(onDismissRequest={confirmation=null;pendingImport=null},
-        title={Text(when(confirmation){"reset"->"恢复当前房间？";"delete"->"移除这件家具？";else->"导入并替换当前造物间？"})},
-        text={Text(if(confirmation=="import")"将替换房间布局与备份中的动物形象；不会删除其他海岸数据。" else "只修改当前房间。")},
+        title={Text(when(confirmation){"reset"->"恢复当前房间？";"delete"->"移除这件家具？";"new-save"->"开始保存新的造物间？";else->"导入并替换当前造物间？"})},
+        text={Text(when(confirmation){"import"->"将替换房间布局与备份中的动物形象；不会删除其他海岸数据。";"new-save"->"原有网页存储不会删除；此后保存当前原生布局，不再自动覆盖它。";else->"只修改当前房间。"})},
         confirmButton={TextButton(onClick={
             when(confirmation){
                 "reset"->{change(r.policy.resetRoom(state));selected=null}
                 "delete"->{selected?.let{change(r.policy.remove(state,it))};selected=null}
-                "import"->{pendingImport?.let{if(recovery&&raw!=null)store.preserve(raw);recovery=false;change(it);selected=null};pendingImport=null}
+                "import"->{pendingImport?.let{next->runCatching{if(recovery&&raw!=null)store.preserve(raw);store.save(r.policy.encode(next))}.onSuccess{state=next;recovery=false;selected=null;message="已导入房间"}.onFailure{message="导入未保存，原资料保留"}};pendingImport=null}
+                "new-save"->{runCatching{if(raw!=null)store.preserve(raw);store.save(r.policy.encode(state))}.onSuccess{recovery=false;message="已启用原生房间保存"}.onFailure{message="保存未确认，旧资料保留"}}
             }
             confirmation=null
         }){Text("确认")}},
