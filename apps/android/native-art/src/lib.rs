@@ -2,17 +2,22 @@
 //! Default sprites still use the reference compiler; this handles edited SVGs.
 use jni::{objects::{JClass, JString}, sys::{jbyteArray, jint}, JNIEnv};
 use resvg::{tiny_skia, usvg};
-use std::{panic::{catch_unwind, AssertUnwindSafe}, ptr};
+use std::{panic::{catch_unwind, AssertUnwindSafe}, ptr, sync::{Arc, OnceLock}};
 
 fn raster(svg: &str, w: u32, h: u32) -> Option<Vec<u8>> {
     if w == 0 || h == 0 || w > 1536 || h > 1536 || svg.len() > 1_000_000 {
         return None;
     }
     let mut options = usvg::Options::default();
-    // Only the OS's installed fonts, never font files or external URLs from the SVG.
-    for path in ["/system/fonts/Roboto-Regular.ttf", "/system/fonts/NotoSans-Regular.ttf", "/system/fonts/NotoSansCJK-Regular.ttc"] {
-        if let Ok(data) = std::fs::read(path) { options.fontdb_mut().load_font_data(data); }
-    }
+    // Share immutable font data across animation frames. Only explicit OS files are read.
+    static FONTS: OnceLock<Arc<usvg::fontdb::Database>> = OnceLock::new();
+    options.fontdb = FONTS.get_or_init(|| {
+        let mut db = usvg::fontdb::Database::new();
+        for path in ["/system/fonts/Roboto-Regular.ttf", "/system/fonts/NotoSans-Regular.ttf", "/system/fonts/NotoSansCJK-Regular.ttc"] {
+            if let Ok(data) = std::fs::read(path) { db.load_font_data(data); }
+        }
+        Arc::new(db)
+    }).clone();
     options.font_family = "Roboto".to_owned();
     let tree = usvg::Tree::from_str(svg, &options).ok()?;
     let mut pixmap = tiny_skia::Pixmap::new(w, h)?;
