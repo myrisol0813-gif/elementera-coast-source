@@ -68,7 +68,7 @@ internal class LocalDreamLedger(private val store:LocalPersistence){
         val clock=Regex("([01][0-9]|2[0-3]):[0-5][0-9]")
         require(clock.matches(cfg.dailyTime));ZoneId.of(cfg.timeZone)
         cfg.quietHours?.let{require(clock.matches(it.start)&&clock.matches(it.end))}
-        require(e.tokenBudget in 1..1000000&&e.outputLimit in 1..65536&&e.toolBudget in 0..128&&e.readTurns in 1..400&&e.extraPerDay in 0..128&&e.invitation.isNotBlank()&&e.invitation.length<=16000)
+        require(e.tokenBudget in 1..1000000&&e.outputLimit in 1..65536&&e.toolBudget in 0..128&&e.readTurns in 1..400&&e.extraPerDay in 0..128&&e.voiceLimit in 0..128&&e.imageLimit in 0..128&&e.invitation.isNotBlank()&&e.invitation.length<=16000)
         val arm=request.action=="arm"
         if(arm&&(!enableAllowed||!request.confirmExecution||!model.startsWith("local:")||'/' !in model))return@readConsistent null
         val next=DreamSettings(revision=UUID.randomUUID().toString(),enabled=arm,config=cfg,modelId=model,armedAt=if(arm)now else null)
