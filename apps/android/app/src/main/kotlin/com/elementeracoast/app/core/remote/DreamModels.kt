@@ -38,14 +38,16 @@ data class DreamSettings(
 @Serializable
 data class DreamSettingsResponse(
     val ok:Boolean=false,val settings:DreamSettings=DreamSettings(),
-    val executionAvailable:Boolean=false,val schedulerConfigured:Boolean=false
+    val executionAvailable:Boolean=false,val schedulerConfigured:Boolean=false,
+    val planExecutionAvailable:Boolean=false,val planStatus:String?=null
 )
 
 @Serializable
 data class DreamSettingsRequest(
     @SerialName("conversation_id") val conversationId:String,
     val revision:String?=null,val action:String,val config:DreamConfig?=null,
-    val modelId:String?=null,val confirmExecution:Boolean=false
+    val modelId:String?=null,val confirmExecution:Boolean=false,
+    val confirmPlanSoftBudget:Boolean=false,val planRequestLimit:Int=5
 )
 
 @Serializable
