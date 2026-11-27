@@ -312,3 +312,18 @@ test('autonomous media and activity receipts restore atomically without arming a
   assert.equal((await readConversationState(target,cid)).turns.length,1);
   assert.equal((await target.prepare('SELECT enabled FROM dream_tide_arms WHERE conversation_id=?').bind(cid).first()).enabled,0);
 });
+
+
+test('owner media limits are independent, zero disables the tool, claimed attempts consume the quota',async()=>{
+  const {db,cid}=await fixture({allowVoice:true,allowImage:true,voiceLimit:2,imageLimit:0,toolBudget:5});
+  const {claimDreamTide}=await import('../functions/dream-tide-ledger.js');
+  const {reserveDreamStep,recordDreamStep,reserveDreamTool}=await import('../functions/dream-tide-records.js');
+  const claim=await claimDreamTide(db,cid,{now:due,currentModelId:model,busy:false});
+  assert.ok(claim);assert.ok(await reserveDreamStep(db,claim,0,due));
+  assert.ok(await recordDreamStep(db,claim,0,'completed',{},due));
+  assert.equal(await reserveDreamTool(db,claim,0,0,'image_generate',due),false);
+  assert.ok(await reserveDreamTool(db,claim,0,1,'voice_create',due));
+  assert.ok(await reserveDreamTool(db,claim,0,2,'voice_create',due));
+  assert.equal(await reserveDreamTool(db,claim,0,3,'voice_create',due),false);
+  assert.ok(await reserveDreamTool(db,claim,0,4,'dream_write_note',due));
+});
