@@ -149,4 +149,36 @@ class LocalDreamExecutorTest {
         assertEquals(1,LocalDreamArchive(store).export(cid)!!.getValue("runs").jsonArray.size)
     }
 
+    @Test fun canonicalDailyAndCalendarCreationHasWakeProvenance()=runBlocking{
+        val (store,initial)=fixture();val cache=RemoteCacheStore(store);val ledger=LocalDreamLedger(store)
+        val history=cache.history(cid)!!
+        cache.putHistory(cid,history.copy(contextSettings=history.contextSettings.copy(localModelWriteEnabled=true)))
+        val cfg2=cfg.copy(execution=cfg.execution!!.copy(allowDailyWrite=true,allowCalendarWrite=true,tokenBudget=24000,toolBudget=5))
+        val settings=ledger.configure(cid,DreamSettingsRequest(cid,initial.revision,"arm",cfg2,model,true),true,at-86400000)!!
+        var requests=0
+        val engine=LocalDreamExecutor(store,{provider to "fixture/model"},{_,_,_,tools,_->
+            requests++
+            if(requests==1){
+                assertTrue(tools.toString().contains("create_diary"))
+                assertFalse(tools.toString().contains("moment_comment"))
+                response(call("d","create_diary",buildJsonObject{put("date","2026-11-27");put("text","fixture diary")}),
+                    call("m","create_moment",buildJsonObject{put("date","2026-11-27");put("text","fixture moment")}),
+                    call("c","calendar_create",buildJsonObject{put("date","2026-11-28");put("title","fixture calendar");put("kind","note")}))
+            }else response()
+        },clock={at})
+        assertEquals("completed",engine.run(cid,settings.revision!!,model,at))
+        assertEquals(2,requests)
+        val diary=cache.dailyDiaries().single();val moment=cache.dailyMoments().single()
+        val calendar=LocalCalendarStore(store).snapshot().single().jsonObject
+        assertNull(diary.sourceTurnId);assertNull(moment.sourceTurnId)
+        assertEquals(JsonNull,calendar["source_turn_id"])
+        assertEquals("model_partner",diary.author)
+        assertTrue(diary.toolCallId.orEmpty().startsWith("dream:"))
+        val events=LocalDreamArchive(store).export(cid)!!.getValue("tools").jsonArray
+        assertEquals(listOf(diary.id,moment.id,calendar.getValue("id").jsonPrimitive.content),events.map{
+            Json.parseToJsonElement(it.jsonObject.getValue("receipt_json").jsonPrimitive.content).jsonObject.getValue("record_id").jsonPrimitive.content
+        })
+        assertEquals(1,cache.history(cid)!!.turns.size)
+    }
+
 }
