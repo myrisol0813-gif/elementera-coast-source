@@ -3,22 +3,27 @@ package com.elementeracoast.app.feature.daily
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.toPixelMap
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithTag
+import androidx.activity.compose.setContent
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Rect
+import android.os.Handler
+import android.os.Looper
+import android.view.PixelCopy
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.elementeracoast.app.core.restbox.*
 import org.junit.Assert.*
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class NativeRestSceneDeviceTest {
-    @get:Rule val compose = createComposeRule()
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test fun threeNativeRoomsActuallyPaintAndFurnitureIsNotFlattened() {
@@ -42,36 +47,65 @@ class NativeRestSceneDeviceTest {
         val room=mutableStateOf("living")
         val items=mutableStateOf(cat.defaults("living"))
         val images=mutableStateOf(load("living",items.value))
-        compose.setContent {
-            MaterialTheme {
-                NativeRestScene(cat,room.value,items.value,emptyList(),images.value,false,null,
-                    onSelect={},onMove={_,_,_->},onMoveFinished={},modifier=Modifier.testTag("native-room"))
+        val instr=InstrumentationRegistry.getInstrumentation()
+        val activity=instr.startActivitySync(Intent(context,NativeRestTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as NativeRestTestActivity
+        val bounds=AtomicReference<Rect>()
+        try{
+            instr.runOnMainSync {
+                activity.setContent {
+                    MaterialTheme {
+                        NativeRestScene(cat,room.value,items.value,emptyList(),images.value,false,null,
+                            onSelect={},onMove={_,_,_->},onMoveFinished={},modifier=Modifier.onGloballyPositioned{
+                                val b=it.boundsInWindow()
+                                bounds.set(Rect(b.left.toInt(),b.top.toInt(),b.right.toInt(),b.bottom.toInt()))
+                            })
+                    }
+                }
             }
-        }
-        fun colors():List<Int> {
-            val image=compose.onNodeWithTag("native-room").captureToImage()
-            assertTrue("Native room has real dimensions",image.width>100&&image.height>100)
-            val pixels=image.toPixelMap()
-            return buildList {
-                for(y in 1..19)for(x in 1..19)add(pixels[image.width*x/20,image.height*y/20].value.hashCode())
+            fun update(block:()->Unit){
+                instr.runOnMainSync(block)
+                val drawn=CountDownLatch(1)
+                instr.runOnMainSync {
+                    activity.window.decorView.postOnAnimation {
+                        activity.window.decorView.postOnAnimation { drawn.countDown() }
+                    }
+                }
+                assertTrue("Wait for native layout/draw",drawn.await(10,TimeUnit.SECONDS))
+                instr.waitForIdleSync()
             }
-        }
-        val roomSignatures=mutableSetOf<List<Int>>()
-        for(id in cat.rooms.keys) {
-            val defaults=cat.defaults(id)
-            val snapshot=load(id,defaults)
-            compose.runOnIdle {room.value=id;items.value=defaults;images.value=snapshot}
-            val signature=colors()
-            assertTrue("$id is visibly painted, not blank",signature.distinct().size>20)
-            roomSignatures.add(signature)
-        }
-        assertEquals("Room backgrounds are distinct",3,roomSignatures.size)
-        val defaults=cat.defaults("living")
-        val snapshot=load("living",defaults)
-        compose.runOnIdle {room.value="living";items.value=defaults;images.value=snapshot}
-        val withFurniture=colors()
-        compose.runOnIdle {items.value=defaults.map{it.copy(visible=false)}}
-        assertNotEquals("Furniture is separate from the environment",withFurniture,colors())
+            fun colors():List<Int> {
+                update{}
+                val rect=requireNotNull(bounds.get())
+                assertTrue("Native room has real dimensions",rect.width()>100&&rect.height()>100)
+                val image=Bitmap.createBitmap(rect.width(),rect.height(),Bitmap.Config.ARGB_8888)
+                val done=CountDownLatch(1)
+                val status=java.util.concurrent.atomic.AtomicInteger(-1)
+                instr.runOnMainSync {
+                    PixelCopy.request(activity.window,rect,image,{result->status.set(result);done.countDown()},Handler(Looper.getMainLooper()))
+                }
+                assertTrue("Window capture completed",done.await(10,TimeUnit.SECONDS))
+                assertEquals("Actual Android window pixels",PixelCopy.SUCCESS,status.get())
+                return try{buildList {
+                    for(y in 1..19)for(x in 1..19)add(image.getPixel(image.width*x/20,image.height*y/20))
+                }}finally{image.recycle()}
+            }
+            val roomSignatures=mutableSetOf<List<Int>>()
+            for(id in cat.rooms.keys) {
+                val defaults=cat.defaults(id)
+                val snapshot=load(id,defaults)
+                update {room.value=id;items.value=defaults;images.value=snapshot}
+                val signature=colors()
+                assertTrue("$id is visibly painted, not blank",signature.distinct().size>20)
+                roomSignatures.add(signature)
+            }
+            assertEquals("Room backgrounds are distinct",3,roomSignatures.size)
+            val defaults=cat.defaults("living")
+            val snapshot=load("living",defaults)
+            update {room.value="living";items.value=defaults;images.value=snapshot}
+            val withFurniture=colors()
+            update {items.value=defaults.map{it.copy(visible=false)}}
+            assertNotEquals("Furniture is separate from the environment",withFurniture,colors())
+        }finally{instr.runOnMainSync{activity.finish()}}
     }
 
     @Test fun allAuthoredAnimalPalettesAndSixPosesArePackagedAndDecode() {
