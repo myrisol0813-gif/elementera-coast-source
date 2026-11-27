@@ -93,6 +93,41 @@ class LocalDreamExecutorTest {
         val rows=LocalDreamArchive(store).export(cid)!!.getValue("runs").jsonArray
         assertEquals("interrupted",rows.last().jsonObject.getValue("status").jsonPrimitive.content)
     }
+    @Test fun notificationsFollowPersistedEventsAndDoNotRetryInference()=runBlocking{
+        val (store,settings)=fixture()
+        val events=mutableListOf<Pair<String,String>>()
+        var requests=0
+        val engine=LocalDreamExecutor(store,{provider to "fixture/model"},{_,_,_,_,_->
+            requests++
+            if(requests==1)response(call("note","dream_write_note",buildJsonObject{put("body","notification fixture")})) else response()
+        },clock={at},onNotice={window,claim,kind->
+            val history=LocalDreamArchive(store).runtimeHistory(window)
+            val run=history.getValue("runs").jsonArray.first{it.jsonObject.getValue("claim_id").jsonPrimitive.content==claim}
+            events.add(kind to if(kind=="note")history.getValue("notes").jsonArray.single().jsonObject.getValue("claim_id").jsonPrimitive.content else run.jsonObject.getValue("claim_id").jsonPrimitive.content)
+            // A system notification failure must not affect the saved activity.
+            if(kind=="note")throw IllegalStateException("notification disabled")
+        })
+        assertEquals("completed",engine.run(cid,settings.revision!!,model,at))
+        assertEquals(2,requests)
+        assertEquals(listOf("start","note"),events.map{it.first})
+        assertEquals(1,events.map{it.second}.distinct().size)
+        assertEquals("not_due",engine.run(cid,settings.revision!!,model,at))
+        assertEquals(2,events.size)
+        val (emptyStore,emptySettings)=fixture()
+        val silent=mutableListOf<String>()
+        val empty=LocalDreamExecutor(emptyStore,{provider to "fixture/model"},{_,_,_,_,_->response()},clock={at},onNotice={_,_,kind->silent.add(kind)})
+        assertEquals("completed",empty.run(cid,emptySettings.revision!!,model,at))
+        assertEquals(listOf("start"),silent)
+        val (badStore,badSettings)=fixture()
+        val failed=mutableListOf<Pair<String,String>>()
+        val bad=LocalDreamExecutor(badStore,{provider to "fixture/model"},{_,_,_,_,_->response(withUsage=false)},clock={at},onNotice={window,claim,kind->
+            val status=LocalDreamArchive(badStore).runtimeHistory(window).getValue("runs").jsonArray.single{it.jsonObject.getValue("claim_id").jsonPrimitive.content==claim}.jsonObject.getValue("status").jsonPrimitive.content
+            failed.add(kind to status)
+        })
+        assertEquals("failed",bad.run(cid,badSettings.revision!!,model,at))
+        assertEquals(listOf("start" to "running","failure" to "failed"),failed)
+    }
+
     @Test fun scheduleQuietAndAlreadyConsumedSlots(){
         val (_,a)=fixture()
         assertEquals("daily:2026-11-27",LocalDreamSchedule.candidate(a,emptySet(),at)?.key)
