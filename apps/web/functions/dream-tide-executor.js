@@ -111,7 +111,7 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
     }:t);
     const imageModel=e.allowImage?await autonomousImageModel(db,env):null;
     const imageTool=imageModel?tool('image_generate','可选：生成并保存一张独立活动图像，使用已授权生图供应商额度。只发送必要绘图提示。不返回像素，不要假称看见。', {prompt:{type:'string',minLength:1,maxLength:4000}},['prompt']):null;
-    let imageAttempted=false;
+    let imageAttempted=false,voiceAttempted=false;
     const commonNames=new Set(common.map(t=>t.function.name));
     const allowed=[...toolsFor(e,actual.allowExtra&&e.extraPerDay>0),...common,...(imageTool?[imageTool]:[])];
     const prepared=await prepare(env,{model:currentModelId,messages:context.messages,tools:e.toolBudget?allowed:[],settings:{max_tokens:e.outputLimit}},true);
@@ -175,10 +175,11 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
               imageAttempted=true;
               const value=await generateDreamImage(db,env,a,{...toolContext,autonomous_event:{step:index,index:callIndex}},{expectedModel:imageModel});
               result={ok:true,record_id:value.id,data:value};activities.push({kind:name,ok:true});
-            }else if(commonNames.has(name)&&a&&!(name==='library_write'&&a.action!=='create')&&!(name==='create_diary'&&('replace_id' in a||'conflict_mode' in a))){
+            }else if(commonNames.has(name)&&a&&!(name==='voice_create'&&voiceAttempted)&&!(name==='library_write'&&a.action!=='create')&&!(name==='create_diary'&&('replace_id' in a||'conflict_mode' in a))){
               // Recheck revision and current registry permission immediately
               // before dispatch; the registry still validates its own arguments.
               await authorize();
+              if(name==='voice_create')voiceAttempted=true;
               const callId='dream:'+claim.claimId+':'+index+':'+callIndex;
               const value=await executeModelTool(db,{...call,id:callId},{...toolContext,tool_call_id:callId,autonomous_event:{step:index,index:callIndex}});
               if(name==='library_write'&&value?.note?.id)result.record_id=value.note.id;
