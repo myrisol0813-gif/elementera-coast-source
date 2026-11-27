@@ -163,7 +163,7 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
                             Text(note.body)
                             note.replies.forEach{reply->Text(stamp(reply.createdAt)+" · 回复\n"+reply.body,style=MaterialTheme.typography.bodySmall)}
                             OutlinedTextField(body,{body=it.take(16000)},label={Text("回复")},modifier=Modifier.fillMaxWidth(),enabled=!busy,minLines=2)
-                            Button(enabled=!localMode&&!busy&&body.isNotBlank(),onClick={
+                            Button(enabled=!busy&&body.isNotBlank(),onClick={
                                 if(retryBody!=body){retryBody=body;retryId=UUID.randomUUID().toString()}
                                 val text=body;val id=retryId
                                 busy=true;error=""
