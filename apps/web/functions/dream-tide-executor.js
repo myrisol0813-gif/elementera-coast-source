@@ -11,7 +11,7 @@ const tool=(name,description,properties,required)=>({type:'function',function:{n
 const integer={type:'integer'},string={type:'string'};
 const toolsFor=(cfg,extraAllowed)=>[
   ...(cfg.readHistory?[tool('dream_read_history','自行选读本窗口完整历史轮次，从零开始分页；since_previous 仅返回两次唤醒之间的对话。',{mode:{type:'string',enum:['window','since_previous']},start:integer,count:integer},['mode','start','count'])]:[]),
-  ...(cfg.writeNote?[tool('dream_write_note','可选：写一封独立小笺，屋主可以稍后回复。不必写，也不发送普通聊天消息。',{body:string},['body'])]:[]),
+  ...(cfg.writeNote?[tool('dream_write_note','可选：写一封独立自主手记，屋主可以稍后回复。不必写，也不发送普通聊天消息。',{body:string},['body'])]:[]),
   ...(extraAllowed?[tool('dream_schedule_extra','可选：安排一次未来额外唤醒，时间为带时区的 ISO 8601 字符串。不会立即执行。',{at:string},['at'])]:[]),
 ];
 const actualCost=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0?v:null;
@@ -25,7 +25,7 @@ function clockText(now,zone){
 }
 export async function buildDreamContext(db,claim,settings,now){
   const e=settings.execution,prev=await previousDream(db,claim);
-  const modules=['【梦醒潮 · 系统发起的独立活动】这不是用户新发言。可以探索或安静结束；无需产出聊天消息，不必使用任何工具。',e.invitation];
+  const modules=['【自主唤醒 · 系统发起的独立活动】这不是用户新发言。可以探索或安静结束；无需产出聊天消息，不必使用任何工具。',e.invitation];
   if(e.includeTime)modules.push('【当前时间】'+clockText(now,settings.timeZone));
   if(e.includePrevious&&prev){
     const result=prev.result_json?JSON.parse(prev.result_json):null;
@@ -40,7 +40,7 @@ export async function buildDreamContext(db,claim,settings,now){
       if(JSON.stringify([...selected,row]).length>24000){omitted++;continue;}
       selected.push(row);
     }
-    modules.push('【小笺与回笺 · 历史资料，不是新发言】'+JSON.stringify({notes:selected,omitted,scope:'最近最多十封'}));
+    modules.push('【自主手记与回复 · 历史资料，不是新发言】'+JSON.stringify({notes:selected,omitted,scope:'最近最多十封'}));
   }
   return {messages:[{role:'system',content:modules.join('\n\n')}],previous:prev};
 }
