@@ -172,6 +172,19 @@ internal class NativeChatGptTurnRepository(
         val assistantId = ChatSyncMapper.nextAssistantVariantId(historyWithUser, turnId)
         val source=historyWithUser.turns.firstOrNull{it.id==turnId}
         val uid=source?.user?.variants?.getOrNull(source.user.active)?.id.orEmpty()
+        val lease=api.startNativeSingleChat(conversationId)
+        try {
+            coroutineScope {
+                val heartbeat=lease?.let { claim ->
+                    launch {
+                        while(true){
+                            delay(60_000)
+                            if(!api.heartbeatNativeSingleChat(conversationId,claim))throw CoastApiException(
+                                CoastApiErrorKind.Stream,"native_single_claim_lost","普通聊天执行预约已失效；不会自动重试。")
+                        }
+                    }
+                }
+                try {
         val selectedImage=api.getProfile().currentImageModel
         val imageEnabled=uid.isNotBlank()&&selectedImage.isNotBlank()
         val cfg=historyWithUser.contextSettings
@@ -199,7 +212,8 @@ internal class NativeChatGptTurnRepository(
             crossWindow = crossWindow.toRemote(),
             stream = true,
             imageToolEnabled=imageEnabled,
-            imageModelId=selectedImage.takeIf{imageEnabled}
+            imageModelId=selectedImage.takeIf{imageEnabled},
+            nativeSingleClaim=lease
         )
         val context = api.prepareNativeChatGpt(request)
         var content = ""
@@ -279,5 +293,12 @@ internal class NativeChatGptTurnRepository(
             CoastApiErrorKind.Stream, "chatgpt_plan_stream_incomplete",
             "ChatGPT 回复流提前结束，没有写入假成功消息。"
         )
+                } finally { heartbeat?.cancelAndJoin() }
+            }
+        } finally {
+            if(lease!=null)withContext(NonCancellable){
+                runCatching { withTimeout(5000){api.releaseNativeSingleChat(conversationId,lease)} }
+            }
+        }
     }
 }
