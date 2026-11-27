@@ -1,0 +1,357 @@
+{
+  "version": 1,
+  "sources": {
+    "furniture": {
+      "repo": "myrisol0813-gif/elementera-creature-workshop",
+      "commit": "6fd374173ad9c0c4233fb5bc7b922bff26ad0839",
+      "file": "furniture/v1/preview-mobile.html"
+    },
+    "wardrobe": {
+      "repo": "myrisol0813-gif/elementera-creature-workshop",
+      "commit": "525df964c870885aaddb5ad8af52638d9c6da3f4",
+      "file": "wardrobe/v0.5/preview.html"
+    },
+    "original-props": {
+      "repo": "myrisol0813-gif/elementera-creature-workshop",
+      "commit": "9012b6ebb81109a6cebd8d4eb22a68fc2ee0a1e1",
+      "file": "originals/2026-11-26/props/"
+    }
+  },
+  "expected": [
+    {
+      "path": "assets/living-window.svg",
+      "origin": "furniture",
+      "blob": "2593e6a6f3796919fab04f3d18234e85975577f1"
+    },
+    {
+      "path": "assets/living-curtains.svg",
+      "origin": "furniture",
+      "blob": "9a29247c4b80ad7bbfaa7d56339bd04215a0ff80"
+    },
+    {
+      "path": "assets/living-chime.svg",
+      "origin": "furniture",
+      "blob": "ba8294d4a8eb500e611f6dd89e07d84778c5e9b2"
+    },
+    {
+      "path": "assets/living-picture.svg",
+      "origin": "furniture",
+      "blob": "af4740361b199b89d9a25e54fdf3932fad5f4d63"
+    },
+    {
+      "path": "assets/living-bookcase.svg",
+      "origin": "furniture",
+      "blob": "36dcb941c28916d243c4aa8028c8493ad554bb09"
+    },
+    {
+      "path": "assets/living-vase.svg",
+      "origin": "furniture",
+      "blob": "4153f3c1d9269d2b1de329d14438590ef6a43e57"
+    },
+    {
+      "path": "assets/living-lamp.svg",
+      "origin": "furniture",
+      "blob": "55186a1e217e3302008867e1c39cda3bb29f86dd"
+    },
+    {
+      "path": "assets/living-sofa.svg",
+      "origin": "furniture",
+      "blob": "7ca6ed2bb850e1df54177cde7a4ee5a670bb9dd2"
+    },
+    {
+      "path": "assets/living-rug.svg",
+      "origin": "furniture",
+      "blob": "8cfbb7bb23f93a8cfaaa9e3d64dd7d1635d0de60"
+    },
+    {
+      "path": "assets/living-table.svg",
+      "origin": "furniture",
+      "blob": "6417d593922382d403a3773199db5ae7dfe4b517"
+    },
+    {
+      "path": "assets/living-plant.svg",
+      "origin": "furniture",
+      "blob": "044a86a7a0e524c5bdf761f5e4827fa865e4956f"
+    },
+    {
+      "path": "assets/living-nest.svg",
+      "origin": "furniture",
+      "blob": "46d983d3c56490a7dcbed96fc8d4a5815c6dd7b6"
+    },
+    {
+      "path": "assets/living-books.svg",
+      "origin": "furniture",
+      "blob": "3f5624571a7a6af0bd71150bdef91d6a25681bc8"
+    },
+    {
+      "path": "assets/study-bookcase.svg",
+      "origin": "furniture",
+      "blob": "d15b61d72c895332ab49bd263ec1882a50a5d954"
+    },
+    {
+      "path": "assets/study-globe.svg",
+      "origin": "furniture",
+      "blob": "0151b4599667da5bf2c0cdabd48de2ca48716eac"
+    },
+    {
+      "path": "assets/study-window.svg",
+      "origin": "furniture",
+      "blob": "0b70df23827044b8d21fd1a788fb3de646117ad0"
+    },
+    {
+      "path": "assets/study-curtain.svg",
+      "origin": "furniture",
+      "blob": "151447627d28b3e2f3eb4a7291ede197af8a98a7"
+    },
+    {
+      "path": "assets/study-picture.svg",
+      "origin": "furniture",
+      "blob": "804977e96ccff390e258daedee489d38f6730a5d"
+    },
+    {
+      "path": "assets/study-clock.svg",
+      "origin": "furniture",
+      "blob": "d4f094fed7f0ffa54428e7f08269f7b800132a15"
+    },
+    {
+      "path": "assets/study-rug.svg",
+      "origin": "furniture",
+      "blob": "44e01075d35722c0a12763ad232f5ff1da8cc216"
+    },
+    {
+      "path": "assets/study-desk.svg",
+      "origin": "furniture",
+      "blob": "21185f055aee9888429d42ee67773898e8322342"
+    },
+    {
+      "path": "assets/study-lamp.svg",
+      "origin": "furniture",
+      "blob": "87c2b612f7d3202a98dceeb764f52f998a0b8868"
+    },
+    {
+      "path": "assets/study-open-book.svg",
+      "origin": "furniture",
+      "blob": "d81c442328e6ca8668844cc8b7f768425443f321"
+    },
+    {
+      "path": "assets/study-ink.svg",
+      "origin": "furniture",
+      "blob": "52b0ebf2d9adcee7d764beeecb44c11fca402111"
+    },
+    {
+      "path": "assets/study-cup.svg",
+      "origin": "furniture",
+      "blob": "25bd02b0d1063f6a290a0221594b69032478251d"
+    },
+    {
+      "path": "assets/study-chair.svg",
+      "origin": "furniture",
+      "blob": "9abc37842975ae3cfd2129a4a957e10999554f1b"
+    },
+    {
+      "path": "assets/study-cushion.svg",
+      "origin": "furniture",
+      "blob": "1f0f61cacd5c810083a0da887610947faff90cb9"
+    },
+    {
+      "path": "assets/study-plant.svg",
+      "origin": "furniture",
+      "blob": "d43d13bb3f2a2b89d89267660ef76ef3a0e7cb6f"
+    },
+    {
+      "path": "assets/study-scrolls.svg",
+      "origin": "furniture",
+      "blob": "064754cec69aa3bbccbabc2b44d65b2d465826ca"
+    },
+    {
+      "path": "assets/bedroom-picture.svg",
+      "origin": "furniture",
+      "blob": "ded2b5a12d7adb16e9b93730fb371018fd3e68e4"
+    },
+    {
+      "path": "assets/bedroom-mobile.svg",
+      "origin": "furniture",
+      "blob": "e1b73f29f75aceb66641dffb2e7ea5df4d99e0f0"
+    },
+    {
+      "path": "assets/bedroom-window.svg",
+      "origin": "furniture",
+      "blob": "deb3ab8df2b3f5741e195f3f44b808e5e94f5a20"
+    },
+    {
+      "path": "assets/bedroom-curtains.svg",
+      "origin": "furniture",
+      "blob": "30313bdeebec40596a9b79d2f7062f7906b75294"
+    },
+    {
+      "path": "assets/bedroom-chest.svg",
+      "origin": "furniture",
+      "blob": "e1472844e866cd598e3675a198f62a7823193f0e"
+    },
+    {
+      "path": "assets/bedroom-lamp.svg",
+      "origin": "furniture",
+      "blob": "9cc7f40258fa6cdb76970354cd7dcb460c2e4d1a"
+    },
+    {
+      "path": "assets/bedroom-books.svg",
+      "origin": "furniture",
+      "blob": "2aaa0877dc31ed5a16b10e8f1d5e2fd3bb7f6c3e"
+    },
+    {
+      "path": "assets/bedroom-rug.svg",
+      "origin": "furniture",
+      "blob": "598cf55d2e777ca62984543eef187487ad596752"
+    },
+    {
+      "path": "assets/bedroom-bed.svg",
+      "origin": "furniture",
+      "blob": "89ec3e993f0794cf8d0b30f883df0949731757ca"
+    },
+    {
+      "path": "assets/bedroom-nest.svg",
+      "origin": "furniture",
+      "blob": "d249169fc27a9702cce90ba3e012616eb32557fa"
+    },
+    {
+      "path": "assets/bedroom-slippers.svg",
+      "origin": "furniture",
+      "blob": "8b3499f1559cd5a3f2a24cef26885a30ca839e08"
+    },
+    {
+      "path": "assets/bedroom-plant.svg",
+      "origin": "furniture",
+      "blob": "f4f4edb31301c4fa3ceba5ca3c135281274a9061"
+    },
+    {
+      "path": "rooms/living-environment.svg",
+      "origin": "furniture",
+      "blob": "9469aea25cc8f17de2eba7fae8475d0342058a5b"
+    },
+    {
+      "path": "rooms/living-overlay.svg",
+      "origin": "furniture",
+      "blob": "26501f3d5eb0c128a7f5c49f237f18468816a3aa"
+    },
+    {
+      "path": "rooms/study-environment.svg",
+      "origin": "furniture",
+      "blob": "c43e3e333b06cb91f91b78702808c6c1f80139d2"
+    },
+    {
+      "path": "rooms/bedroom-environment.svg",
+      "origin": "furniture",
+      "blob": "93d6bcf38049b78873bf164b40e8350fdc81f80e"
+    },
+    {
+      "path": "creatures/wolf.svg",
+      "origin": "wardrobe",
+      "blob": "71b56aa89ddb1d0b7c3817f466b96c13924488a2"
+    },
+    {
+      "path": "creatures/cat.svg",
+      "origin": "wardrobe",
+      "blob": "714ac627b66b9a3b98aa03df1012a44b52122413"
+    },
+    {
+      "path": "creatures/fox.svg",
+      "origin": "wardrobe",
+      "blob": "e45c450d04f0789e5c731355651b763a361f414b"
+    },
+    {
+      "path": "creatures/rabbit.svg",
+      "origin": "wardrobe",
+      "blob": "2e1300f449ba29f699eeddae1ce7a70305895e4b"
+    },
+    {
+      "path": "creatures/bear.svg",
+      "origin": "wardrobe",
+      "blob": "0009bca074b6f9adc045ad7349909181b9a4344f"
+    },
+    {
+      "path": "creatures/deer.svg",
+      "origin": "wardrobe",
+      "blob": "7a5e95fb8972535d452251c49d412526405125e9"
+    },
+    {
+      "path": "creatures/lion.svg",
+      "origin": "wardrobe",
+      "blob": "8ba6a0dd639e9bc17864ef9795bb44e7322e047e"
+    },
+    {
+      "path": "creatures/tiger.svg",
+      "origin": "wardrobe",
+      "blob": "8bca63e25ee4b93154afe0b6d2b422ef3052a772"
+    },
+    {
+      "path": "creatures/bird.svg",
+      "origin": "wardrobe",
+      "blob": "44417507a174b8c396b30c479144b10ca7de7761"
+    },
+    {
+      "path": "creatures/snake.svg",
+      "origin": "wardrobe",
+      "blob": "253d2a487ca41a629b712e62f098a6b774752aac"
+    },
+    {
+      "path": "creatures/fish.svg",
+      "origin": "wardrobe",
+      "blob": "817a7223350d828d47907b213aec870be02425a2"
+    },
+    {
+      "path": "creatures/puppy.svg",
+      "origin": "wardrobe",
+      "blob": "8152fb40b8ce7bcc57a9e7eb3823c47e06926e5a"
+    },
+    {
+      "path": "creatures/dog.svg",
+      "origin": "wardrobe",
+      "blob": "24263d8525705f2fc921fcedd0fa4d976c681e99"
+    },
+    {
+      "path": "creatures/stoatA.svg",
+      "origin": "wardrobe",
+      "blob": "9c4c6b60183681dec9d760d678c35035a198b9cb"
+    },
+    {
+      "path": "creatures/stoat.svg",
+      "origin": "wardrobe",
+      "blob": "cb02922331c604e3982084c809cbc50a1dbcb42e"
+    },
+    {
+      "path": "creatures/redPanda.svg",
+      "origin": "wardrobe",
+      "blob": "c95784262b8883a9eb74a6744076c3160f647130"
+    },
+    {
+      "path": "props/book.svg",
+      "origin": "original-props",
+      "blob": "4d559a67de0bc8c5925840a1b345dd8a0d294d5b"
+    },
+    {
+      "path": "props/flower.svg",
+      "origin": "original-props",
+      "blob": "b67876552ed4db07c836b14429328cf1b5c5f1dd"
+    },
+    {
+      "path": "props/cookie.svg",
+      "origin": "original-props",
+      "blob": "e57e1ab129dff8179627d377d0ebcc1fc4d0a1ab"
+    },
+    {
+      "path": "props/tea.svg",
+      "origin": "original-props",
+      "blob": "789aa54b0e42c1b45d1f0553bddd0be5e815bc95"
+    },
+    {
+      "path": "props/letter.svg",
+      "origin": "original-props",
+      "blob": "6ecfdcc6eb434b862770e108197778a0abfdf67d"
+    }
+  ],
+  "unverifiedExtras": [
+    "extras/afternoon.json",
+    "extras/stationery.json"
+  ],
+  "note": "Expected Git blob SHA-1 from archived originals; offline V3 bundle all matched, five Source files directly checked. Run regression on checkout for full verification. 14 extra assets are reconstructed candidates, not recovered approved originals."
+}

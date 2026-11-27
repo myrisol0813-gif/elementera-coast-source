@@ -15,7 +15,9 @@ return {body:`M160 43C106.75 43 89 78 89 113C89 139 103 151 123 154C114 171 115 
 function tailFrames(action){
   const amplitude={idle:[2,3,0,0,1],cling:[5,7,0,0,2],cheer:[4,5,0,-6,5],sad:[0,2,4,17,1],sit:[0,0,2,10,1]}[action];
   if(!amplitude)return null;const [ax,ay,x,y,speed]=amplitude;
-  return {duration:1.9/speed,frames:[0,1,0,-1,0].map(t=>snakeTailPaths(x+ax*t,y+ay*t))};
+  // Original prototype increments phase by .055 each 60Hz animation frame. Sample its sinusoid without changing its paths.
+  const steps=60,frames=Array.from({length:steps+1},(_,i)=>{const t=Math.sin(2*Math.PI*i/steps);return snakeTailPaths(x+ax*t,y+ay*t)});
+  return {duration:2*Math.PI/(.055*60*speed),frames,keyTimes:frames.map((_,i)=>i/steps).join(';')};
 }
 function appendMarkup(doc,parent,markup){
   const parsed=new DOMParser().parseFromString('<svg xmlns="'+NS+'">'+markup+'</svg>','image/svg+xml');
@@ -38,15 +40,15 @@ function mountNeck(doc,body,def,appearance,action,accessories){
   else{attrs.transform='translate('+x+' '+y+') scale('+(sz||1)+')';if(appearance.neck==='scarf')markup='<path d="M'+(-w)+' -10Q0 4 '+w+' -10L'+w+' 7Q0 20 '+(-w)+' 7Z"/><path d="M8 7L26 8L22 38L4 35Z"/><path d="M'+(-w)+' -1Q0 13 '+w+' -1M6 29L23 32" fill="none" stroke="#fff8e8" stroke-width="3" opacity=".6"/>'}
   appendMarkup(doc,group(doc,parent,before,attrs),markup);
 }
-function animate(doc,node,attr,values,duration){
-  if(!node)return;const el=doc.createElementNS(NS,'animate');for(const [k,v] of Object.entries({attributeName:attr,values:values.join(';'),dur:duration+'s',repeatCount:'indefinite',keyTimes:'0;0.25;0.5;0.75;1'}))el.setAttribute(k,v);node.append(el);
+function animate(doc,node,attr,values,duration,keyTimes){
+  if(!node)return;const el=doc.createElementNS(NS,'animate');for(const [k,v] of Object.entries({attributeName:attr,values:values.join(';'),dur:duration+'s',repeatCount:'indefinite',keyTimes}))el.setAttribute(k,v);node.append(el);
 }
 function badgeShape(k,c,mode,badgePaths){if(!Object.hasOwn(badgePaths,k))return '';const d=badgePaths[k];if(mode!=='original')return `<path d="${d}" fill="${c}" fill-rule="evenodd"/>`;if(k==='gpt')return `<path d="${d.split('Z')[0]}Z" fill="#ffffff"/><path d="${d}" fill="#171719" fill-rule="evenodd"/>`;if(k==='gemini')return `<defs><linearGradient id="gemBase" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#34a853"/><stop offset=".42" stop-color="#4285f4"/><stop offset="1" stop-color="#4285f4"/></linearGradient><radialGradient id="gemRed" cx="50%" cy="0%" r="64%"><stop stop-color="#ea4335"/><stop offset="1" stop-color="#ea4335" stop-opacity="0"/></radialGradient><radialGradient id="gemYellow" cx="0%" cy="50%" r="53%"><stop stop-color="#fbbc04"/><stop offset="1" stop-color="#fbbc04" stop-opacity="0"/></radialGradient></defs><path d="${d}" fill="url(#gemBase)"/><path d="${d}" fill="url(#gemRed)"/><path d="${d}" fill="url(#gemYellow)"/>`;if(k==='grok')return `<circle r="16" fill="#171719"/><path d="${d}" fill="#ffffff"/>`;return `<path d="${d}" fill="${k==='claude'?'#d97757':'#4d6bfe'}" fill-rule="evenodd"/>`;}
 
 function mountBadge(doc,body,appearance,action,badges){
   if(appearance.badge==='none'||!badges)return;const cfg=body.config,$=id=>doc.getElementById(id),head=$(cfg.head),pet=$(cfg.pet),sleep=action==='sleep',onHead=appearance.badgePlace==='head';
   let parent=pet,before=null,anchor=cfg.badge;
-  if(onHead){parent=head;before=$('hat');anchor=body.id==='stoatA'?[178,105,1.6]:cfg.kind==='fish'?[150,65,.62]:cfg.kind==='snake'?[160,67,.62]:cfg.kind==='bird'?[160,65,.62]:cfg.kind==='stoat'?[160,87,.58]:[160,89,.65]}
+  if(onHead){parent=head;before=$('hat');anchor=body.id==='stoatA'?[178,102,1.6]:cfg.kind==='fish'?[150,65,.62]:cfg.kind==='snake'?[160,67,.62]:cfg.kind==='bird'?[160,65,.62]:cfg.kind==='stoat'?[160,87,.58]:[160,89,.65]}
   else if(cfg.kind==='bird'){parent=sleep?$('sleepBody'):$('standingBody');before=sleep?null:$('wingL');if(sleep)anchor=cfg.sleepB}
   else if(cfg.kind==='snake'){parent=sleep?head:pet;before=sleep?$('eyes'):head;if(sleep)anchor=cfg.sleepB}
   else if(cfg.kind==='fish')before=$('fin');else before=$('hands');
@@ -87,7 +89,7 @@ export function creatureSvg(source,body,defs,accessories,input,action='idle',{re
   if(cfg.kind==='snake'){
     if(!appearance.horn&&$('face')?.firstElementChild)$('face').firstElementChild.setAttribute('display','none');
     if($('giftAnchor'))$('giftAnchor').setAttribute('display',action==='sleep'?'none':'inline');
-    const f=tailFrames(action);if(f){const first=f.frames[0];$('bodyShape')?.setAttribute('d',first.body);$('bellyShape')?.setAttribute('d',first.belly);$('giftAnchor')?.setAttribute('transform','translate('+first.anchor.join(' ')+')');if(!reducedMotion&&action!=='sit'){animate(doc,$('bodyShape'),'d',f.frames.map(x=>x.body),f.duration);animate(doc,$('bellyShape'),'d',f.frames.map(x=>x.belly),f.duration);if($('giftAnchor')){const a=doc.createElementNS(NS,'animateTransform');for(const [k,v] of Object.entries({attributeName:'transform',type:'translate',values:f.frames.map(x=>x.anchor.join(' ')).join(';'),dur:f.duration+'s',repeatCount:'indefinite',keyTimes:'0;0.25;0.5;0.75;1'}))a.setAttribute(k,v);$('giftAnchor').append(a)}}}
+    const f=tailFrames(action);if(f){const first=f.frames[0];$('bodyShape')?.setAttribute('d',first.body);$('bellyShape')?.setAttribute('d',first.belly);$('giftAnchor')?.setAttribute('transform','translate('+first.anchor.join(' ')+')');if(!reducedMotion&&action!=='sit'){animate(doc,$('bodyShape'),'d',f.frames.map(x=>x.body),f.duration,f.keyTimes);animate(doc,$('bellyShape'),'d',f.frames.map(x=>x.belly),f.duration,f.keyTimes);if($('giftAnchor')){const a=doc.createElementNS(NS,'animateTransform');for(const [k,v] of Object.entries({attributeName:'transform',type:'translate',values:f.frames.map(x=>x.anchor.join(' ')).join(';'),dur:f.duration+'s',repeatCount:'indefinite',keyTimes:f.keyTimes}))a.setAttribute(k,v);$('giftAnchor').append(a)}}}
   }
   if(!appearance.hat&&$('hat'))$('hat').style.setProperty('display','none','important');
   if(appearance.glasses!=='none'){
