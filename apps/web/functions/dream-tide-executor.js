@@ -11,9 +11,10 @@ import {buildRealityContext} from './reality-context.js';
 import {localClock} from './dream-tide-schedule.js';
 import {dreamToolNames} from './dream-tide-policy.js';
 import {autonomousVoiceConfigured} from './voice-clips.js';
-import {autonomousImageModel,generateDreamImage} from './dream-tide-image.js';
+import {autonomousImageModel,generateDreamImage,prepareDreamImageReadback} from './dream-tide-image.js';
 import {proposeDreamMemory} from './dream-tide-memory.js';
 import {resolveToolSelection,executeModelTool} from './tool-registry-core.js';
+import {cachedCatalogModel} from './models/model-catalog.js';
 import {estimateWireInputTokens,assertWireInputBudget} from './context-budget.js';
 
 const tool=(name,description,properties,required)=>({type:'function',function:{name,description,parameters:{type:'object',properties,required,additionalProperties:false}}});
@@ -78,7 +79,7 @@ export async function buildDreamContext(db,claim,settings,now,env={COAST_CHAT_DB
 // enabled and the caller must be trusted. Native plan models are intentionally
 // not sent to OpenRouter. No scheduler is installed by this module.
 export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,expectedRevision=null,now=Date.now(),
-  prepare=prepareFormalChat,invoke=requestOpenRouter,clock=Date.now}={}){
+  prepare=prepareFormalChat,invoke=requestOpenRouter,generateImage=generateDreamImage,modelEntry=cachedCatalogModel,clock=Date.now}={}){
   const db=env.COAST_CHAT_DB;
   if(env.COAST_DREAM_TIDE_ENABLED!=='true'||busy!==false||signal?.aborted)return {status:'disabled_or_busy'};
   const config=await dreamExecutionConfig(db,cid,expectedRevision);
@@ -112,30 +113,33 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
       ...t,function:{...t.function,description:'可选：创建自己的书房批注、划线或读后感。此次活动不修改或删除既有笔记。',parameters:{...t.function.parameters,properties:{...t.function.parameters.properties,action:{type:'string',enum:['create']}}}}
     }:t);
     const imageModel=e.allowImage&&e.imageLimit>0?await autonomousImageModel(db,env):null;
-    const imageTool=imageModel?tool('image_generate','可选：生成并保存一张独立活动图像，使用已授权生图供应商额度。只发送必要绘图提示。不返回像素，不要假称看见。', {prompt:{type:'string',minLength:1,maxLength:4000}},['prompt']):null;
+    const imageTool=imageModel?tool('image_generate','可选：生成并保存一张独立活动图像，使用已授权生图供应商额度。只发送必要绘图提示。若已单独授权且当前模型支持视觉，下一请求可收到系统转交原图；未收到像素不要假称看见。', {prompt:{type:'string',minLength:1,maxLength:4000}},['prompt']):null;
     let imageAttempts=0,voiceAttempts=0;
     const commonNames=new Set(common.map(t=>t.function.name));
     const allowed=[...toolsFor(e,actual.allowExtra&&e.extraPerDay>0),...common,...(imageTool?[imageTool]:[])];
     const prepared=await prepare(env,{model:currentModelId,messages:context.messages,tools:e.toolBudget?allowed:[],settings:{max_tokens:e.outputLimit}},true);
     if(prepared.modelId!==currentModelId||prepared.payload.model!==currentModelId)throw Error('model route mismatch');
-    let messages=prepared.payload.messages;
+    let messages=prepared.payload.messages,pendingImages=[];
+    const entry=modelEntry(currentModelId),vision=entry?.architecture?.input_modalities;
+    const canReadImage=e.allowImageReadback===true&&Array.isArray(vision)&&vision.includes('image');
     for(let index=0;index<=e.toolBudget;index++){
       await authorize();
       const remaining=e.tokenBudget-used;
-      const payload={...prepared.payload,messages};
+      const images=pendingImages;pendingImages=[];
+      const payload={...prepared.payload,messages:[...messages,...images.map(x=>x.message)]};
       if(calls>=e.toolBudget||index===e.toolBudget){delete payload.tools;delete payload.tool_choice;}
       const estimate=estimateWireInputTokens(payload);
       const output=Math.min(e.outputLimit,remaining-estimate);
       if(!known||output<1){reason='budget_or_usage_unknown';break;}
       payload.max_completion_tokens=output;
       if('max_tokens' in payload)payload.max_tokens=output;
-      assertWireInputBudget(payload);
+      assertWireInputBudget(payload,entry);
       if(!await reserveDreamStep(db,claim,index,clock()))throw new DOMException('Aborted','AbortError');
       // A durable reservation is recorded before the potentially billable request.
       let raw;
       try{await authorize();raw=await invoke(env,payload,'Elementera Coast Dream Tide',controller.signal);}
       catch(error){
-        await recordDreamStep(db,claim,index,'failed',{error_type:safeError(error),usage:null,cost:null},clock());
+        await recordDreamStep(db,claim,index,'failed',{error_type:safeError(error),usage:null,cost:null,...(images.length?{image_readback_unconfirmed:images.map(x=>x.id)}:{})},clock());
         known=false;costKnown=false;throw error;
       }
       const usage=normalizeUsage(raw?.usage),stepCost=actualCost(raw?.usage?.cost),choice=raw?.choices?.[0];
@@ -145,7 +149,7 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
       try{requested=normalizeToolCalls(choice?.message?.tool_calls);}
       catch(error){await recordDreamStep(db,claim,index,'failed',{error_type:safeError(error),usage,cost:stepCost},clock());throw error;}
       const receipt={usage,cost:stepCost,model:typeof raw?.model==='string'?raw.model.slice(0,180):null,
-        finish_reason:typeof choice?.finish_reason==='string'?choice.finish_reason.slice(0,80):null,requested_tools:requested.map(x=>x.function.name)};
+        finish_reason:typeof choice?.finish_reason==='string'?choice.finish_reason.slice(0,80):null,requested_tools:requested.map(x=>x.function.name),...(images.length?{[choice?'image_readback_accepted':'image_readback_unconfirmed']:images.map(x=>x.id)}:{})};
       if(!await recordDreamStep(db,claim,index,'completed',receipt,clock()))throw new DOMException('Aborted','AbortError');
       await authorize();
       if(!choice||!known||used>=e.tokenBudget){reason='budget_or_usage_unknown';break;}
@@ -156,6 +160,7 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
       }
       if(choice.finish_reason!=='tool_calls'||!payload.tools?.length){reason='unexpected_tool_request';break;}
       const exposed=new Set(payload.tools.map(t=>t.function?.name)),results=[];
+      if(images.length)messages=[...messages,{role:'system',content:'【系统记录】上一请求曾转交自主活动图像 '+images.map(x=>x.id).join('、')+'；本请求不再附送这些像素。'}];
       for(const [callIndex,call] of requested.entries()){
         const name=call.function.name,a=parseArgs(call);
         let result={ok:false,reason:'unavailable_or_invalid'};
@@ -179,8 +184,14 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
               if(Number.isSafeInteger(at)&&at>clock()){extraAt=at;result={ok:true,status:'proposed_pending_completion'};}
               activities.push({kind:'extra_requested',ok:result.ok});
             }else if(name==='image_generate'&&imageModel&&exact(a,['prompt'])){
-              const value=await generateDreamImage(db,env,a,{...toolContext,autonomous_event:{step:index,index:callIndex}},{expectedModel:imageModel});
-              result={ok:true,record_id:value.id,data:value};activities.push({kind:name,ok:true});
+              const value=await generateImage(db,env,a,{...toolContext,autonomous_event:{step:index,index:callIndex}},{expectedModel:imageModel});
+              let readback='not_delivered';
+              if(canReadImage&&index<e.toolBudget)try{
+                await authorize();
+                const next=await prepareDreamImageReadback(db,cid,value.id,true);
+                if(next&&pendingImages.reduce((n,x)=>n+x.bytes,0)+next.bytes<=8*1024*1024){pendingImages.push(next);readback='prepared_for_next_request';}
+              }catch{/* saved original remains valid; no pixels claimed */}
+              result={ok:true,record_id:value.id,data:{...value,readback}};activities.push({kind:name,ok:true});
             }else if(commonNames.has(name)&&a&&!(name==='library_write'&&a.action!=='create')&&!(name==='create_diary'&&('replace_id' in a||'conflict_mode' in a))){
               // Recheck revision and current registry permission immediately
               // before dispatch; the registry still validates its own arguments.
