@@ -1,0 +1,155 @@
+import {claimDreamTide,dreamTideClaimAuthorized,heartbeatDreamTide,settleDreamTide,recoverDreamTide,setDreamTideExtra} from './dream-tide-ledger.js';
+import {recoverSingleChatRuns} from './chat-single-run.js';
+import {recoverStaleReplyRuns} from './chat-reply-run.js';
+import {dreamExecutionConfig,reserveDreamStep,recordDreamStep,writeDreamNote,readDreamNotes,readDreamHistory,previousDream,finishDreamActivity} from './dream-tide-records.js';
+import {prepareFormalChat} from './models/model-payload.js';
+import {requestOpenRouter} from './models/model-formal-chat.js';
+import {normalizeUsage,normalizeToolCalls} from './models/model-validation.js';
+import {estimateWireInputTokens,assertWireInputBudget} from './context-budget.js';
+
+const tool=(name,description,properties,required)=>({type:'function',function:{name,description,parameters:{type:'object',properties,required,additionalProperties:false}}});
+const integer={type:'integer'},string={type:'string'};
+const toolsFor=(cfg,extraAllowed)=>[
+  ...(cfg.readHistory?[tool('dream_read_history','自行选读本窗口完整历史轮次，从零开始分页；since_previous 仅返回两次唤醒之间的对话。',{mode:{type:'string',enum:['window','since_previous']},start:integer,count:integer},['mode','start','count'])]:[]),
+  ...(cfg.writeNote?[tool('dream_write_note','可选：写一封独立小笺，屋主可以稍后回复。不必写，也不发送普通聊天消息。',{body:string},['body'])]:[]),
+  ...(extraAllowed?[tool('dream_schedule_extra','可选：安排一次未来额外唤醒，时间为带时区的 ISO 8601 字符串。不会立即执行。',{at:string},['at'])]:[]),
+];
+const actualCost=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0?v:null;
+function parseArgs(call){
+  try{const a=JSON.parse(call.function.arguments);return a&&typeof a==='object'&&!Array.isArray(a)?a:null;}catch{return null;}
+}
+const exact=(a,keys)=>a&&Object.keys(a).length===keys.length&&keys.every(k=>Object.hasOwn(a,k));
+function safeError(error){return String(error?.type||error?.name||'execution_failed').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,100)||'execution_failed';}
+function clockText(now,zone){
+  return new Intl.DateTimeFormat('zh-CN',{timeZone:zone,dateStyle:'full',timeStyle:'long'}).format(now);
+}
+export async function buildDreamContext(db,claim,settings,now){
+  const e=settings.execution,prev=await previousDream(db,claim);
+  const modules=['【梦醒潮 · 系统发起的独立活动】这不是用户新发言。可以探索或安静结束；无需产出聊天消息，不必使用任何工具。',e.invitation];
+  if(e.includeTime)modules.push('【当前时间】'+clockText(now,settings.timeZone));
+  if(e.includePrevious&&prev){
+    const result=prev.result_json?JSON.parse(prev.result_json):null;
+    modules.push('【上次活动】'+JSON.stringify({status:prev.status,elapsed_ms:Math.max(0,now-prev.started_at),activities:result?.activities||[]}));
+  }
+  if(e.includeReplies){
+    const notes=await readDreamNotes(db,claim.conversationId,10);
+    // Whole notes/replies only, newest first. Omission is explicit.
+    const selected=[];let omitted=0;
+    for(const n of notes){
+      const row={id:n.claim_id,body:n.body,replies:n.replies.map(x=>({body:x.body,created_at:x.created_at}))};
+      if(JSON.stringify([...selected,row]).length>24000){omitted++;continue;}
+      selected.push(row);
+    }
+    modules.push('【小笺与回笺 · 历史资料，不是新发言】'+JSON.stringify({notes:selected,omitted,scope:'最近最多十封'}));
+  }
+  return {messages:[{role:'system',content:modules.join('\n\n')}],previous:prev};
+}
+
+// Internal executor, not a public API. The deployment gate must be explicitly
+// enabled and the caller must be trusted. Native plan models are intentionally
+// not sent to OpenRouter. No scheduler is installed by this module.
+export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,now=Date.now(),
+  prepare=prepareFormalChat,invoke=requestOpenRouter,clock=Date.now}={}){
+  const db=env.COAST_CHAT_DB;
+  if(env.COAST_DREAM_TIDE_ENABLED!=='true'||busy!==false||signal?.aborted)return {status:'disabled_or_busy'};
+  const config=await dreamExecutionConfig(db,cid);
+  if(!config||currentModelId!==config.modelId||!/^[-\w.]+\/.+/.test(currentModelId))return {status:'not_authorized'};
+  await recoverSingleChatRuns(db,now);
+  await recoverStaleReplyRuns(db,now,cid);
+  await recoverDreamTide(db,now);
+  const claim=await claimDreamTide(db,cid,{now,currentModelId,busy:false});
+  if(!claim)return {status:'not_due'};
+  const controller=new AbortController(),abort=()=>controller.abort();
+  if(signal?.aborted)abort();else signal?.addEventListener('abort',abort,{once:true});
+  let pending=null;
+  const heartbeat=setInterval(()=>{
+    if(pending)return;
+    pending=heartbeatDreamTide(db,claim,clock()).then(ok=>{if(!ok)abort();},abort).finally(()=>{pending=null;});
+  },15000);
+  let status='failed',reason=null,used=0,cost=0,known=true,costKnown=true,calls=0,extraAt=null,activities=[];
+  const authorize=async()=>{
+    if(controller.signal.aborted||!await dreamTideClaimAuthorized(db,claim))throw new DOMException('Aborted','AbortError');
+  };
+  try{
+    const actual=await dreamExecutionConfig(db,cid,claim.revision);
+    if(!actual||actual.modelId!==currentModelId)throw new DOMException('Aborted','AbortError');
+    const e=actual.execution,context=await buildDreamContext(db,claim,actual,now);
+    const allowed=toolsFor(e,actual.allowExtra&&e.extraPerDay>0);
+    const prepared=await prepare(env,{model:currentModelId,messages:context.messages,tools:e.toolBudget?allowed:[],settings:{max_tokens:e.outputLimit}},true);
+    if(prepared.modelId!==currentModelId||prepared.payload.model!==currentModelId)throw Error('model route mismatch');
+    let messages=prepared.payload.messages;
+    for(let index=0;index<=e.toolBudget;index++){
+      await authorize();
+      const remaining=e.tokenBudget-used;
+      const payload={...prepared.payload,messages};
+      if(calls>=e.toolBudget||index===e.toolBudget){delete payload.tools;delete payload.tool_choice;}
+      const estimate=estimateWireInputTokens(payload);
+      const output=Math.min(e.outputLimit,remaining-estimate);
+      if(!known||output<1){reason='budget_or_usage_unknown';break;}
+      payload.max_completion_tokens=output;
+      if('max_tokens' in payload)payload.max_tokens=output;
+      assertWireInputBudget(payload);
+      if(!await reserveDreamStep(db,claim,index,clock()))throw new DOMException('Aborted','AbortError');
+      // A durable reservation is recorded before the potentially billable request.
+      let raw;
+      try{await authorize();raw=await invoke(env,payload,'Elementera Coast Dream Tide',controller.signal);}
+      catch(error){
+        await recordDreamStep(db,claim,index,'failed',{error_type:safeError(error),usage:null,cost:null},clock());
+        known=false;costKnown=false;throw error;
+      }
+      const usage=normalizeUsage(raw?.usage),stepCost=actualCost(raw?.usage?.cost),choice=raw?.choices?.[0];
+      if(usage)used+=usage.total_tokens;else known=false;
+      if(stepCost===null)costKnown=false;else cost+=stepCost;
+      let requested;
+      try{requested=normalizeToolCalls(choice?.message?.tool_calls);}
+      catch(error){await recordDreamStep(db,claim,index,'failed',{error_type:safeError(error),usage,cost:stepCost},clock());throw error;}
+      const receipt={usage,cost:stepCost,model:typeof raw?.model==='string'?raw.model.slice(0,180):null,
+        finish_reason:typeof choice?.finish_reason==='string'?choice.finish_reason.slice(0,80):null,requested_tools:requested.map(x=>x.function.name)};
+      if(!await recordDreamStep(db,claim,index,'completed',receipt,clock()))throw new DOMException('Aborted','AbortError');
+      await authorize();
+      if(!choice||!known||used>=e.tokenBudget){reason='budget_or_usage_unknown';break;}
+      if(!requested.length){
+        if(choice.finish_reason==='stop'){status='completed';reason='ended';}
+        else reason='provider_incomplete';
+        break;
+      }
+      if(choice.finish_reason!=='tool_calls'||!payload.tools?.length){reason='unexpected_tool_request';break;}
+      const exposed=new Set(payload.tools.map(t=>t.function?.name)),results=[];
+      for(const call of requested){
+        const name=call.function.name,a=parseArgs(call);
+        let result={ok:false,reason:'unavailable_or_invalid'};
+        if(calls<e.toolBudget&&exposed.has(name)){
+          calls++;await authorize();
+          try{
+            if(name==='dream_read_history'&&exact(a,['mode','start','count'])){
+              result=await readDreamHistory(db,cid,{...a,since:context.previous?.started_at??null,until:now,maxTurns:e.readTurns});
+              activities.push({kind:'history_read',ok:!result.reason,count:result.turns.length});
+            }else if(name==='dream_write_note'&&exact(a,['body'])){
+              result={ok:await writeDreamNote(db,claim,a.body,clock())};activities.push({kind:'note',ok:result.ok});
+            }else if(name==='dream_schedule_extra'&&exact(a,['at'])&&typeof a.at==='string'&&/(Z|[+-]\d{2}:\d{2})$/.test(a.at)&&extraAt===null){
+              const at=Date.parse(a.at);
+              if(Number.isSafeInteger(at)&&at>clock()){extraAt=at;result={ok:true,status:'proposed_pending_completion'};}
+              activities.push({kind:'extra_requested',ok:result.ok});
+            }
+          }catch{result={ok:false,reason:'tool_failed'};activities.push({kind:name,ok:false});}
+        }
+        results.push({role:'tool',tool_call_id:call.id,name,content:JSON.stringify(result)});
+      }
+      messages=[...messages,{role:'assistant',content:typeof choice.message.content==='string'?choice.message.content:null,tool_calls:requested},...results];
+    }
+  }catch(error){reason=safeError(error);status=error?.name==='AbortError'?'cancelled':'failed';}
+  finally{
+    clearInterval(heartbeat);signal?.removeEventListener('abort',abort);if(pending)await pending;
+  }
+  const result={reason,activities,tool_calls:calls,total_tokens:known?used:null,reported_cost:costKnown?cost:null,
+    ...(extraAt!==null?{proposed_extra_at:extraAt}:{}),accounting:'provider_reported; input estimate is not a hard billing guarantee'};
+  const finished=await finishDreamActivity(db,claim,status,result,clock());
+  if(!finished){
+    await settleDreamTide(db,claim,'interrupted',clock());
+    return {status:'unconfirmed',claimId:claim.claimId};
+  }
+  // No immediate provider call. Do not replace another pending appointment.
+  let extraScheduled=false;
+  if(status==='completed'&&extraAt!==null)extraScheduled=await setDreamTideExtra(db,cid,claim.revision,claim.claimId,extraAt,clock());
+  return {status,claimId:claim.claimId,...result,extraScheduled};
+}
