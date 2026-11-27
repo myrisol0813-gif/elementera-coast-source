@@ -36,7 +36,7 @@ internal fun studioAssetPath(uri: Uri): String? {
     }
 }
 
-private class StudioExportBridge(private val export: (String) -> Unit) {
+internal class StudioExportBridge(private val export: (String) -> Unit) {
     @JavascriptInterface fun exportLayout(json: String) {
         if (json.length > MAX_STUDIO_JSON || json.toByteArray(Charsets.UTF_8).size > MAX_STUDIO_JSON) return
         Handler(Looper.getMainLooper()).post { export(json) }
@@ -99,7 +99,7 @@ internal fun PetScreen() {
                 }
             }
             webChromeClient = object : WebChromeClient() {
-                override fun onShowFileChooser(view: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
+                override fun onShowFileChooser(view: WebView, callback: ValueCallback<Array<Uri>>, params: WebChromeClient.FileChooserParams): Boolean {
                     fileCallback?.onReceiveValue(null)
                     fileCallback = callback
                     try { pick.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }
