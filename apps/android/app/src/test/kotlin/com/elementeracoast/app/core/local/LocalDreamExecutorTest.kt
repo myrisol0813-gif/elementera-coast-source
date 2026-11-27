@@ -330,6 +330,10 @@ class LocalDreamExecutorTest {
             val originals=LocalAttachmentStore(dst);assertArrayEquals(png,originals.bytes(originals.entries().single()))
             val restored=LocalSideRecords(dst);assertArrayEquals(mp3,restored.bytes(restored.audio(voiceId)!!))
             assertEquals(side.rows(),restored.rows())
+            val archive=LocalDreamArchive(dst)
+            for(id in listOf(pictureId,voiceId))assertEquals(JsonPrimitive(claim.id),archive.activity(cid,0,id).getValue("items").jsonArray.single().jsonObject["claim_id"])
+            assertTrue(archive.activity(cid,0,pictureId+"_forged").getValue("items").jsonArray.isEmpty())
+            assertTrue(archive.activity("other",0,voiceId).getValue("items").jsonArray.isEmpty())
         }finally{dir.deleteRecursively()}
     }
 
