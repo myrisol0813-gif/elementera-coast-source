@@ -1,4 +1,5 @@
 import {ensureChatSchema,readConversationState} from './chat-store.js';
+import {dreamToolAllowed} from './dream-tide-policy.js';
 import {localClock} from './dream-tide-schedule.js';
 
 const stmt=(db,sql,...args)=>db.prepare(sql).bind(...args);
@@ -32,8 +33,10 @@ export async function recordDreamStep(db,claim,index,status,receipt,now=Date.now
   return r.meta.changes===1;
 }
 export async function reserveDreamTool(db,claim,step,index,name,now=Date.now()){
-  if(!Number.isSafeInteger(step)||step<0||!Number.isSafeInteger(index)||index<0||!['dream_read_history','dream_write_note','dream_schedule_extra'].includes(name))return false;
+  if(!Number.isSafeInteger(step)||step<0||!Number.isSafeInteger(index)||index<0||typeof name!=='string'||name.length>120)return false;
   await ensureChatSchema(db);
+  const config=await dreamExecutionConfig(db,claim.conversationId,claim.revision);
+  if(!config||!dreamToolAllowed(config,name))return false;
   const r=await stmt(db,`INSERT OR IGNORE INTO dream_tide_tool_events(claim_id,step_index,call_index,tool_name,status,started_at)
     SELECT ?,?,?,?,'claimed',? WHERE EXISTS(SELECT 1 FROM dream_tide_runs r JOIN dream_tide_arms a ON a.conversation_id=r.conversation_id WHERE ${active})
     AND EXISTS(SELECT 1 FROM dream_tide_steps WHERE claim_id=? AND step_index=? AND status='completed')
