@@ -177,7 +177,7 @@ export async function resolveTreasureSource(db, input = {}) {
     if(origin.status==='ambiguous')throw new TreasureError('source_ambiguous','同一原件关联了不同发送者，不能猜测收藏来源。',409);
     // Legacy human attachment favorites stored no message ID. Keep restore
     // compatibility while giving new assistant originals their exact variant.
-    role=origin.role || 'user';
+    role=String(row.id).startsWith('att_dream_')&&row.turn_id==null?'assistant':origin.role || 'user';
     messageId=origin.role==='assistant'?origin.messageId:null;
     if(origin.role==='assistant'&&!messageId)throw new TreasureError('source_ambiguous','无法唯一确认助手图片所属消息。',409);
   }
