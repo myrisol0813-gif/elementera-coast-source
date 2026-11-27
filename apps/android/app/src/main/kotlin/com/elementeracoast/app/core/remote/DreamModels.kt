@@ -39,7 +39,7 @@ data class DreamSettings(
 data class DreamSettingsResponse(
     val ok:Boolean=false,val settings:DreamSettings=DreamSettings(),
     val executionAvailable:Boolean=false,val schedulerConfigured:Boolean=false,
-    val planExecutionAvailable:Boolean=false,val planStatus:String?=null
+    val planExecutionAvailable:Boolean=false,val planStatus:String?=null,val planRequestLimit:Int?=null
 )
 
 @Serializable
