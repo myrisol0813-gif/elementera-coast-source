@@ -78,6 +78,20 @@ export function validateDreamArchive(v,cid){
   }
   return v;
 }
+// Present originals must refer to a real historical tool reservation. A
+// missing original does not invalidate a historical receipt (e.g. deletion
+// or a selected-module export). An interrupted save may lack its receipt.
+export function validateDreamMediaOrigin(archive,row,kind){
+  const prefix=kind==='voice'?'voice_dream_':'att_dream_';
+  const independent=String(row.id).startsWith(prefix)||kind==='voice'&&row.source==='dream_tide';
+  if(!independent)return;
+  check(row.turn_id===null&&(kind==='voice'?row.message_id===null&&row.source==='dream_tide':row.kind==='image'),'invalid autonomous media origin');
+  const name=kind==='voice'?'voice_create':'image_generate';
+  const event=archive?.tools?.find(e=>e.tool_name===name&&row.id===prefix+e.claim_id+'_'+e.step_index+'_'+e.call_index);
+  check(event&&archive.runs.some(r=>r.claim_id===event.claim_id&&r.conversation_id===row.conversation_id),'autonomous media activity missing');
+  const receipt=event.receipt_json==null?null:JSON.parse(event.receipt_json);
+  check(!receipt?.record_id||receipt.record_id===row.id,'autonomous media receipt differs');
+}
 // Prepared statements participate in the existing atomic chat restore. No
 // original permission survives; even an archive of an enabled window creates
 // a disabled draft and terminal receipts only.
