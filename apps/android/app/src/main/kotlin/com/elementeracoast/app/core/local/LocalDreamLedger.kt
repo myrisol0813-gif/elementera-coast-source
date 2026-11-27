@@ -126,6 +126,12 @@ internal class LocalDreamLedger(private val store:LocalPersistence){
         val row=JsonObject(old+mapOf("status" to JsonPrimitive(if(success)"completed"else "failed"),"receipt_json" to JsonPrimitive(receipt.toString()),"finished_at" to JsonPrimitive(now)))
         JsonObject(h+("steps" to JsonArray(rows.map{if(it==old)row else it})))
     }
+    fun toolClaimed(c:Claim,callId:String,name:String)=store.readConsistent{s->
+        val h=LocalDreamArchive(s).runtimeHistory(c.cid)
+        authorized(s,c,h)&&LocalDreamToolPolicy.allowed(c,name)&&h.rows("tools").any{r->
+            r.str("claim_id")==c.id&&r.str("tool_name")==name&&r.str("status")=="claimed"&&
+                callId==c.id+":"+r.str("step_index")+":"+r.str("call_index")}
+    }
     fun reserveTool(c:Claim,step:Int,index:Int,name:String,now:Long)=mutate(c){h->
         val e=requireNotNull(c.config.execution)
         if(!LocalDreamToolPolicy.allowed(c,name))return@mutate null
