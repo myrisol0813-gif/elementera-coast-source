@@ -60,3 +60,9 @@ export function maintainSingleChatRun(db,claim,externalSignal){
     return closed;
   }};
 }
+
+export async function hasSingleChatClaim(db,cid,claimId){
+  if(!valid(cid)||!valid(claimId))return false;
+  await ensureChatSchema(db);
+  return !!await stmt(db,"SELECT 1 FROM chat_single_runs WHERE conversation_id=? AND claim_id=?",cid,claimId).first();
+}
