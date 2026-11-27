@@ -1,7 +1,7 @@
 import {ensureChatSchema} from './chat-store.js';
 import {dreamTideCandidate,localClock} from './dream-tide-schedule.js';
 
-// Internal D1 ledger; not reachable from a route or scheduler yet.
+// Internal D1 ledger. Only authenticated owner configuration may change authorization.
 // Only an authenticated owner action may call armDreamTide/disarmDreamTide.
 // Never archive authorization or active claims. Import must not call arm.
 const stmt=(db,sql,...args)=>db.prepare(sql).bind(...args);
@@ -44,6 +44,34 @@ export async function armDreamTide(db,cid,config,modelId,now=Date.now()){
     armed_at=excluded.armed_at,model_id=excluded.model_id,extra_id=NULL,extra_at=NULL`,
     cid,revision,JSON.stringify(cfg),now,modelId,cid,cid).run();
   return changed(result)?revision:null;
+}
+// Owner-facing configuration uses a compare-and-swap revision. Saving a
+// draft is deliberately different from granting execution permission.
+export async function readDreamSettings(db,cid){
+  if(!id(cid))throw new TypeError('invalid window');
+  await schema(db);
+  if(!await stmt(db,liveWindow,cid).first())return null;
+  const row=await stmt(db,"SELECT revision,enabled,config_json,model_id,armed_at,extra_at FROM dream_tide_arms WHERE conversation_id=?",cid).first();
+  if(!row)return {revision:null,enabled:false,config:null,modelId:null,armedAt:null,extraAt:null};
+  const running=!!await stmt(db,"SELECT 1 FROM dream_tide_runs WHERE conversation_id=? AND status='running'",cid).first();
+  return {revision:row.revision,enabled:row.enabled===1,config:JSON.parse(row.config_json),modelId:row.model_id,
+    armedAt:row.enabled===1?row.armed_at:null,extraAt:row.enabled===1?row.extra_at:null,running};
+}
+export async function configureDreamTide(db,cid,config,modelId,{expectedRevision=null,enable=false,now=Date.now()}={}){
+  if(!id(cid)||!time(now)||typeof modelId!=='string'||!modelId.trim()||modelId.length>180||
+    (expectedRevision!==null&&!id(expectedRevision)))throw new TypeError('invalid dream configuration identity');
+  const cfg=normalizeConfig(config),revision=crypto.randomUUID();
+  if(enable&&!cfg.execution)throw new TypeError('explicit execution consent required');
+  await schema(db);
+  const noRun="NOT EXISTS(SELECT 1 FROM dream_tide_runs WHERE conversation_id=? AND status='running')";
+  const result=expectedRevision===null
+    ?await stmt(db,`INSERT OR IGNORE INTO dream_tide_arms(conversation_id,revision,enabled,config_json,armed_at,model_id)
+      SELECT ?,?,?,?,?,? WHERE EXISTS(${liveWindow}) AND ${noRun}`,
+      cid,revision,enable?1:0,JSON.stringify(cfg),now,modelId,cid,cid).run()
+    :await stmt(db,`UPDATE dream_tide_arms SET revision=?,enabled=?,config_json=?,armed_at=?,model_id=?,extra_id=NULL,extra_at=NULL
+      WHERE conversation_id=? AND revision=? AND EXISTS(${liveWindow}) AND ${noRun}`,
+      revision,enable?1:0,JSON.stringify(cfg),now,modelId,cid,expectedRevision,cid,cid).run();
+  return changed(result)?await readDreamSettings(db,cid):null;
 }
 export async function disarmDreamTide(db,cid,revision){
   if(!id(cid)||!id(revision))throw new TypeError('invalid arm identity');
