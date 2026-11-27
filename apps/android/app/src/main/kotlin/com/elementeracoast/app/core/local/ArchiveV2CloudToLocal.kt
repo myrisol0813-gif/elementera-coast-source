@@ -76,7 +76,7 @@ internal object ArchiveV2CloudToLocal {
                         for(k in listOf("id","day","kind","title","body","recurrence","author","source","created_at","updated_at"))put(k,data.getValue(k))
                         for(k in listOf("model_label","tool_call_id","conversation_id","source_turn_id"))data.getValue(k).takeIf { it!=JsonNull }?.let { put(k,it) }
                         // Keep explicit no-chat-turn provenance for independent activity.
-                        if(data["source_turn_id"]==JsonNull&&data["source"]==JsonPrimitive("chat_tool")&&
+                        if(data["source_turn_id"]==JsonNull&&data["source"] in setOf(JsonPrimitive("chat_tool"),JsonPrimitive("coast_chat"))&&
                             data["tool_call_id"]?.jsonPrimitive?.contentOrNull.orEmpty().startsWith("dream:"))put("source_turn_id",JsonNull)
                         put("occurrence_day",data.getValue("day"))
                         if(data["anniversary_mode"]!=JsonNull)putJsonObject("anniversary"){
