@@ -133,3 +133,35 @@ test('ordinary chat readback remains independent of scheduling and rechecks perm
   await assert.rejects(()=>executeModelTool(db,toolCall('r4','dream_readback',{kind:'notes'}),ctx),/未授权/);
   assert.equal(calls,2);
 });
+
+test('autonomous daily and calendar writes are append-only, attributed and fenced',async()=>{
+  const {env,db,cid,opts,rev}=await fixture({allowDailyWrite:true,allowCalendarWrite:true,tokenBudget:24000,toolBudget:5});
+  const {listMoments,listDiaries,createDiary}=await import('../functions/daily-store.js');
+  const {listCalendarEntries}=await import('../functions/calendar-store.js');
+  const {claimDreamTide}=await import('../functions/dream-tide-ledger.js');
+  const {apiModelPartnerIdentity}=await import('../functions/coast-identity.js');
+  let calls=0;
+  const out=await executeDreamTide(env,cid,{...opts,invoke:async(_,payload)=>{
+    calls++;
+    if(calls===1){
+      const names=payload.tools.map(t=>t.function.name);
+      assert.ok(names.includes('create_diary')&&names.includes('create_moment')&&names.includes('calendar_create'));
+      assert.ok(!names.includes('calendar_delete')&&!names.includes('moment_comment'));
+      return response([toolCall('d','create_diary',{text:'fixture diary',date:'2026-11-27'}),toolCall('m','create_moment',{text:'fixture moment',date:'2026-11-27'}),toolCall('c','calendar_create',{title:'fixture calendar',day:'2026-11-28',kind:'note'})]);
+    }
+    return response();
+  }});
+  assert.equal(out.status,'completed');assert.equal(calls,2);
+  const diaries=await listDiaries(db,{date:'2026-11-27'}),moments=await listMoments(db,{date:'2026-11-27'}),calendar=await listCalendarEntries(db,{month:'2026-11'});
+  assert.equal(diaries.length,1);assert.equal(moments.length,1);assert.equal(calendar.length,1);
+  assert.equal(diaries[0].source_turn_id,null);assert.equal(moments[0].source_turn_id,null);assert.equal(calendar[0].source_turn_id,null);
+  assert.equal(diaries[0].author,'api');assert.equal(diaries[0].model_label,model);
+  assert.match(diaries[0].tool_call_id,/^dream:/);
+  const receipts=(await readDreamActivity(db,cid))[0].tools;
+  assert.deepEqual(receipts.map(t=>t.receipt.record_id),[diaries[0].id,moments[0].id,calendar[0].id]);
+  const claim=await claimDreamTide(db,cid,{now:due+86400000,currentModelId:model,busy:false});assert.ok(claim);
+  await disarmDreamTide(db,cid,rev);
+  await assert.rejects(()=>createDiary(db,{text:'revoked',date:'2026-11-27',conflict_mode:'append'},
+    {author:'api',source:'chat_tool',conversation_id:cid,source_turn_id:null,identity:apiModelPartnerIdentity({model_label:model}),autonomous_claim:claim,autonomous_event:{step:0,index:0}}),/权限已撤回/);
+  assert.equal((await listDiaries(db,{date:'2026-11-27'})).length,1);
+});
