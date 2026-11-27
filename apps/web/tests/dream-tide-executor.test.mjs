@@ -168,7 +168,7 @@ test('autonomous daily and calendar writes are append-only, attributed and fence
 
 
 test('autonomous voice preserves audio originals, rejects revoked and duplicate claims',async()=>{
-  const {db,cid,env,rev}=await fixture({allowVoice:true,toolBudget:5});
+  const {db,cid,env,rev}=await fixture({allowVoice:true,voiceLimit:2,toolBudget:5});
   const {claimDreamTide}=await import('../functions/dream-tide-ledger.js');
   const {reserveDreamStep,recordDreamStep,reserveDreamTool}=await import('../functions/dream-tide-records.js');
   const {generateVoiceClip,voiceClipAudio,listVoiceClips}=await import('../functions/voice-clips.js');
@@ -215,7 +215,7 @@ test('autonomous voice is not exposed without the separate deployment gate',asyn
 
 
 test('independent image preserves exact original, is not a chat attachment, and fences revocation',async()=>{
-  const {db,cid,env,rev}=await fixture({allowImage:true,toolBudget:5});
+  const {db,cid,env,rev}=await fixture({allowImage:true,imageLimit:2,toolBudget:5});
   const {writeProfile}=await import('../functions/chat-store.js');
   const {claimDreamTide}=await import('../functions/dream-tide-ledger.js');
   const {reserveDreamStep,recordDreamStep,reserveDreamTool}=await import('../functions/dream-tide-records.js');
