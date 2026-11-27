@@ -11,8 +11,9 @@ fn raster(svg: &str, w: u32, h: u32) -> Option<Vec<u8>> {
     let mut options = usvg::Options::default();
     // Only the OS's installed fonts, never font files or external URLs from the SVG.
     for path in ["/system/fonts/Roboto-Regular.ttf", "/system/fonts/NotoSans-Regular.ttf", "/system/fonts/NotoSansCJK-Regular.ttc"] {
-        let _ = options.fontdb_mut().load_font_file(path);
+        if let Ok(data) = std::fs::read(path) { options.fontdb_mut().load_font_data(data); }
     }
+    options.font_family = "Roboto".to_owned();
     let tree = usvg::Tree::from_str(svg, &options).ok()?;
     let mut pixmap = tiny_skia::Pixmap::new(w, h)?;
     let s = tree.size();
