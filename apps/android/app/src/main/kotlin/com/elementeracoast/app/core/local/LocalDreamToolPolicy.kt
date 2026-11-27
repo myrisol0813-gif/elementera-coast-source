@@ -18,6 +18,7 @@ internal object LocalDreamToolPolicy{
             "create_moment","create_diary"->e.allowDailyWrite
             "calendar_create"->e.allowCalendarWrite
             "voice_create"->e.allowVoice
+            "image_generate"->e.allowImage
             else->false
         }
     }
