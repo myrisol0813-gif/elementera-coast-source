@@ -57,6 +57,8 @@ jobs:
           if [[ ! -d "$ndk" ]]; then ndk="$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"; fi
           test -d "$ndk/toolchains/llvm"
           echo "ANDROID_NDK_HOME=$ndk" >> "$GITHUB_ENV"
+      - name: Verify native art and legacy recovery fixtures
+        run: cargo test --manifest-path native-art/Cargo.toml
       - name: Verify source identity
         shell: bash
         run: |
