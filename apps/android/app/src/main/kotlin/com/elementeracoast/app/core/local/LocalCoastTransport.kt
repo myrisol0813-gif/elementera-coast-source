@@ -161,8 +161,9 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 return ok(r, "conversation" to element(RemoteConversation.serializer(), next))
             }
             if (method == "DELETE") {
-                if(LocalReplyRunStore(store).active(cid))return failure(r,409,"reply_run_active","当前窗口正在连续回复。")
+                if(LocalReplyRunStore(store).active(cid)||LocalDreamLedger(store).active(cid))return failure(r,409,"generation_active","当前窗口正在执行活动。")
                 store.atomic{staged->
+                    require(!LocalDreamLedger(staged).active(cid)){"窗口正在自主唤醒。"}
                     LocalSideRecords(staged).removeConversation(cid)
                     LocalDogtalkStore(staged).deleteConversation(cid)
                     LocalDreamArchive(staged).remove(cid)
@@ -182,7 +183,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             if (method == "GET") {
                 LocalReplyRunStore(store).recover(cid)
                 val h=store.readConsistent{s->val c=RemoteCacheStore(s,strictReads=true);val old=c.history(cid)?:RemoteHistory(conversationId=cid)
-                    if(LocalReplyRunStore(s).active(cid))old else LocalImageRecovery.recover(old).also{if(it!=old)c.putHistory(cid,it)}}
+                    if(LocalReplyRunStore(s).active(cid)||LocalDreamLedger(s).active(cid))old else LocalImageRecovery.recover(old).also{if(it!=old)c.putHistory(cid,it)}}
                 return ok(r,"source" to JsonPrimitive("local"),"history" to element(RemoteHistory.serializer(),h))
             }
             if (method == "PUT") {
@@ -190,7 +191,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
                 val h=store.readConsistent{s->
                     val c=RemoteCacheStore(s,strictReads=true)
                     val old=c.history(cid)?:RemoteHistory(conversationId=cid)
-                    require(!LocalReplyRunStore(s).active(cid)){"当前窗口正在连续回复。"}
+                    require(!LocalReplyRunStore(s).active(cid)&&!LocalDreamLedger(s).active(cid)){"当前窗口正在执行活动。"}
                     LocalReplyRunStore.protect(old,input,r.header("X-Coast-Delete-Revision"))
                     val next=LocalImageRecovery.protect(old,input,r.header("X-Coast-Delete-Revision")).copy(conversationId=cid,updatedAt=now())
                     val originals=LocalAttachmentStore(s)
