@@ -38,3 +38,25 @@ export async function isSingleChatRunActive(db,cid){
   await ensureChatSchema(db);
   return !!await stmt(db,"SELECT 1 FROM chat_single_runs WHERE conversation_id=?",cid).first();
 }
+
+/** Keep a server-side lease alive until the actual request finishes. A lost
+ * heartbeat aborts execution rather than silently allowing another owner. */
+export function maintainSingleChatRun(db,claim,externalSignal){
+  const controller=new AbortController();
+  const abort=()=>controller.abort();
+  if(externalSignal?.aborted)abort();
+  else externalSignal?.addEventListener('abort',abort,{once:true});
+  let pending=null,closed=null;
+  const timer=setInterval(()=>{
+    if(pending||closed)return;
+    pending=heartbeatSingleChatRun(db,claim).then(ok=>{if(!ok)abort();},abort).finally(()=>{pending=null;});
+  },60*1000);
+  return {signal:controller.signal,abort,close(){
+    if(!closed){
+      clearInterval(timer);
+      externalSignal?.removeEventListener('abort',abort);
+      closed=(async()=>{if(pending)await pending;return releaseSingleChatRun(db,claim);})();
+    }
+    return closed;
+  }};
+}
