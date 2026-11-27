@@ -154,6 +154,26 @@ private fun NativeStudioPage(r: StudioResources) {
             StudioMotionRequest(layer.role,if(layer.role=="model")state.household.model else state.household.human,layer.anchor.action,null)
         }
     }
+    val furnitureMotionKeys=if(panel!="room")emptySet()else buildSet{
+        for(layer in scene)when(layer){
+            is NativeSceneLayer.Environment -> r.atlas.movingEnvironmentKey(layer.path)?.let{add(it)}
+            is NativeSceneLayer.Furniture -> layer.asset?.let{a->r.atlas.movingFurnitureKey(a,layer.part,layer.item.colors)?.let{add(it)}}
+            is NativeSceneLayer.Occupant -> Unit
+        }
+    }
+    val movingFurniture by produceState<Map<String,android.graphics.Bitmap>>(emptyMap(),r.atlas,furnitureMotionKeys,state.reducedMotion,editing){
+        value=emptyMap()
+        if(state.reducedMotion||editing||furnitureMotionKeys.isEmpty())return@produceState
+        val start=SystemClock.uptimeMillis()
+        while(isActive){
+            val elapsed=SystemClock.uptimeMillis()-start
+            // Only authored moving layers; do not repaint the full room or static furniture.
+            value=withContext(Dispatchers.Default){
+                furnitureMotionKeys.mapNotNull{key->r.atlas.furnitureMotionFrame(key,elapsed)?.let{key to it}}.toMap()
+            }
+            delay(250)
+        }
+    }
     val moving by produceState<Map<String,android.graphics.Bitmap>>(emptyMap(),r.atlas,motionRequests,state.reducedMotion,panel){
         value=emptyMap()
         if(state.reducedMotion||motionRequests.isEmpty())return@produceState
@@ -169,7 +189,7 @@ private fun NativeStudioPage(r: StudioResources) {
             delay(125)
         }
     }
-    val images=remember(r.atlas,bitmaps,state.household,moving){NativeRestSpriteSnapshot(r.atlas,bitmaps,state.household,moving)}
+    val images=remember(r.atlas,bitmaps,state.household,moving,movingFurniture){NativeRestSpriteSnapshot(r.atlas,bitmaps,state.household,moving+movingFurniture)}
     val unsupported = items.count { item -> item.visible && r.cat.assets[item.assetId]?.let {
         !r.atlas.has(r.atlas.furnitureKey(it,NativePaintPart.WHOLE,item.colors))
     } != false }

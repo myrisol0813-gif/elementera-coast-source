@@ -88,6 +88,19 @@ class NativeFurnitureSvg(private val art: RestArtRepository) {
         }
         return NativeSvgXml.serialize(doc)
     }
+    /** Tracks address the element order of the same source after the same front/back split. */
+    fun animatePrepared(svg:String,tracks:List<NativeMotionTrack>,elapsedMs:Long):String {
+        val doc=NativeSvgXml.parse(svg)
+        val elements=NativeSvgXml.elements(doc.documentElement)
+        for(track in tracks) {
+            require(track.attribute in setOf("transform","opacity","d"))
+            val index=track.targetId.takeIf{it.startsWith("@")}?.substring(1)?.toIntOrNull()?:continue
+            val target=elements.getOrNull(index)?:error("Missing original animated element")
+            track.frame(elapsedMs)?.let{target.setAttribute(track.attribute,it)}
+        }
+        return NativeSvgXml.serialize(doc)
+    }
+
     companion object {
         private val hex=Regex("^#[0-9a-fA-F]{6}$")
         private fun channels(color:String)=listOf(1,3,5).map{color.substring(it,it+2).toInt(16)}

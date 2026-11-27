@@ -58,17 +58,18 @@ function authoredMatrix(e){
   if(!value||value==='none')return 'matrix(1 0 0 1 0 0)';
   if(!value.startsWith('matrix('))throw Error('unsupported authored 3D transform');
   const origin=style.transformOrigin.split(/\s+/).map(parseFloat),m=new DOMMatrix(value);
-  const [x=0,y=0]=origin;
+  let [x=0,y=0]=origin;
+  if(style.transformBox==='fill-box'||style.transformBox==='stroke-box'){const box=e.getBBox();x+=box.x;y+=box.y;}
   return 'matrix('+[m.a,m.b,m.c,m.d,m.e+x-m.a*x-m.c*y,m.f+y-m.b*x-m.d*y].join(' ')+')';
 }
 // Capture the actual authored animation rather than re-inventing wag/blink/breath paths.
 // CSS tracks keep their own periods; native time sampling combines them.
-function captureMotion(svg){
+function captureMotion(svg,{indexed=false}={}){
   const tracks=[],animated=svg.getAnimations({subtree:true});
   for(const a of animated){a.pause();a.currentTime=0}
-  const seen=new Set();
+  const seen=new Set(),elements=[svg,...svg.querySelectorAll('*')];
   for(const a of animated){
-    const target=a.effect?.target, id=target?.getAttribute('id'), timing=a.effect?.getTiming();
+    const target=a.effect?.target, id=indexed&&target?'@'+elements.indexOf(target):target?.getAttribute('id'), timing=a.effect?.getTiming();
     if(!id||!timing||typeof timing.duration!=='number'||timing.duration<=0)continue;
     const frames=a.effect.getKeyframes();
     const props=['transform','opacity'].filter(p=>frames.some(f=>Object.hasOwn(f,p)));
@@ -97,6 +98,9 @@ function captureMotion(svg){
   return tracks;
 }
 
+export function compileFurnitureMotion(source,width,height){
+  return inSvg(source,{viewBox:'0 0 '+width+' '+height},svg=>captureMotion(svg,{indexed:true}));
+}
 export async function compilePoseTemplate(art,creature,state,job) {
   const body=art.creatures[job.id], def=art.appearance[job.id];
   const source=await art.read(body.file);

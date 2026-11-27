@@ -19,6 +19,11 @@ internal class NativeRestSprites(private val assets: AssetManager) {
     private val templates = index["templates"]?.jsonObject.orEmpty().mapValues { e -> e.value.jsonPrimitive.content.also { p ->
         require(Regex("^poses/[0-9a-f]{24}\\.json$").matches(p))
     } }
+    private val motion = index["motion"]?.jsonObject.orEmpty().mapValues { (_,v) ->
+        Json.decodeFromJsonElement<List<NativeMotionTrack>>(v).also { tracks ->
+            require(tracks.size<=100&&tracks.all{it.targetId.matches(Regex("^@[0-9]+$"))&&it.attribute in setOf("transform","opacity","d")&&it.durationMs.isFinite()&&it.durationMs>0&&it.frames.size in 1..128})
+        }
+    }
     private val cache = object : LruCache<String,Bitmap>(48 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
     }
@@ -53,6 +58,33 @@ internal class NativeRestSprites(private val assets: AssetManager) {
             pair[0] to pair[1]
         }
         CustomFurniture(a,part,colors)
+    }.getOrNull()
+    fun movingFurnitureKey(asset:NativeFurnitureAsset,part:NativePaintPart,colors:Map<String,String>):String? =
+        furnitureKey(asset,part,colors).takeIf { furnitureKey(asset,part,emptyMap()) in motion }
+    fun movingEnvironmentKey(path:String):String? = environmentKey(path).takeIf{it in motion}
+    fun furnitureMotionFrame(key:String,elapsedMs:Long):Bitmap? = runCatching {
+        val path:String
+        val svg:String
+        val w:Double
+        val h:Double
+        val tracks:List<NativeMotionTrack>
+        if(key.startsWith("e|")){
+            path=key.substringAfter('|')
+            val room=catalogue.rooms.values.firstOrNull{it.environment==path||it.overlay==path}?:return null
+            tracks=motion[key]?:return null
+            svg=art.svg(path);w=room.width;h=room.height
+        }else{
+            val parts=key.split('|')
+            if(parts.size!=4||parts[0]!="f")return null
+            val a=catalogue.assets[parts[1]]?:return null
+            val part=NativePaintPart.entries.firstOrNull{it.name.lowercase()==parts[2]}?:return null
+            tracks=motion[furnitureKey(a,part,emptyMap())]?:return null
+            val colors=if(parts[3].isEmpty())emptyMap()else customFurniture(key)?.colors?:return null
+            svg=furnitureSvg.prepare(a,colors,part);w=a.width;h=a.height
+        }
+        val factor=minOf(1.5,480.0/maxOf(w,h))
+        NativeSvgRaster.render(furnitureSvg.animatePrepared(svg,tracks,elapsedMs),
+            kotlin.math.ceil(w*factor).toInt().coerceAtLeast(1),kotlin.math.ceil(h*factor).toInt().coerceAtLeast(1))
     }.getOrNull()
     private fun getCustomFurniture(key:String):Bitmap? {
         cache.get(key)?.let{return it}
@@ -116,9 +148,9 @@ internal class NativeRestSpriteSnapshot(
     private val house: RestHousehold,
     private val moving: Map<String,Bitmap> = emptyMap(),
 ) : NativeRestImages {
-    override fun environment(path: String) = bitmaps[atlas.environmentKey(path)]
+    override fun environment(path: String) = moving[atlas.environmentKey(path)]?:bitmaps[atlas.environmentKey(path)]
     override fun furniture(asset: NativeFurnitureAsset, part: NativePaintPart, colors: Map<String,String>) =
-        bitmaps[atlas.furnitureKey(asset,part,colors)] ?: bitmaps[atlas.furnitureKey(asset,part,emptyMap())]
+        moving[atlas.furnitureKey(asset,part,colors)] ?: bitmaps[atlas.furnitureKey(asset,part,colors)] ?: bitmaps[atlas.furnitureKey(asset,part,emptyMap())]
     override fun occupant(role: String, action: String):Bitmap? {
         val a=if(role=="model")house.model else house.human
         return moving[role]?:bitmaps[atlas.creatureKey(a,action)]?:bitmaps[atlas.baseCreatureKey(a,action)]

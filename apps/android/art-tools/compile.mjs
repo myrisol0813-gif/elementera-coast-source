@@ -62,8 +62,13 @@ try {
     const [,,pw,ph]=wolf.viewBox.split(/\s+/).map(Number);
     push('reference|creature|wolf',wolf.file,pw,ph,{kind:'creature',id:'wolf',palette:art.appearance.wolf.defaultPalette,action:'idle',reference:true,
       appearance:{colors:{fur:'#7389b0'},glasses:'round',neck:'scarf',badge:'gpt',badgePlace:'head',badgeMode:'custom',badgeColor:'#ba8371',badgeX:3,badgeY:-2},prop:'book'});
-    const {compilePoseTemplate}=await import('/__native-pose-templates.mjs');
+    const {compilePoseTemplate,compileFurnitureMotion}=await import('/__native-pose-templates.mjs');
     globalThis.compilePose=job=>compilePoseTemplate(art,creature,state,job);
+    globalThis.compileFurnitureMotion=async job=>{
+      const source=await art.read(job.file);
+      const svg=room.prepareSvg(source,job.kind==='furniture'?art.catalogue.assets[job.id]:{}, {},job.part??'whole',{reducedMotion:false});
+      return compileFurnitureMotion(svg,job.width,job.height);
+    };
     globalThis.compileSprite=async job=>{
       const source=await art.read(job.file);
       let svg;
@@ -91,7 +96,7 @@ try {
     };
     return work;
   });
-  const entries={},templates={};
+  const entries={},templates={},motion={};
   for(const job of jobs){
     if(entries[job.key])continue;
     const hash=createHash('sha256').update(job.key).digest('hex').slice(0,24);
@@ -100,6 +105,10 @@ try {
     await mkdir(dirname(resolve(temp,file)),{recursive:true});
     await writeFile(resolve(temp,file),Buffer.from(data,'base64'));
     entries[job.key]=file;
+    if(!job.reference && (job.kind==='environment'||(job.kind==='furniture'&&Object.keys(job.colors??{}).length===0))){
+      const tracks=await page.evaluate(job=>globalThis.compileFurnitureMotion(job),job);
+      if(tracks.length)motion[job.key]=tracks;
+    }
     if(job.kind==='creature'&&!job.reference){
       const templateFile='poses/'+hash+'.json';
       const template=await page.evaluate(job=>globalThis.compilePose(job),job);
@@ -108,7 +117,7 @@ try {
       templates[job.key]=templateFile;
     }
   }
-  await writeFile(resolve(temp,'index.json'),JSON.stringify({version:1,entries,templates},null,2));
+  await writeFile(resolve(temp,'index.json'),JSON.stringify({version:1,entries,templates,motion},null,2));
   await rm(output,{recursive:true,force:true});
   await rename(temp,output);
   console.log('Compiled '+Object.keys(entries).length+' non-empty transparent native art layers; '+Object.keys(templates).length+' editable pose templates');
