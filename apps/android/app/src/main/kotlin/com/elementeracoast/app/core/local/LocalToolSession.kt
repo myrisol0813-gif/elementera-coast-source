@@ -66,7 +66,7 @@ internal class LocalToolSession private constructor(
         }
         if(writeAllowed){
             if(image!=null)add(Spec("image_generate","image.generate","绘制图片","自行决定是否绘制一张图，使用已选生图模型、正常API计费。本轮至多一次；只发送必要绘图提示。收到原件像素才可声称看见。",schema(mapOf("prompt" to string(4000)),listOf("prompt"))))
-            if(voice?.configured()==true) add(Spec("voice_create","voice.create","留下语音","把自己写的一小段文字念成真实MP3，保存到当前轮次。使用已授权的独立ElevenLabs额度，一轮至多一次；只发送待朗读文字。",schema(mapOf("text" to string(2400)),listOf("text"))))
+            if(voice?.configured()==true) add(Spec("voice_create","voice.create","留下语音","把自己写的一小段文字念成真实MP3，普通聊天保存在当前轮次，自主活动保存在该次活动下。使用已授权的独立ElevenLabs额度，每次活动至多一次；只发送待朗读文字。",schema(mapOf("text" to string(2400)),listOf("text"))))
             if(base.thinkingSoil.enabled && LocalPortraitStore(store).read("self_portrait")?.root?.get("write_enabled")?.jsonPrimitive?.int != 0)
                 add(Spec("global_excerpt_propose","memory.global_excerpt_propose","提出自我画像修改稿","仅在自动整理和画像写入均开启时提出整篇完整修改稿，说明长期价值；只进入待确认区，不覆盖正式正文。本机单次工具参数最多12000字符；不要提交截断的正文。",schema(mapOf("proposed_body" to string(10000),"reason" to string(4000),"change_kind" to string(40)),listOf("proposed_body","reason"))))
             if(base.thinkingSoil.enabled && LocalPortraitStore(store).read("user_portrait")?.root?.get("write_enabled")?.jsonPrimitive?.int != 0)
