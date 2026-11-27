@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildOfflineArchive} from '../elementera-mcp/deploy-pages/public/features/offline-archive.js';
 test('offline archive keeps all variants, escapes text and restores media bytes',async()=>{
-  const archive={chat:{conversations:[{conversation:{id:'c',title:'<script>x</script>'},history:{turns:[{user:{variants:[{content:'<script>x</script>',attachments:[{id:'a'}]},{content:'second branch'}]},assistant:{variantsByUserVariant:{0:[{content:'reply'}],1:[{content:'other reply'}]}}}]}}]},attachments:{payloads:[{id:'a',conversation_id:'c',name:'../../a.png',mime:'image/png',size:3,data_base64:'AQID'}]},voice:{payloads:[{id:'v',chunks:['BAU=']}]},excluded_modules:['credentials']};
+  const archive={chat:{conversations:[{conversation:{id:'c',title:'<script>x</script>'},history:{turns:[{user:{variants:[{content:'<script>x</script>',attachments:[{id:'a'}]},{content:'second branch'}]},assistant:{variantsByUserVariant:{0:[{content:'reply\n<!--tideloom:split-->\nsegment two'}],1:[{content:'other reply'}]}}}]}}]},attachments:{payloads:[{id:'a',conversation_id:'c',name:'../../a.png',mime:'image/png',size:3,data_base64:'AQID'}]},voice:{payloads:[{id:'v',chunks:['BAU=']}]},excluded_modules:['credentials']};
   const {blob,warnings,mediaCount}=buildOfflineArchive(archive);
   assert.equal(mediaCount,2);assert.deepEqual(warnings,[]);
   const bytes=new Uint8Array(await blob.arrayBuffer()),dv=new DataView(bytes.buffer),files=new Map();let pos=0;
@@ -13,6 +13,7 @@ test('offline archive keeps all variants, escapes text and restores media bytes'
   assert.deepEqual([...files.get('media/1.png')],[1,2,3]);
   assert.deepEqual([...files.get('media/2.mp3')],[4,5]);
   const html=new TextDecoder().decode(files.get('chats/1.html'));
+  assert.match(html,/reply\n\nsegment two/);assert.doesNotMatch(html,/tideloom:split/);
   assert.match(html,/second branch/);assert.match(html,/other reply/);assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/);assert.match(html,/\.\.\/media\/1.png/);
   assert.equal(JSON.parse(new TextDecoder().decode(files.get('manifest.json'))).restore_supported,false);
 });
@@ -29,7 +30,7 @@ test('verified V2 reading copy keeps library anchors, original media and signatu
     ['library','n','library_notes',{book_id:'b',chapter_index:0,paragraph_index:1,kind:'annotation',author:'assistant',quote:'two',body:'note'}],
     ['library','cover','library_covers',{book_id:'b',mime:'image/png'},['image']],
     ['voice','v','voice',{id:'v',mime:'audio/mpeg'},['audio']],
-    ['chat','chat','chat',{conversation:{id:'chat',title:'chat'},history_json:JSON.stringify({turns:[{user:{variants:[{content:'署名测试'}]},assistant:{variantsByUserVariant:{0:[{id:'old',content:'old version'},{id:'a0',content:'first',reply_sequence:{id:'seq',index:0},desk_slip:{summary:'desk first'}},{id:'a1',content:'second',reply_sequence:{id:'seq',index:1},desk_slip:{reply_sequence_previous:[{message_id:'a0',content:'first'}]}}]}}}]})}]
+    ['chat','chat','chat',{conversation:{id:'chat',title:'chat'},history_json:JSON.stringify({turns:[{user:{variants:[{content:'署名测试'}]},assistant:{variantsByUserVariant:{0:[{id:'old',content:'old version'},{id:'a0',content:'first',reply_sequence:{id:'seq',index:0},desk_slip:{summary:'desk first'}},{id:'a1',content:'second\n<!--tideloom:split-->\nnext segment',reply_sequence:{id:'seq',index:1},desk_slip:{reply_sequence_previous:[{message_id:'a0',content:'first'}]}}]}}}]})}]
   ];
   const enc=new TextEncoder(),values=new Map([['image',new Uint8Array([1,2,3])],['audio',new Uint8Array([4,5])]]);
   const records=rows.map(([module,id,kind,data,media_objects=[]],i)=>{const record_object='r'+i;values.set(record_object,enc.encode(JSON.stringify({kind,data})));return {module,id,record_object,media_objects,dependencies:[]};});
@@ -39,7 +40,7 @@ test('verified V2 reading copy keeps library anchors, original media and signatu
   const text=new TextDecoder().decode(await new Blob(parts).arrayBuffer());
   assert.equal(result.mediaCount,2);assert.deepEqual(result.warnings,[]);
   assert.match(text,/2\.html#p-1/);assert.match(text,/id="p-1"/);assert.match(text,/&lt;script&gt;/);
-  assert.match(text,/版本 2 · 连续回复 1 · 组 seq/);assert.match(text,/版本 2 · 连续回复 2 · 组 seq/);assert.match(text,/reply_sequence_previous/);
+  assert.match(text,/版本 2 · 连续回复 1 · 组 seq/);assert.match(text,/版本 2 · 连续回复 2 · 组 seq/);assert.match(text,/reply_sequence_previous/);assert.match(text,/second\n\nnext segment/);assert.doesNotMatch(text,/tideloom:split/);
   assert.match(text,/归档署名/);assert.match(text,/media\/1\.png/);assert.match(text,/media\/2\.mp3/);
 });
 
