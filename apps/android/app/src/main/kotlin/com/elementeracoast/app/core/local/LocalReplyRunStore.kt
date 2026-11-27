@@ -59,6 +59,7 @@ internal class LocalReplyRunStore(private val store:LocalPersistence){
     fun acquire(request:RemoteReplyRunRequest):Boolean=store.readConsistent{s->
         val cid=request.conversationId;val seq=request.sequenceId
         checkIds(cid,seq,request.turnId,request.userVariantId)
+        if(LocalDreamLedger(s).active(cid))return@readConsistent false
         val old=s.get(activeKey(cid))
         if(get(s,cid,seq)!=null||old.isNotBlank()&&get(s,cid,old)?.status=="running")return@readConsistent false
         val c=cache(s);val h=c.history(cid)?:return@readConsistent false
