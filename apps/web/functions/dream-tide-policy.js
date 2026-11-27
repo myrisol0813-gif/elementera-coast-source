@@ -6,7 +6,7 @@ export const DREAM_TOOL_GROUPS=Object.freeze({
   allowLibrary:['library_books','library_read','library_notes'],
   allowMemory:['memory_search'],
   allowCalendar:['calendar_list'],
-  allowCollection:['vault_search_index','vault_read_item'],
+  allowCollection:['vault_search_index','vault_read_selected'],
   allowLibraryWrite:['library_write'],
 });
 export const DREAM_CONTEXT_FLAGS=Object.freeze(['includeCustom','includeUserPortrait','includeSelfPortrait','includeConversationCount','includeWeather','includeCalendar']);
