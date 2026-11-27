@@ -248,9 +248,7 @@ test('independent image preserves exact original, is not a chat attachment, and 
   await assert.rejects(()=>deleteChatAttachment(db,cid,result.id));
   await assert.rejects(()=>generateDreamImage(db,cfg,{prompt:'repeat'},ctx,options));
   assert.equal(calls,1);
-  const archive=await readArchiveAttachment(db,cid,result.id);
-  const dest=new D1Database();
-  await assert.rejects(()=>prepareArchiveAttachment(dest,{...archive.metadata,turn_id:'turn-one'},archive.descriptor,()=>null,{conversationIds:new Set([cid])}),/invalid autonomous image origin/);
+  await assert.rejects(()=>readArchiveAttachment(db,cid,result.id),/正在自主唤醒/);
   assert.ok(await reserveDreamTool(db,claim,0,1,'image_generate',due));
   await assert.rejects(()=>generateDreamImage(db,cfg,{prompt:'revoked'},{...ctx,autonomous_event:{step:0,index:1}},{...options,generate:async()=>{await disarmDreamTide(db,cid,rev);return fake;}}),/权限已撤回/);
   assert.equal((await listMediaLibrary(db,{kind:'image'})).items.length,1);
