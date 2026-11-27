@@ -10,13 +10,15 @@ import kotlinx.serialization.json.*
 /** Native-only runtime. Compiled layers are independent sprites, never whole-room screenshots. */
 internal class NativeRestSprites(private val assets: AssetManager) {
     private val root = "rest-box/native/v1/"
-    private val entries: Map<String,String> = assets.open(root+"index.json").bufferedReader().use {
-        val doc = Json.parseToJsonElement(it.readText()).jsonObject
-        require(doc["version"]?.jsonPrimitive?.intOrNull == 1)
-        doc.getValue("entries").jsonObject.mapValues { e -> e.value.jsonPrimitive.content.also { p ->
-            require(Regex("^sprites/[0-9a-f]{24}\\.png$").matches(p))
-        } }
+    private val index = assets.open(root+"index.json").bufferedReader().use {
+        Json.parseToJsonElement(it.readText()).jsonObject.also { doc -> require(doc["version"]?.jsonPrimitive?.intOrNull == 1) }
     }
+    private val entries = index.getValue("entries").jsonObject.mapValues { e -> e.value.jsonPrimitive.content.also { p ->
+        require(Regex("^sprites/[0-9a-f]{24}\\.png$").matches(p))
+    } }
+    private val templates = index["templates"]?.jsonObject.orEmpty().mapValues { e -> e.value.jsonPrimitive.content.also { p ->
+        require(Regex("^poses/[0-9a-f]{24}\\.json$").matches(p))
+    } }
     private val cache = object : LruCache<String,Bitmap>(48 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
     }
@@ -24,10 +26,15 @@ internal class NativeRestSprites(private val assets: AssetManager) {
     private val art by lazy { RestArtRepository(assets) }
     private val catalogue by lazy { NativeSceneCatalogue.load(art) }
     private val furnitureSvg by lazy { NativeFurnitureSvg(art) }
+    private val appearanceCatalogue by lazy { art.appearance() }
+    private val creatureSvg by lazy { NativeCreatureSvg(appearanceCatalogue) }
+    private val json=Json{encodeDefaults=true}
+    private val poseCache=object:LruCache<String,NativePoseTemplate>(12){}
+    fun propOptions(a:RestAppearance,action:String):List<String> = template(a,action)?.mounts?.keys?.filter{it.startsWith("prop:")}?.map{it.substringAfter(':')}.orEmpty()
     fun colorSlots(asset: NativeFurnitureAsset) = furnitureSvg.colorSlots(asset)
-    fun has(key: String) = key in entries || customFurniture(key) != null
+    fun has(key: String) = key in entries || customFurniture(key) != null || customCreature(key) != null
     fun get(key: String): Bitmap? {
-        val path = entries[key] ?: return getCustomFurniture(key)
+        val path = entries[key] ?: return if(key.startsWith("cc|"))getCustomCreature(key)else getCustomFurniture(key)
         cache.get(path)?.let { return it }
         val bitmap = assets.open(root+path).use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inScaled=false }) }
         return bitmap?.also { cache.put(path,it) }
@@ -61,7 +68,34 @@ internal class NativeRestSprites(private val assets: AssetManager) {
     fun furnitureKey(asset: NativeFurnitureAsset, part: NativePaintPart, colors: Map<String,String>): String =
         "f|${asset.id}|${part.name.lowercase()}|" + colors.toSortedMap().entries.joinToString(",") { "${it.key}=${it.value.lowercase()}" }
     fun environmentKey(path: String) = "e|$path"
-    fun creatureKey(appearance: RestAppearance, action: String) = "c|${appearance.bodyId}|${appearance.palette}|$action"
+    fun baseCreatureKey(appearance:RestAppearance,action:String) = "c|${appearance.bodyId}|${appearance.palette}|$action"
+    fun creatureKey(appearance:RestAppearance,action:String,prop:String?=null):String =
+        if(!customized(appearance)&&prop==null)baseCreatureKey(appearance,action)
+        else "cc|$action|${prop.orEmpty()}|"+json.encodeToString(RestAppearance.serializer(),appearance.copy(colors=appearance.colors.toSortedMap()))
+    private data class CreatureRequest(val appearance:RestAppearance,val action:String,val prop:String?)
+    private fun customCreature(key:String):CreatureRequest?=runCatching {
+        val p=key.split('|',limit=4)
+        if(p.size!=4||p[0]!="cc"||p[1] !in RestAppearancePolicy.actions)return null
+        val a=RestAppearancePolicy.validate(appearanceCatalogue,json.decodeFromString<RestAppearance>(p[3]))
+        if(baseCreatureKey(a,p[1]) !in templates)return null
+        val prop=p[2].takeIf{it.isNotEmpty()}
+        if(prop!=null&&prop !in setOf("book","flower","cookie","tea","letter"))return null
+        CreatureRequest(a,p[1],prop)
+    }.getOrNull()
+    private fun template(a:RestAppearance,action:String):NativePoseTemplate? {
+        val path=templates[baseCreatureKey(a,action)]?:return null
+        poseCache.get(path)?.let{return it}
+        return assets.open(root+path).bufferedReader().use{creatureSvg.decode(it.readText())}.also{poseCache.put(path,it)}
+    }
+    private fun getCustomCreature(key:String):Bitmap? {
+        cache.get(key)?.let{return it}
+        val req=customCreature(key)?:return null
+        return runCatching {
+            val t=template(req.appearance,req.action)?:return null
+            val p=creatureSvg.prepare(t,req.appearance,req.prop)
+            NativeSvgRaster.render(p.svg,p.width,p.height)
+        }.getOrNull()?.also{cache.put(key,it)}
+    }
     fun customized(appearance: RestAppearance) = appearance.colors.isNotEmpty() || appearance.glasses!="none" ||
         appearance.neck!="none" || appearance.badge!="none" || !appearance.horn || !appearance.hat || !appearance.tongue
 
@@ -78,6 +112,8 @@ internal class NativeRestSpriteSnapshot(
     override fun environment(path: String) = bitmaps[atlas.environmentKey(path)]
     override fun furniture(asset: NativeFurnitureAsset, part: NativePaintPart, colors: Map<String,String>) =
         bitmaps[atlas.furnitureKey(asset,part,colors)] ?: bitmaps[atlas.furnitureKey(asset,part,emptyMap())]
-    override fun occupant(role: String, action: String) =
-        bitmaps[atlas.creatureKey(if(role=="model") house.model else house.human,action)]
+    override fun occupant(role: String, action: String):Bitmap? {
+        val a=if(role=="model")house.model else house.human
+        return bitmaps[atlas.creatureKey(a,action)]?:bitmaps[atlas.baseCreatureKey(a,action)]
+    }
 }
