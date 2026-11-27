@@ -1,3 +1,5 @@
+import {createCreatureRenderer} from './creature-renderer.mjs';
+import {newAppearance} from './creature-state.mjs';
 import {assetSize,buildCatalogue,sceneLayers} from './room-state.mjs';
 
 const safePath=p=>typeof p==='string' && /^(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.(?:json|svg)$/.test(p);
@@ -17,8 +19,8 @@ export async function loadArt({base=new URL('./art/v1/',import.meta.url),fetcher
   };
   const json=async p=>JSON.parse(await read(p));
   const idx=await json('index.json');
-  const [rooms,extras,presets,creatures]=await Promise.all([Promise.all(idx.rooms.map(r=>json(r.manifest))),Promise.all(idx.extras.map(json)),json(idx.colorPresets),json(idx.creatures)]);
-  return {catalogue:buildCatalogue(rooms,extras,presets),creatures:Object.fromEntries(creatures.bodies.map(b=>[b.id,b])),read};
+  const [rooms,extras,presets,creatures,appearance,accessories]=await Promise.all([Promise.all(idx.rooms.map(r=>json(r.manifest))),Promise.all(idx.extras.map(json)),json(idx.colorPresets),json(idx.creatures),json(idx.appearance),json(idx.accessories)]);
+  return {catalogue:buildCatalogue(rooms,extras,presets),creatures:Object.fromEntries(creatures.bodies.map(b=>[b.id,b])),appearance:appearance.bodies,accessories,read};
 }
 
 // Only bundled assets, never arbitrary imported SVG. Images isolate internal IDs and CSS.
@@ -61,7 +63,7 @@ export function prepareSvg(source,asset={},colors={},part='whole'){
 
 export function createRoomRenderer(container,art){
   let generation=0;
-  const {catalogue:cat}=art,cache=new Map();
+  const {catalogue:cat}=art,cache=new Map(),paintCreature=createCreatureRenderer(art);
   const paint=async (asset,colors={},part='whole')=>{
     const key=JSON.stringify([asset.file,Object.entries(colors).sort(),part]);
     if(!cache.has(key)){
@@ -78,16 +80,16 @@ export function createRoomRenderer(container,art){
     if(opts.selected)img.style.outline='1px dashed #78936f';
     return img;
   }
-  async function render(layout,roomId,{occupants=[],selected=null,editing=false}={}){
+  async function render(layout,roomId,{occupants=[],selected=null,editing=false,household=null,reducedMotion=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches??false}={}){
     const token=++generation,r=cat.rooms[roomId];if(!r)throw Error('unknown room');
     const {layers,unplaced}=sceneLayers(layout,cat,roomId,occupants);
     const pct=(x,y,w,h)=>[x*100/r.width,y*100/r.height,w*100/r.width,h*100/r.height];
     const bg=await paint({file:r.environment});
     const nodes=await Promise.all(layers.map(async l=>{
       if(l.kind==='creature'){
-        const body=Object.hasOwn(art.creatures,l.creatureId)?art.creatures[l.creatureId]:null;if(!body)return null;
+        const appearance=household?.[l.role]??newAppearance(art.appearance,l.creatureId);const body=Object.hasOwn(art.creatures,appearance.bodyId)?art.creatures[appearance.bodyId]:null;if(!body)return null;
         const [, , bw,bh]=body.viewBox.split(/\s+/).map(Number),h=55,w=h*bw/bh;
-        return image(await paint(body),...pct(l.x-w/2,l.y-h/2,w,h),{label:l.role});
+        return image(await paintCreature(appearance,l.action,{reducedMotion}),...pct(l.x-w/2,l.y-h/2,w,h),{label:l.role});
       }
       const i=l.item,a=cat.assets[i.assetId];
       if(!a){

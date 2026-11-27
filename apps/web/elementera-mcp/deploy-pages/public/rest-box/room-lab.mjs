@@ -1,15 +1,17 @@
+import {newHousehold,restoreHousehold} from './creature-state.mjs';
+import {mountCreatureEditor} from './creature-editor.mjs';
 import {loadArt,createRoomRenderer} from './room-renderer.mjs';
 import {newLayout,editLayout,restoreLayout} from './room-state.mjs';
 const $=id=>document.getElementById(id);
 const labels={living:'客厅',study:'书房',bedroom:'卧室',extras:'新家具'};
 const btn=(label,fn,pressed)=>{const b=document.createElement('button');b.type='button';b.textContent=label;if(pressed!==undefined)b.setAttribute('aria-pressed',String(pressed));b.addEventListener('click',fn);return b};
-let art,cat,state,renderer,room='living',family='living',editing=false,selected=null,pets=false,drag=null;
+let art,cat,state,renderer,household,creatureEditor,room='living',family='living',editing=false,selected=null,pets=false,drag=null;
 function message(s,error=false){$('status').textContent=s;$('status').classList.toggle('error',error)}
 function chosen(){return state.rooms[room].find(i=>i.id===selected)}
 function uid(){return 'i-'+crypto.randomUUID()}
 function edit(op){try{state=editLayout(state,cat,room,op);if(op.type==='delete'||op.type==='reset')selected=null;if(op.type==='copy')selected=op.newId;if(op.type==='add')selected=op.id;refresh()}catch(e){message(e.message,true)}}
-function occupancy(){const b=state.rooms[room].find(i=>i.assetId==='bedroom-bed'&&i.visible);return pets&&b?[{role:'model',creatureId:'wolf',instanceId:b.id,anchorId:'sleep-left'},{role:'human',creatureId:'cat',instanceId:b.id,anchorId:'sleep-right'}]:[]}
-async function draw(){try{await renderer.render(state,room,{occupants:occupancy(),selected,editing})}catch(e){message(e.message,true)}}
+function occupancy(){const b=state.rooms[room].find(i=>i.assetId==='bedroom-bed'&&i.visible);return pets&&b?[{role:'model',creatureId:household.model.bodyId,instanceId:b.id,anchorId:'sleep-left'},...(household.humanEnabled?[{role:'human',creatureId:household.human.bodyId,instanceId:b.id,anchorId:'sleep-right'}]:[])]:[]}
+async function draw(){try{await renderer.render(state,room,{occupants:occupancy(),selected,editing,household})}catch(e){message(e.message,true)}}
 function refresh(){
   $('rooms').replaceChildren(...Object.keys(cat.rooms).map(id=>btn(labels[id],()=>{room=id;selected=null;refresh()},room===id)));
   $('editor').hidden=!editing;$('edit').textContent=editing?'完成':'布置房间';$('scene').classList.toggle('editing',editing);
@@ -30,7 +32,9 @@ function refresh(){
   message(labels[room]+' · '+state.rooms[room].length+' 件家具');draw();
 }
 try{
- art=await loadArt();cat=art.catalogue;state=newLayout(cat);renderer=createRoomRenderer($('scene'),art);
+ art=await loadArt();cat=art.catalogue;state=newLayout(cat);household=newHousehold(art.appearance);renderer=createRoomRenderer($('scene'),art);
+ creatureEditor=mountCreatureEditor($('creatureEditor'),art,()=>household,next=>{household=next;draw()});
+ $('appearance').onclick=()=>{const show=$('creatureEditor').hidden;$('creatureEditor').hidden=!show;if(show)creatureEditor.refresh();};
  $('edit').onclick=()=>{editing=!editing;selected=null;refresh()};
  $('pets').onclick=()=>{pets=!pets;if(pets){room='bedroom';selected=null}refresh()};
  $('reset').onclick=()=>{if(confirm('恢复当前房间默认布局？'))edit({type:'reset'})};
@@ -42,7 +46,7 @@ try{
  $('scene').addEventListener('pointermove',e=>{if(!drag||drag.pointer!==e.pointerId)return;const p=point(e),r=cat.rooms[room],i=chosen();drag.x=p.x-drag.dx;drag.y=p.y-drag.dy;for(const el of $('scene').querySelectorAll('[data-instance]'))if(el.dataset.instance===drag.id){el.style.left=drag.x*100/r.width+'%';el.style.top=drag.y*100/r.height+'%'}});
  $('scene').addEventListener('pointerup',e=>{if(drag?.pointer!==e.pointerId)return;const d=drag;drag=null;if(d.room===room)edit({type:'move',id:d.id,x:d.x,y:d.y})});
  $('scene').addEventListener('pointercancel',()=>{drag=null;refresh()});
- $('export').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='rest-box-layout.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
- $('import').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>1000000)throw Error('布局文件过大');state=restoreLayout(JSON.parse(await f.text()),cat);selected=null;refresh()}catch(e){message(e.message,true)}finally{e.target.value=''}};
+ $('export').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify({version:1,layout:state,household},null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='rest-box-layout.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+ $('import').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>1000000)throw Error('布局文件过大');const raw=JSON.parse(await f.text());const next=restoreLayout(raw.layout??raw,cat),nextHouse=raw.household?restoreHousehold(raw.household,art.appearance):household;state=next;household=nextHouse;selected=null;creatureEditor.refresh();refresh()}catch(e){message(e.message,true)}finally{e.target.value=''}};
  refresh();
 }catch(e){message('资源加载失败：'+e.message,true)}

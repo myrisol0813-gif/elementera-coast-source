@@ -51,5 +51,6 @@
     "creatures": 16,
     "handheldProps": 5
   },
-  "status": "art resources only; runtime and packaging not connected"
+  "status": "isolated Web room and creature runtime; production navigation, persistence and Native pending",
+  "appearance": "creatures/appearance.json"
 }
