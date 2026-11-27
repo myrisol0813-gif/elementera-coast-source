@@ -1,4 +1,5 @@
 import { ensureChatAttachmentSchema, getChatAttachmentRecord, MAX_ATTACHMENT_BYTES } from './chat-attachments.js';
+import {readDreamArchive,validateDreamMediaOrigin} from './dream-tide-archive.js';
 import { getConversation } from './chat-store.js';
 import { ensureDogtalkSchema } from './dogtalk-store.js';
 import { ARCHIVE_CHUNK_BYTES, digestBytes, describeObject, stageVerifiedObject } from './coast-archive-v2-chunks.js';
@@ -20,6 +21,7 @@ export async function readArchiveAttachment(db,conversationId,id){
   check(validId(conversationId)&&validId(id),'invalid attachment identity');
   await getConversation(db,conversationId);
   const record=await getChatAttachmentRecord(db,conversationId,id);
+  if(id.startsWith('att_dream_'))validateDreamMediaOrigin(await readDreamArchive(db,conversationId),record,'image');
   const bytes=toBytes(record.data);
   check(bytes&&Number.isSafeInteger(record.size)&&record.size===bytes.length&&record.size>0&&record.size<=MAX_ATTACHMENT_BYTES,'attachment original missing or corrupt');
   const chunks=[];for(let offset=0;offset<bytes.length;offset+=ARCHIVE_CHUNK_BYTES)chunks.push(bytes.subarray(offset,offset+ARCHIVE_CHUNK_BYTES));
