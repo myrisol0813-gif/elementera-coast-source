@@ -1,4 +1,5 @@
 import {ensureChatSchema} from './chat-store.js';
+import {DREAM_CONTEXT_FLAGS,DREAM_TOOL_FLAGS} from './dream-tide-policy.js';
 import {dreamTideCandidate,localClock} from './dream-tide-schedule.js';
 
 // Internal D1 ledger. Only authenticated owner configuration may change authorization.
@@ -28,7 +29,8 @@ export function normalizeDreamConfig(config){
       ||!int(e.extraPerDay??0,0,128)||typeof e.invitation!=='string'||e.invitation.length>16000||!e.invitation.trim())throw new TypeError('invalid dream tide execution settings');
     execution={tokenBudget:e.tokenBudget,outputLimit:e.outputLimit,toolBudget:e.toolBudget,readTurns:e.readTurns,
       extraPerDay:e.extraPerDay??0,invitation:e.invitation,includeTime:e.includeTime===true,includePrevious:e.includePrevious===true,
-      includeReplies:e.includeReplies===true,readHistory:e.readHistory===true,writeNote:e.writeNote===true};
+      includeReplies:e.includeReplies===true,readHistory:e.readHistory===true,writeNote:e.writeNote===true,
+      ...Object.fromEntries([...DREAM_CONTEXT_FLAGS,...DREAM_TOOL_FLAGS].map(key=>[key,e[key]===true]))};
   }
   return {enabled:true,timeZone:config.timeZone,dailyTime:config.dailyTime,quietHours,allowExtra:config.allowExtra===true,execution};
 }
