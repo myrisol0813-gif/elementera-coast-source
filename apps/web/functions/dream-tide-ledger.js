@@ -10,23 +10,7 @@ const id=v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(v);
 const time=v=>Number.isSafeInteger(v)&&v>=0;
 const clock=v=>typeof v==='string'&&/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(v);
 const terminal=new Set(['completed','failed','cancelled','interrupted']);
-async function schema(db){
-  await ensureChatSchema(db);
-  await db.prepare(`CREATE TABLE IF NOT EXISTS dream_tide_arms (
-    conversation_id TEXT PRIMARY KEY, revision TEXT NOT NULL, enabled INTEGER NOT NULL,
-    config_json TEXT NOT NULL, armed_at INTEGER NOT NULL, model_id TEXT NOT NULL,
-    extra_id TEXT, extra_at INTEGER
-  )`).run();
-  await db.prepare(`CREATE TABLE IF NOT EXISTS dream_tide_runs (
-    conversation_id TEXT NOT NULL, slot_key TEXT NOT NULL, local_day TEXT NOT NULL,
-    kind TEXT NOT NULL CHECK(kind IN ('daily','extra')), arm_revision TEXT NOT NULL,
-    claim_id TEXT NOT NULL UNIQUE, model_id TEXT NOT NULL,
-    status TEXT NOT NULL CHECK(status IN ('running','completed','failed','cancelled','interrupted')),
-    started_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
-    PRIMARY KEY(conversation_id,slot_key)
-  )`).run();
-  await db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS dream_tide_one_active ON dream_tide_runs(conversation_id) WHERE status='running'").run();
-}
+const schema=ensureChatSchema;
 function normalizeConfig(config){
   if(!config||!clock(config.dailyTime)||typeof config.timeZone!=='string'||!config.timeZone)throw new TypeError('invalid dream tide configuration');
   new Intl.DateTimeFormat('en',{timeZone:config.timeZone}).format(0);
@@ -93,12 +77,13 @@ export async function claimDreamTide(db,cid,{now=Date.now(),currentModelId,busy=
   if(!candidate)return null;
   const claimId=crypto.randomUUID();
   // Unique slot and partial unique active index enforce atomic claim.
-  // Reply-run guard is one-way only until both executors share the lock.
+  // Other admission statements check this ledger in the same D1 write.
   const r=await stmt(db,`INSERT OR IGNORE INTO dream_tide_runs(conversation_id,slot_key,local_day,kind,arm_revision,claim_id,model_id,status,started_at,updated_at)
     SELECT ?,?,?,?,?,?,?,'running',?,? WHERE EXISTS(${liveWindow})
     AND EXISTS(SELECT 1 FROM dream_tide_arms WHERE conversation_id=? AND revision=? AND enabled=1 AND model_id=? AND extra_id IS ? AND extra_at IS ?)
-    AND NOT EXISTS(SELECT 1 FROM chat_reply_runs WHERE conversation_id=? AND status='running')`,
-    cid,candidate.key,candidate.day,candidate.kind,arm.revision,claimId,arm.model_id,now,now,cid,cid,arm.revision,arm.model_id,arm.extra_id,arm.extra_at,cid).run();
+    AND NOT EXISTS(SELECT 1 FROM chat_reply_runs WHERE conversation_id=? AND status='running')
+    AND NOT EXISTS(SELECT 1 FROM chat_single_runs WHERE conversation_id=?)`,
+    cid,candidate.key,candidate.day,candidate.kind,arm.revision,claimId,arm.model_id,now,now,cid,cid,arm.revision,arm.model_id,arm.extra_id,arm.extra_at,cid,cid).run();
   if(!changed(r))return null;
   return {conversationId:cid,claimId,revision:arm.revision,modelId:arm.model_id,...candidate};
 }
