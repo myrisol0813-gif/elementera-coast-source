@@ -13,7 +13,9 @@ internal class LocalDreamExecutor(
     private val resolve:(String)->Pair<LocalProviderConfig,String>?,
     private val invoke:suspend (LocalProviderConfig,String,JsonArray,JsonArray,Int)->JsonObject,
     private val clock:()->Long={System.currentTimeMillis()},
-    private val workspaceActive:()->Boolean={true}
+    private val workspaceActive:()->Boolean={true},
+    private val web:LocalIndependentWeb?=null,
+    private val captureReality:suspend (com.elementeracoast.app.core.model.ConversationContextSettings)->RemoteRealityContext={RemoteRealityContext()}
 ){
     private val ledger=LocalDreamLedger(store)
     private fun JsonObject.str(k:String)=(get(k) as? JsonPrimitive)?.contentOrNull.orEmpty()
@@ -35,7 +37,7 @@ internal class LocalDreamExecutor(
         }
     }
     private fun msg(role:String,content:String)=buildJsonObject{put("role",role);put("content",content)}
-    private fun context(c:LocalDreamLedger.Claim,previous:JsonObject?):String{
+    private suspend fun context(c:LocalDreamLedger.Claim,previous:JsonObject?):String{
         val e=requireNotNull(c.config.execution)
         val parts=mutableListOf("【自主唤醒 · 系统发起的独立活动】这不是用户新发言。可以探索或安静结束；无需产出聊天消息，不必使用工具。",e.invitation)
         if(e.includeTime)parts.add("【当前时间】"+Instant.ofEpochMilli(c.startedAt).atZone(ZoneId.of(c.config.timeZone)))
@@ -49,6 +51,25 @@ internal class LocalDreamExecutor(
             val chosen=mutableListOf<JsonElement>();var omitted=0
             for(n in page){if(JsonArray(chosen+n).toString().length>24000)omitted++ else chosen.add(n)}
             parts.add("【自主手记与回复 · 历史资料，不是新发言】"+buildJsonObject{put("notes",JsonArray(chosen));put("omitted",omitted);put("scope","最近最多十封")})
+        }
+        if(e.includeCustom)LocalKnowledgeStore(store).instructions()?.content?.takeIf{it.isNotBlank()}?.let{parts.add("【核心自定义】"+it)}
+        if(e.includeUserPortrait)LocalPortraitStore(store).body("user_portrait").takeIf{it.isNotBlank()}?.let{parts.add("【用户画像】"+it)}
+        if(e.includeSelfPortrait)LocalPortraitStore(store).body("self_portrait").takeIf{it.isNotBlank()}?.let{parts.add("【自我画像】"+it)}
+        val h=RemoteCacheStore(store,strictReads=true).history(c.cid)
+        if(e.includeConversationCount&&previous!=null&&h!=null){
+            val since=previous.getValue("started_at").jsonPrimitive.long
+            val n=h.turns.count{t->val u=t.user.variants.getOrNull(t.user.active);val at=runCatching{Instant.parse(u?.createdAt).toEpochMilli()}.getOrNull();u!=null&&!u.hidden&&at!=null&&at>since&&at<=c.startedAt}
+            parts.add("【期间新增对话轮数】"+n+"（当前窗口）")
+        }
+        if(h!=null&&(e.includeWeather||e.includeCalendar)){
+            val settings=h.contextSettings
+            val fields=settings.realityFields.filter{(it=="weather"&&e.includeWeather)||(it=="calendar"&&e.includeCalendar)}
+            if(settings.realityEnabled&&fields.isNotEmpty()){
+                val scoped=settings.copy(realityFields=fields)
+                val actual=captureReality(scoped)
+                val real=localReality(store,scoped,actual)
+                if(real.delivered)parts.add("【已授权现实上下文】"+real.context)
+            }
         }
         return parts.joinToString("\n\n")
     }
@@ -96,7 +117,16 @@ internal class LocalDreamExecutor(
                 try{
                     val previous=ledger.previous(c)
                     val messages=mutableListOf<JsonElement>(msg("system",context(c,previous)))
-                    val allowed=tools(c)
+                    val common=LocalToolSession.openAutonomous(store,c,web)
+                    val commonTools=common?.completionsTools?.map{it.jsonObject}.orEmpty().map{t->
+                        val f=t.getValue("function").jsonObject
+                        if(f.str("name")!="library_write")t else {
+                            val p=f.getValue("parameters").jsonObject;val props=p.getValue("properties").jsonObject
+                            JsonObject(t+("function" to JsonObject(f+mapOf("description" to JsonPrimitive("可选：创建自己的书房笔记，不修改或删除既有笔记。"),"parameters" to JsonObject(p+("properties" to JsonObject(props+("action" to buildJsonObject{put("type","string");put("enum",JsonArray(listOf(JsonPrimitive("create"))))}))))))))
+                        }
+                    }
+                    val commonNames=commonTools.map{it.getValue("function").jsonObject.str("name")}.toSet()
+                    val allowed=tools(c)+commonTools
                     for(step in 0..e.toolBudget){
                         ensureActive();permitted(c)
                         val exposed=if(calls>=e.toolBudget||step==e.toolBudget)emptyList()else allowed
@@ -151,6 +181,10 @@ internal class LocalDreamExecutor(
                                         name=="dream_schedule_extra"&&args?.keys==setOf("at")&&proposed==null->{
                                             val at=Instant.parse(args.str("at")).toEpochMilli()
                                             if(at>clock()){proposed=at;buildJsonObject{put("ok",true);put("status","proposed_pending_completion")}}else result
+                                        }
+                                        name in commonNames&&common!=null->{
+                                            val out=common.execute(c.id+":"+step+":"+index,name,fn.str("arguments"))
+                                            buildJsonObject{put("ok",out.ok);put("data",Json.parseToJsonElement(out.output))}
                                         }
                                         else->result
                                     }
