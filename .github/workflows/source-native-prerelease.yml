@@ -66,7 +66,7 @@ jobs:
           grep -Fxq "# ${{ steps.version_gate.outputs.version }}" "$notes"
           grep -Eq '^[-*] .+' "$notes"
           ! grep -Eiq '(^|[^[:alnum:]])(TODO|TBD|PLACEHOLDER)([^[:alnum:]]|$)' "$notes"
-          test "$(wc -c < "$notes")" -le 12000
+          test "$(wc -c < "$notes")" -le 4000
 
       - uses: actions/setup-java@v4
         if: steps.version_gate.outputs.skip != 'true'
