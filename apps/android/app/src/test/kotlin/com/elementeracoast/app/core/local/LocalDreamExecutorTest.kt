@@ -488,4 +488,55 @@ class LocalDreamExecutorTest {
         }
     }
 
+
+    @Test fun planRouteRunsSameDurableToolsWithNoApiFallbackOrHumanTurn()=runBlocking{
+        val (store,initial)=fixture();val ledger=LocalDreamLedger(store)
+        val m="chatgpt-plan:fixture-model";val rev="plan-revision"
+        val request=DreamSettingsRequest(cid,initial.revision,"arm",cfg,m,true,confirmPlanSoftBudget=true,planRequestLimit=3)
+        assertNull(ledger.configure(cid,request.copy(confirmPlanSoftBudget=false),true,at-86400000,planRevision=rev))
+        assertNull(ledger.configure(cid,request,true,at-86400000))
+        val armed=ledger.configure(cid,request,true,at-86400000,planRevision=rev)!!
+        assertEquals(rev,armed.revision)
+        val grant=com.elementeracoast.app.feature.chatgpt.NativeDreamPlanProtocol.Grant(cid,rev,"account","client","fixture-model",true,3)
+        var calls=0
+        val binding=com.elementeracoast.app.feature.chatgpt.NativeDreamPlanBinding(grant,{true}){body,tools,authorize->
+            assertTrue(authorize());calls++
+            assertEquals(JsonPrimitive(false),body["store"]);assertFalse("max_output_tokens" in body)
+            assertTrue(ledger.active(cid))
+            val history=LocalDreamArchive(store).runtimeHistory(cid)
+            assertTrue(history.getValue("steps").jsonArray.any{it.jsonObject["step_index"]==JsonPrimitive(calls-1)&&it.jsonObject["status"]==JsonPrimitive("claimed")})
+            val result=if(calls==1)"""{"status":"completed","model":"fixture-model","usage":{"total_tokens":120},"output":[{"type":"function_call","namespace":"coast","name":"dream_write_note","call_id":"n","arguments":"{\"body\":\"套餐手记\"}"}]}"""
+            else{
+                assertTrue(body.getValue("input").jsonArray.any{it.jsonObject["type"]==JsonPrimitive("function_call_output")&&it.jsonObject["call_id"]==JsonPrimitive("n")})
+                """{"status":"completed","model":"fixture-model","usage":{"total_tokens":120},"output":[]}"""
+            }
+            com.elementeracoast.app.feature.chatgpt.NativeDreamPlanProtocol.complete(Json.parseToJsonElement(result).jsonObject,emptyMap(),tools)
+        }
+        val engine=LocalDreamExecutor(store,{error("API fallback prohibited")},{_,_,_,_,_->error("API fallback prohibited")},clock={at},preparePlan={w,r,id->assertEquals(cid,w);assertEquals(rev,r);assertEquals(m,id);binding})
+        assertEquals("completed",engine.run(cid,rev,m,at));assertEquals(2,calls)
+        val archive=LocalDreamArchive(store)
+        assertEquals("套餐手记",archive.notes(cid,0).getValue("items").jsonArray.single().jsonObject["body"]!!.jsonPrimitive.content)
+        val row=archive.activity(cid,0).getValue("items").jsonArray.single().jsonObject
+        assertEquals(JsonPrimitive(240),row.getValue("result").jsonObject["total_tokens"])
+        assertEquals(JsonNull,row.getValue("result").jsonObject["reported_cost"])
+        assertEquals(1,RemoteCacheStore(store).history(cid)!!.turns.size)
+        assertEquals("not_due",engine.run(cid,rev,m,at));assertEquals(2,calls)
+    }
+    @Test fun planQuotaFailureIsTerminalAndCannotSwitchToApiKey()=runBlocking{
+        val (store,initial)=fixture();val ledger=LocalDreamLedger(store)
+        val m="chatgpt-plan:fixture-model";val rev="plan-quota"
+        val request=DreamSettingsRequest(cid,initial.revision,"arm",cfg,m,true,confirmPlanSoftBudget=true,planRequestLimit=2)
+        assertNotNull(ledger.configure(cid,request,true,at-86400000,planRevision=rev))
+        val grant=com.elementeracoast.app.feature.chatgpt.NativeDreamPlanProtocol.Grant(cid,rev,"account","client","fixture-model",true,2)
+        var calls=0;var authorized=true
+        val binding=com.elementeracoast.app.feature.chatgpt.NativeDreamPlanBinding(grant,{authorized}){_,_,_->calls++;authorized=false;throw com.elementeracoast.app.feature.chatgpt.NativeDreamPlanFailure("plan_usage_limit")}
+        val engine=LocalDreamExecutor(store,{error("must not fallback")},{_,_,_,_,_->error("must not fallback")},clock={at},preparePlan={_,_,_->binding.takeIf{authorized}})
+        assertEquals("failed",engine.run(cid,rev,m,at));assertEquals(1,calls)
+        assertEquals("model_unavailable",engine.run(cid,rev,m,at+86400000));assertEquals(1,calls)
+        val row=LocalDreamArchive(store).activity(cid,0).getValue("items").jsonArray.single().jsonObject
+        assertEquals(JsonPrimitive("plan_usage_limit"),row.getValue("result").jsonObject["reason"])
+        assertEquals(JsonNull,row.getValue("result").jsonObject["total_tokens"])
+        assertEquals(1,RemoteCacheStore(store).history(cid)!!.turns.size)
+    }
+
 }
