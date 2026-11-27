@@ -1,5 +1,6 @@
 package com.elementeracoast.app.feature.wolf
 
+import com.elementeracoast.app.core.model.ReplySegments
 import com.elementeracoast.app.core.local.*
 import kotlinx.serialization.json.*
 import java.io.File
@@ -99,7 +100,7 @@ internal object OfflineV2HtmlArchive {
                             val conv=data["conversation"].obj()
                             val history=(data["history"]?:data["history_json"]).let { if(it is JsonPrimitive)Json.parseToJsonElement(it.content).obj() else it.obj() }
                             fun variant(v:JsonObject,role:String,label:String)=buildString{
-                                append("<article class=\"$role\"><small>"+esc(label)+" · "+esc(v.s("id"))+" · "+esc(time(v.s("created_at")))+"</small><p>"+esc(v.s("content"))+"</p>")
+                                append("<article class=\"$role\"><small>"+esc(label)+" · "+esc(v.s("id"))+" · "+esc(time(v.s("created_at")))+"</small><p>"+esc(if(role=="assistant")ReplySegments.plain(v.s("content")) else v.s("content"))+"</p>")
                                 for(a in v["attachments"].arr()){
                                     val ref=a.obj();val m=attachments[conv.s("id")+":"+ref.s("id")]
                                     if(m!=null)append(media(m)) else {append("<p>原件未归档："+esc(ref.s("name"))+"</p>");warnings.add("聊天附件未匹配："+ref.s("id"))}

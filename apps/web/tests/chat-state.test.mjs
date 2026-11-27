@@ -167,3 +167,12 @@ const generatedState=normalizeState({turns:[{id:'image-turn',user:{variants:[{id
 assert.equal(generatedState.turns[0].user.variants[0].attachments[0].image_generation,undefined);
 assert.deepEqual(generatedState.turns[0].assistant.variantsByUserVariant['0'][0].attachments[0].image_generation,provenance);
 assert.equal(generatedState.turns[0].assistant.variantsByUserVariant['0'][1].attachments[0].image_generation,undefined);
+
+// A presentation split never changes the number or identity of stored messages.
+const {splitReplySegments,plainReplyText,REPLY_SEGMENT_MARKER}=await import('../elementera-mcp/deploy-pages/public/core/dom.js');
+const marker=REPLY_SEGMENT_MARKER;
+if(splitReplySegments('甲\n\n乙').length!==1)throw Error('ordinary paragraphs split');
+if(JSON.stringify(splitReplySegments('甲\n'+marker+'\n乙'))!==JSON.stringify(['甲','乙']))throw Error('explicit split');
+if(splitReplySegments('```html\n'+marker+'\n```').length!==1)throw Error('code fence split');
+if(plainReplyText('甲\n'+marker+'\n乙')!=='甲\n\n乙')throw Error('copy marker');
+if(splitReplySegments('甲\n'+marker.slice(0,8),true)[0]!=='甲')throw Error('partial marker flashed');

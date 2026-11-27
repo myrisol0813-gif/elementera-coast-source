@@ -15,10 +15,12 @@ function sizeLabel(bytes) {
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function attachmentCard(attachment, conversationId, { pending = false } = {}) {
+function attachmentCard(attachment, conversationId, { pending = false, stickerSize = 144 } = {}) {
   const name = escapeHtml(attachment.name || '附件');
   const meta = escapeHtml(`${attachment.mime || '文件'} · ${sizeLabel(attachment.size)}`);
   const url = attachmentUrl(conversationId, attachment.id);
+  const isSticker=!pending&&attachment.type==='image'&&Boolean(attachment.sticker_delivery?.sticker_id);
+  if(isSticker)return `<a class="chat-sticker-image" style="--sticker-size:${Number.isSafeInteger(stickerSize)&&stickerSize>=64&&stickerSize<=256?stickerSize:144}px" href="${escapeAttribute(url)}" target="_blank" rel="noopener"><img src="${escapeAttribute(url)}" alt="${name}" loading="lazy"></a>`;
   const body = attachment.type === 'image'
     ? `<img class="chat-attachment-image" src="${escapeAttribute(url)}" alt="${escapeAttribute(attachment.name || '图片附件')}" loading="lazy">`
     : `<span class="chat-attachment-file-icon">${icon('file')}</span>`;
@@ -32,10 +34,10 @@ function attachmentCard(attachment, conversationId, { pending = false } = {}) {
   return open;
 }
 
-export function renderMessageAttachments(attachments, conversationId) {
+export function renderMessageAttachments(attachments, conversationId, stickerSize=144) {
   const items = Array.isArray(attachments) ? attachments : [];
   if (!items.length) return '';
-  return `<div class="chat-attachments">${items.map((item) => attachmentCard(item, conversationId)).join('')}</div>`;
+  return `<div class="chat-attachments">${items.map((item) => attachmentCard(item, conversationId,{stickerSize})).join('')}</div>`;
 }
 
 async function uploadAttachment(conversationId, file) {

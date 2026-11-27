@@ -1,3 +1,4 @@
+import { plainReplyText } from '../core/dom.js';
 // Offline archive: no remote resources, scripts, or executable attachment previews.
 const utf8 = new TextEncoder();
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -53,7 +54,7 @@ export function buildOfflineArchive(archive, initialWarnings=[], ownerLabel='屋
   const nav=[];
   records.forEach(({conversation={},history={}},i)=>{
     const path='chats/'+(i+1)+'.html',title=conversation.title||conversation.id||'未命名窗口';nav.push('<li><a href="'+path+'">'+esc(title)+'</a></li>');
-    const article=(v,role,label)=>'<article class="'+role+'"><small>'+esc(v.display_author || (role==='user'?ownerLabel:'模型伙伴'))+' · '+esc(label)+' · '+esc(v.created_at||'')+'</small><div style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(v.content)+'</div>'+ (v.attachments||[]).map(a=>{const m=attachments.get(conversation.id+':'+a.id);return m?mediaHtml(m,'../'):'<p>原件未归档：'+esc(a.name||a.id)+'</p>';}).join('')+(v.desk_slip?'<details><summary>历史回执</summary><pre>'+esc(JSON.stringify(v.desk_slip,strip,2))+'</pre></details>':'')+((v.model_echo||v.usage)?'<details><summary>模型回波与用量</summary><pre>'+esc(JSON.stringify({model_echo:v.model_echo,usage:v.usage},strip,2))+'</pre></details>':'')+'</article>';
+    const article=(v,role,label)=>'<article class="'+role+'"><small>'+esc(v.display_author || (role==='user'?ownerLabel:'模型伙伴'))+' · '+esc(label)+' · '+esc(v.created_at||'')+'</small><div style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(role==='assistant'?plainReplyText(v.content):v.content)+'</div>'+ (v.attachments||[]).map(a=>{const m=attachments.get(conversation.id+':'+a.id);return m?mediaHtml(m,'../'):'<p>原件未归档：'+esc(a.name||a.id)+'</p>';}).join('')+(v.desk_slip?'<details><summary>历史回执</summary><pre>'+esc(JSON.stringify(v.desk_slip,strip,2))+'</pre></details>':'')+((v.model_echo||v.usage)?'<details><summary>模型回波与用量</summary><pre>'+esc(JSON.stringify({model_echo:v.model_echo,usage:v.usage},strip,2))+'</pre></details>':'')+'</article>';
     const rows=(history.turns||[]).map((t,j)=>'<section><h2>第 '+(j+1)+' 轮</h2>'+ (t.user?.variants||[]).map((v,k)=>article(v,'user','用户变体 '+(k+1))).join('')+Object.entries(t.assistant?.variantsByUserVariant||{}).map(([k,vs])=>vs.map((v,l)=>article(v,'assistant','分支 '+k+' · 回复 '+(l+1))).join('')).join('')+'</section>').join('');
     files.push([path,page(title,'<a href="../index.html">返回海岸</a><h1>'+esc(title)+'</h1>'+rows)]);
   });

@@ -86,7 +86,7 @@ internal fun VoiceSelectionDialog(
     localMode:Boolean=false
 ) {
     val paragraphs = remember(message.remoteVariantId, message.text) {
-        message.text.split(Regex("\\n\\s*\\n")).map { it.trim() }.filter(String::isNotEmpty)
+        com.elementeracoast.app.core.model.ReplySegments.plain(message.text).split(Regex("\\n\\s*\\n")).map { it.trim() }.filter(String::isNotEmpty)
     }
     var indices by remember(message.id) { mutableStateOf<Set<Int>>(emptySet()) }
     val count = indices.sorted().joinToString("\n\n") { paragraphs[it] }.length

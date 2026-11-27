@@ -201,8 +201,9 @@ export function createDeskSlip({
       label: '回应节奏', description: DESCRIPTIONS.response_mode,
       status: responseValue.short_reply_mode === true
         ? (responseValue.delivered_to_model === true ? '短句模式 · 已递给' : '短句模式 · 未递给')
-        : '普通',
+        : responseValue.segmented_bubbles === true ? (responseValue.delivered_to_model === true ? '分隔气泡 · 已递给' : '分隔气泡 · 未递给') : '普通',
       short_reply_mode: responseValue.short_reply_mode === true,
+      ...(responseValue.segmented_bubbles === true ? { segmented_bubbles: true } : {}),
       delivered: responseValue.delivered_to_model === true,
       context: privateDetails && responseValue.delivered_to_model === true ? String(responseValue.context || '') : '',
     },

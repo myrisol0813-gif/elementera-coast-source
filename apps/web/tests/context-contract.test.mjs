@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createConversation } from '../functions/chat-store.js';
+import { createConversation, readConversationState, writeConversationState } from '../functions/chat-store.js';
 import { assembleCleanContext } from '../functions/context-assemble-clean.js';
 import { registerMailboxVisitor } from '../functions/mailbox-service.js';
 import { GLOBAL_EXCERPT_INITIAL_TEXT, confirmGlobalExcerptCandidate, createEntry, createGlobalExcerptCandidate, createPocket, writeCustomInstructions, writeSoil } from '../functions/memory-store.js';
@@ -157,6 +157,27 @@ assert.equal(emptySlip.related_memory.status, '未命中');
 assert.equal(emptySlip.worldbook.status, '未命中');
 assert.equal(emptySlip.thinking_soil.status, '未递给');
 assert.equal(emptySlip.external_tide.content, '本轮没有递入外部材料。');
+
+assert.ok(emptySystem.includes('希望你用得顺手，也用得开心。'), 'ordinary chat receives the default invitation without keyword matching');
+assert.equal(emptySlip.workbench.prompt_delivered,true);
+const savedWindow=await readConversationState(emptyDb,emptyConversation.id);
+const assembleWindow=()=>assembleCleanContext({COAST_CHAT_DB:emptyDb},{
+  surface:'main_chat',conversationId:emptyConversation.id,messages:emptyMessages,lastUser:emptyMessages.at(-1),permission:'owner',preview:true,
+});
+await writeConversationState(emptyDb,emptyConversation.id,{...savedWindow,context_settings:{...savedWindow.context_settings,workbench_prompt:'【我的邀请】\nWORKBENCH_CUSTOM_TEST_713'}});
+const edited=await assembleWindow();
+assert.ok(edited.modelMessages[0].content.includes('【我的邀请】\nWORKBENCH_CUSTOM_TEST_713'));
+assert.equal(edited.modelMessages[0].content.includes('希望你用得顺手，也用得开心。'),false);
+assert.equal(edited.deskSlip().workbench.prompt_delivered,true);
+const noTools=await assembleCleanContext({COAST_CHAT_DB:emptyDb},{surface:'main_chat',conversationId:emptyConversation.id,messages:emptyMessages,lastUser:emptyMessages.at(-1),permission:'owner',preview:true,exposeTools:false});
+assert.equal(noTools.modelMessages[0].content.includes('WORKBENCH_CUSTOM_TEST_713'),false);
+assert.equal(noTools.deskSlip().workbench.prompt_delivered,false);
+const editedState=await readConversationState(emptyDb,emptyConversation.id);
+await writeConversationState(emptyDb,emptyConversation.id,{...editedState,context_settings:{...editedState.context_settings,workbench_prompt:''}});
+const blank=await assembleWindow();
+assert.equal(blank.deskSlip().workbench.prompt_delivered,false);
+assert.equal(blank.tools.length,edited.tools.length,'blank invitation does not disable tools');
+assert.equal(blank.modelMessages[0].content.includes('希望你用得顺手，也用得开心。'),false);
 
 await writeCustomInstructions(db, { content: 'OWNER_PRIVATE_CUSTOM_INSTRUCTION_713' });
 const visitor = await registerMailboxVisitor(db, env, { display_name: '上下文访客', preferred_name: '小访客', passphrase: '透明海岸-713', allow_memory: true });

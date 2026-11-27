@@ -134,7 +134,7 @@ test('reply group with real sticker original and individual desk receipts round 
  const bytes=Uint8Array.from([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,6,0,0,0]);
  const sticker=await uploadOwnerSticker(src,{name:'group.png',mime:'image/png',description:'group fixture',bytes},{actor:'owner'});
  const identity={conversationId:c.id,turnId:'group-turn',userVariantId:'group-user',sequenceId:'group-run'};
- await writeConversationState(src,c.id,{context_settings:{reply_sequence_enabled:true,reply_sequence_max_messages:2,reply_sequence_tool_budget:3,reply_sequence_token_budget:9000,sticker_send_enabled:true},turns:[{id:identity.turnId,user:{variants:[{id:identity.userVariantId,content:'hello'}]}}]});
+ await writeConversationState(src,c.id,{context_settings:{reply_sequence_enabled:true,reply_sequence_max_messages:2,reply_sequence_tool_budget:3,reply_sequence_token_budget:9000,sticker_send_enabled:true,segmented_bubbles:true,sticker_display_size:192,workbench_prompt:'自定义邀请'},turns:[{id:identity.turnId,user:{variants:[{id:identity.userVariantId,content:'hello'}]}}]});
  assert.equal(await acquireReplyRun(src,identity,{maxMessages:2,toolBudget:3,tokenBudget:9000}),true);
  assert.equal(await reserveReplyStep(src,identity,'group-first',0),true);
  assert.ok(await claimReplyStep(src,identity,'group-first'));
@@ -144,7 +144,7 @@ test('reply group with real sticker original and individual desk receipts round 
  assert.ok(await commitReplyStep(src,identity,'group-first',{id:'group-first',content:'',finish_reason:'stop',model_id:'fixture/chat',desk_slip:{summary:'first desk'}},{tool_calls:1,total_tokens:100,continue_requested:true}));
  assert.equal(await reserveReplyStep(src,identity,'group-second',1),true);
  assert.ok(await claimReplyStep(src,identity,'group-second'));
- assert.ok(await commitReplyStep(src,identity,'group-second',{id:'group-second',content:'next message',finish_reason:'stop',model_id:'fixture/chat',desk_slip:{summary:'second desk',reply_sequence_previous:[{message_id:'group-first',content:''}]}},{tool_calls:0,total_tokens:100,continue_requested:false}));
+ assert.ok(await commitReplyStep(src,identity,'group-second',{id:'group-second',content:'next message\n<!--tideloom:split-->\nsecond segment',finish_reason:'stop',model_id:'fixture/chat',desk_slip:{summary:'second desk',reply_sequence_previous:[{message_id:'group-first',content:''}]}},{tool_calls:0,total_tokens:100,continue_requested:false}));
  assert.equal(await settleReplyRun(src,identity,'completed'),true);
  assert.ok(await readArchiveChat(src,c.id));
  const original=(await readConversationState(src,c.id)).turns[0].assistant.variantsByUserVariant['0'];
@@ -171,6 +171,10 @@ test('reply group with real sticker original and individual desk receipts round 
    assert.deepEqual(group[0].attachments,original[0].attachments);
    assert.equal(group[0].content,'');assert.equal(history.context_settings.reply_sequence_tool_budget,3);
    assert.equal(history.context_settings.reply_sequence_token_budget,9000);
+   assert.equal(history.context_settings.segmented_bubbles,true);
+   assert.equal(history.context_settings.sticker_display_size,192);
+   assert.equal(history.context_settings.workbench_prompt,'自定义邀请');
+   assert.equal(group[1].content,'next message\n<!--tideloom:split-->\nsecond segment');
    assert.deepEqual(new Uint8Array((await getChatAttachmentRecord(to,c.id,attachment.id)).data),bytes);
    assert.equal(await isReplyRunActive(to,c.id),false);
    assert.equal(await claimReplyRunSoil(to,c.id,identity.sequenceId,'group-second'),false);

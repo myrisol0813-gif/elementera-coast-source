@@ -1,6 +1,8 @@
 import { escapeAttribute, escapeHtml, q } from '../../core/dom.js';
 import { normalizeContextSettings } from '../chat-state.js';
 
+const DEFAULT_WORKBENCH_PROMPT = "用户欢迎你使用这里为你开放的诸多工具。\n\n你可以依照自己的判断，选择顺手的功能，让它们自然地加入对话、阅读、创作与探索。不必等用户逐项提出要求，也不必为了使用而使用。\n\n希望你用得顺手，也用得开心。";
+
 const WEB_REALITY_FIELDS = Object.freeze([
   ['date', '日期', '今天是哪一天'],
   ['time', '时间', '当前本地时间'],
@@ -113,11 +115,23 @@ export function createChatWindowSettings({
           </section>
 
           <section class="window-context-card">
+            <div class="window-context-copy" style="padding:12px">
+              <strong>工作区 · 工具箱注入词</strong>
+              <textarea aria-label="工具箱注入词" data-workbench-prompt maxlength="4000" rows="7" style="width:100%;box-sizing:border-box;font:inherit;resize:vertical" ${mediaLocked?'disabled':''}>${escapeHtml(settings.workbench_prompt??DEFAULT_WORKBENCH_PROMPT)}</textarea>
+              <small>仅当前窗口生效；本轮有可用工具时递入。留空不递入邀请词，不关闭工具。</small>
+            </div>
+            <button class="window-context-link" type="button" data-action="chat:window-workbench-save" ${mediaLocked?'disabled':''}><span><strong>保存注入词</strong></span><span>›</span></button>
+            <button class="window-context-link" type="button" data-action="chat:window-workbench-reset" ${mediaLocked?'disabled':''}><span><strong>恢复默认</strong></span><span>›</span></button>
+          </section>
+          <section class="window-context-card">
+            <div class="window-context-copy" style="padding:8px 12px"><label><strong>表情包显示尺寸 (px)</strong><input type="number" inputmode="numeric" min="64" max="256" step="1" data-sticker-size value="${settings.sticker_display_size??144}" ${mediaLocked?'disabled':''}></label><small>64—256；只改变表情包显示，不修改原件。</small></div>
+            <button class="window-context-link" type="button" data-action="chat:window-sticker-size-save" ${mediaLocked?'disabled':''}><span><strong>保存显示尺寸</strong></span><span>›</span></button>
             ${switchRow({title:'允许发送表情包',note:'模型可自主查找和发送已启用的素材，不调用生图 API。',checked:settings.sticker_send_enabled,enabled:!mediaLocked,action:!mediaLocked?'chat:window-sticker-send':''})}
             ${switchRow({title:'允许添加表情包',note:'模型可登记自己在本窗口生成并保存的图片。',checked:settings.sticker_add_enabled,enabled:!mediaLocked,action:!mediaLocked?'chat:window-sticker-add':''})}
           </section>
           <section class="window-context-card">
-            ${switchRow({title:'真实连续回复（实验）',note:plan?'网页不能直接调用设备上的 GPT 套餐；请选择普通 API 模型。':'模型可主动追加独立回复；达到额度或缺少用量时停止。',checked:settings.reply_sequence_enabled,enabled:!replyLocked,action:!replyLocked?'chat:window-reply-toggle':''})}
+            ${switchRow({title:'分隔气泡',note:'模型自主选择在同一次回复中分隔气泡，不增加生成次数。',checked:settings.segmented_bubbles,enabled:!mediaLocked,action:!mediaLocked?'chat:window-segments-toggle':''})}
+            ${switchRow({title:'真实连续回复',note:plan?'网页不能直接调用设备上的 GPT 套餐；请选择普通 API 模型。':'模型可主动追加独立回复；达到额度或缺少用量时停止。',checked:settings.reply_sequence_enabled,enabled:!replyLocked,action:!replyLocked?'chat:window-reply-toggle':''})}
             ${REPLY_BUDGET_FIELDS.map(field=>replyBudgetRow(settings,field,mediaLocked)).join('')}
             <button class="window-context-link" type="button" data-action="chat:window-reply-budget-save" ${mediaLocked?'disabled':''}><span><strong>保存本窗口预算</strong><small>留空的项目继承基本设置。</small></span><span>›</span></button>
           </section>
@@ -177,6 +191,26 @@ export function createChatWindowSettings({
     const state = currentHistory();
     const settings = normalizeContextSettings(state.context_settings);
 
+    if(name==='window-workbench-save'||name==='window-workbench-reset'){
+      if(isUnavailableConversation()||!['main','radio'].includes(activeConversation()?.room_type))return;
+      if(runtime.generation||runtime.finalizing||runtime.pendingComposerSend)return toast('请先结束当前回复，再修改注入词。');
+      const next={...settings};
+      if(name==='window-workbench-reset')delete next.workbench_prompt;
+      else {
+        const field=root?.querySelector('[data-workbench-prompt]');
+        if(!field||field.value.length>4000)return;
+        next.workbench_prompt=field.value;
+      }
+      return writeSettings(next);
+    }
+    if(name==='window-segments-toggle'||name==='window-sticker-size-save'){
+      if(isUnavailableConversation()||!['main','radio'].includes(activeConversation()?.room_type))return;
+      if(runtime.generation||runtime.finalizing||runtime.pendingComposerSend)return toast('请先结束当前回复，再修改设置。');
+      if(name==='window-segments-toggle')return writeSettings({...settings,segmented_bubbles:!settings.segmented_bubbles});
+      const field=root?.querySelector('[data-sticker-size]'),size=Number(field?.value);
+      if(!Number.isSafeInteger(size)||size<64||size>256)return toast('请输入 64—256 的整数，原设置保留。');
+      return writeSettings({...settings,sticker_display_size:size});
+    }
     if(name==='window-reply-toggle'){
       if(isUnavailableConversation()||!['main','radio'].includes(activeConversation()?.room_type))return;
       if(runtime.generation||runtime.finalizing||runtime.pendingComposerSend)return toast('请先结束当前回复，再修改开关。');

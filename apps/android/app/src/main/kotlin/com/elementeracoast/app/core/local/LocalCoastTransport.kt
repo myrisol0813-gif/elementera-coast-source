@@ -298,7 +298,7 @@ class LocalCoastTransport(private val store: LocalPersistence,
             return response(r, 200, element(RemoteNativeChatContext.serializer(), RemoteNativeChatContext(
                 ok = true,
                 tools = session?.tools?:JsonArray(emptyList()),
-                modelMessages = localMultimodalMessages(prepared.messages,prepared.imageParts),
+                modelMessages = localMultimodalMessages(session?.withWorkbench(prepared.messages)?:prepared.messages,prepared.imageParts),
                 deskSlip = session?.receipt?:prepared.receipt,
                 limitations = RemoteNativeToolLimits(session?.maxCalls?:com.elementeracoast.app.core.network.TurnToolPolicy.stored(store))
             )).jsonObject)

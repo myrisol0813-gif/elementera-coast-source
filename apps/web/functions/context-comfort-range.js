@@ -21,7 +21,7 @@ export const SOURCE_GUIDES = Object.freeze({
   cross_window: ['【跨窗口读取】', '这是本轮从其他对话窗口读取的近期聊天记录。', '仅用于补充当前任务上下文；是否引用其中内容，应由当前消息与任务相关性决定。'].join('\n'),
   reality: ['【现实上下文】', '这是当前窗口明确允许模型看见的现场现实信息。', '只把这里实际出现的事实当作本轮现实坐标；没有出现的设备或生活信息不要猜。'].join('\n'),
   response_mode: ['【回应节奏】', '这是当前窗口明确选择的表达节奏。', '它只调整回应方式，不改变事实、关系位置或工具权限。'].join('\n'),
-  workbench: ['【工作台 / 工具回执】', '这是代码、文件、接口、真机、GitHub 等技术领域的话题与事实结果。', '它用于提供可核对的客观状态，并约束回复不要把未完成的动作说成已经完成。'].join('\n'),
+  workbench: ['【工作台 / 工具回执】', '以下是本窗口关于工具使用的说明；实际可用工具、权限及预算仍以本轮授权为准。', '没有执行成功的动作不能说成已经完成。'].join('\n'),
   external: ['【外部入口消息】', '这是从应用外部临时读入、且尚未归档成内部对话窗口的材料。', '本轮如果没有外部材料，则显示“本轮没有递入外部材料”。'].join('\n'),
 });
 
@@ -97,7 +97,7 @@ function assembleText(value, messages) {
     itemBlock(SOURCE_GUIDES.worldbook, value.worldbookItems.map((item) => `- ${item}`)),
     sourceBlock(SOURCE_GUIDES.reality, value.realityText),
     sourceBlock(SOURCE_GUIDES.response_mode, value.responseModeText),
-    sourceBlock(SOURCE_GUIDES.workbench, value.workbenchText),
+    value.workbenchText ? `${SOURCE_GUIDES.workbench}\n${value.workbenchText}` : '',
     `${SOURCE_GUIDES.external}\n本轮没有递入外部材料。`,
     recent ? `${SOURCE_GUIDES.recent}\n以下 ${recent} 条消息属于最近上下文。` : '',
     hasCurrentMessage(messages) ? SOURCE_GUIDES.current : '',

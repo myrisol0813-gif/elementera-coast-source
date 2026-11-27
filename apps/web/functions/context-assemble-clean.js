@@ -94,7 +94,13 @@ async function roomPapers(env, access, { conversationId, visitorId, query, recen
   }
   return { memory: null, soil: null, recent, dogtalk: null };
 }
-function workbenchPrompt(query, toolCount) { if (!toolCount || !/(记忆|落袋|动态|日记|私人草稿|跨窗口|信箱|共通聊天室|MCP 对话区|工具|工作台)/u.test(String(query || ''))) return ''; return '【工作台】\n前端里有一些可使用的工具。需要时再用，不必为了使用而使用。'; }
+const DEFAULT_WORKBENCH_PROMPT = "用户欢迎你使用这里为你开放的诸多工具。\n\n你可以依照自己的判断，选择顺手的功能，让它们自然地加入对话、阅读、创作与探索。不必等用户逐项提出要求，也不必为了使用而使用。\n\n希望你用得顺手，也用得开心。";
+function workbenchPrompt(query, toolCount, windowSettings = null) {
+  if (!toolCount) return '';
+  if (windowSettings) return typeof windowSettings.workbench_prompt === 'string' ? windowSettings.workbench_prompt.trim() : DEFAULT_WORKBENCH_PROMPT;
+  if (!/(记忆|落袋|动态|日记|私人草稿|跨窗口|信箱|共通聊天室|MCP 对话区|工具|工作台)/u.test(String(query || ''))) return '';
+  return '前端里有一些可使用的工具。需要时再用，不必为了使用而使用。';
+}
 function soilDeskSnapshot(deliveredText, value) {
   const text = String(deliveredText || '');
   const lines = text.split('\n');
@@ -162,7 +168,7 @@ function mergeModelReads(previous, next) {
 
 export async function assembleCleanContext(env, {
   surface, conversationId, roomId, visitorId, sourceTurnId = null, messages = [], lastUser, settings = {}, localDate = new Date().toISOString().slice(0, 10),
-  localDateTime = '', realityContext = null, realityAllowedFields = null, recentEntryIds = [], authScope = null, model = '', permission: requestedPermission, preview = false, baseSystemPrompt = '', exposeTools = true, initialFurniture = [], crossWindow = null, groupDogtalk = undefined,
+  localDateTime = '', realityContext = null, realityAllowedFields = null, recentEntryIds = [], authScope = null, model = '', permission: requestedPermission, preview = false, baseSystemPrompt = '', exposeTools = true, exposeOpenRouterSearch = true, initialFurniture = [], crossWindow = null, groupDogtalk = undefined,
 } = {}) {
   const permission = requestedPermission || (surface === 'mailbox_visitor' ? 'visitor' : 'owner');
   const access = roomAccess(surface, { permission, visitorId }); const request = requestSettings(settings);
@@ -186,7 +192,7 @@ export async function assembleCleanContext(env, {
     : { mode: 'off', sources: [] };
   const independentWebEnabled = exposeTools && permission === 'owner' && WEB_SEARCH_SURFACES.has(surface) && crossWindowRequest.mode !== 'keyword' && env.COAST_INDEPENDENT_WEB_ENABLED === 'true' && Boolean(env.TAVILY_API_KEY?.trim());
   const selection = exposeTools ? resolveToolSelection({ permission, surface, authScope, visitorId, env, independent_web_enabled: independentWebEnabled, cross_window_mode: crossWindowRequest.mode, global_excerpt_write_enabled: globalExcerpt?.write_enabled === true, user_portrait_write_enabled: userPortrait?.write_enabled === true && isThinkingSoilEnabled(papers.soil) }) : { backendTools: [], modelVisibleToolRecords: [], modelVisibleTools: [] };
-  const webSearchEnabled = Boolean(!independentWebEnabled && exposeTools && permission === 'owner' && WEB_SEARCH_SURFACES.has(surface)
+  const webSearchEnabled = Boolean(!independentWebEnabled && exposeTools && exposeOpenRouterSearch && permission === 'owner' && WEB_SEARCH_SURFACES.has(surface)
     && crossWindowRequest.mode !== 'keyword');
   const modelVisibleToolRecords = webSearchEnabled
     ? [...selection.modelVisibleToolRecords, WEB_SEARCH_TOOL_RECORD]
@@ -213,7 +219,7 @@ export async function assembleCleanContext(env, {
   const soilText = formatThinkingSoil(papers.soil, { maxCharacters: request.soilCharacters, maxAfterthoughts: 7 });
   const memoryRecords = papers.memory?.visitor_memories ? [] : (Array.isArray(papers.memory?.items) ? papers.memory.items.slice(0, request.memoryLimit) : []);
   const memoryItems = papers.memory?.visitor_memories ? notebookItems(papers.memory.visitor_memories) : recallMemoryItems({ items: memoryRecords });
-  const dogtalk = papers.dogtalk || directDogtalk; const worldbookItems = worldbook.map((entry) => `${entry.title}：${entry.content}`); const workbenchText = workbenchPrompt(query, modelVisibleTools.length);
+  const dogtalk = papers.dogtalk || directDogtalk; const worldbookItems = worldbook.map((entry) => `${entry.title}：${entry.content}`); const workbenchText = workbenchPrompt(query, modelVisibleTools.length, permission === 'owner' && conversationId && REALITY_CONTEXT_SURFACES.has(surface) ? contextSettings : null);
   const comfort = trimContextToComfortRange({
     basePrompt: surface === 'mailbox_visitor' ? String(baseSystemPrompt || '').trim() || VISITOR_PROMPT : OWNER_CUSTOM_INSTRUCTION_SURFACES.has(surface) ? OWNER_TECHNICAL_PROMPT : String(baseSystemPrompt || '').trim() || OWNER_TECHNICAL_PROMPT,
     customInstructionsText: hasCustomInstructions ? customInstructionsText : '', userPortraitText, globalExcerptText, soilText, memoryItems, worldbookItems, dogtalkText: dogtalk?.context || '',
