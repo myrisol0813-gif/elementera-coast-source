@@ -46,7 +46,7 @@ export async function reserveDreamTool(db,claim,step,index,name,now=Date.now()){
 }
 export async function recordDreamTool(db,claim,step,index,receipt,now=Date.now()){
   await ensureChatSchema(db);
-  const safe={ok:receipt?.ok===true,...(Number.isSafeInteger(receipt?.count)&&receipt.count>=0?{count:receipt.count}:{})};
+  const safe={ok:receipt?.ok===true,...(Number.isSafeInteger(receipt?.count)&&receipt.count>=0?{count:receipt.count}:{}),...(typeof receipt?.record_id==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(receipt.record_id)?{record_id:receipt.record_id}:{})};
   const r=await stmt(db,`UPDATE dream_tide_tool_events SET status=?,receipt_json=?,finished_at=? WHERE claim_id=? AND step_index=? AND call_index=? AND status='claimed'
     AND EXISTS(SELECT 1 FROM dream_tide_runs r WHERE r.claim_id=? AND r.conversation_id=? AND r.arm_revision=? AND r.status='running')`,
     safe.ok?'completed':'failed',JSON.stringify(safe),now,claim.claimId,step,index,...args(claim)).run();
