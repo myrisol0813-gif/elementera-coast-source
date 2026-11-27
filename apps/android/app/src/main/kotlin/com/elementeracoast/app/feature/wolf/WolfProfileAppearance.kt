@@ -340,8 +340,10 @@ internal fun SettingGroup(title: String, content: @Composable () -> Unit) {
     SnowLetterSurface(
         modifier = Modifier.fillMaxWidth(),
         role = SnowLetterSurfaceRole.StatusCard,
-        fallbackColor = MaterialTheme.colorScheme.surfaceVariant,
-        fallbackShape = RoundedCornerShape(22.dp)
+        fallbackColor = MaterialTheme.colorScheme.surface,
+        fallbackShape = RoundedCornerShape(22.dp),
+        fallbackBorder = androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=.55f)),
+        fallbackElevation = 1.dp
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(title, fontWeight = FontWeight.SemiBold)

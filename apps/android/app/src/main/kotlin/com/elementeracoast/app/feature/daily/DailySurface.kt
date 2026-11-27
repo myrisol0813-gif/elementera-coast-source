@@ -39,15 +39,17 @@ internal fun DailySurfaceCard(
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
-    val shape = RoundedCornerShape(22.dp)
-    val base = modifier
-        .fillMaxWidth()
-        .shadow(elevation = 2.dp, shape = shape, clip = false)
-        .background(MaterialTheme.colorScheme.surfaceVariant, shape)
-    Column(
-        modifier = (if (onClick == null) base else base.clickable(onClick = onClick))
-            .padding(horizontal = 20.dp, vertical = 20.dp)
-    ) { content() }
+    val base=modifier.fillMaxWidth()
+    com.elementeracoast.app.ui.theme.SnowLetterSurface(
+        modifier=if(onClick==null)base else base.clickable(onClick=onClick),
+        role=com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole.StatusCard,
+        fallbackColor=MaterialTheme.colorScheme.surface,
+        fallbackShape=RoundedCornerShape(22.dp),
+        fallbackBorder=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=.55f)),
+        fallbackElevation=1.dp
+    ){
+        Column(Modifier.padding(horizontal=20.dp,vertical=20.dp)){content()}
+    }
 }
 
 @Composable
