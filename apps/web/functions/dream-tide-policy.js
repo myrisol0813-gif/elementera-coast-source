@@ -8,6 +8,8 @@ export const DREAM_TOOL_GROUPS=Object.freeze({
   allowCalendar:['calendar_list'],
   allowCollection:['vault_search_index','vault_read_selected'],
   allowLibraryWrite:['library_write'],
+  allowDailyWrite:['create_moment','create_diary'],
+  allowCalendarWrite:['calendar_create'],
 });
 export const DREAM_CONTEXT_FLAGS=Object.freeze(['includeCustom','includeUserPortrait','includeSelfPortrait','includeConversationCount','includeWeather','includeCalendar','includeSteps','includeAppUsage']);
 export const DREAM_TOOL_FLAGS=Object.freeze(Object.keys(DREAM_TOOL_GROUPS));
