@@ -404,6 +404,10 @@ export function createCoastVault({ router, chat, toast }) {
       return;
     }
     if (name === 'source') {
+      const mediaId=item.source_id||item.id;
+      if(['audio','image'].includes(item.kind)&&/^(att|voice)_dream_/.test(mediaId)){
+        return router.open('dream-tide-activity',{conversationId:item.conversation_id,mediaId});
+      }
       await router.close();
       const hit = {
         kind: item.message_id ? 'message' : 'conversation',
