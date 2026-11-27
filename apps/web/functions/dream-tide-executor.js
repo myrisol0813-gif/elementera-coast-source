@@ -98,7 +98,7 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
     if(!actual||actual.modelId!==currentModelId)throw new DOMException('Aborted','AbortError');
     const e=actual.execution,context=await buildDreamContext(db,claim,actual,now,env);
     const toolContext={permission:'owner',surface:'main_chat',env,conversation_id:cid,source_turn_id:null,
-      model_label:currentModelId,autonomous_activity:true,autonomous_tool_names:dreamToolNames(actual),
+      model_label:currentModelId,autonomous_activity:true,autonomous_claim:claim,autonomous_tool_names:dreamToolNames(actual),
       independent_web_enabled:e.allowWeb===true};
     const common=resolveToolSelection(toolContext).modelVisibleTools.map(t=>t.function.name==='library_write'?{
       ...t,function:{...t.function,description:'可选：创建自己的书房批注、划线或读后感。此次活动不修改或删除既有笔记。',parameters:{...t.function.parameters,properties:{...t.function.parameters.properties,action:{type:'string',enum:['create']}}}}
@@ -167,12 +167,13 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
               // before dispatch; the registry still validates its own arguments.
               await authorize();
               const value=await executeModelTool(db,{...call,id:claim.claimId+':'+index+':'+callIndex},toolContext);
+              if(name==='library_write'&&value?.note?.id)result.record_id=value.note.id;
               const encoded=JSON.stringify(value);
-              result=encoded.length<=24000?{ok:value?.ok!==false,data:value}:{ok:false,reason:'result_too_large'};
+              result=encoded.length<=24000?{ok:value?.ok!==false,data:value,...(result.record_id?{record_id:result.record_id}:{})}:{ok:false,reason:'result_too_large',...(result.record_id?{record_id:result.record_id}:{})};
               activities.push({kind:name,ok:result.ok});
             }
           }catch{result={ok:false,reason:'tool_failed'};activities.push({kind:name,ok:false});}
-          const receipt={ok:result.ok===true||(name==='dream_read_history'&&Array.isArray(result.turns)&&!result.reason),...(Array.isArray(result.turns)?{count:result.turns.length}:{})};
+          const receipt={ok:result.ok===true||(name==='dream_read_history'&&Array.isArray(result.turns)&&!result.reason),...(Array.isArray(result.turns)?{count:result.turns.length}:{}),...(result.record_id?{record_id:result.record_id}:{})};
           if(!await recordDreamTool(db,claim,index,callIndex,receipt,clock()))throw new DOMException('Aborted','AbortError');
         }
         results.push({role:'tool',tool_call_id:call.id,name,content:JSON.stringify(result)});
