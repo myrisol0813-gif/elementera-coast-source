@@ -1,4 +1,4 @@
-import {claimDreamTide,dreamTideClaimAuthorized,heartbeatDreamTide,settleDreamTide,recoverDreamTide,setDreamTideExtra} from './dream-tide-ledger.js';
+import {claimDreamTide,dreamTideClaimAuthorized,heartbeatDreamTide,settleDreamTide,recoverDreamTide} from './dream-tide-ledger.js';
 import {recoverSingleChatRuns} from './chat-single-run.js';
 import {recoverStaleReplyRuns} from './chat-reply-run.js';
 import {dreamExecutionConfig,reserveDreamStep,recordDreamStep,writeDreamNote,readDreamNotes,readDreamHistory,previousDream,finishDreamActivity} from './dream-tide-records.js';
@@ -143,13 +143,10 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
   }
   const result={reason,activities,tool_calls:calls,total_tokens:known?used:null,reported_cost:costKnown?cost:null,
     ...(extraAt!==null?{proposed_extra_at:extraAt}:{}),accounting:'provider_reported; input estimate is not a hard billing guarantee'};
-  const finished=await finishDreamActivity(db,claim,status,result,clock());
-  if(!finished){
+  const settled=await finishDreamActivity(db,claim,status,result,clock());
+  if(!settled.finished){
     await settleDreamTide(db,claim,'interrupted',clock());
     return {status:'unconfirmed',claimId:claim.claimId};
   }
-  // No immediate provider call. Do not replace another pending appointment.
-  let extraScheduled=false;
-  if(status==='completed'&&extraAt!==null)extraScheduled=await setDreamTideExtra(db,cid,claim.revision,claim.claimId,extraAt,clock());
-  return {status,claimId:claim.claimId,...result,extraScheduled};
+  return {status,claimId:claim.claimId,...result,extraScheduled:settled.extraScheduled};
 }
