@@ -256,3 +256,59 @@ test('independent image preserves exact original, is not a chat attachment, and 
   assert.equal((await listMediaLibrary(db,{kind:'image'})).items.length,1);
   assert.equal((await readConversationState(db,cid)).turns.length,1);
 });
+
+
+test('autonomous media and activity receipts restore atomically without arming a new job',async()=>{
+  const {db,cid,env}=await fixture({allowImage:true,allowVoice:true,toolBudget:5});
+  const {writeProfile}=await import('../functions/chat-store.js');
+  const {claimDreamTide,settleDreamTide}=await import('../functions/dream-tide-ledger.js');
+  const {reserveDreamStep,recordDreamStep,reserveDreamTool,recordDreamTool}=await import('../functions/dream-tide-records.js');
+  const {generateDreamImage}=await import('../functions/dream-tide-image.js');
+  const {generateVoiceClip,voiceClipAudio}=await import('../functions/voice-clips.js');
+  const {getChatAttachmentRecord}=await import('../functions/chat-attachments.js');
+  const {readArchiveAttachment}=await import('../functions/coast-archive-v2-media.js');
+  const {readArchiveChat,readArchiveVoice}=await import('../functions/coast-archive-v2-records.js');
+  const {validateDreamMediaOrigin}=await import('../functions/dream-tide-archive.js');
+  const {MODULES,encodeRecordObject}=await import('../functions/coast-archive-v2-manifest.js');
+  const {createArchiveSession,registerArchiveObject,putArchiveChunk}=await import('../functions/coast-archive-v2-stage.js');
+  const {restoreArchiveChatGroup}=await import('../functions/coast-archive-v2-restore.js');
+  const {saveTreasure}=await import('../functions/coast-vault-treasures.js');
+  const imageModel='fixture/paid';
+  await writeProfile(db,{current_image_model:imageModel,model_box:{image:[imageModel]}});
+  const claim=await claimDreamTide(db,cid,{now:due,currentModelId:model,busy:false});
+  assert.ok(claim);assert.ok(await reserveDreamStep(db,claim,0,due));
+  assert.ok(await recordDreamStep(db,claim,0,'completed',{},due));
+  const cfg={...env,COAST_DREAM_MEDIA_ENABLED:'true',OPENROUTER_API_KEY:'fixture-only',ELEVENLABS_API_KEY:'fixture-only',ELEVENLABS_VOICE_ID:'fixture_voice'};
+  const ctx={autonomous_activity:true,autonomous_claim:claim,autonomous_event:{step:0,index:0},conversation_id:cid,model_label:model};
+  const png=new Uint8Array(24);png.set([137,80,78,71,13,10,26,10]);
+  const audio=new Uint8Array([73,68,51,4,0,0,0,0,0,0,1,2]);
+  assert.ok(await reserveDreamTool(db,claim,0,0,'image_generate',due));
+  const picture=await generateDreamImage(db,cfg,{prompt:'fixture'},ctx,{expectedModel:imageModel,discover:async()=>[{id:imageModel}],generate:async()=>({bytes:png,mime:'image/png',provider:'openrouter',requested_model:imageModel})});
+  assert.ok(await recordDreamTool(db,claim,0,0,{ok:true,record_id:picture.id},due));
+  assert.ok(await reserveDreamTool(db,claim,0,1,'voice_create',due));
+  const clip=await generateVoiceClip(db,cfg,{text:'fixture'},{...ctx,autonomous_event:{step:0,index:1}},async()=>new Response(audio));
+  assert.ok(await recordDreamTool(db,claim,0,1,{ok:true,record_id:clip.id},due));
+  assert.ok(await settleDreamTide(db,claim,'completed',due));
+  const chat=await readArchiveChat(db,cid),image=await readArchiveAttachment(db,cid,picture.id),voice=await readArchiveVoice(db,clip.id);
+  assert.throws(()=>validateDreamMediaOrigin(null,image.metadata,'image'),/activity missing/);
+  assert.throws(()=>validateDreamMediaOrigin(chat.dream_tide,{...voice.metadata,turn_id:'turn-one'},'voice'),/invalid autonomous media origin/);
+  const favorite=await saveTreasure(db,{kind:'image',conversation_id:cid,source_id:picture.id,notes:'activity drawing'});
+  assert.equal(favorite.role,'assistant');assert.equal(favorite.message_id,null);
+  const records=[],objects=[];
+  for(const [module,id,kind,data,media] of [['chat',cid,'chat',chat,null],['attachments',picture.id,'attachment',image.metadata,image],['voice',clip.id,'voice',voice.metadata,voice]]){
+    const o=await encodeRecordObject({kind,data});objects.push(o);if(media)objects.push(media);
+    records.push({module,id,record_object:o.descriptor.object_sha256,media_objects:media?[media.descriptor.object_sha256]:[],dependencies:media?['chat/'+cid]:[]});
+  }
+  const manifest={format:'elementera-coast-archive',version:2,workspace:'backend',application_id:'com.elementeracoast.source',exported_at:new Date(due).toISOString(),modules:MODULES.map(module=>({module,coverage:records.some(r=>r.module===module)?'partial':'unavailable',count:records.filter(r=>r.module===module).length})),records,objects:objects.map(o=>o.descriptor)};
+  const target=new D1Database(),session=await createArchiveSession(target);
+  for(const o of objects){await registerArchiveObject(target,session.id,o.descriptor);for(let i=0;i<o.chunks.length;i++)await putArchiveChunk(target,session.id,o.descriptor.object_sha256,i,o.chunks[i]);}
+  const preview=await restoreArchiveChatGroup(target,session.id,manifest,cid,false);
+  assert.equal(preview.committed,false);await assert.rejects(()=>readArchiveChat(target,cid));
+  const restored=await restoreArchiveChatGroup(target,session.id,manifest,cid,true);
+  assert.equal(restored.committed,true);assert.equal(restored.attachments,1);assert.equal(restored.voices,1);
+  assert.deepEqual(new Uint8Array((await getChatAttachmentRecord(target,cid,picture.id)).data),png);
+  assert.deepEqual(await voiceClipAudio(target,clip.id),audio);
+  assert.deepEqual((await readArchiveChat(target,cid)).dream_tide,chat.dream_tide);
+  assert.equal((await readConversationState(target,cid)).turns.length,1);
+  assert.equal((await target.prepare('SELECT enabled FROM dream_tide_arms WHERE conversation_id=?').bind(cid).first()).enabled,0);
+});
