@@ -58,17 +58,17 @@ export function createDreamTideViews({router,chat,toast}){
     return page('自主手记',(body||'<p class="feature-note">还没有自主手记。</p>')+'<p class="feature-note">回复只保存文字，不立即唤醒模型。</p>'+
       (notesOffset?button('上一页','notes-prev'):'')+(d.nextOffset!==null?button('下一页','notes-next'):''));
   });
-  router.register('dream-tide-activity',async({conversationId:cid}={})=>{if(!cid)return noWindow();
+  router.register('dream-tide-activity',async({conversationId:cid,mediaId}={})=>{if(!cid)return noWindow();
     if(activityWindow!==cid){activityWindow=cid;activityOffset=0;}
-    const d=await requestJson(query('/activity',cid,activityOffset));
+    const d=await requestJson(query('/activity',cid,mediaId?0:activityOffset)+(mediaId?'&media_id='+encodeURIComponent(mediaId):''));
     const body=d.items.map(r=>section(stamp(r.started_at)+' · '+(r.kind==='daily'?'固定唤醒':'额外唤醒'),
       '<p>'+h(names[r.status]||r.status)+'</p><p class="feature-note">'+h(r.model_id)+'</p>'+
       '<p class="feature-note">总 token：'+h(r.result?.total_tokens??'未确认')+' · 供应商报告成本：'+h(r.result?.reported_cost==null?'未确认':'USD '+r.result.reported_cost)+'</p>'+
       r.tools.map(t=>'<p class="feature-note">'+h((toolNames[t.tool_name]||t.tool_name)+' · '+(names[t.status]||t.status)+(Number.isInteger(t.receipt?.count)?' · '+t.receipt.count+' 轮':''))+'</p>').join('')+
       (r.result?.extra_scheduled?'<p class="feature-note">已保存额外预约。</p>':'')+
       (r.steps.some(s=>s.status==='claimed')?'<p class="feature-note">存在未确认请求，不会自动重放。</p>':''))).join('');
-    return page('活动记录',(body||'<p class="feature-note">还没有活动记录。</p>')+
-      (activityOffset?button('上一页','activity-prev'):'')+(d.nextOffset!==null?button('下一页','activity-next'):''));
+    return page('活动记录',(mediaId?'<p class="feature-note">作品来源 · '+h(mediaId)+'</p>':'')+(body||'<p class="feature-note">'+(mediaId?'未找到对应的活动记录。':'还没有活动记录。')+'</p>')+
+      (mediaId?button('查看全部活动','activity'):(activityOffset?button('上一页','activity-prev'):'')+(d.nextOffset!==null?button('下一页','activity-next'):'')));
   });
   const value=id=>q('#'+id)?.value??'';
   const checked=id=>q('#'+id)?.checked===true;
