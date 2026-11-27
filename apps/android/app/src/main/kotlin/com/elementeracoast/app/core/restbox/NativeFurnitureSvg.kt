@@ -124,10 +124,13 @@ internal object NativeSvgXml {
         val factory=DocumentBuilderFactory.newInstance().apply{
             isNamespaceAware=true
             isExpandEntityReferences=false
-            setFeature("http://xml.org/sax/features/external-general-entities",false)
-            setFeature("http://xml.org/sax/features/external-parameter-entities",false)
+            runCatching { setFeature("http://xml.org/sax/features/external-general-entities",false) }
+            runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities",false) }
         }
-        val doc=factory.newDocumentBuilder().parse(InputSource(StringReader(svg)))
+        val builder=factory.newDocumentBuilder().apply {
+            setEntityResolver { _, _ -> throw org.xml.sax.SAXException("External SVG entity forbidden") }
+        }
+        val doc=builder.parse(InputSource(StringReader(svg)))
         require(doc.documentElement.localName=="svg")
         for(e in elements(doc.documentElement)){
             require(e.localName !in setOf("script","foreignObject","image"))
@@ -142,6 +145,20 @@ internal object NativeSvgXml {
     fun elements(root:Element):List<Element> = buildList{
         add(root)
         for(i in 0 until root.childNodes.length)(root.childNodes.item(i) as? Element)?.let{addAll(elements(it))}
+    }
+    /** Apply only compiled attributes to this exact authored split part. */
+    fun motion(svg:String, tracks:List<NativeMotionTrack>, elapsedMs:Long):String {
+        val doc=parse(svg)
+        val elements=elements(doc.documentElement)
+        val ids=elements.filter{it.hasAttribute("id")}.associateBy{it.getAttribute("id")}
+        for(track in tracks) {
+            require(track.attribute in setOf("transform","opacity","d"))
+            val target=if(track.targetId.startsWith("@"))track.targetId.drop(1).toIntOrNull()?.let{elements.getOrNull(it)}
+                else ids[track.targetId]
+            track.frame(elapsedMs)?.let{v->target?.setAttribute(track.attribute,v)}
+        }
+        elements.filter{it.localName in setOf("animate","animateTransform","animateMotion")}.forEach{it.parentNode?.removeChild(it)}
+        return serialize(doc)
     }
     fun serialize(doc:Document):String {
         val writer=StringWriter()
