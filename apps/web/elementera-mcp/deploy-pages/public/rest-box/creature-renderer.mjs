@@ -74,7 +74,7 @@ export function creatureSvg(source,body,defs,accessories,input,action='idle',{re
   if(cfg.kind==='snake'){
     if(!appearance.horn&&$('face')?.firstElementChild)$('face').firstElementChild.setAttribute('display','none');
     if($('giftAnchor'))$('giftAnchor').setAttribute('display',action==='sleep'?'none':'inline');
-    const f=tailFrames(action);if(f){const first=f.frames[0];$('bodyShape')?.setAttribute('d',first.body);$('bellyShape')?.setAttribute('d',first.belly);$('giftAnchor')?.setAttribute('transform','translate('+first.anchor.join(' ')+')');if(!reducedMotion&&action!=='sit'){animate(doc,$('bodyShape'),'d',f.frames.map(x=>x.body),f.duration);animate(doc,$('bellyShape'),'d',f.frames.map(x=>x.belly),f.duration);animate(doc,$('giftAnchor'),'transform',f.frames.map(x=>'translate('+x.anchor.join(' ')+')'),f.duration)}}
+    const f=tailFrames(action);if(f){const first=f.frames[0];$('bodyShape')?.setAttribute('d',first.body);$('bellyShape')?.setAttribute('d',first.belly);$('giftAnchor')?.setAttribute('transform','translate('+first.anchor.join(' ')+')');if(!reducedMotion&&action!=='sit'){animate(doc,$('bodyShape'),'d',f.frames.map(x=>x.body),f.duration);animate(doc,$('bellyShape'),'d',f.frames.map(x=>x.belly),f.duration);if($('giftAnchor')){const a=doc.createElementNS(NS,'animateTransform');for(const [k,v] of Object.entries({attributeName:'transform',type:'translate',values:f.frames.map(x=>x.anchor.join(' ')).join(';'),dur:f.duration+'s',repeatCount:'indefinite',keyTimes:'0;0.25;0.5;0.75;1'}))a.setAttribute(k,v);$('giftAnchor').append(a)}}}
   }
   if(!appearance.hat&&$('hat'))$('hat').style.setProperty('display','none','important');
   if(appearance.glasses!=='none'){
