@@ -190,7 +190,7 @@ internal class LocalDreamExecutor(
                                         }
                                         name in commonNames&&common!=null->{
                                             val out=common.execute(c.id+":"+step+":"+index,name,fn.str("arguments"))
-                                            buildJsonObject{put("ok",out.ok);val data=Json.parseToJsonElement(out.output);put("data",data);if(name=="library_write"&&out.ok)(data as? JsonObject)?.get("id")?.let{put("record_id",it)}}
+                                            buildJsonObject{put("ok",out.ok);val data=Json.parseToJsonElement(out.output);put("data",data);if(name in setOf("library_write","create_moment","create_diary","calendar_create")&&out.ok)(data as? JsonObject)?.get("id")?.let{put("record_id",it)}}
                                         }
                                         else->result
                                     }
