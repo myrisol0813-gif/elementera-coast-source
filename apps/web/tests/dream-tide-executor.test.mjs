@@ -364,3 +364,31 @@ test('autonomous memory proposal enters pending only, suppresses duplicates and 
   await assert.rejects(()=>proposeDreamMemory(db,{...input,content:'revoked'},context),/权限已撤回/);
   assert.equal((await readConversationState(db,cid)).turns.length,1);
 });
+
+
+test('autonomous pixels are opt-in, vision-gated, one-shot, budgeted and absent from durable receipts',async()=>{
+  const {writeProfile}=await import('../functions/chat-store.js');
+  const {generateDreamImage}=await import('../functions/dream-tide-image.js');
+  const imageModel='fixture/paid',bytes=new Uint8Array(24);bytes.set([137,80,78,71,13,10,26,10]);
+  for(const [permission,vision,budget,expected] of [[true,true,24000,true],[false,true,24000,false],[true,false,24000,false],[true,null,24000,false],[true,true,1800,false]]){
+    const {db,cid,env,opts}=await fixture({allowImage:true,allowImageReadback:permission,tokenBudget:budget});
+    await writeProfile(db,{current_image_model:imageModel,model_box:{image:[imageModel]}});
+    let calls=0,seen=0;
+    const out=await executeDreamTide({...env,COAST_DREAM_MEDIA_ENABLED:'true',OPENROUTER_API_KEY:'fixture-only'},cid,{
+      ...opts,modelEntry:()=>vision===null?null:{architecture:{input_modalities:vision?['text','image']:['text']},context_length:100000},
+      generateImage:(db,env,a,ctx,o)=>generateDreamImage(db,env,a,ctx,{...o,discover:async()=>[{id:imageModel}],generate:async()=>({bytes,mime:'image/png',provider:'openrouter',requested_model:imageModel})}),
+      invoke:async(_,payload)=>{
+        calls++;const imageParts=payload.messages.flatMap(m=>Array.isArray(m.content)?m.content.filter(p=>p.type==='image_url'):[]);
+        if(calls===1)return response([toolCall('i','image_generate',{prompt:'fixture'})]);
+        if(imageParts.length){seen++;assert.equal(imageParts.length,1);assert.deepEqual(new Uint8Array(Buffer.from(imageParts[0].image_url.url.split(',')[1],'base64')),bytes);}
+        if(calls===2)return response([toolCall('n','dream_write_note',{body:'fixture note'})]);
+        return response();
+      }});
+    assert.equal(seen,expected?1:0);
+    if(budget===24000)assert.equal(out.status,'completed');
+    const activity=(await readDreamActivity(db,cid))[0];
+    assert.equal(activity.steps.some(s=>s.receipt?.image_readback_accepted?.length),expected);
+    assert.ok(!JSON.stringify(activity).includes('data:image/'));
+    assert.equal((await readConversationState(db,cid)).turns.length,1);
+  }
+});
