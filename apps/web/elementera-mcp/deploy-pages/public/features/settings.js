@@ -2,6 +2,7 @@ import { chooseImage, downloadFile, escapeAttribute, escapeHtml, q, timestampLab
 import { API, requestJson } from '../core/api.js';
 import { shortModelName } from '../core/model-format.js';
 import { createTransferSettings } from './settings-transfer.js';
+import { createDreamTideViews } from './dream-tide.js';
 import { saveArchiveV2 } from '../core/archive-v2-save.js';
 import { saveOfflineV2 } from './offline-v2-archive.js';
 import { openGuideTarget, manualMarkup, dismissGuideHint } from '../core/feature-guide.js';
@@ -86,6 +87,7 @@ export function auditFullArchiveCompleteness(archive) {
 export function createSettings({ storage, shell, chat, router, toast, memory, daily, dogtalk }) {
   const preferences = () => storage.read().preferences;
   const transfer = createTransferSettings({ router, toast, chat, storage });
+  const dreamTide=createDreamTideViews({router,chat,toast});
 
   router.register('wolf', () => {
     const currentModel = chat.getProfile().current_chat_model;
@@ -100,6 +102,7 @@ export function createSettings({ storage, shell, chat, router, toast, memory, da
         + row('聊天记录', '完整前端包 / 当前窗口导出 / 导入', 'settings:chat-records')
         + row('模型箱', `当前：${shortModelName(currentModel || '未选择')}`, 'models:open')
         + row('基本设置', '回答长度、流式输出、记忆召回与世界书', 'tools:basic-settings')
+        + row('梦醒潮', '当前窗口 · 小笺、潮痕与唤醒设置', 'settings:dream-open')
         + row('版本与更新', 'PWA / Native / GitHub Release / SHA-256', 'devhands:update')
         + row('关于与诊断', '版本、缓存、Service Worker 与当前窗口', 'settings:diagnostics')
         + row('使用手册', '按页面查看说明与操作入口', 'settings:help')),
@@ -272,6 +275,7 @@ export function createSettings({ storage, shell, chat, router, toast, memory, da
   }
 
   async function handleAction(name, target) {
+    if (name.startsWith('dream-')) return dreamTide.handle(name.slice(6),target);
     if (name.startsWith('transfer-')) return transfer.handle(name,target);
     if (name === 'dismiss-guide') return dismissGuideHint();
     if (name === 'help') {
