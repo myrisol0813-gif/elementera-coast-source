@@ -90,6 +90,8 @@ async function createLatestSchema(db) {
     config_json TEXT NOT NULL, armed_at INTEGER NOT NULL, model_id TEXT NOT NULL,
     extra_id TEXT, extra_at INTEGER
   )`);
+  await ensureColumn(db,'dream_tide_arms','device_digest','TEXT DEFAULT NULL');
+  await ensureColumn(db,'dream_tide_arms','device_request_limit','INTEGER DEFAULT NULL');
   await run(db, `CREATE TABLE IF NOT EXISTS dream_tide_runs (
     conversation_id TEXT NOT NULL, slot_key TEXT NOT NULL, local_day TEXT NOT NULL,
     kind TEXT NOT NULL CHECK(kind IN ('daily','extra')), arm_revision TEXT NOT NULL,
@@ -106,6 +108,7 @@ async function createLatestSchema(db) {
     receipt_json TEXT, started_at INTEGER NOT NULL, finished_at INTEGER,
     PRIMARY KEY(claim_id,step_index)
   )`);
+  await ensureColumn(db,'dream_tide_steps','device_dispatch_done','INTEGER NOT NULL DEFAULT 0');
   await run(db, `CREATE TABLE IF NOT EXISTS dream_tide_tool_events (
     claim_id TEXT NOT NULL, step_index INTEGER NOT NULL, call_index INTEGER NOT NULL,
     tool_name TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('claimed','completed','failed')),

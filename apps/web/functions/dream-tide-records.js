@@ -48,7 +48,7 @@ export async function reserveDreamTool(db,claim,step,index,name,now=Date.now()){
 }
 export async function recordDreamTool(db,claim,step,index,receipt,now=Date.now()){
   await ensureChatSchema(db);
-  const safe={ok:receipt?.ok===true,...(Number.isSafeInteger(receipt?.count)&&receipt.count>=0?{count:receipt.count}:{}),...(typeof receipt?.record_id==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(receipt.record_id)?{record_id:receipt.record_id}:{})};
+  const safe={ok:receipt?.ok===true,...(Number.isSafeInteger(receipt?.count)&&receipt.count>=0?{count:receipt.count}:{}),...(Number.isSafeInteger(receipt?.proposed_extra_at)&&receipt.proposed_extra_at>0?{proposed_extra_at:receipt.proposed_extra_at}:{}),...(typeof receipt?.record_id==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(receipt.record_id)?{record_id:receipt.record_id}:{})};
   const r=await stmt(db,`UPDATE dream_tide_tool_events SET status=?,receipt_json=?,finished_at=? WHERE claim_id=? AND step_index=? AND call_index=? AND status='claimed'
     AND EXISTS(SELECT 1 FROM dream_tide_runs r WHERE r.claim_id=? AND r.conversation_id=? AND r.arm_revision=? AND r.status='running')`,
     safe.ok?'completed':'failed',JSON.stringify(safe),now,claim.claimId,step,index,...args(claim)).run();
@@ -108,7 +108,7 @@ export async function readDreamHistory(db,cid,{mode='window',start=0,count=1,sin
     if(!u||u.hidden)return [];
     const list=turn.assistant.variantsByUserVariant[key]||[],a=list[turn.assistant.activeByUserVariant[key]];
     const selected=a?.reply_sequence?list.filter(v=>v.reply_sequence?.id===a.reply_sequence.id).sort((x,y)=>x.reply_sequence.index-y.reply_sequence.index):a?[a]:[];
-    const messages=[{role:'user',id:u.id,content:u.content,created_at:u.created_at},...selected.map(v=>({role:'assistant',id:v.id,content:v.content,created_at:v.created_at}))];
+    const messages=[{role:'user',id:u.id,content:u.content,created_at:u.created_at},...selected.filter(v=>!v.hidden).map(v=>({role:'assistant',id:v.id,content:v.content,created_at:v.created_at}))];
     const bounded=messages.filter(m=>{const time=Date.parse(m.created_at);return mode==='window'||(Number.isFinite(time)&&time>since&&time<=until);});
     return bounded.length?[{index,turn_id:turn.id,messages:bounded}]:[];
   });

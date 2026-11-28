@@ -43,7 +43,7 @@ export async function armDreamTide(db,cid,config,modelId,now=Date.now()){
   const result=await stmt(db,`INSERT INTO dream_tide_arms(conversation_id,revision,enabled,config_json,armed_at,model_id)
     SELECT ?,?,1,?,?,? WHERE EXISTS(${liveWindow}) AND NOT EXISTS(SELECT 1 FROM dream_tide_runs WHERE conversation_id=? AND status='running')
     ON CONFLICT(conversation_id) DO UPDATE SET revision=excluded.revision,enabled=1,config_json=excluded.config_json,
-    armed_at=excluded.armed_at,model_id=excluded.model_id,extra_id=NULL,extra_at=NULL`,
+    armed_at=excluded.armed_at,model_id=excluded.model_id,extra_id=NULL,extra_at=NULL,device_digest=NULL,device_request_limit=NULL`,
     cid,revision,JSON.stringify(cfg),now,modelId,cid,cid).run();
   return changed(result)?revision:null;
 }
@@ -59,20 +59,21 @@ export async function readDreamSettings(db,cid){
   return {revision:row.revision,enabled:row.enabled===1,config:JSON.parse(row.config_json),modelId:row.model_id,
     armedAt:row.enabled===1?row.armed_at:null,extraAt:row.enabled===1?row.extra_at:null,running};
 }
-export async function configureDreamTide(db,cid,config,modelId,{expectedRevision=null,enable=false,now=Date.now()}={}){
+export async function configureDreamTide(db,cid,config,modelId,{expectedRevision=null,enable=false,now=Date.now(),deviceGrant=null}={}){
   if(!id(cid)||!time(now)||typeof modelId!=='string'||!modelId.trim()||modelId.length>180||
     (expectedRevision!==null&&!id(expectedRevision)))throw new TypeError('invalid dream configuration identity');
   const cfg=normalizeDreamConfig(config),revision=crypto.randomUUID();
+  if(deviceGrant!==null&&(!enable||!modelId.startsWith('chatgpt-plan:')||!/^[a-f0-9]{64}$/.test(deviceGrant.digest)||!Number.isSafeInteger(deviceGrant.requestLimit)||deviceGrant.requestLimit<1||deviceGrant.requestLimit>2147483646))throw new TypeError('invalid device grant');
   if(enable&&!cfg.execution)throw new TypeError('explicit execution consent required');
   await schema(db);
   const noRun="NOT EXISTS(SELECT 1 FROM dream_tide_runs WHERE conversation_id=? AND status='running')";
   const result=expectedRevision===null
-    ?await stmt(db,`INSERT OR IGNORE INTO dream_tide_arms(conversation_id,revision,enabled,config_json,armed_at,model_id)
-      SELECT ?,?,?,?,?,? WHERE EXISTS(${liveWindow}) AND ${noRun}`,
-      cid,revision,enable?1:0,JSON.stringify(cfg),now,modelId,cid,cid).run()
-    :await stmt(db,`UPDATE dream_tide_arms SET revision=?,enabled=?,config_json=?,armed_at=?,model_id=?,extra_id=NULL,extra_at=NULL
+    ?await stmt(db,`INSERT OR IGNORE INTO dream_tide_arms(conversation_id,revision,enabled,config_json,armed_at,model_id,device_digest,device_request_limit)
+      SELECT ?,?,?,?,?,?,?,? WHERE EXISTS(${liveWindow}) AND ${noRun}`,
+      cid,revision,enable?1:0,JSON.stringify(cfg),now,modelId,deviceGrant?.digest??null,deviceGrant?.requestLimit??null,cid,cid).run()
+    :await stmt(db,`UPDATE dream_tide_arms SET revision=?,enabled=?,config_json=?,armed_at=?,model_id=?,extra_id=NULL,extra_at=NULL,device_digest=?,device_request_limit=?
       WHERE conversation_id=? AND revision=? AND EXISTS(${liveWindow}) AND ${noRun}`,
-      revision,enable?1:0,JSON.stringify(cfg),now,modelId,cid,expectedRevision,cid,cid).run();
+      revision,enable?1:0,JSON.stringify(cfg),now,modelId,deviceGrant?.digest??null,deviceGrant?.requestLimit??null,cid,expectedRevision,cid,cid).run();
   return changed(result)?await readDreamSettings(db,cid):null;
 }
 export async function disarmDreamTide(db,cid,revision){
@@ -80,7 +81,7 @@ export async function disarmDreamTide(db,cid,revision){
   await schema(db);
   // Do not release a running claim here: an uncertain provider request may
   // still be in flight. The executor must observe revocation and settle.
-  return changed(await stmt(db,"UPDATE dream_tide_arms SET revision=?,enabled=0,extra_id=NULL,extra_at=NULL WHERE conversation_id=? AND revision=? AND enabled=1",crypto.randomUUID(),cid,revision).run());
+  return changed(await stmt(db,"UPDATE dream_tide_arms SET revision=?,enabled=0,extra_id=NULL,extra_at=NULL,device_digest=NULL,device_request_limit=NULL WHERE conversation_id=? AND revision=? AND enabled=1",crypto.randomUUID(),cid,revision).run());
 }
 async function expireExtra(db,arm,now){
   if(!arm?.extra_id||!time(arm.extra_at)||arm.extra_at>=now)return false;

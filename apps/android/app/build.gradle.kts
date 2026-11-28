@@ -32,8 +32,8 @@ android {
         minSdk = 26
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         targetSdk = 34
-        versionCode = 54
-        versionName = "0.2.52-source"
+        versionCode = 55
+        versionName = "0.2.53-source"
         buildConfigField("String", "COAST_API_BASE_URL", "\"${sourceApiBaseUrl.get()}\"")
         buildConfigField("String", "SOURCE_PREVIEW_PASSWORD_HINT", "\"${sourcePreviewPasswordHint.get()}\"")
         buildConfigField("boolean", "SOURCE_TOUR_ENABLED", sourceTourEnabled.get().toString())
