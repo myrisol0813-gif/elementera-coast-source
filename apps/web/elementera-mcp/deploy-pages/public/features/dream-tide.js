@@ -34,7 +34,8 @@ export function createDreamTideViews({router,chat,toast}){
     const model=s.modelId||chat.getProfile().current_chat_model||'';
     const zone=c.timeZone||Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
     const status=s.enabled?(s.running?'活动中':'已授权'):'未授权';
-    const notice=configState.available?'服务端已配置调度；授权后才会请求模型。':'当前服务端未开通实际调度；可保存设置，不会自动请求模型。';
+    const deviceModel=model.startsWith('chatgpt-plan:');
+    const notice=deviceModel?(data.planExecutionAvailable?'套餐唤醒由已授权 Android 设备执行，网页可查看、保存设置或撤销；不能在网页授权手机账号。':'手机端套餐调度尚未开放，可保存草稿。'):configState.available?'服务端已配置调度；授权后才会请求模型。':'当前服务端未开通实际调度；可保存设置，不会自动请求模型。';
     return page('自主唤醒',section('当前状态','<p class="feature-note">'+h(status+' · '+notice)+'</p>'+
       (s.extraAt?'<p class="feature-note">下一次额外预约：'+h(stamp(s.extraAt))+'</p>':'')+
       (s.enabled?button('关闭唤醒授权','disarm'):''))
@@ -54,7 +55,7 @@ export function createDreamTideViews({router,chat,toast}){
       +section('注入与工具','<div class="form-stack">'+modules.map(([key,label])=>checkbox('dream-'+key,label,e[key]===true)).join('')+'</div>')
       +section('保存与授权','<p class="feature-note">保存为草稿会保持或恢复暂停状态，不会发起请求。授权绑定本窗口及指定模型。</p>'+
       button('保存设置（不启用）','save')+checkbox('dreamConsent','我确认允许按上述设置进行模型调用并产生相应费用',false)+
-      (configState.available?button('保存并授权唤醒','arm'):'<p class="feature-note">实际调度尚未开通。</p>')));
+      (configState.available&&!deviceModel?button('保存并授权唤醒','arm'):'<p class="feature-note">'+(deviceModel?'套餐授权请在 Android 在线模式完成。':'实际调度尚未开通。')+'</p>')));
   });
   router.register('dream-tide-notes',async({conversationId:cid}={})=>{if(!cid)return noWindow();
     if(notesWindow!==cid){notesWindow=cid;notesOffset=0;}
@@ -107,6 +108,7 @@ export function createDreamTideViews({router,chat,toast}){
         if(!['save','arm'].includes(name))return;
         if(name==='arm'&&(!configState.available||!checked('dreamConsent')))throw Error('请明确确认执行授权。');
         data.modelId=value('dreamModel').trim();data.confirmExecution=checked('dreamConsent');
+        if(name==='arm'&&data.modelId.startsWith('chatgpt-plan:'))throw Error('套餐授权请在 Android 在线模式完成。');
         data.config={timeZone:value('dreamZone').trim(),dailyTime:value('dreamTime'),allowExtra:checked('dreamExtra'),
           quietHours:checked('dreamQuiet')?{start:value('dreamQuietStart'),end:value('dreamQuietEnd')}:null,
           execution:{invitation:value('dreamInvitation'),tokenBudget:number('dreamTokens'),outputLimit:number('dreamOutput'),toolBudget:number('dreamTools'),readTurns:number('dreamReadTurns'),extraPerDay:number('dreamExtraLimit'),voiceLimit:number('dreamVoiceLimit'),imageLimit:number('dreamImageLimit'),

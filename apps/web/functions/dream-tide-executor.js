@@ -75,6 +75,22 @@ export async function buildDreamContext(db,claim,settings,now,env={COAST_CHAT_DB
   return {messages:[{role:'system',content:modules.join('\n\n')}],previous:prev};
 }
 
+// Shared tool definitions and permissions for cloud and device-executed wakes.
+export async function buildDreamToolContext(env,claim,actual,now){
+    const db=env.COAST_CHAT_DB,cid=claim.conversationId,currentModelId=claim.modelId,e=actual.execution;
+    const toolContext={permission:'owner',surface:'main_chat',env,conversation_id:cid,source_turn_id:null,
+      model_label:currentModelId,local_date:localClock(now,actual.timeZone).day,autonomous_activity:true,autonomous_claim:claim,autonomous_tool_names:dreamToolNames(actual).filter(name=>name!=='voice_create'||autonomousVoiceConfigured(env)),
+      independent_web_enabled:e.allowWeb===true};
+    const common=resolveToolSelection(toolContext).modelVisibleTools.map(t=>t.function.name==='create_diary'?{...t,function:{...t.function,description:'可选：创建自己的日记，追加而不替换既有日记。',parameters:{...t.function.parameters,properties:Object.fromEntries(Object.entries(t.function.parameters.properties).filter(([k])=>!['replace_id','conflict_mode'].includes(k)))}}}:t.function.name==='create_moment'?{...t,function:{...t.function,description:'可选：在海岸内部新增自己的动态，不外发。'}}:t.function.name==='library_write'?{
+      ...t,function:{...t.function,description:'可选：创建自己的书房批注、划线或读后感。此次活动不修改或删除既有笔记。',parameters:{...t.function.parameters,properties:{...t.function.parameters.properties,action:{type:'string',enum:['create']}}}}
+    }:t);
+    const imageModel=e.allowImage&&e.imageLimit>0?await autonomousImageModel(db,env):null;
+    const imageTool=imageModel?tool('image_generate','可选：生成并保存一张独立活动图像，使用已授权生图供应商额度。只发送必要绘图提示。若已单独授权且当前模型支持视觉，下一请求可收到系统转交原图；未收到像素不要假称看见。', {prompt:{type:'string',minLength:1,maxLength:4000}},['prompt']):null;
+    const commonNames=new Set(common.map(t=>t.function.name));
+    const allowed=[...toolsFor(e,actual.allowExtra&&e.extraPerDay>0),...common,...(imageTool?[imageTool]:[])];
+    return {toolContext,imageModel,commonNames,allowed};
+}
+
 // Internal executor, not a public API. The deployment gate must be explicitly
 // enabled and the caller must be trusted. Native plan models are intentionally
 // not sent to OpenRouter. No scheduler is installed by this module.
@@ -106,17 +122,8 @@ export async function executeDreamTide(env,cid,{currentModelId,busy=true,signal,
     await authorize();
     const e=actual.execution,context=await buildDreamContext(db,claim,actual,now,env);
     await authorize();
-    const toolContext={permission:'owner',surface:'main_chat',env,conversation_id:cid,source_turn_id:null,
-      model_label:currentModelId,local_date:localClock(now,actual.timeZone).day,autonomous_activity:true,autonomous_claim:claim,autonomous_tool_names:dreamToolNames(actual).filter(name=>name!=='voice_create'||autonomousVoiceConfigured(env)),
-      independent_web_enabled:e.allowWeb===true};
-    const common=resolveToolSelection(toolContext).modelVisibleTools.map(t=>t.function.name==='create_diary'?{...t,function:{...t.function,description:'可选：创建自己的日记，追加而不替换既有日记。',parameters:{...t.function.parameters,properties:Object.fromEntries(Object.entries(t.function.parameters.properties).filter(([k])=>!['replace_id','conflict_mode'].includes(k)))}}}:t.function.name==='create_moment'?{...t,function:{...t.function,description:'可选：在海岸内部新增自己的动态，不外发。'}}:t.function.name==='library_write'?{
-      ...t,function:{...t.function,description:'可选：创建自己的书房批注、划线或读后感。此次活动不修改或删除既有笔记。',parameters:{...t.function.parameters,properties:{...t.function.parameters.properties,action:{type:'string',enum:['create']}}}}
-    }:t);
-    const imageModel=e.allowImage&&e.imageLimit>0?await autonomousImageModel(db,env):null;
-    const imageTool=imageModel?tool('image_generate','可选：生成并保存一张独立活动图像，使用已授权生图供应商额度。只发送必要绘图提示。若已单独授权且当前模型支持视觉，下一请求可收到系统转交原图；未收到像素不要假称看见。', {prompt:{type:'string',minLength:1,maxLength:4000}},['prompt']):null;
+    const {toolContext,imageModel,commonNames,allowed}=await buildDreamToolContext(env,claim,actual,now);
     let imageAttempts=0,voiceAttempts=0;
-    const commonNames=new Set(common.map(t=>t.function.name));
-    const allowed=[...toolsFor(e,actual.allowExtra&&e.extraPerDay>0),...common,...(imageTool?[imageTool]:[])];
     const prepared=await prepare(env,{model:currentModelId,messages:context.messages,tools:e.toolBudget?allowed:[],settings:{max_tokens:e.outputLimit}},true);
     if(prepared.modelId!==currentModelId||prepared.payload.model!==currentModelId)throw Error('model route mismatch');
     let messages=prepared.payload.messages,pendingImages=[];

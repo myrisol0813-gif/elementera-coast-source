@@ -71,7 +71,7 @@ async function assertNativeSingleClaim(env,cid,claimId){
       throw new ChatStoreError('native_single_claim_lost','套餐普通聊天的执行预约已失效。',409);
     return;
   }
-  if(env.COAST_DREAM_TIDE_ENABLED==='true'||await isSingleChatRunActive(db,cid))
+  if(env.COAST_DREAM_TIDE_ENABLED==='true'||env.COAST_DEVICE_DREAM_TIDE_ENABLED==='true'||await isSingleChatRunActive(db,cid))
     throw new ChatStoreError('native_single_claim_required','请更新客户端，或等待本窗口当前任务结束。',409);
 }
 export async function routeNativeSingleChatRun(request,env){

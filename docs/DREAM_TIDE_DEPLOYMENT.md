@@ -297,3 +297,40 @@ terms still govern each request. An actual-account test is pending. No live prov
 were made by development fixtures. The cloud route still rejects plan
 models; a native online-workspace foreground plan login is not a server
 background authorization. API-key wake remains separate.
+
+
+## Online workspace, Android plan execution (self-hosted; opt-in gate)
+
+The phone keeps the account grant in an isolated, nonportable store. The
+online D1 window is authoritative for settings, exact revision, scheduled slot,
+provider-step reservations, permitted tool writes, notes, activities and
+historical receipts. The server never receives the ChatGPT account access or
+refresh token and never invokes a plan model. The independent
+COAST_DEVICE_DREAM_TIDE_ENABLED gate is distinct from the cloud API Worker
+and needs no Cloudflare Cron or plan credential. The owner-authenticated,
+same-origin native endpoint uses a per-window random device key; D1 stores
+only its SHA-256 digest and authorized request count. Reconfiguration and
+revocation rotate the revision; export omits this grant and the in-flight
+dispatch fence. Restore must reauthorize on the device.
+
+The phone uses its existing exact-plan stateless response session and
+WorkManager (15-minute minimum, best effort). A server reservation precedes
+each provider call; the server runs only the existing allowed tools and
+records their actual outcomes. Unknown usage, an uncertain step/tool response,
+or authorization changes stop the activity; the same claim is not replayed.
+Normal chat and autonomous work share the online D1 exclusion checks. The
+device does not mirror the online chat into local mode.
+
+Technical transport limits are 2 MiB per device action, at most 128 function
+calls in one provider response and 60,000 characters per tool arguments/result;
+these are protocol/resource protections, not the configurable per-activity
+budget. Plan output remains a suggestion, with reported total usage recorded
+when available and no inferred dollar cost. Independent media may use the
+configured server provider; this draft does not deliver image pixels back to
+plan models or capture phone reality fields for the online path. Both must
+be explicit in the UI until verified. Device notifications are posted only
+after confirmed persistence; not a remote-push service.
+
+Before enabling the gate: run integrated API/Android tests, real-device
+authorization, lock-screen scheduling, note/activity readback, ordinary chat
+exclusion and revocation, archive/restore, and exact-provider acceptance.
