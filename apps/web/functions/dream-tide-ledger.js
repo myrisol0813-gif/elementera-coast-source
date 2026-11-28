@@ -32,13 +32,25 @@ export function normalizeDreamConfig(config){
       includeReplies:e.includeReplies===true,readHistory:e.readHistory===true,writeNote:e.writeNote===true,
       ...Object.fromEntries([...DREAM_CONTEXT_FLAGS,...DREAM_TOOL_FLAGS].map(key=>[key,e[key]===true]))};
   }
-  return {enabled:true,timeZone:config.timeZone,dailyTime:config.dailyTime,quietHours,allowExtra:config.allowExtra===true,execution};
+  const scheduleEpoch=config.scheduleEpoch;
+  if(scheduleEpoch!=null&&(typeof scheduleEpoch!=='string'||! /^[a-f0-9-]{36}$/.test(scheduleEpoch)))throw new TypeError('invalid schedule identity');
+  return {enabled:true,timeZone:config.timeZone,dailyTime:config.dailyTime,quietHours,allowExtra:config.allowExtra===true,execution,...(scheduleEpoch?{scheduleEpoch}:{})};
+}
+// The owner changes the scheduling identity only when the clock or zone changes.
+// Revision changes alone (including authorization and budget edits) must not
+// cause a second billable activity. Legacy schedules keep their existing slot.
+function scheduleConfig(config,previous){
+  const {scheduleEpoch:ignored,...cfg}=normalizeDreamConfig(config);
+  const epoch=previous&&(previous.dailyTime!==cfg.dailyTime||previous.timeZone!==cfg.timeZone)?crypto.randomUUID():previous?.scheduleEpoch;
+  return epoch?{...cfg,scheduleEpoch:epoch}:cfg;
 }
 const liveWindow="SELECT 1 FROM conversations WHERE id=? AND user_id='owner' AND room_type='main' AND source='coast' AND conversation_kind='chat' AND deleted_at IS NULL";
 export async function armDreamTide(db,cid,config,modelId,now=Date.now()){
   if(!id(cid)||!time(now)||typeof modelId!=='string'||!modelId.trim()||modelId.length>180)throw new TypeError('invalid arm identity');
-  const cfg=normalizeDreamConfig(config), revision=crypto.randomUUID();
+  const revision=crypto.randomUUID();
   await schema(db);
+  const prior=await stmt(db,"SELECT config_json FROM dream_tide_arms WHERE conversation_id=?",cid).first();
+  const cfg=scheduleConfig(config,prior?JSON.parse(prior.config_json):null);
   // Reconfiguration must wait until the existing claim settles.
   const result=await stmt(db,`INSERT INTO dream_tide_arms(conversation_id,revision,enabled,config_json,armed_at,model_id)
     SELECT ?,?,1,?,?,? WHERE EXISTS(${liveWindow}) AND NOT EXISTS(SELECT 1 FROM dream_tide_runs WHERE conversation_id=? AND status='running')
@@ -62,10 +74,12 @@ export async function readDreamSettings(db,cid){
 export async function configureDreamTide(db,cid,config,modelId,{expectedRevision=null,enable=false,now=Date.now(),deviceGrant=null}={}){
   if(!id(cid)||!time(now)||typeof modelId!=='string'||!modelId.trim()||modelId.length>180||
     (expectedRevision!==null&&!id(expectedRevision)))throw new TypeError('invalid dream configuration identity');
-  const cfg=normalizeDreamConfig(config),revision=crypto.randomUUID();
+  const revision=crypto.randomUUID();
+  await schema(db);
+  const prior=await stmt(db,"SELECT config_json FROM dream_tide_arms WHERE conversation_id=? AND revision IS ?",cid,expectedRevision).first();
+  const cfg=scheduleConfig(config,prior?JSON.parse(prior.config_json):null);
   if(deviceGrant!==null&&(!enable||!modelId.startsWith('chatgpt-plan:')||!/^[a-f0-9]{64}$/.test(deviceGrant.digest)||!Number.isSafeInteger(deviceGrant.requestLimit)||deviceGrant.requestLimit<1||deviceGrant.requestLimit>2147483646))throw new TypeError('invalid device grant');
   if(enable&&!cfg.execution)throw new TypeError('explicit execution consent required');
-  await schema(db);
   const noRun="NOT EXISTS(SELECT 1 FROM dream_tide_runs WHERE conversation_id=? AND status='running')";
   const result=expectedRevision===null
     ?await stmt(db,`INSERT OR IGNORE INTO dream_tide_arms(conversation_id,revision,enabled,config_json,armed_at,model_id,device_digest,device_request_limit)
@@ -123,14 +137,15 @@ export async function claimDreamTide(db,cid,{now=Date.now(),currentModelId,busy=
     if(count.n>=extraLimit)return null;
   }
   const claimId=crypto.randomUUID();
+  const initial=config.execution?JSON.stringify({phase:'claimed',phase_at:now,limits:{token_budget:config.execution.tokenBudget,tool_budget:config.execution.toolBudget,request_limit:arm.device_request_limit??null}}):null;
   // Unique slot and partial unique active index enforce atomic claim.
   // Other admission statements check this ledger in the same D1 write.
-  const r=await stmt(db,`INSERT OR IGNORE INTO dream_tide_runs(conversation_id,slot_key,local_day,kind,arm_revision,claim_id,model_id,status,started_at,updated_at)
-    SELECT ?,?,?,?,?,?,?,'running',?,? WHERE EXISTS(${liveWindow})
+  const r=await stmt(db,`INSERT OR IGNORE INTO dream_tide_runs(conversation_id,slot_key,local_day,kind,arm_revision,claim_id,model_id,status,started_at,updated_at,result_json)
+    SELECT ?,?,?,?,?,?,?,'running',?,?,? WHERE EXISTS(${liveWindow})
     AND EXISTS(SELECT 1 FROM dream_tide_arms WHERE conversation_id=? AND revision=? AND enabled=1 AND model_id=? AND extra_id IS ? AND extra_at IS ?)
     AND NOT EXISTS(SELECT 1 FROM chat_reply_runs WHERE conversation_id=? AND status='running')
     AND NOT EXISTS(SELECT 1 FROM chat_single_runs WHERE conversation_id=?)`,
-    cid,candidate.key,candidate.day,candidate.kind,arm.revision,claimId,arm.model_id,now,now,cid,cid,arm.revision,arm.model_id,arm.extra_id,arm.extra_at,cid,cid).run();
+    cid,candidate.key,candidate.day,candidate.kind,arm.revision,claimId,arm.model_id,now,now,initial,cid,cid,arm.revision,arm.model_id,arm.extra_id,arm.extra_at,cid,cid).run();
   if(!changed(r))return null;
   return {conversationId:cid,claimId,revision:arm.revision,modelId:arm.model_id,...candidate};
 }
@@ -143,9 +158,16 @@ export async function dreamTideClaimAuthorized(db,claim){
 export async function heartbeatDreamTide(db,claim,now=Date.now()){
   if(!time(now))return false;
   await schema(db);
-  return changed(await stmt(db,`UPDATE dream_tide_runs SET updated_at=MAX(updated_at,?) WHERE claim_id=? AND conversation_id=? AND arm_revision=? AND status='running'
+  return changed(await stmt(db,`UPDATE dream_tide_runs SET result_json=json_set(COALESCE(result_json,'{}'),'$.heartbeat_at',MAX(COALESCE(json_extract(result_json,'$.heartbeat_at'),0),?)),updated_at=MAX(updated_at,?) WHERE claim_id=? AND conversation_id=? AND arm_revision=? AND status='running'
     AND EXISTS(SELECT 1 FROM dream_tide_arms WHERE conversation_id=? AND revision=? AND enabled=1)
-    AND EXISTS(${liveWindow})`,now,claim.claimId,claim.conversationId,claim.revision,claim.conversationId,claim.revision,claim.conversationId).run());
+    AND EXISTS(${liveWindow})`,now,now,claim.claimId,claim.conversationId,claim.revision,claim.conversationId,claim.revision,claim.conversationId).run());
+}
+// Persist only allowlisted operational metadata, never model or tool payloads.
+export async function recordDreamPhase(db,claim,phase,now=Date.now()){
+  if(!['context','tools_prepare','claim_response_ready','device_received','request_reserved','tool_dispatch','step_recorded'].includes(phase)||!time(now))throw new TypeError('invalid phase');
+  await schema(db);
+  return changed(await stmt(db,`UPDATE dream_tide_runs SET result_json=json_set(COALESCE(result_json,'{}'),'$.phase',?,'$.phase_at',?),updated_at=MAX(updated_at,?) WHERE claim_id=? AND conversation_id=? AND arm_revision=? AND status='running'
+    AND EXISTS(SELECT 1 FROM dream_tide_arms WHERE conversation_id=? AND revision=? AND enabled=1)`,phase,now,now,claim.claimId,claim.conversationId,claim.revision,claim.conversationId,claim.revision).run());
 }
 export async function settleDreamTide(db,claim,status,now=Date.now()){
   if(!terminal.has(status)||!time(now))throw new TypeError('invalid settlement');
@@ -159,14 +181,14 @@ export async function settleDreamTide(db,claim,status,now=Date.now()){
 }
 // No retry after ambiguous work. A late response cannot reclaim the same slot.
 // Extra appointments already claimed before interruption are likewise consumed.
-export async function recoverDreamTide(db,now=Date.now(),staleMs=30*60*1000){
-  if(!time(now)||!Number.isSafeInteger(staleMs)||staleMs<=0)throw new TypeError('invalid recovery boundary');
+export async function recoverDreamTide(db,now=Date.now(),staleMs=30*60*1000,cid=null){
+  if(!time(now)||!Number.isSafeInteger(staleMs)||staleMs<=0||(cid!==null&&!id(cid)))throw new TypeError('invalid recovery boundary');
   await schema(db);
   const r=await db.batch([
-    stmt(db,"UPDATE dream_tide_runs SET status='interrupted',updated_at=? WHERE status='running' AND updated_at<?",now,now-staleMs),
-    db.prepare(`UPDATE dream_tide_arms SET extra_id=NULL,extra_at=NULL WHERE EXISTS(
+    stmt(db,`UPDATE dream_tide_runs SET status='interrupted',result_json=json_set(COALESCE(result_json,'{}'),'$.reason','heartbeat_expired','$.last_activity_at',updated_at,'$.recovered_at',?),updated_at=? WHERE status='running' AND updated_at<? AND (? IS NULL OR conversation_id=?)`,now,now,now-staleMs,cid,cid),
+    stmt(db,`UPDATE dream_tide_arms SET extra_id=NULL,extra_at=NULL WHERE (? IS NULL OR conversation_id=?) AND EXISTS(
       SELECT 1 FROM dream_tide_runs r WHERE r.conversation_id=dream_tide_arms.conversation_id AND r.arm_revision=dream_tide_arms.revision
-      AND r.status='interrupted' AND r.slot_key='extra:'||dream_tide_arms.extra_id)`)
+      AND r.status='interrupted' AND r.slot_key='extra:'||dream_tide_arms.extra_id)`,cid,cid)
   ]);
   return r[0].meta.changes;
 }

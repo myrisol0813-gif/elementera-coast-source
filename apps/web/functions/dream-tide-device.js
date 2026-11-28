@@ -1,4 +1,4 @@
-import {claimDreamTide,dreamTideClaimAuthorized,heartbeatDreamTide,recoverDreamTide} from './dream-tide-ledger.js';
+import {claimDreamTide,dreamTideClaimAuthorized,heartbeatDreamTide,recoverDreamTide,recordDreamPhase} from './dream-tide-ledger.js';
 import {dreamExecutionConfig,finishDreamActivity,reserveDreamStep,recordDreamStep,reserveDreamTool,recordDreamTool,readDreamHistory,previousDream,writeDreamNote} from './dream-tide-records.js';
 import {buildDreamContext,buildDreamToolContext} from './dream-tide-executor.js';
 import {recoverSingleChatRuns} from './chat-single-run.js';
@@ -33,22 +33,27 @@ export async function claimDeviceDream(env,cid,{revision,modelId,now=Date.now(),
   // device and server activity. No copy of the online window is made.
   const claim=await claimDreamTide(db,cid,{now,currentModelId:modelId,busy:false,expectedRevision:revision});
   if(!claim)return {status:'not_due'};
+  let phase='context';
   try{
+    if(!await recordDreamPhase(db,claim,phase,clock()))throw new Error('revoked');
     if(!await dreamTideClaimAuthorized(db,claim))throw new Error('revoked');
     const actual=await dreamExecutionConfig(db,cid,claim.revision);
     if(!actual||actual.modelId!==modelId)throw new Error('revoked');
     const context=await buildDreamContext(db,claim,actual,now,env);
+    phase='tools_prepare';
+    if(!await recordDreamPhase(db,claim,phase,clock()))throw new Error('revoked');
     const {allowed}=await buildDreamToolContext(env,claim,actual,now);
-    if(!await heartbeatDreamTide(db,claim,clock()))throw new Error('revoked');
+    phase='claim_response_ready';
+    if(!await recordDreamPhase(db,claim,phase,clock()))throw new Error('revoked');
     return {status:'claimed',claim,settings:actual,context,tools:actual.execution.toolBudget?allowed:[]};
   }catch{
     // No inference was sent. Consume the claimed slot, never replay it.
     const authorized=await dreamTideClaimAuthorized(db,claim);
+    const reason=authorized?(phase==='tools_prepare'?'tool_context_unavailable':'context_unavailable'):'authorization_ended';
     await finishDreamActivity(db,claim,authorized?'failed':'cancelled',{
-      reason:authorized?'context_unavailable':'authorization_ended',
-      total_tokens:0,cost:null,activities:[],
+      reason,phase,total_tokens:0,reported_cost:null,activities:[],
     },clock());
-    return {status:authorized?'context_unavailable':'authorization_ended'};
+    return {status:reason};
   }
 }
 
@@ -68,8 +73,8 @@ export async function deviceGrant(db,cid,revision,key){
     WHERE conversation_id=? AND revision=? AND enabled=1 AND device_digest=?`,cid,revision,digest).first();
 }
 async function liveClaim(db,cid,revision,claimId,modelId){
-  const row=await stmt(db,`SELECT claim_id,started_at,model_id FROM dream_tide_runs WHERE conversation_id=? AND arm_revision=? AND claim_id=? AND model_id=? AND status='running'`,cid,revision,claimId,modelId).first();
-  return row?{conversationId:cid,claimId,revision,modelId,startedAt:row.started_at}:null;
+  const row=await stmt(db,`SELECT claim_id,started_at,updated_at,model_id,result_json FROM dream_tide_runs WHERE conversation_id=? AND arm_revision=? AND claim_id=? AND model_id=? AND status='running'`,cid,revision,claimId,modelId).first();
+  return row?{conversationId:cid,claimId,revision,modelId,startedAt:row.started_at,updatedAt:row.updated_at,diagnostics:row.result_json?JSON.parse(row.result_json):{}}:null;
 }
 async function stepRows(db,claim){
   return (await stmt(db,'SELECT step_index,status,receipt_json,device_dispatch_done FROM dream_tide_steps WHERE claim_id=? ORDER BY step_index',claim.claimId).all()).results;
@@ -153,6 +158,7 @@ export async function deviceDreamAction(env,cid,value,now=Date.now(),clock=Date.
   const claim=await liveClaim(db,cid,value.revision,value.claim_id,grant.model_id);
   if(!claim||!await dreamTideClaimAuthorized(db,claim))return failure('authorization_ended');
   if(value.action==='heartbeat')return {ok:await heartbeatDreamTide(db,claim,now)};
+  if(value.action==='received')return {ok:await recordDreamPhase(db,claim,'device_received',now)};
   const actual=await dreamExecutionConfig(db,cid,value.revision);
   if(!actual)return failure('authorization_ended');
   const rows=await stepRows(db,claim),used=totals(rows),index=value.step;
@@ -160,7 +166,9 @@ export async function deviceDreamAction(env,cid,value,now=Date.now(),clock=Date.
     if(!integer(index)||index!==rows.length||index>=grant.device_request_limit||index>actual.execution.toolBudget||used===null||used>=actual.execution.tokenBudget||rows.at(-1)?.receipt_json&&JSON.parse(rows.at(-1).receipt_json).finish_reason!=='tool_calls')return failure('request_budget_or_sequence');
     const events=await toolRows(db,claim);
     if(events.some(r=>r.status==='claimed')||rows.some(r=>r.device_dispatch_done!==1))return failure('tool_unconfirmed');
-    return {ok:await reserveDreamStep(db,claim,index,now)};
+    const reserved=await reserveDreamStep(db,claim,index,now);
+    if(reserved)await recordDreamPhase(db,claim,'request_reserved',now);
+    return {ok:reserved};
   }
   if(value.action==='step'){
     if(!integer(index)||rows.at(-1)?.step_index!==index||rows.at(-1)?.status!=='claimed')return failure('step_not_reserved');
@@ -168,8 +176,10 @@ export async function deviceDreamAction(env,cid,value,now=Date.now(),clock=Date.
     const finish=value.finish;
     if(!calls||!['stop','tool_calls','failed'].includes(finish)||finish==='stop'&&calls.length||finish==='tool_calls'&&!calls.length||finish==='failed'&&calls.length)return failure('invalid_step');
     const receipt={usage,cost:null,model:grant.model_id,finish_reason:finish,requested_tools:calls.map(c=>c.name)};
+    if(finish==='failed'&&Number.isInteger(value.http_status)&&value.http_status>=100&&value.http_status<=599)receipt.http_status=value.http_status;
     if(finish==='failed')receipt.error_type=typeof value.reason==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(value.reason)?value.reason:'plan_request_unconfirmed';
     if(!await recordDreamStep(db,claim,index,finish==='failed'?'failed':'completed',receipt,now))return failure('step_unconfirmed');
+    await recordDreamPhase(db,claim,'tool_dispatch',now);
     const results=[];
     const after=usage&&totals([...rows.slice(0,-1),{status:'completed',receipt_json:JSON.stringify(receipt)}]);
     // A last request must have no tools; unknown usage is terminal.
@@ -181,6 +191,7 @@ export async function deviceDreamAction(env,cid,value,now=Date.now(),clock=Date.
     }
     const dispatch=await stmt(db,"UPDATE dream_tide_steps SET device_dispatch_done=1 WHERE claim_id=? AND step_index=? AND device_dispatch_done=0",claim.claimId,index).run();
     if(dispatch.meta.changes!==1)return failure('tool_settlement_unconfirmed');
+    await recordDreamPhase(db,claim,'step_recorded',clock());
     return {ok:true,results,canContinue:finish==='tool_calls'&&after!==null&&after<actual.execution.tokenBudget&&index<actual.execution.toolBudget&&index+1<grant.device_request_limit};
   }
   if(value.action==='finish'){
@@ -189,7 +200,7 @@ export async function deviceDreamAction(env,cid,value,now=Date.now(),clock=Date.
     const completed=value.completed===true&&last?.status==='completed'&&lastReceipt?.finish_reason==='stop'&&last.device_dispatch_done===1&&used!==null&&!events.some(x=>x.status==='claimed');
     const reason=completed?'ended':typeof value.reason==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(value.reason)?value.reason:'plan_incomplete';
     const proposed=events.map(x=>x.receipt_json?JSON.parse(x.receipt_json).proposed_extra_at:null).find(x=>integer(x,1));
-    const result={reason,total_tokens:used,reported_cost:null,tool_calls:events.length,activities:events.map(x=>({kind:x.tool_name,ok:x.status==='completed'})),accounting:'device plan reported usage; separate media costs not included; soft budget',...(proposed?{proposed_extra_at:proposed}:{})};
+    const result={reason,phase_at:claim.diagnostics.phase_at??null,heartbeat_at:claim.diagnostics.heartbeat_at??null,last_activity_at:claim.updatedAt,limits:{token_budget:actual.execution.tokenBudget,tool_budget:actual.execution.toolBudget,request_limit:grant.device_request_limit},phase:typeof value.phase==='string'&&['device_received','request_prepare','request_reserved','provider_wait','step_delivery','finish'].includes(value.phase)?value.phase:'finish',total_tokens:used,reported_cost:null,confirmed_tokens:rows.reduce((n,r)=>n+(r.status==='completed'?(JSON.parse(r.receipt_json||'{}').usage?.total_tokens??0):0),0),requests_reserved:rows.length,tool_calls:events.length,activities:events.map(x=>({kind:x.tool_name,ok:x.status==='completed'})),accounting:'device plan reported usage; separate media costs not included; soft budget',...(proposed?{proposed_extra_at:proposed}:{})};
     const settled=await finishDreamActivity(db,claim,completed?'completed':'failed',result,now);
     return {ok:settled.finished,status:completed?'completed':'failed',extraScheduled:settled.extraScheduled};
   }

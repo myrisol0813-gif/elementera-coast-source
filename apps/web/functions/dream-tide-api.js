@@ -1,6 +1,6 @@
 import {ChatStoreError} from './chat-store.js';
 import {json,readJson,sameOrigin,methodNotAllowed} from './http.js';
-import {readDreamSettings,configureDreamTide,disarmDreamTide} from './dream-tide-ledger.js';
+import {readDreamSettings,configureDreamTide,disarmDreamTide,recoverDreamTide} from './dream-tide-ledger.js';
 import {readDreamNotes,readDreamActivity,replyDreamNote} from './dream-tide-records.js';
 import {deviceDreamPlanSlug,deviceKeyDigest,deviceDreamAction} from './dream-tide-device.js';
 
@@ -17,6 +17,7 @@ export async function routeDreamTide(request,env){
   if(method==='GET'&&readable){
     const cid=u.searchParams.get('conversation_id');
     if(!id(cid))throw invalid();
+    await recoverDreamTide(db,Date.now(),30*60*1000,cid);
     const settings=await readDreamSettings(db,cid);
     if(!settings)throw new ChatStoreError('dream_window_unavailable','此窗口不支持自主唤醒。',404);
     if(path===base)return json({ok:true,settings,executionAvailable:env.COAST_DREAM_TIDE_ENABLED==='true',schedulerConfigured:env.COAST_DREAM_TIDE_SCHEDULER==='true',planExecutionAvailable:env.COAST_DEVICE_DREAM_TIDE_ENABLED==='true'});

@@ -67,6 +67,10 @@ internal class NativeDreamPlanTransport(private val account:ChatGptPlanRepositor
                     close()
                 }catch(e:CancellationException){throw e}
                 catch(e:NativeDreamPlanFailure){close(e)}
+                catch(e:java.io.InterruptedIOException){close(NativeDreamPlanFailure("plan_request_timeout"))}
+                catch(e:IOException){close(NativeDreamPlanFailure("plan_network_error"))}
+                catch(e:kotlinx.serialization.SerializationException){close(NativeDreamPlanFailure("plan_response_decode_error"))}
+                catch(e:IllegalArgumentException){close(NativeDreamPlanFailure("plan_invalid_response"))}
                 catch(_:Exception){close(NativeDreamPlanFailure("plan_request_unconfirmed"))}
                 finally{active.getAndSet(null)?.cancel()}
             }

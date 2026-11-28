@@ -56,7 +56,7 @@ export function validateDreamArchive(v,cid){
   for(const r of v.runs){
     check(exact(r,specs.runs[1].split(','))&&id(r.claim_id)&&r.conversation_id===cid&&!runs.has(r.claim_id)&&!slots.has(r.slot_key)&&
       text(r.slot_key,180)&&typeof r.local_day==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.local_day)&&
-      (r.kind==='daily'?r.slot_key==='daily:'+r.local_day:r.kind==='extra'&&r.slot_key.startsWith('extra:')&&id(r.slot_key.slice(6)))&&
+      (r.kind==='daily'?(r.slot_key==='daily:'+r.local_day||r.slot_key.startsWith('daily:'+r.local_day+':')&&/^[a-f0-9-]{36}$/.test(r.slot_key.slice(17))):r.kind==='extra'&&r.slot_key.startsWith('extra:')&&id(r.slot_key.slice(6)))&&
       model(r.model_id)&&terminal.includes(r.status)&&stamp(r.started_at)&&stamp(r.updated_at)&&r.updated_at>=r.started_at&&jsonText(r.result_json),'invalid historical wake run');
     runs.set(r.claim_id,r);slots.add(r.slot_key);
   }

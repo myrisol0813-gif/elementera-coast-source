@@ -21,7 +21,7 @@ class OnlineDreamWorker(context:Context,params:WorkerParameters):CoroutineWorker
                 if(NativeWorkspace.localSelected(context))break
                 try{if(device.execute(api,r))break}
                 catch(e:CancellationException){throw e}
-                catch(_:Exception){continue}
+                catch(e:Exception){device.recordCheckFailure(r,e);continue}
             }
             Result.success()
         }catch(e:CancellationException){throw e}

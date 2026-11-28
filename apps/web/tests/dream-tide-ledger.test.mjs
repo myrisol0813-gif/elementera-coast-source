@@ -113,3 +113,29 @@ test('owner-defined larger execution budgets are accepted without truncation',()
   for(const [key,value] of Object.entries(execution))assert.equal(normalized[key],value);
   assert.throws(()=>normalizeDreamConfig({...config,execution:{...execution,outputLimit:2147483647}}));
 });
+
+
+test('changing the scheduled clock creates one new same-day slot, not a replay of the old slot',async()=>{
+  const {db,cid,rev}=await fixture();
+  const {configureDreamTide}=await import('../functions/dream-tide-ledger.js');
+  const {readDreamArchive,validateDreamArchive}=await import('../functions/dream-tide-archive.js');
+  const execution={tokenBudget:8000,outputLimit:1000,toolBudget:4,readTurns:10,invitation:'fixture'};
+  const old=await claimDreamTide(db,cid,{now:due,currentModelId:model,busy:false});
+  assert.ok(old);
+  assert.equal(await configureDreamTide(db,cid,{...config,dailyTime:'10:00',execution},model,{expectedRevision:rev,enable:true,now:due+1}),null);
+  await settleDreamTide(db,old,'interrupted',due+2);
+  const unchanged=await configureDreamTide(db,cid,{...config,execution},model,{expectedRevision:rev,enable:true,now:due+3});
+  assert.ok(unchanged);
+  assert.equal(await claimDreamTide(db,cid,{now:due+30000,currentModelId:model,busy:false}),null);
+  const edited=await configureDreamTide(db,cid,{...config,dailyTime:'10:00',execution},model,{expectedRevision:unchanged.revision,enable:true,now:due+31000});
+  assert.ok(edited.config.scheduleEpoch);
+  assert.equal(await claimDreamTide(db,cid,{now:due+3599999,currentModelId:model,busy:false}),null);
+  const fresh=(await Promise.all(Array.from({length:4},()=>claimDreamTide(db,cid,{now:due+3600000,currentModelId:model,busy:false})))).filter(Boolean);
+  assert.equal(fresh.length,1);assert.notEqual(fresh[0].key,old.key);
+  await settleDreamTide(db,fresh[0],'completed',due+3600001);
+  const saved=await configureDreamTide(db,cid,{...config,dailyTime:'10:00',execution},model,{expectedRevision:edited.revision,enable:true,now:due+3600002});
+  assert.equal(saved.config.scheduleEpoch,edited.config.scheduleEpoch);
+  assert.equal(await claimDreamTide(db,cid,{now:due+3600003,currentModelId:model,busy:false}),null);
+  const archive=await readDreamArchive(db,cid);
+  assert.equal(archive.runs.length,2);assert.equal(validateDreamArchive(archive,cid),archive);
+});
