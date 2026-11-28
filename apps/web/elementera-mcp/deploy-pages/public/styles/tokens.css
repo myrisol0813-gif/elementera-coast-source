@@ -136,6 +136,25 @@
   --shadow: 0 18px 46px rgba(120, 80, 109, .11);
 }
 
+:root[data-theme="warm-moss"] {
+  color-scheme: light;
+  --bg: #f1eee7;
+  --surface: #fcfaf5;
+  --surface-soft: #e5e2d9;
+  --surface-raised: #fffdf8;
+  --text: #51493e;
+  --text-soft: #665f55;
+  --muted: #766f64;
+  --line: #d8d3c8;
+  --user: #e2e8d9;
+  --accent: #526d4e;
+  --accent-contrast: #ffffff;
+  --selection: #a7b6a0;
+  --danger: #a04d52;
+  --success: #526d4e;
+  --shadow: 0 12px 34px rgba(87, 81, 64, .11);
+}
+
 *,
 *::before,
 *::after {
