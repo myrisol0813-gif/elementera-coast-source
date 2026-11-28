@@ -73,8 +73,8 @@ export async function deviceGrant(db,cid,revision,key){
     WHERE conversation_id=? AND revision=? AND enabled=1 AND device_digest=?`,cid,revision,digest).first();
 }
 async function liveClaim(db,cid,revision,claimId,modelId){
-  const row=await stmt(db,`SELECT claim_id,started_at,model_id FROM dream_tide_runs WHERE conversation_id=? AND arm_revision=? AND claim_id=? AND model_id=? AND status='running'`,cid,revision,claimId,modelId).first();
-  return row?{conversationId:cid,claimId,revision,modelId,startedAt:row.started_at}:null;
+  const row=await stmt(db,`SELECT claim_id,started_at,updated_at,model_id,result_json FROM dream_tide_runs WHERE conversation_id=? AND arm_revision=? AND claim_id=? AND model_id=? AND status='running'`,cid,revision,claimId,modelId).first();
+  return row?{conversationId:cid,claimId,revision,modelId,startedAt:row.started_at,updatedAt:row.updated_at,diagnostics:row.result_json?JSON.parse(row.result_json):{}}:null;
 }
 async function stepRows(db,claim){
   return (await stmt(db,'SELECT step_index,status,receipt_json,device_dispatch_done FROM dream_tide_steps WHERE claim_id=? ORDER BY step_index',claim.claimId).all()).results;
@@ -176,6 +176,7 @@ export async function deviceDreamAction(env,cid,value,now=Date.now(),clock=Date.
     const finish=value.finish;
     if(!calls||!['stop','tool_calls','failed'].includes(finish)||finish==='stop'&&calls.length||finish==='tool_calls'&&!calls.length||finish==='failed'&&calls.length)return failure('invalid_step');
     const receipt={usage,cost:null,model:grant.model_id,finish_reason:finish,requested_tools:calls.map(c=>c.name)};
+    if(finish==='failed'&&Number.isInteger(value.http_status)&&value.http_status>=100&&value.http_status<=599)receipt.http_status=value.http_status;
     if(finish==='failed')receipt.error_type=typeof value.reason==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(value.reason)?value.reason:'plan_request_unconfirmed';
     if(!await recordDreamStep(db,claim,index,finish==='failed'?'failed':'completed',receipt,now))return failure('step_unconfirmed');
     await recordDreamPhase(db,claim,'tool_dispatch',now);
@@ -199,7 +200,7 @@ export async function deviceDreamAction(env,cid,value,now=Date.now(),clock=Date.
     const completed=value.completed===true&&last?.status==='completed'&&lastReceipt?.finish_reason==='stop'&&last.device_dispatch_done===1&&used!==null&&!events.some(x=>x.status==='claimed');
     const reason=completed?'ended':typeof value.reason==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(value.reason)?value.reason:'plan_incomplete';
     const proposed=events.map(x=>x.receipt_json?JSON.parse(x.receipt_json).proposed_extra_at:null).find(x=>integer(x,1));
-    const result={reason,phase:typeof value.phase==='string'&&['device_received','request_prepare','request_reserved','provider_wait','step_delivery','finish'].includes(value.phase)?value.phase:'finish',total_tokens:used,reported_cost:null,tool_calls:events.length,activities:events.map(x=>({kind:x.tool_name,ok:x.status==='completed'})),accounting:'device plan reported usage; separate media costs not included; soft budget',...(proposed?{proposed_extra_at:proposed}:{})};
+    const result={reason,phase_at:claim.diagnostics.phase_at??null,heartbeat_at:claim.diagnostics.heartbeat_at??null,last_activity_at:claim.updatedAt,limits:{token_budget:actual.execution.tokenBudget,tool_budget:actual.execution.toolBudget,request_limit:grant.device_request_limit},phase:typeof value.phase==='string'&&['device_received','request_prepare','request_reserved','provider_wait','step_delivery','finish'].includes(value.phase)?value.phase:'finish',total_tokens:used,reported_cost:null,confirmed_tokens:rows.reduce((n,r)=>n+(r.status==='completed'?(JSON.parse(r.receipt_json||'{}').usage?.total_tokens??0):0),0),requests_reserved:rows.length,tool_calls:events.length,activities:events.map(x=>({kind:x.tool_name,ok:x.status==='completed'})),accounting:'device plan reported usage; separate media costs not included; soft budget',...(proposed?{proposed_extra_at:proposed}:{})};
     const settled=await finishDreamActivity(db,claim,completed?'completed':'failed',result,now);
     return {ok:settled.finished,status:completed?'completed':'failed',extraScheduled:settled.extraScheduled};
   }
