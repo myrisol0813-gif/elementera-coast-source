@@ -13,6 +13,10 @@ import com.elementeracoast.app.core.network.CoastApiClient
 import com.elementeracoast.app.core.remote.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import com.elementeracoast.app.core.local.WakeDiagnostic
 import kotlinx.serialization.json.*
 import java.time.Instant
 import java.time.ZoneId
@@ -27,6 +31,53 @@ private fun toolName(value:String)=when(value){
     "voice_create"->"自主语音";"image_generate"->"自主生图";"dream_memory_candidate"->"提议记忆候选";"dream_read_history"->"阅读历史";"dream_write_note"->"写自主手记";"dream_schedule_extra"->"提议额外唤醒";else->value
 }
 private fun JsonElement?.field(key:String):String?=((this as? JsonObject)?.get(key) as? JsonPrimitive)?.contentOrNull
+private fun diagnosticStamp(value:Long)=Instant.ofEpochMilli(value).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+private fun phaseLabel(value:String)=when(value){
+    "settings_fetch"->"读取在线设置";"catalog_check"->"核对套餐授权与模型";"claim_request"->"向服务端请求认领";"claim_not_admitted"->"本轮检查未认领";"preflight_failed"->"执行前检查失败";"claim_response_unconfirmed"->"认领回执未确认";"context"->"准备上下文";"tools_prepare"->"准备工具";"claim_response_ready"->"服务端已准备认领回执，手机接收未确认";"device_received"->"手机已收到认领回执";"request_prepare"->"准备下一次模型请求";"request_reserved"->"请求预留阶段";"provider_wait"->"已预留请求，等待模型回执";"response_received"->"已取得模型响应";"step_delivery"->"向服务端交付模型响应";"tool_dispatch"->"执行工具";"step_recorded"->"请求及工具结果已记录";"finish"->"收尾";"finish_unconfirmed"->"收尾回执未确认";else->value
+}
+private fun reasonLabel(value:String)=when(value){
+    "ended"->"正常结束";"heartbeat_expired"->"超过回收期限未取得活动更新";"process_interrupted"->"进程中断";"plan_request_timeout","request_timeout","coast_timeout"->"请求超时";"plan_network_error","network_error","coast_network"->"网络连接异常";"plan_response_decode_error","response_decode_error","coast_decode","claim_decode_error"->"响应解析失败";"plan_invalid_response","invalid_protocol_data"->"响应或协议数据无效";"plan_usage_limit"->"套餐额度限制";"plan_authorization_unavailable","plan_not_authorized"->"套餐授权不可用";"plan_binding_unavailable"->"未取得有效模型绑定";"server_gate_disabled"->"服务端未开启设备执行";"plan_soft_budget_exhausted","input_budget_exhausted"->"剩余软预算不足以容纳下一请求";"token_budget_reached"->"累计 token 已达到预算";"usage_unconfirmed"->"供应商用量未确认";"plan_step_or_soft_budget_limit"->"套餐请求次数或软预算已达上限";"budget_or_usage_unknown"->"预算已用尽或供应商用量未知";"context_unavailable"->"上下文准备失败";"tool_context_unavailable"->"工具准备失败";"not_due"->"尚未到新的可认领时段";"authorization_or_task_ended","authorization_ended"->"授权撤回或执行任务中止";"execution_failed","invalid_execution_state"->"执行状态异常";"cancelled"->"已取消";else->value
+}
+private fun safeCode(value:String?)=value?.takeIf{it.matches(Regex("[A-Za-z0-9_.:/-]{1,180}"))}?: "未确认"
+private fun safeNumber(value:String?)=value?.toLongOrNull()?.toString()?: "未确认"
+private fun timeLine(label:String,value:String?)=value?.toLongOrNull()?.takeIf{it in 0L..253402300799999L}?.let{label+"："+diagnosticStamp(it)}
+private fun deviceLines(entry:JsonObject)=buildList<String>{
+    add("阶段："+phaseLabel(safeCode(entry.field("phase"))))
+    timeLine("记录时间",entry.field("at"))?.let(::add)
+    entry.field("reason")?.let{add("原因："+reasonLabel(safeCode(it))+" · "+safeCode(it))}
+    entry.field("step")?.toIntOrNull()?.let{add("请求序号："+(it+1L))}
+    entry.field("http_status")?.toIntOrNull()?.let{add("HTTP："+it)}
+    entry.field("claim_id")?.let{add("活动 ID："+safeCode(it))}
+}
+private fun activityLines(r:DreamActivity,localMode:Boolean)=buildList<String>{
+    add("执行模式："+if(localMode)"本机" else "在线")
+    add("模型："+safeCode(r.modelId));add("活动 ID："+safeCode(r.claimId))
+    add("状态："+status(r.status));add("认领时间："+diagnosticStamp(r.startedAt))
+    r.updatedAt?.let{timeLine("最近记录更新",it.toString())?.let(::add)}
+    add("阶段："+(r.result.field("phase")?.let{phaseLabel(safeCode(it))}?: "未记录"))
+    timeLine("阶段记录时间",r.result.field("phase_at"))?.let(::add)
+    timeLine("最近心跳",r.result.field("heartbeat_at"))?.let(::add)?:add("最近心跳：未记录")
+    timeLine("回收前最后更新",r.result.field("last_activity_at"))?.let(::add)
+    timeLine("回收时间",r.result.field("recovered_at"))?.let(::add)
+    val reason=r.result.field("reason")
+    if(reason!=null)add("结束原因："+reasonLabel(safeCode(reason))+" · "+safeCode(reason)) else if(r.status!="running")add("结束原因：未确认（旧记录可能没有诊断）")
+    r.result.field("http_status")?.toIntOrNull()?.let{add("HTTP："+it)}
+    val limits=(r.result as? JsonObject)?.get("limits")
+    val confirmed=r.steps.mapNotNull{s->((s as? JsonObject)?.get("receipt") as? JsonObject)?.get("usage").field("total_tokens")?.toLongOrNull()?.takeIf{it>=0}}
+    add("已确认请求 token 合计："+(r.result.field("confirmed_tokens")?.toLongOrNull()?.toString()?:confirmed.takeIf{it.isNotEmpty()}?.sum()?.toString()?: "未确认")+" / "+safeNumber(limits.field("token_budget")))
+    add("已预留请求："+r.steps.size+" / "+safeNumber(limits.field("request_limit"))+"；已记录工具："+r.tools.size+" / "+safeNumber(limits.field("tool_budget")))
+    r.result.field("estimated_input_tokens")?.let{add("末次输入估算："+safeNumber(it))};r.result.field("estimated_remaining_tokens")?.let{add("末次剩余软预算："+safeNumber(it))}
+    r.steps.forEach{s->
+        val receipt=(s as? JsonObject)?.get("receipt") as? JsonObject
+        val index=s.field("step_index")?.toIntOrNull()?.let{it+1L}?.toString()?: "?"
+        add("请求 "+index+" · "+status(s.field("status").orEmpty())+" · token "+safeNumber(receipt?.get("usage").field("total_tokens")))
+        timeLine("  预留时间",s.field("started_at"))?.let(::add);timeLine("  回执时间",s.field("finished_at"))?.let(::add)
+        receipt.field("finish_reason")?.let{add("  结束标记："+safeCode(it))};receipt.field("error_type")?.let{add("  错误："+reasonLabel(safeCode(it))+" · "+safeCode(it))};receipt.field("http_status")?.toIntOrNull()?.let{add("  HTTP："+it)}
+    }
+    r.tools.forEach{t->add("工具："+toolName(safeCode(t.field("tool_name")))+" · "+status(t.field("status").orEmpty()));timeLine("  开始",t.field("started_at"))?.let(::add);timeLine("  回执",t.field("finished_at"))?.let(::add)}
+    if(r.steps.any{it.field("status") in setOf("claimed","failed")})add("存在未确认或失败请求，可能已消耗额度；不会自动重放。")
+    if(r.status in setOf("failed","interrupted","cancelled")&&r.tools.any{it.field("status")=="completed"})add("部分成功：已完成的工具与作品保留。")
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +109,8 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
     var planLimitText by remember(cid){mutableStateOf("5")}
     var notePage by remember(cid){mutableStateOf(DreamNotesResponse())}
     var activityPage by remember(cid){mutableStateOf(DreamActivityResponse())}
+    var deviceDiagnostics by remember(cid){mutableStateOf(emptyList<JsonObject>())}
+    fun copyDiagnostic(lines:List<String>){context.getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(android.content.ClipData.newPlainText("自主唤醒诊断",lines.joinToString("\n")));notice="已复制脱敏诊断。"}
     var previewId by remember(cid){mutableStateOf<String?>(null)}
     var offset by remember(cid){mutableStateOf(0)}
     val sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)
@@ -79,12 +132,19 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
             when(tab){
                 0->hydrate(api.dreamSettings(cid))
                 1->notePage=api.dreamNotes(cid,offset)
-                2->activityPage=api.dreamActivity(cid,offset)
+                2->{activityPage=api.dreamActivity(cid,offset);deviceDiagnostics=withContext(Dispatchers.IO){onlineDevice?.diagnostics(cid).orEmpty()}}
             }
         }catch(e:CancellationException){throw e}catch(e:Exception){error=e.message?:"读取未完成。"}
         finally{busy=false}
     }
     LaunchedEffect(cid,tab,offset){load()}
+    val activeActivity=activityPage.items.any{it.status=="running"}
+    LaunchedEffect(cid,tab,offset,activeActivity){
+        if(tab==2&&offset==0&&activeActivity)while(activityPage.items.any{it.status=="running"}){
+            delay(5000)
+            if(!busy)try{activityPage=api.dreamActivity(cid,offset);deviceDiagnostics=withContext(Dispatchers.IO){onlineDevice?.diagnostics(cid).orEmpty()}}catch(e:CancellationException){throw e}catch(e:Exception){error="活动刷新失败："+reasonLabel(WakeDiagnostic.reason(e))}
+        }
+    }
     previewId?.let{id->DreamMediaPreview(api,cid,id){previewId=null}}
     val canArm=response.executionAvailable&&response.schedulerConfigured
     val planDraft=model.startsWith("chatgpt-plan:")
@@ -241,13 +301,29 @@ internal fun DreamTideSheet(cid:String,selectedModel:String,localMode:Boolean,ap
                     }
                 }}
             }else if(tab==2){
+                if(!localMode&&deviceDiagnostics.isNotEmpty()){
+                    val lines=deviceDiagnostics.flatMap(::deviceLines)
+                    Text("手机端最近检查与执行诊断",style=MaterialTheme.typography.titleSmall)
+                    lines.forEach{Text(it,style=MaterialTheme.typography.bodySmall)}
+                    TextButton(onClick={copyDiagnostic(lines)}){Text("复制手机诊断")}
+                }
                 if(localMode&&!canArm)Text("本机自动执行尚未开放；已归档的历史仍可阅读。",style=MaterialTheme.typography.bodySmall)
                 if(activityPage.items.isEmpty()&&!busy)Text("还没有活动记录。")
                 activityPage.items.forEach{r->com.elementeracoast.app.ui.theme.SnowLetterSurface(modifier=Modifier.fillMaxWidth(),role=com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole.StatusCard,fallbackColor=MaterialTheme.colorScheme.surface,fallbackBorder=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=.55f)),fallbackElevation=1.dp){
                     Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
                         Text(stamp(r.startedAt)+" · "+if(r.kind=="daily")"固定唤醒" else "额外唤醒")
                         Text(status(r.status)+" · "+r.modelId,style=MaterialTheme.typography.bodySmall)
-                        r.result.field("reason")?.let{reason->Text("活动回执："+when(reason){"ended"->"正常结束";"budget_or_usage_unknown"->"预算已用尽或供应商未返回用量";"plan_step_or_soft_budget_limit"->"套餐请求次数或软预算达到上限";"plan_soft_budget_exhausted"->"套餐软预算已用尽";"execution_failed"->"执行异常";"process_interrupted"->"进程中断";"cancelled"->"已取消";else->reason},style=MaterialTheme.typography.bodySmall)}
+                        val resultReason=r.result.field("reason")
+                        if(resultReason!=null)Text("活动回执："+reasonLabel(safeCode(resultReason))+" · "+safeCode(resultReason),style=MaterialTheme.typography.bodySmall)
+                        else if(r.status!="running")Text("活动回执：结束原因未确认（旧记录可能没有诊断）",style=MaterialTheme.typography.bodySmall)
+                        r.result.field("phase")?.let{Text("阶段："+phaseLabel(safeCode(it)),style=MaterialTheme.typography.bodySmall)}
+                        if(r.status=="running")Text(timeLine("最近心跳",r.result.field("heartbeat_at"))?: "最近心跳：未记录",style=MaterialTheme.typography.bodySmall)
+                        if(r.status in setOf("failed","cancelled","interrupted")&&r.tools.any{it.field("status")=="completed"})Text("部分成功 · 已完成的工具与作品保留",style=MaterialTheme.typography.bodySmall)
+                        val lines=activityLines(r,localMode)
+                        var showDetails by remember(r.claimId){mutableStateOf(false)}
+                        TextButton(onClick={showDetails=!showDetails}){Text(if(showDetails)"收起详细回执" else "展开详细回执")}
+                        if(showDetails)lines.forEach{Text(it,style=MaterialTheme.typography.bodySmall)}
+                        TextButton(onClick={copyDiagnostic(lines)}){Text("复制脱敏诊断")}
                         Text("总 token："+(r.result.field("total_tokens")?:"未确认")+" · 成本："+(r.result.field("reported_cost")?.let{"USD "+it}?:"未确认"),style=MaterialTheme.typography.bodySmall)
                         r.tools.forEach{t->
                             val name=t.field("tool_name").orEmpty()
