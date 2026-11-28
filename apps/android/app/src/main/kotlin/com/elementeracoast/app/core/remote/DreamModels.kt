@@ -68,7 +68,8 @@ data class DreamNote(
 data class DreamActivity(
     @SerialName("claim_id") val claimId:String,@SerialName("model_id") val modelId:String,
     val kind:String,val status:String,@SerialName("started_at") val startedAt:Long,
-    val result:JsonElement=JsonNull,val tools:List<JsonElement> = emptyList(),val steps:List<JsonElement> = emptyList()
+    val result:JsonElement=JsonNull,val tools:List<JsonElement> = emptyList(),val steps:List<JsonElement> = emptyList(),
+    @SerialName("updated_at") val updatedAt:Long?=null
 )
 @Serializable
 data class DreamNotesResponse(val ok:Boolean=false,val items:List<DreamNote> = emptyList(),val nextOffset:Int?=null)
