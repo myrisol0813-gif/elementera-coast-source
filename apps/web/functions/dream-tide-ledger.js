@@ -32,13 +32,25 @@ export function normalizeDreamConfig(config){
       includeReplies:e.includeReplies===true,readHistory:e.readHistory===true,writeNote:e.writeNote===true,
       ...Object.fromEntries([...DREAM_CONTEXT_FLAGS,...DREAM_TOOL_FLAGS].map(key=>[key,e[key]===true]))};
   }
-  return {enabled:true,timeZone:config.timeZone,dailyTime:config.dailyTime,quietHours,allowExtra:config.allowExtra===true,execution};
+  const scheduleEpoch=config.scheduleEpoch;
+  if(scheduleEpoch!=null&&(typeof scheduleEpoch!=='string'||! /^[a-f0-9-]{36}$/.test(scheduleEpoch)))throw new TypeError('invalid schedule identity');
+  return {enabled:true,timeZone:config.timeZone,dailyTime:config.dailyTime,quietHours,allowExtra:config.allowExtra===true,execution,...(scheduleEpoch?{scheduleEpoch}:{})};
+}
+// The owner changes the scheduling identity only when the clock or zone changes.
+// Revision changes alone (including authorization and budget edits) must not
+// cause a second billable activity. Legacy schedules keep their existing slot.
+function scheduleConfig(config,previous){
+  const {scheduleEpoch:ignored,...cfg}=normalizeDreamConfig(config);
+  const epoch=previous&&(previous.dailyTime!==cfg.dailyTime||previous.timeZone!==cfg.timeZone)?crypto.randomUUID():previous?.scheduleEpoch;
+  return epoch?{...cfg,scheduleEpoch:epoch}:cfg;
 }
 const liveWindow="SELECT 1 FROM conversations WHERE id=? AND user_id='owner' AND room_type='main' AND source='coast' AND conversation_kind='chat' AND deleted_at IS NULL";
 export async function armDreamTide(db,cid,config,modelId,now=Date.now()){
   if(!id(cid)||!time(now)||typeof modelId!=='string'||!modelId.trim()||modelId.length>180)throw new TypeError('invalid arm identity');
-  const cfg=normalizeDreamConfig(config), revision=crypto.randomUUID();
+  const revision=crypto.randomUUID();
   await schema(db);
+  const prior=await stmt(db,"SELECT config_json FROM dream_tide_arms WHERE conversation_id=?",cid).first();
+  const cfg=scheduleConfig(config,prior?JSON.parse(prior.config_json):null);
   // Reconfiguration must wait until the existing claim settles.
   const result=await stmt(db,`INSERT INTO dream_tide_arms(conversation_id,revision,enabled,config_json,armed_at,model_id)
     SELECT ?,?,1,?,?,? WHERE EXISTS(${liveWindow}) AND NOT EXISTS(SELECT 1 FROM dream_tide_runs WHERE conversation_id=? AND status='running')
@@ -62,10 +74,12 @@ export async function readDreamSettings(db,cid){
 export async function configureDreamTide(db,cid,config,modelId,{expectedRevision=null,enable=false,now=Date.now(),deviceGrant=null}={}){
   if(!id(cid)||!time(now)||typeof modelId!=='string'||!modelId.trim()||modelId.length>180||
     (expectedRevision!==null&&!id(expectedRevision)))throw new TypeError('invalid dream configuration identity');
-  const cfg=normalizeDreamConfig(config),revision=crypto.randomUUID();
+  const revision=crypto.randomUUID();
+  await schema(db);
+  const prior=await stmt(db,"SELECT config_json FROM dream_tide_arms WHERE conversation_id=? AND revision IS ?",cid,expectedRevision).first();
+  const cfg=scheduleConfig(config,prior?JSON.parse(prior.config_json):null);
   if(deviceGrant!==null&&(!enable||!modelId.startsWith('chatgpt-plan:')||!/^[a-f0-9]{64}$/.test(deviceGrant.digest)||!Number.isSafeInteger(deviceGrant.requestLimit)||deviceGrant.requestLimit<1||deviceGrant.requestLimit>2147483646))throw new TypeError('invalid device grant');
   if(enable&&!cfg.execution)throw new TypeError('explicit execution consent required');
-  await schema(db);
   const noRun="NOT EXISTS(SELECT 1 FROM dream_tide_runs WHERE conversation_id=? AND status='running')";
   const result=expectedRevision===null
     ?await stmt(db,`INSERT OR IGNORE INTO dream_tide_arms(conversation_id,revision,enabled,config_json,armed_at,model_id,device_digest,device_request_limit)
