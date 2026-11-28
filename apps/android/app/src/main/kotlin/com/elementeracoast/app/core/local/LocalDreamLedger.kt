@@ -31,8 +31,9 @@ internal object LocalDreamSchedule {
         val here=day(now,c.timeZone);val m=minute(now,c.timeZone)
         c.quietHours?.let{val a=minute(it.start);val b=minute(it.end);if(a==b||if(a<b)m in a until b else m>=a||m<b)return null}
         val daily=minute(c.dailyTime)
-        if(m>=daily&&!(day(armed,c.timeZone)==here&&minute(armed,c.timeZone)>daily)&&"daily:"+here !in used)
-            return LocalDreamSlot("daily","daily:"+here,here)
+        val dailyKey="daily:"+here+(c.scheduleEpoch?.let{":"+it}?:"")
+        if(m>=daily&&!(day(armed,c.timeZone)==here&&minute(armed,c.timeZone)>daily)&&dailyKey !in used)
+            return LocalDreamSlot("daily",dailyKey,here)
         val extra=settings.extraAt?:return null
         val extraId=settings.extraId?:return null
         if(!c.allowExtra||c.execution.extraPerDay<=0||extra<armed||extra>now||day(extra,c.timeZone)!=here||"extra:"+extraId in used)return null
@@ -72,7 +73,11 @@ internal class LocalDreamLedger(private val store:LocalPersistence){
         val arm=request.action=="arm"
         val plan=com.elementeracoast.app.feature.chatgpt.NativeDreamPlanProtocol.slug(model)!=null
         if(arm&&(!enableAllowed||!request.confirmExecution||(if(plan)planRevision==null||!request.confirmPlanSoftBudget||request.planRequestLimit !in 1..2147483646 else !model.startsWith("local:")||'/' !in model)))return@readConsistent null
-        val next=DreamSettings(revision=if(arm&&plan)requireNotNull(planRevision)else UUID.randomUUID().toString(),enabled=arm,config=cfg,modelId=model,armedAt=if(arm)now else null)
+        // Only an explicit clock/zone edit creates a new daily schedule identity.
+        // Reauthorization, unchanged saves, and budget edits cannot replay a slot.
+        val previous=old.config
+        val scheduleEpoch=if(previous!=null&&(previous.dailyTime!=cfg.dailyTime||previous.timeZone!=cfg.timeZone))UUID.randomUUID().toString()else previous?.scheduleEpoch
+        val next=DreamSettings(revision=if(arm&&plan)requireNotNull(planRevision)else UUID.randomUUID().toString(),enabled=arm,config=cfg.copy(scheduleEpoch=scheduleEpoch),modelId=model,armedAt=if(arm)now else null)
         save(s,cid,next);next
     }
     private fun authorized(s:LocalPersistence,c:Claim,h:JsonObject):Boolean{
