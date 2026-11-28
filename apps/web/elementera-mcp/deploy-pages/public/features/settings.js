@@ -9,7 +9,10 @@ import { openGuideTarget, manualMarkup, dismissGuideHint } from '../core/feature
 const LOADED_AT = new Date().toISOString();
 
 function row(title, subtitle, action, extra = '') {
-  return `<button class="feature-row" type="button" data-action="${escapeAttribute(action)}" ${extra}><span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(subtitle)}</small></span></button>`;
+  const classes = extra.match(/^class="([^"]*)"\s*/);
+  const className = classes ? 'feature-row ' + classes[1] : 'feature-row';
+  const attributes = classes ? extra.slice(classes[0].length) : extra;
+  return `<button class="${escapeAttribute(className)}" type="button" data-action="${escapeAttribute(action)}" ${attributes}><span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(subtitle)}</small></span></button>`;
 }
 
 function line(title, subtitle) {
@@ -156,7 +159,7 @@ export function createSettings({ storage, shell, chat, router, toast, memory, da
     subtitle: '前端本机显示',
     className: 'settings-panel',
     body: group('外观',
-      row('主题', '七种可选外观 · 含雪粒信笺', 'settings:theme')
+      row('主题', '八种可选外观 · 含暖苔信笺', 'settings:theme')
       + row('用户气泡颜色', '屋主消息气泡', 'settings:bubble')
       + row('重点色', '橙色 / 金色 / 蓝色 / 粉色', 'settings:accent')
       + row('文字气质', '经典宋体 / 柔和现代 / 手札', 'settings:font')),
@@ -183,6 +186,7 @@ export function createSettings({ storage, shell, chat, router, toast, memory, da
       ['mist', '海雾蓝', '潮水与薄雾'],
       ['sage', '苔原绿', '安静的草地与苔藓'],
       ['blush', '薄暮粉', '夕照中的浅粉'],
+      ['warm-moss', '暖苔信笺', '暖白纸页 · 浅苔绿色块'],
     ].map(([value, title, subtitle]) => row(
       title, subtitle, 'settings:set-theme',
       `class="theme-choice" data-value="${value}" aria-pressed="${preferences().theme === value}"`,
