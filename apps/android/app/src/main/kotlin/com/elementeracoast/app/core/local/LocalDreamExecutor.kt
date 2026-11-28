@@ -127,17 +127,23 @@ internal class LocalDreamExecutor(
         var total=0L;var cost=0.0;var known=true;var costKnown=!isPlan;var calls=0;var proposed:Long?=null
         val activities=mutableListOf<JsonElement>()
         var cancelled:CancellationException?=null
+        var phase="context";var stepIndex:Int?=null;var httpStatus:Int?=null
+        var inputEstimate:Long?=null;var remainingBudget:Long?=null
+        fun mark(value:String){phase=value;runCatching{ledger.progress(c,phase,clock(),stepIndex)}}
         fun authorized()=workspaceActive()&&ledger.authorized(c)&&(plan==null||plan.authorized())
         fun checkAuthorization(){if(!authorized())throw CancellationException("wake authorization ended")}
         try{
             coroutineScope{
                 val running=currentCoroutineContext()[Job]!!
                 val watch=launch(Dispatchers.IO){
-                    while(isActive){delay(1000);if(!authorized()){running.cancel(CancellationException("wake authorization ended"));break}}
+                    var ticks=0
+                    while(isActive){delay(1000);if(!authorized()){running.cancel(CancellationException("wake authorization ended"));break};if(++ticks%15==0)runCatching{ledger.progress(c,null,clock())}}
                 }
                 try{
+                    mark("context")
                     val previous=ledger.previous(c)
                     val invitation=context(c,previous)
+                    mark("tools_prepare")
                     val messages=mutableListOf<JsonElement>(msg("system",invitation))
                     val planSession=plan?.let{p->NativeDreamPlanSession(p.grant,invitation,e.tokenBudget,e.outputLimit){body,tools->p.send(body,tools){authorized()}}}
                     var planResults=emptyList<JsonObject>()
@@ -161,6 +167,7 @@ internal class LocalDreamExecutor(
                     var voiceReservations=0;var imageReservations=0
                     for(step in 0..e.toolBudget){
                         ensureActive();checkAuthorization()
+                        stepIndex=step;mark("request_prepare")
                         if(planSession!=null&&!planSession.canContinue()){reason="plan_step_or_soft_budget_limit";break}
                         val exposed=if(calls>=e.toolBudget||step==e.toolBudget||plan!=null&&step+1>=plan.grant.requestLimit)emptyList()else allowed
                         val images=pendingImages.toList();pendingImages.clear()
@@ -168,25 +175,27 @@ internal class LocalDreamExecutor(
                         val wireMessages=JsonArray(messages+images.map{it.message})
                         val estimate=LocalContextPolicy.estimate(JsonArray(messages).toString())+LocalContextPolicy.estimate(JsonArray(exposed).toString())+images.size*2048+LocalContextPolicy.estimate(images.joinToString(" "){it.id})
                         if(visionBudget?.wireLimit?.let{estimate>it}==true){reason="context_window_estimate_exceeded";break}
-                        val cap=minOf(e.outputLimit.toLong(),e.tokenBudget.toLong()-total-estimate).toInt()
-                        if(!known||cap<1){reason="budget_or_usage_unknown";break}
+                        inputEstimate=estimate.toLong();remainingBudget=e.tokenBudget.toLong()-total-estimate
+                        val cap=minOf(e.outputLimit.toLong(),requireNotNull(remainingBudget)).toInt()
+                        if(!known||cap<1){reason=if(!known)"usage_unconfirmed" else "input_budget_exhausted";break}
                         val selected=if(isPlan)null else resolve(modelId)
                         if(!isPlan&&(selected==null||selected!=initial)){reason="model_configuration_changed";break}
                         var reserved=false
                         val raw=try{
                             checkAuthorization()
                             if(images.isNotEmpty()&&RemoteCacheStore(store,strictReads=true).history(cid)?.contextSettings?.localModelWriteEnabled!=true)throw CancellationException("image readback permission ended")
-                            if(planSession!=null)planSession.step(step,JsonArray(exposed),planResults,images.map{it.message},reserve={ledger.reserveStep(c,step,clock()).also{reserved=it}},authorize={authorized()}).normalized
+                            if(planSession!=null)planSession.step(step,JsonArray(exposed),planResults,images.map{it.message},reserve={ledger.reserveStep(c,step,clock()).also{reserved=it;if(it)mark("provider_wait")}},authorize={authorized()}).normalized
                             else{
-                                check(ledger.reserveStep(c,step,clock()));reserved=true
+                                check(ledger.reserveStep(c,step,clock()));reserved=true;mark("provider_wait")
                                 checkAuthorization();val p=requireNotNull(selected);invoke(p.first,p.second,wireMessages,JsonArray(exposed),cap)
                             }
                         }
                         catch(ex:Exception){
                             if(reserved){known=false;costKnown=false
-                            withContext(NonCancellable){ledger.recordStep(c,step,false,buildJsonObject{put("error_type",(ex as? NativeDreamPlanFailure)?.reason?:"provider_unconfirmed");put("usage",JsonNull);put("cost",JsonNull);if(images.isNotEmpty())put("image_readback_unconfirmed",JsonArray(images.map{JsonPrimitive(it.id)}))},clock())}}
+                            withContext(NonCancellable){ledger.recordStep(c,step,false,buildJsonObject{put("error_type",WakeDiagnostic.reason(ex));WakeDiagnostic.http(ex)?.let{put("http_status",it)};put("usage",JsonNull);put("cost",JsonNull);if(images.isNotEmpty())put("image_readback_unconfirmed",JsonArray(images.map{JsonPrimitive(it.id)}))},clock())}}
                             throw ex
                         }
+                        mark("response_received")
                         val usage=raw["usage"] as? JsonObject
                         val reported=usage?.get("total_tokens")?.jsonPrimitive?.longOrNull?.takeIf{it>=0&&it<=1000000000}
                         if(reported==null)known=false else total+=reported
@@ -209,13 +218,14 @@ internal class LocalDreamExecutor(
                         check(ledger.recordStep(c,step,valid&&choice!=null,receipt,clock()))
                         checkAuthorization()
                         if(!valid||choice==null){reason="invalid_provider_response";break}
-                        if(!known||total>=e.tokenBudget){reason="budget_or_usage_unknown";break}
+                        if(!known||total>=e.tokenBudget){reason=if(!known)"usage_unconfirmed" else "token_budget_reached";break}
                         if(planSession!=null&&requested.isNotEmpty()&&!planSession.canContinue()){reason="plan_step_or_soft_budget_limit";break}
                         if(requested.isEmpty()){if(finish=="stop"){status="completed";reason="ended"}else reason="provider_incomplete";break}
                         if(finish!="tool_calls"||exposed.isEmpty()){reason="unexpected_tool_request";break}
                         val exposedNames=exposed.map{it.getValue("function").jsonObject.str("name")}.toSet()
                         val results=mutableListOf<JsonElement>()
                         if(images.isNotEmpty())messages.add(msg("system","【系统记录】上一请求曾转交自主活动图像 "+images.joinToString("、"){it.id}+"；本请求不再附送这些像素。"))
+                        mark("tool_dispatch")
                         for((index,item) in requested.withIndex()){
                             checkAuthorization();val call=item.jsonObject;val fn=call.getValue("function").jsonObject;val name=fn.str("name")
                             var result=buildJsonObject{put("ok",false);put("reason","unavailable_or_invalid")}
@@ -267,12 +277,12 @@ internal class LocalDreamExecutor(
                         messages.add(buildJsonObject{put("role","assistant");put("content",message?.get("content") as? JsonPrimitive?:JsonNull);put("tool_calls",JsonArray(requested))})
                         messages.addAll(results)
                         if(planSession!=null)planResults=results.map{it.jsonObject}
+                        mark("step_recorded")
                     }
                 }finally{watch.cancelAndJoin()}
             }
         }catch(ex:CancellationException){status="cancelled";reason="cancelled";cancelled=ex}
-        catch(ex:NativeDreamPlanFailure){status="failed";reason=ex.reason}
-        catch(_:Exception){status="failed";reason="execution_failed"}
+        catch(ex:Exception){status="failed";reason=WakeDiagnostic.reason(ex);httpStatus=WakeDiagnostic.http(ex)}
         // A response may have failed parsing after transmission. Any still
         // claimed step has unconfirmed billing, even if earlier usage was known.
         val uncertain=withContext(NonCancellable){LocalDreamArchive(store).runtimeHistory(cid).arr("steps").any{
@@ -280,7 +290,10 @@ internal class LocalDreamExecutor(
         }}
         if(uncertain){known=false;costKnown=false}
         val result=buildJsonObject{
-            put("reason",reason);put("activities",JsonArray(activities));put("tool_calls",calls)
+            put("reason",reason);put("phase",phase);stepIndex?.let{put("step",it)};httpStatus?.let{put("http_status",it)}
+            put("confirmed_tokens",total);inputEstimate?.let{put("estimated_input_tokens",it)};remainingBudget?.let{put("estimated_remaining_tokens",it)}
+            putJsonObject("limits"){put("token_budget",e.tokenBudget);put("tool_budget",e.toolBudget);plan?.grant?.requestLimit?.let{put("request_limit",it)}}
+            put("activities",JsonArray(activities));put("tool_calls",calls)
             put("total_tokens",if(known)JsonPrimitive(total)else JsonNull);put("reported_cost",if(costKnown)JsonPrimitive(cost)else JsonNull)
             proposed?.let{put("proposed_extra_at",it)};put("accounting",if(isPlan)"ChatGPT plan usage; soft token budget; no USD inference cost reported; separate media cost not included" else "chat provider reported; separate media cost not included; input estimate is not a hard billing guarantee")
         }
