@@ -22,7 +22,7 @@ internal object LocalDreamNotifications {
     const val NOTE="note"
     const val FAILURE="failure"
     const val START="start"
-    data class Target(val cid:String,val claim:String,val tab:Int)
+    data class Target(val cid:String,val claim:String,val tab:Int,val localMode:Boolean=true)
     private fun manager(c:Context)=c.getSystemService(NotificationManager::class.java)
     private fun prefs(c:Context)=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE)
     private fun channel(kind:String)="coast_dream_${kind}_v1"
@@ -53,20 +53,22 @@ internal object LocalDreamNotifications {
     fun target(intent:Intent?):Target?{
         if(intent?.action!=ACTION)return null
         val data=intent.data?:return null
-        if(data.scheme!="coast-dream"||data.host!="notice"||data.pathSegments.size!=3)return null
+        if(data.scheme!="coast-dream"||data.host!="notice"||data.pathSegments.size !in 3..4)return null
         val (cid,claim,kind)=data.pathSegments
+        val workspace=data.pathSegments.getOrNull(3)?:"local"
+        if(workspace !in setOf("local","online"))return null
         if(cid.isBlank()||cid.length>180||claim.length>180)return null
-        return Target(cid,claim,when(kind){NOTE->1;START,FAILURE->2;"test"->0;else->return null})
+        return Target(cid,claim,when(kind){NOTE->1;START,FAILURE->2;"test"->0;else->return null},workspace=="local")
     }
     /** One stable tag per persisted claim and event. Reposting cannot stack duplicate alerts. */
-    fun post(c:Context,cid:String,claim:String,kind:String,body:String?=null):Boolean=runCatching{
+    fun post(c:Context,cid:String,claim:String,kind:String,body:String?=null,localMode:Boolean=true):Boolean=runCatching{
         if(kind !in setOf(NOTE,FAILURE,START,"test"))return false
         if(kind!="test"&&!enabled(c,kind))return false
         ensure(c)
         val ch=channel(if(kind=="test")NOTE else kind)
         if(!permitted(c)||manager(c).getNotificationChannel(ch)?.importance==NotificationManager.IMPORTANCE_NONE)return false
         val intent=Intent(c,MainActivity::class.java).setAction(ACTION)
-            .setData(Uri.Builder().scheme("coast-dream").authority("notice").appendPath(cid).appendPath(claim).appendPath(kind).build())
+            .setData(Uri.Builder().scheme("coast-dream").authority("notice").appendPath(cid).appendPath(claim).appendPath(kind).appendPath(if(localMode)"local" else "online").build())
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val open=PendingIntent.getActivity(c,0,intent,PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val fallback=when(kind){NOTE->"有一份新的自主手记，打开看看吧。";FAILURE->"有一次活动未完成，请查看记录。";START->"一次活动已经开始。";else->"这是一条测试通知，没有调用模型。"}
@@ -81,7 +83,7 @@ internal object LocalDreamNotifications {
             .setOnlyAlertOnce(true).setVisibility(if(showPublic)Notification.VISIBILITY_PUBLIC else Notification.VISIBILITY_PRIVATE).setPublicVersion(public)
             .setStyle(Notification.BigTextStyle().bigText(text))
             .setCategory(Notification.CATEGORY_MESSAGE).build()
-        val tag="coast-dream:$cid:$claim:$kind"
+        val tag=if(localMode)"coast-dream:$cid:$claim:$kind" else "coast-dream:online:$cid:$claim:$kind"
         if(kind=="test")manager(c).cancel(tag,4218)
         manager(c).notify(tag,4218,notification)
         true

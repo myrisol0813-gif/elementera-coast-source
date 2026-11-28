@@ -430,6 +430,10 @@ class CoastApiClient(
         val payload=wire.encodeToString(com.elementeracoast.app.core.remote.DreamSettingsRequest.serializer(),value)
         return jsonRequest(Request.Builder().url(config.url("/api/chat/dream-tide")).post(jsonBody(payload)).build(),com.elementeracoast.app.core.remote.DreamSettingsResponse.serializer())
     }
+    internal suspend fun dreamDeviceAction(value:JsonObject):JsonObject {
+        require(config.localTransport==null){"在线活动接口不能写入本机工作区。"}
+        return jsonRequestElement(Request.Builder().url(config.url("/api/chat/dream-tide/device")).post(jsonBody(value.toString())).build()).jsonObject
+    }
     suspend fun dreamNotes(cid:String,offset:Int=0):com.elementeracoast.app.core.remote.DreamNotesResponse =
         jsonRequest(Request.Builder().url(config.url("/api/chat/dream-tide/notes?conversation_id=${encodeQuery(cid)}&offset=$offset")).get().build(),com.elementeracoast.app.core.remote.DreamNotesResponse.serializer())
     suspend fun dreamMediaBytes(cid:String,id:String):ByteArray {

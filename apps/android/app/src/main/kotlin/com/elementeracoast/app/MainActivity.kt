@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
         if(savedInstanceState==null) chatNotice=com.elementeracoast.app.core.local.CoastMessageNotifications.target(intent)
         if(savedInstanceState==null) dreamNotice=com.elementeracoast.app.core.local.LocalDreamNotifications.target(intent)
         com.elementeracoast.app.core.local.LocalDreamWorker.sync(applicationContext)
+        com.elementeracoast.app.core.local.OnlineDreamWorker.sync(applicationContext)
         if (NativeWorkspace.isLocal) SourceVisitGate.leave()
         setContent {
             val vm: CoastShellViewModel = viewModel(factory = CoastShellViewModel.factory(applicationContext))
@@ -160,13 +161,13 @@ class MainActivity : ComponentActivity() {
                     val target=dreamNotice
                     val noticeApi=vm.dreamApi
                     if(target!=null && noticeApi!=null){
-                        if(state.localMode && state.conversations.any{it.id==target.cid}){
+                        if(state.localMode==target.localMode && state.conversations.any{it.id==target.cid}){
                             androidx.compose.runtime.key(target){
-                                com.elementeracoast.app.feature.shell.DreamTideSheet(target.cid,state.currentModel,true,noticeApi,initialTab=target.tab,onDismiss={dreamNotice=null})
+                                com.elementeracoast.app.feature.shell.DreamTideSheet(target.cid,state.currentModel,state.localMode,noticeApi,initialTab=target.tab,onDismiss={dreamNotice=null})
                             }
-                        }else if(!state.localMode){
+                        }else if(state.localMode!=target.localMode){
                             LaunchedEffect(target){
-                                vm.showPlaceholder("这是一条本机活动通知。请切回本机模式查看。")
+                                vm.showPlaceholder(if(target.localMode)"这是一条本机活动通知。请切回本机模式查看。" else "这是一条在线活动通知。请切回在线模式查看。")
                                 dreamNotice=null
                             }
                         }

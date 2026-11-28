@@ -16,7 +16,7 @@ import androidx.lifecycle.LifecycleOwner
 import com.elementeracoast.app.core.local.LocalDreamNotifications as Notices
 
 @Composable
-internal fun DreamNotificationControls(cid:String){
+internal fun DreamNotificationControls(cid:String,localMode:Boolean=true){
     val context=LocalContext.current
     val app=context.applicationContext
     var permitted by remember{mutableStateOf(Notices.permitted(app))}
@@ -35,7 +35,7 @@ internal fun DreamNotificationControls(cid:String){
     com.elementeracoast.app.ui.theme.SnowLetterSurface(modifier=Modifier.fillMaxWidth(),role=com.elementeracoast.app.ui.theme.SnowLetterSurfaceRole.StatusCard,fallbackColor=MaterialTheme.colorScheme.surface,fallbackBorder=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=.55f)),fallbackElevation=1.dp){
         Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
             Text("本机系统通知",style=MaterialTheme.typography.titleMedium)
-            Text("应用级设置，适用于本机所有已授权窗口。锁屏默认隐藏私密正文；不影响模型活动或费用。",style=MaterialTheme.typography.bodySmall)
+            Text("应用级设置，适用于此设备执行的已授权窗口。锁屏默认隐藏私密正文；不影响模型活动或费用。",style=MaterialTheme.typography.bodySmall)
             if(!permitted){
                 Text("系统通知尚未允许。",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
                 TextButton(onClick={
@@ -48,10 +48,10 @@ internal fun DreamNotificationControls(cid:String){
             DreamNotificationRow("开始活动",start,settings={runCatching{Notices.channelSettings(app,Notices.START)}.onFailure{status="无法打开通知类别，请到系统设置调整。"}},change={Notices.setEnabled(app,Notices.START,it);start=it})
             Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
                 TextButton(onClick={runCatching{Notices.appSettings(app)}.onFailure{status="无法打开系统设置。"}}){Text("系统通知设置")}
-                TextButton(onClick={status=if(Notices.post(app,cid,"test","test"))"已提交测试通知，请查看通知栏。" else "未能发送，请检查系统通知权限和类别设置。"}){Text("测试通知")}
+                TextButton(onClick={status=if(Notices.post(app,cid,"test","test",localMode=localMode))"已提交测试通知，请查看通知栏。" else "未能发送，请检查系统通知权限和类别设置。"}){Text("测试通知")}
             }
             if(status.isNotBlank())Text(status,style=MaterialTheme.typography.bodySmall)
-            Text("是否响铃、震动、显示顶部横幅及锁屏通知由 Android、手机厂商设置和勿扰模式决定。测试不会请求模型。在线模式暂不提供此推送。",style=MaterialTheme.typography.bodySmall)
+            Text("是否响铃、震动、显示顶部横幅及锁屏通知由 Android、手机厂商设置和勿扰模式决定。测试不会请求模型。在线套餐活动由手机执行并在确认保存后通知；不是远程推送。",style=MaterialTheme.typography.bodySmall)
         }
     }
 }

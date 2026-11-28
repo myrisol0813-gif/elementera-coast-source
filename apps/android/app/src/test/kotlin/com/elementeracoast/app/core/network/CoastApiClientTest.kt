@@ -49,6 +49,26 @@ class CoastApiClientTest {
     }
 
     @Test
+    fun onlineDreamUsesAuthenticatedDeviceEndpointWithoutProviderCredentials() = runBlocking {
+        server.enqueue(jsonResponse("""{"ok":true,"claim":{"claimId":"claim-1"}}"""))
+        val body=kotlinx.serialization.json.Json.parseToJsonElement("""{"conversation_id":"c1","action":"claim","modelId":"chatgpt-plan:gpt-6.2-sol","revision":"rev","deviceKey":"test-device-key"}""") as kotlinx.serialization.json.JsonObject
+        val response=api.dreamDeviceAction(body)
+        assertEquals("true",response["ok"].toString())
+        val req=server.takeRequest()
+        assertEquals("/api/chat/dream-tide/device",req.path)
+        assertEquals("POST",req.method)
+        assertEquals(config.origin,req.getHeader("Origin"))
+        assertEquals("native-android",req.getHeader("X-Coast-Client"))
+        assertEquals("__Host-coast_session=test-cookie",req.getHeader("Cookie"))
+        assertEquals(null,req.getHeader("Authorization"))
+        val wire=req.body.readUtf8()
+        assertTrue(wire.contains("test-device-key"))
+        assertTrue(!wire.contains("accessToken")&&!wire.contains("refreshToken"))
+        val request=com.elementeracoast.app.core.remote.DreamSettingsRequest("c1",action="arm",deviceKey="test-device-key")
+        assertTrue(!request.toString().contains("test-device-key"))
+    }
+
+    @Test
     fun profileConversationAndHistoryDecodeCurrentBackendShape() = runBlocking {
         server.enqueue(jsonResponse("""{"ok":true,"profile":{"assistant_avatar_dataurl":"data:image/png;base64,AA==","current_chat_model":"openai/gpt-5.6","current_image_model":"","model_box":{"chat":["openai/gpt-5.6"],"free":[],"image":[]}}}"""))
         server.enqueue(jsonResponse("""{"ok":true,"conversations":[{"id":"c1","title":"PWA 窗口","room_type":"radio","updated_at":"2026-09-02T10:00:00Z"}]}"""))
