@@ -161,6 +161,13 @@ export async function heartbeatDreamTide(db,claim,now=Date.now()){
     AND EXISTS(SELECT 1 FROM dream_tide_arms WHERE conversation_id=? AND revision=? AND enabled=1)
     AND EXISTS(${liveWindow})`,now,claim.claimId,claim.conversationId,claim.revision,claim.conversationId,claim.revision,claim.conversationId).run());
 }
+// Persist only allowlisted operational metadata, never model or tool payloads.
+export async function recordDreamPhase(db,claim,phase,now=Date.now()){
+  if(!['context','tools_prepare','claim_response_ready','device_received','request_reserved','tool_dispatch','step_recorded'].includes(phase)||!time(now))throw new TypeError('invalid phase');
+  await schema(db);
+  return changed(await stmt(db,`UPDATE dream_tide_runs SET result_json=json_set(COALESCE(result_json,'{}'),'$.phase',?,'$.phase_at',?),updated_at=MAX(updated_at,?) WHERE claim_id=? AND conversation_id=? AND arm_revision=? AND status='running'
+    AND EXISTS(SELECT 1 FROM dream_tide_arms WHERE conversation_id=? AND revision=? AND enabled=1)`,phase,now,now,claim.claimId,claim.conversationId,claim.revision,claim.conversationId,claim.revision).run());
+}
 export async function settleDreamTide(db,claim,status,now=Date.now()){
   if(!terminal.has(status)||!time(now))throw new TypeError('invalid settlement');
   await schema(db);
@@ -173,14 +180,14 @@ export async function settleDreamTide(db,claim,status,now=Date.now()){
 }
 // No retry after ambiguous work. A late response cannot reclaim the same slot.
 // Extra appointments already claimed before interruption are likewise consumed.
-export async function recoverDreamTide(db,now=Date.now(),staleMs=30*60*1000){
-  if(!time(now)||!Number.isSafeInteger(staleMs)||staleMs<=0)throw new TypeError('invalid recovery boundary');
+export async function recoverDreamTide(db,now=Date.now(),staleMs=30*60*1000,cid=null){
+  if(!time(now)||!Number.isSafeInteger(staleMs)||staleMs<=0||(cid!==null&&!id(cid)))throw new TypeError('invalid recovery boundary');
   await schema(db);
   const r=await db.batch([
-    stmt(db,"UPDATE dream_tide_runs SET status='interrupted',updated_at=? WHERE status='running' AND updated_at<?",now,now-staleMs),
-    db.prepare(`UPDATE dream_tide_arms SET extra_id=NULL,extra_at=NULL WHERE EXISTS(
+    stmt(db,`UPDATE dream_tide_runs SET status='interrupted',result_json=json_set(COALESCE(result_json,'{}'),'$.reason','heartbeat_expired','$.last_heartbeat_at',updated_at,'$.recovered_at',?),updated_at=? WHERE status='running' AND updated_at<? AND (? IS NULL OR conversation_id=?)`,now,now,now-staleMs,cid,cid),
+    stmt(db,`UPDATE dream_tide_arms SET extra_id=NULL,extra_at=NULL WHERE (? IS NULL OR conversation_id=?) AND EXISTS(
       SELECT 1 FROM dream_tide_runs r WHERE r.conversation_id=dream_tide_arms.conversation_id AND r.arm_revision=dream_tide_arms.revision
-      AND r.status='interrupted' AND r.slot_key='extra:'||dream_tide_arms.extra_id)`)
+      AND r.status='interrupted' AND r.slot_key='extra:'||dream_tide_arms.extra_id)`,cid,cid)
   ]);
   return r[0].meta.changes;
 }
