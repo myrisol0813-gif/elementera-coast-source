@@ -94,7 +94,8 @@ internal class LocalDreamLedger(private val store:LocalPersistence){
         s.atomic{staged->
             val a=LocalDreamArchive(staged);val h=a.runtimeHistory(cid);val r=active(h)?:return@atomic false
             if(r.str("claim_id")!=initial.str("claim_id"))return@atomic false
-            val result=buildJsonObject{put("reason","process_interrupted");put("total_tokens",JsonNull);put("reported_cost",JsonNull);put("extra_scheduled",false)}
+            val previous=runCatching{json.parseToJsonElement(r["result_json"]?.jsonPrimitive?.contentOrNull.orEmpty()).jsonObject}.getOrDefault(JsonObject(emptyMap()))
+            val result=JsonObject(previous+buildJsonObject{put("reason","process_interrupted");put("last_activity_at",r.getValue("updated_at"));put("total_tokens",JsonNull);put("reported_cost",JsonNull);put("extra_scheduled",false)})
             val row=JsonObject(r+mapOf("status" to JsonPrimitive("interrupted"),"updated_at" to JsonPrimitive(maxOf(now,r["started_at"]!!.jsonPrimitive.long)),
                 "result_json" to JsonPrimitive(result.toString())))
             a.writeRuntimeHistory(cid,JsonObject(h+("runs" to JsonArray(h.rows("runs").map{if(it==r)row else it}))))
@@ -122,6 +123,16 @@ internal class LocalDreamLedger(private val store:LocalPersistence){
         if(active(h)?.str("claim_id")!=c.id||permission&&!authorized(s,c,h))return@readConsistent false
         val next=block(h)?:return@readConsistent false
         a.writeRuntimeHistory(c.cid,next);true
+    }
+    // Phase/heartbeat metadata is inert and does not authorize any request.
+    fun progress(c:Claim,phase:String?,now:Long,step:Int?=null)=mutate(c){h->
+        val r=active(h)?:return@mutate null
+        val previous=runCatching{json.parseToJsonElement(r["result_json"]?.jsonPrimitive?.contentOrNull.orEmpty()).jsonObject}.getOrDefault(JsonObject(emptyMap()))
+        val values=buildJsonObject{
+            if(phase!=null){put("phase",WakeDiagnostic.code(phase));put("phase_at",now);step?.let{put("step",it)}}else put("heartbeat_at",now)
+        }
+        val row=JsonObject(r+mapOf("updated_at" to JsonPrimitive(maxOf(now,r.getValue("updated_at").jsonPrimitive.long)),"result_json" to JsonPrimitive(JsonObject(previous+values).toString())))
+        JsonObject(h+("runs" to JsonArray(h.rows("runs").map{if(it==r)row else it})))
     }
     fun reserveStep(c:Claim,index:Int,now:Long)=mutate(c){h->
         val rows=h.rows("steps");val prior=rows.filter{it.str("claim_id")==c.id}
@@ -175,7 +186,8 @@ internal class LocalDreamLedger(private val store:LocalPersistence){
         val extraAllowed=auth&&finalStatus=="completed"&&extra!=null&&extra>now&&next.extraAt==null&&c.config.allowExtra&&
             h.rows("runs").count{it.str("kind")=="extra"&&it.str("local_day")==LocalDreamSchedule.day(extra,c.config.timeZone)}<requireNotNull(c.config.execution).extraPerDay
         if(extraAllowed)next=next.copy(extraAt=extra,extraId=c.id)
-        val out=JsonObject(result+("extra_scheduled" to JsonPrimitive(extraAllowed)))
+        val previous=runCatching{json.parseToJsonElement(r["result_json"]?.jsonPrimitive?.contentOrNull.orEmpty()).jsonObject}.getOrDefault(JsonObject(emptyMap()))
+        val out=JsonObject(previous+result+("extra_scheduled" to JsonPrimitive(extraAllowed)))
         val row=JsonObject(r+mapOf("status" to JsonPrimitive(finalStatus),"updated_at" to JsonPrimitive(maxOf(now,c.startedAt)),"result_json" to JsonPrimitive(out.toString())))
         a.writeRuntimeHistory(c.cid,JsonObject(h+("runs" to JsonArray(h.rows("runs").map{if(it==r)row else it}))))
         if(next!=old)save(s,c.cid,next)
