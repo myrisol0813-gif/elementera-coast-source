@@ -31,7 +31,7 @@ export function dreamTideCandidate(config, state, now) {
   const daily=minuteOfDay(config.dailyTime);
   if(inQuietTime(here.minute,config.quietHours)||state.busy===true)return null;
   if(here.minute>=daily && !(armed.day===here.day&&armed.minute>daily) && state.lastDailyDay!==here.day) {
-    return {kind:'daily',key:'daily:'+here.day,day:here.day};
+    return {kind:'daily',key:'daily:'+here.day+(config.scheduleEpoch?':'+config.scheduleEpoch:''),day:here.day};
   }
   // An extra wake is optional, one-shot and scoped to the same local day.
   // The future executor must authorize its creation; this function never creates it.
