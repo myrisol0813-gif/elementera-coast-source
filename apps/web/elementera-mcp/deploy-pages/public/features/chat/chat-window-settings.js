@@ -17,7 +17,7 @@ const REPLY_BUDGET_FIELDS=Object.freeze([
   ['reply_sequence_token_budget','累计 token 预算',1,1000000],
 ]);
 function replyBudgetRow(settings,[key,title,min,max],locked){
-  return `<div class="window-context-copy" style="padding:8px 12px"><label><strong>${escapeHtml(title)}</strong><input type="number" inputmode="numeric" min="${min}" max="${max}" step="1" data-reply-budget="${key}" placeholder="继承基本设置" value="${escapeAttribute(settings[key]??'')}" ${locked?'disabled':''}></label><small>${min}—${max}；留空继承</small></div>`;
+  return `<div class="window-context-copy window-context-number"><label><strong>${escapeHtml(title)}</strong><input type="number" inputmode="numeric" min="${min}" max="${max}" step="1" data-reply-budget="${key}" placeholder="继承基本设置" value="${escapeAttribute(settings[key]??'')}" ${locked?'disabled':''}></label><small>${min}—${max}；留空继承</small></div>`;
 }
 
 function switchRow({ field = '', title, note, checked = false, enabled = true, action, extra = '' }) {
@@ -116,16 +116,16 @@ export function createChatWindowSettings({
 
           <section class="window-context-card">
             ${activeConversation()?.room_type==='main'?switchRow({title:'允许回读自主活动',note:'普通聊天可按需阅读本窗口自主手记与活动摘要；不启动唤醒。',checked:settings.dream_readback_enabled,enabled:!locked,action:!locked?'chat:window-dream-readback':''}):''}
-            <div class="window-context-copy" style="padding:12px">
+            <div class="window-context-copy window-context-editor">
               <strong>工作区 · 工具箱注入词</strong>
-              <textarea aria-label="工具箱注入词" data-workbench-prompt maxlength="4000" rows="7" style="width:100%;box-sizing:border-box;font:inherit;resize:vertical" ${mediaLocked?'disabled':''}>${escapeHtml(settings.workbench_prompt??DEFAULT_WORKBENCH_PROMPT)}</textarea>
+              <textarea aria-label="工具箱注入词" data-workbench-prompt maxlength="4000" rows="7" ${mediaLocked?'disabled':''}>${escapeHtml(settings.workbench_prompt??DEFAULT_WORKBENCH_PROMPT)}</textarea>
               <small>仅当前窗口生效；本轮有可用工具时递入。留空不递入邀请词，不关闭工具。</small>
             </div>
             <button class="window-context-link" type="button" data-action="chat:window-workbench-save" ${mediaLocked?'disabled':''}><span><strong>保存注入词</strong></span><span>›</span></button>
             <button class="window-context-link" type="button" data-action="chat:window-workbench-reset" ${mediaLocked?'disabled':''}><span><strong>恢复默认</strong></span><span>›</span></button>
           </section>
           <section class="window-context-card">
-            <div class="window-context-copy" style="padding:8px 12px"><label><strong>表情包显示尺寸 (px)</strong><input type="number" inputmode="numeric" min="64" max="256" step="1" data-sticker-size value="${settings.sticker_display_size??144}" ${mediaLocked?'disabled':''}></label><small>64—256；只改变表情包显示，不修改原件。</small></div>
+            <div class="window-context-copy window-context-number"><label><strong>表情包显示尺寸 (px)</strong><input type="number" inputmode="numeric" min="64" max="256" step="1" data-sticker-size value="${settings.sticker_display_size??144}" ${mediaLocked?'disabled':''}></label><small>64—256；只改变表情包显示，不修改原件。</small></div>
             <button class="window-context-link" type="button" data-action="chat:window-sticker-size-save" ${mediaLocked?'disabled':''}><span><strong>保存显示尺寸</strong></span><span>›</span></button>
             ${switchRow({title:'允许发送表情包',note:'模型可自主查找和发送已启用的素材，不调用生图 API。',checked:settings.sticker_send_enabled,enabled:!mediaLocked,action:!mediaLocked?'chat:window-sticker-send':''})}
             ${switchRow({title:'允许添加表情包',note:'模型可登记自己在本窗口生成并保存的图片。',checked:settings.sticker_add_enabled,enabled:!mediaLocked,action:!mediaLocked?'chat:window-sticker-add':''})}

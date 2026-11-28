@@ -1,13 +1,13 @@
 import { q, qa } from '../core/dom.js';
 
-const THEMES = Object.freeze(['light', 'dark', 'gold', 'paper', 'mist', 'sage', 'blush']);
+const THEMES = Object.freeze(['light', 'dark', 'gold', 'paper', 'mist', 'sage', 'blush', 'warm-moss']);
 const THEME_LABELS = Object.freeze({
   light: '浅色', dark: '深色', gold: '黑金',
-  paper: '雪粒信笺', mist: '海雾蓝', sage: '苔原绿', blush: '薄暮粉',
+  paper: '雪粒信笺', mist: '海雾蓝', sage: '苔原绿', blush: '薄暮粉', 'warm-moss': '暖苔信笺',
 });
 const THEME_BACKGROUNDS = Object.freeze({
   light: '#ffffff', dark: '#171717', gold: '#0b0b0c',
-  paper: '#edf3f6', mist: '#eaf3f7', sage: '#eef2e9', blush: '#f8eff2',
+  paper: '#edf3f6', mist: '#eaf3f7', sage: '#eef2e9', blush: '#f8eff2', 'warm-moss': '#f1eee7',
 });
 const ROOTS = Object.freeze({
   sidebar: '#sidebar',

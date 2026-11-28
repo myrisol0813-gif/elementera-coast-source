@@ -98,9 +98,9 @@ export function createCalendar({ router, toast }) {
     return {
       title: '日历 · 全部记录', subtitle: '跨月份、跨年份 · 每条原始记录仅展示一次', className: 'coast-calendar-panel',
       headerAction: '<button class="feature-head-action" data-action="calendar:overview-toggle" type="button">返回月历</button>',
-      body: `<section class="coast-calendar-shell"><div class="coast-calendar-detail">
+      body: `<section class="coast-calendar-shell"><div class="coast-calendar-detail coast-calendar-overview">
         <h2>全部记录 <small>${state.ready ? state.entries.length + ' 条' : ''}</small></h2>
-        <div class="coast-calendar-overview-filters" style="display:flex;flex-wrap:wrap;gap:6px">${overviewFilters.map(([key,label]) => `<button type="button" data-action="calendar:overview-filter" data-filter="${key}" aria-pressed="${state.filter === key}">${label}${state.ready ? ' ' + state.entries.filter(entry => key === 'all' || entryType(entry) === key).length : ''}</button>`).join('')}</div>
+        <div class="coast-calendar-overview-filters coast-segments">${overviewFilters.map(([key,label]) => `<button type="button" data-action="calendar:overview-filter" data-filter="${key}" aria-pressed="${state.filter === key}">${label}${state.ready ? ' ' + state.entries.filter(entry => key === 'all' || entryType(entry) === key).length : ''}</button>`).join('')}</div>
         ${state.error ? `<p class="coast-calendar-error">${escapeHtml(state.error)}</p><button type="button" data-action="calendar:reload">重试</button>` : ''}
         ${state.busy ? '<p class="feature-note">正在翻阅全部记录…</p>' : state.ready ? (visible.length ? visible.map(card).join('') : '<p class="feature-empty">这里还没有记录。</p>') : ''}
       </div></section>`,

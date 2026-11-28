@@ -516,9 +516,9 @@
   font-size: 13px;
 }
 
-.form-stack input,
+.form-stack input:not([type="checkbox"]):not([type="radio"]),
 .form-stack textarea,
-.form-grid input,
+.form-grid input:not([type="checkbox"]):not([type="radio"]),
 .form-grid select,
 .select-row select,
 .model-toolbar input,
@@ -530,8 +530,8 @@
   outline: 0;
 }
 
-.form-stack input,
-.form-grid input,
+.form-stack input:not([type="checkbox"]):not([type="radio"]),
+.form-grid input:not([type="checkbox"]):not([type="radio"]),
 .form-grid select,
 .select-row select,
 .model-toolbar input {
@@ -1594,6 +1594,7 @@
 .theme-choice[data-value="mist"]::after { background: linear-gradient(135deg,#f8fcfd 55%,#84b2ca 55%); }
 .theme-choice[data-value="sage"]::after { background: linear-gradient(135deg,#fbfcf6 55%,#93b49b 55%); }
 .theme-choice[data-value="blush"]::after { background: linear-gradient(135deg,#fffafd 55%,#e9b6cb 55%); }
+.theme-choice[data-value="warm-moss"]::after { background: linear-gradient(135deg,#fcfaf5 55%,#a7b6a0 55%); }
 :root[data-theme="paper"] .feature-card,
 :root[data-theme="paper"] .lighthouse-letter,
 :root[data-theme="paper"] .diary-paper {
@@ -1987,3 +1988,51 @@
 .coast-first-guide-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .coast-first-guide-actions button { border: 0; border-radius: 10px; padding: 7px 10px; background: var(--surface-soft); color: var(--text); font: inherit; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
 .coast-first-guide-actions button svg { width: 16px; height: 16px; }
+
+/* Shared settings primitives: color planes, not per-control outlines. */
+.coast-segments { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:3px; padding:4px; background:var(--surface-soft); border-radius:14px; }
+.coast-segments > button { min-width:0; min-height:38px; padding:6px 4px; border:0; border-radius:11px; background:transparent; color:var(--text-soft); font:inherit; font-size:12px; line-height:1.4; white-space:normal; overflow-wrap:anywhere; cursor:pointer; }
+.coast-segments > button[aria-pressed="true"] { background:var(--surface); color:var(--text); font-weight:650; }
+.coast-segments > button:focus-visible, .coast-toggle-row > input:focus-visible, .coast-field-pair input:focus-visible, .dream-tide-card :is(input,textarea,button):focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.coast-field-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; align-items:start; min-width:0; }
+.coast-field-pair > label { min-width:0; overflow-wrap:anywhere; }
+.coast-field-pair input { min-width:0; box-sizing:border-box; }
+.coast-toggle-row, .form-stack .coast-toggle-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; min-height:44px; color:var(--text-soft); font-size:13px; line-height:1.5; cursor:pointer; }
+.coast-toggle-row > span { min-width:0; overflow-wrap:anywhere; }
+.coast-toggle-row > input[type="checkbox"], .form-stack .coast-toggle-row > input[type="checkbox"] { appearance:none; -webkit-appearance:none; display:block; position:relative; box-sizing:border-box; width:38px; height:23px; min-height:0; margin:0; padding:0; border:0; border-radius:999px; background:color-mix(in srgb,var(--muted) 34%,transparent); cursor:pointer; }
+.coast-toggle-row > input[type="checkbox"]::after { content:""; position:absolute; inset:3px auto 3px 3px; width:17px; border-radius:50%; background:var(--surface-raised); box-shadow:0 1px 3px #0002; transition:transform .16s ease; }
+.coast-toggle-row > input[type="checkbox"]:checked { background:var(--accent); }
+.coast-toggle-row > input[type="checkbox"]:checked::after { transform:translateX(15px); }
+.coast-toggle-row > input[type="checkbox"]:disabled { opacity:.55; cursor:default; }
+.coast-toggle-stack { gap:0; }
+.dream-tide-nav { margin-bottom:16px; }
+.dream-tide-card { padding:14px; border:0; overflow:visible; overflow-wrap:anywhere; }
+.dream-tide-card > :first-child { margin-top:0; }
+.dream-tide-card > :last-child { margin-bottom:0; }
+.dream-tide-card .form-stack { gap:10px; }
+.dream-tide-card .coast-toggle-stack { gap:0; }
+.dream-tide-card .form-stack :is(input:not([type="checkbox"]),textarea) { min-width:0; box-sizing:border-box; }
+.dream-tide-card .feature-row { border:0; background:var(--surface-soft); border-radius:12px; margin:6px 0; min-height:44px; }
+@media (max-width:340px) { .coast-field-pair { grid-template-columns:minmax(0,1fr); } }
+
+/* Warm moss keeps the paper surfaces soft; stronger accent remains for text and actions. */
+:root[data-theme="warm-moss"] .feature-card { border-color:transparent; }
+:root[data-theme="warm-moss"] .coast-toggle-row > input[type="checkbox"]:checked { background:var(--selection); }
+:root[data-theme="warm-moss"] .theme-choice[aria-pressed="true"] { background:color-mix(in srgb,var(--selection) 36%,var(--surface)); }
+
+/* Settings share the same color surfaces and compact rhythm. */
+.dream-tide-panel .feature-group { margin-bottom:16px; }
+.dream-tide-panel .dream-tide-card { box-shadow:none; }
+.run-control .feature-group { margin-bottom:16px; }
+.run-control .control-card { padding:12px; border:0; box-shadow:none; }
+.run-control .control-item { min-width:0; padding:10px 3px; gap:7px; background:transparent; border:0; }
+.run-control .control-item h3 { font-size:14px; font-weight:650; overflow-wrap:anywhere; }
+.run-control .control-item p { font-size:12px; line-height:1.55; overflow-wrap:anywhere; }
+.run-control .number-item { grid-template-columns:minmax(0,1fr) minmax(88px,36%); align-items:center; column-gap:10px; }
+.run-control .number-item input { width:100%; min-width:0; min-height:38px; padding:7px 9px; border:0; background:var(--surface-soft); border-radius:12px; }
+.run-control .number-item p { grid-column:1/-1; }
+.run-control .coast-segments .choice-pill { position:relative; display:block; min-width:0; padding:0; border:0; background:transparent; }
+.run-control .coast-segments .choice-pill span { width:100%; min-height:38px; border-radius:11px; padding:6px 4px; background:transparent; color:var(--text-soft); font-size:12px; }
+.run-control .coast-segments .choice-pill input:checked + span { background:var(--surface); color:var(--text); font-weight:650; }
+.run-control .coast-segments .choice-pill input:focus-visible + span { outline:2px solid var(--accent); outline-offset:2px; }
+.run-control .control-card .feature-row { border:0; }

@@ -6,7 +6,7 @@ const names={running:'活动中',completed:'已结束',failed:'未完成',cancel
 const toolNames={voice_create:'自主语音',image_generate:'自主生图',dream_read_history:'阅读历史',dream_write_note:'写自主手记',dream_memory_candidate:'提议记忆候选',dream_schedule_extra:'提议额外唤醒'};
 const row=(label,body)=>'<label>'+h(label)+body+'</label>';
 const input=(id,value,type='text',extra='')=>'<input id="'+id+'" type="'+type+'" value="'+a(String(value??''))+'" '+extra+'>';
-const checkbox=(id,label,checked)=>'<label><input type="checkbox" id="'+id+'" '+(checked?'checked':'')+'> '+h(label)+'</label>';
+const checkbox=(id,label,checked)=>'<label class="coast-toggle-row"><span>'+h(label)+'</span><input type="checkbox" id="'+id+'" '+(checked?'checked':'')+'></label>';
 const button=(label,action,extra='')=>'<button type="button" class="feature-row" data-action="dream-tide:'+action+'" '+extra+'><span><strong>'+h(label)+'</strong></span></button>';
 const mediaLink=(cid,claim,t)=>{
   const id=t.receipt?.record_id;
@@ -16,7 +16,7 @@ const mediaLink=(cid,claim,t)=>{
   const url=audio?'/api/voice/clips/'+encodeURIComponent(id)+'/audio':'/api/chat/attachments/'+encodeURIComponent(id)+'?conversation_id='+encodeURIComponent(cid)+'&inline=1';
   return '<p><a target="_blank" rel="noopener" href="'+a(url)+'">'+(audio?'查看原声':'查看原图')+'</a></p>';
 };
-const section=(title,body)=>'<section class="feature-group"><h2>'+h(title)+'</h2><div class="feature-card">'+body+'</div></section>';
+const section=(title,body)=>'<section class="feature-group"><h2>'+h(title)+'</h2><div class="feature-card dream-tide-card">'+body+'</div></section>';
 const stamp=v=>Number.isFinite(v)?new Date(v).toLocaleString():'未记录';
 const query=(path,cid,offset=0)=>BASE+path+'?'+new URLSearchParams({conversation_id:cid,limit:'20',offset:String(offset)});
 const post=(path,data)=>requestJson(BASE+path,{method:'POST',body:JSON.stringify(data)});
@@ -25,8 +25,8 @@ export function createDreamTideViews({router,chat,toast}){
   const current=()=>chat.getCurrentConversationId();
   const pinned=()=>router.current()?.params?.conversationId||null;
   const open=cid=>router.open('dream-tide',{conversationId:cid});
-  const nav=()=>'<div class="feature-card">'+button('唤醒设置','open')+button('自主手记','notes')+button('活动记录','activity')+'</div>';
-  const page=(title,body)=>({title,subtitle:'当前窗口 · 独立于普通聊天',className:'settings-form',body:nav()+body});
+  const nav=title=>'<nav class="coast-segments dream-tide-nav" aria-label="自主唤醒分区">'+[['唤醒设置','open','自主唤醒'],['自主手记','notes','自主手记'],['活动记录','activity','活动记录']].map(([label,action,active])=>'<button type="button" data-action="dream-tide:'+action+'" aria-pressed="'+(title===active)+'">'+h(label)+'</button>').join('')+'</nav>';
+  const page=(title,body)=>({title,subtitle:'当前窗口 · 独立于普通聊天',className:'settings-form dream-tide-panel',body:nav(title)+body});
   const noWindow=()=>page('自主唤醒','<p class="feature-note">请先打开支持自主唤醒的普通聊天窗口。</p>');
   router.register('dream-tide',async({conversationId:cid}={})=>{if(!cid)return noWindow();
     const data=await requestJson(query('',cid)),s=data.settings,c=s.config||{},e=c.execution||{};
@@ -40,19 +40,19 @@ export function createDreamTideViews({router,chat,toast}){
       (s.extraAt?'<p class="feature-note">下一次额外预约：'+h(stamp(s.extraAt))+'</p>':'')+
       (s.enabled?button('关闭唤醒授权','disarm'):''))
       +section('唤醒与模型','<div class="form-stack">'+row('绑定模型 ID',input('dreamModel',model,'text','maxlength="180"'))+
-      row('时区（IANA）',input('dreamZone',zone))+row('每日固定时间',input('dreamTime',c.dailyTime||'09:00','time'))+
-      checkbox('dreamQuiet','安静时段',!!c.quietHours)+row('开始',input('dreamQuietStart',c.quietHours?.start||'23:00','time'))+
-      row('结束',input('dreamQuietEnd',c.quietHours?.end||'07:00','time'))+checkbox('dreamExtra','允许模型自主预约额外唤醒',c.allowExtra)+
+      '<div class="coast-field-pair">'+row('时区（IANA）',input('dreamZone',zone))+row('每日固定时间',input('dreamTime',c.dailyTime||'09:00','time'))+'</div>'+
+      checkbox('dreamQuiet','安静时段',!!c.quietHours)+'<div class="coast-field-pair">'+row('开始',input('dreamQuietStart',c.quietHours?.start||'23:00','time'))+
+      row('结束',input('dreamQuietEnd',c.quietHours?.end||'07:00','time'))+'</div>'+checkbox('dreamExtra','允许模型自主预约额外唤醒',c.allowExtra)+
       row('每日额外唤醒次数上限',input('dreamExtraLimit',e.extraPerDay??0,'number','min="0" max="2147483646" step="1"'))+'</div>')
-      +section('独立预算与邀请','<div class="form-stack">'+row('单次累计 token 预算',input('dreamTokens',e.tokenBudget??8000,'number','min="1" max="2147483646" step="1"'))+
+      +section('独立预算与邀请','<div class="form-stack"><div class="coast-field-pair">'+row('单次累计 token 预算',input('dreamTokens',e.tokenBudget??8000,'number','min="1" max="2147483646" step="1"'))+
       row('每次请求输出上限',input('dreamOutput',e.outputLimit??1000,'number','min="1" max="2147483646" step="1"'))+
       row('单次工具调用上限',input('dreamTools',e.toolBudget??4,'number','min="0" max="2147483646" step="1"'))+
       row('每次阅读最大轮数',input('dreamReadTurns',e.readTurns??10,'number','min="1" max="2147483646" step="1"'))+
        row('每次活动语音尝试上限',input('dreamVoiceLimit',e.voiceLimit??1,'number','min="0" max="2147483646" step="1"'))+
        row('每次活动生图尝试上限',input('dreamImageLimit',e.imageLimit??1,'number','min="0" max="2147483646" step="1"'))+
-      row('唤醒邀请词','<textarea id="dreamInvitation" maxlength="16000" rows="7">'+h(e.invitation||'')+'</textarea>')+
+      '</div>'+row('唤醒邀请词','<textarea id="dreamInvitation" maxlength="16000" rows="7">'+h(e.invitation||'')+'</textarea>')+
       '<p class="feature-note">预算为自填整数，范围 1–2147483646；次数允许 0 表示禁止该项。输出仍受累计剩余预算、供应商与上下文约束。单次历史读取正文最多 60000 字符，请按需分页。邀请词最多 16000 字符。模型可以什么也不做。实际收费以供应商为准。</p></div>')
-      +section('注入与工具','<div class="form-stack">'+modules.map(([key,label])=>checkbox('dream-'+key,label,e[key]===true)).join('')+'</div>')
+      +section('注入与工具','<div class="form-stack coast-toggle-stack">'+modules.map(([key,label])=>checkbox('dream-'+key,label,e[key]===true)).join('')+'</div>')
       +section('保存与授权','<p class="feature-note">保存为草稿会保持或恢复暂停状态，不会发起请求。授权绑定本窗口及指定模型。</p>'+
       button('保存设置（不启用）','save')+checkbox('dreamConsent','我确认允许按上述设置进行模型调用并产生相应费用',false)+
       (configState.available&&!deviceModel?button('保存并授权唤醒','arm'):'<p class="feature-note">'+(deviceModel?'套餐授权请在 Android 在线模式完成。':'实际调度尚未开通。')+'</p>')));
@@ -60,7 +60,7 @@ export function createDreamTideViews({router,chat,toast}){
   router.register('dream-tide-notes',async({conversationId:cid}={})=>{if(!cid)return noWindow();
     if(notesWindow!==cid){notesWindow=cid;notesOffset=0;}
     const d=await requestJson(query('/notes',cid,notesOffset));
-    const body=d.items.map(n=>'<article class="feature-group"><h2>'+h(stamp(n.created_at)+' · '+n.model_id)+'</h2><div class="feature-card">'+
+    const body=d.items.map(n=>'<article class="feature-group"><h2>'+h(stamp(n.created_at)+' · '+n.model_id)+'</h2><div class="feature-card dream-tide-card">'+
       '<p style="white-space:pre-wrap;overflow-wrap:anywhere">'+h(n.body)+'</p>'+
       n.replies.map(r=>'<p class="feature-note" style="white-space:pre-wrap;overflow-wrap:anywhere">'+h(stamp(r.created_at)+' · 回复\n'+r.body)+'</p>').join('')+
       '<div class="form-stack"><label>回复<textarea rows="3" maxlength="16000"></textarea></label>'+button('保存回复','reply','data-cid="'+a(cid)+'" data-claim="'+a(n.claim_id)+'"')+'</div></div></article>').join('');
