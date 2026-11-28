@@ -26,7 +26,8 @@ data class DreamExecutionConfig(
 @Serializable
 data class DreamConfig(
     val timeZone:String="UTC",val dailyTime:String="09:00",val quietHours:DreamQuietHours?=null,
-    val allowExtra:Boolean=false,val execution:DreamExecutionConfig?=null
+    val allowExtra:Boolean=false,val execution:DreamExecutionConfig?=null,
+    val scheduleEpoch:String?=null
 )
 
 @Serializable
