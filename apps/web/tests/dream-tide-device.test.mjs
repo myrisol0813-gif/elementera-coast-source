@@ -145,3 +145,38 @@ test('owner route separates device authorization from cloud scheduling and check
   const stored=await db.prepare('SELECT enabled,device_digest,device_request_limit FROM dream_tide_arms WHERE conversation_id=?').bind(cv.id).first();
   assert.equal(stored.enabled,0);assert.equal(stored.device_digest,null);assert.equal(stored.device_request_limit,null);
 });
+
+
+test('device phases and scoped GET recovery distinguish missing delivery from model reservation',async()=>{
+  const {db,cid,env,send}=await armedFixture();
+  const {recoverDreamTide}=await import('../functions/dream-tide-ledger.js');
+  const {readDreamActivity}=await import('../functions/dream-tide-records.js');
+  const started=await send({action:'claim'}),claim_id=started.claim.claimId;
+  assert.equal(started.ok,true);
+  let [run]=await readDreamActivity(db,cid);
+  assert.equal(run.result.phase,'claim_response_ready');assert.equal(run.steps.length,0);
+  assert.equal(run.result.limits.request_limit,4);
+  assert.equal((await send({action:'received',claim_id})).ok,true);
+  assert.equal((await send({action:'heartbeat',claim_id})).ok,true);
+  [run]=await readDreamActivity(db,cid);
+  assert.equal(run.result.phase,'device_received');assert.equal(run.result.heartbeat_at,due);
+  assert.equal(await recoverDreamTide(db,due+1800000,1800000,cid),0);
+  const unrelated=await createConversation(db,'unrelated wake','main');
+  assert.equal(await recoverDreamTide(db,due+1800001,1800000,unrelated.id),0);
+  assert.equal(await recoverDreamTide(db,due+1800001,1800000,cid),1);
+  [run]=await readDreamActivity(db,cid);
+  assert.equal(run.status,'interrupted');assert.equal(run.result.reason,'heartbeat_expired');
+  assert.equal(run.result.last_activity_at,due);assert.equal(run.result.heartbeat_at,due);
+  assert.equal(run.steps.length,0);assert.equal((await send({action:'reserve',claim_id,step:0})).ok,false);
+  assert.equal((await send({action:'claim'})).ok,false);
+});
+
+test('activity GET recovers only stale claims and reports the durable reason',async()=>{
+  const {db,cid,env,send}=await armedFixture();
+  const started=await send({action:'claim'});assert.equal(started.ok,true);
+  // Set a stale heartbeat on this test fixture only, independently of wall-clock date.
+  await db.prepare("UPDATE dream_tide_runs SET updated_at=? WHERE claim_id=?").bind(Date.now()-1800001,started.claim.claimId).run();
+  const res=await routeChatApi(new Request('https://coast.test/api/chat/dream-tide/activity?conversation_id='+cid),env);
+  assert.equal(res.status,200);const data=await res.json();assert.equal(data.items[0].status,'interrupted');
+  assert.equal(data.items[0].result.reason,'heartbeat_expired');assert.equal(data.items[0].steps.length,0);
+});
