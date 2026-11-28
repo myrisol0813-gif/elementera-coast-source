@@ -49,11 +49,11 @@ export async function claimDeviceDream(env,cid,{revision,modelId,now=Date.now(),
   }catch{
     // No inference was sent. Consume the claimed slot, never replay it.
     const authorized=await dreamTideClaimAuthorized(db,claim);
+    const reason=authorized?(phase==='tools_prepare'?'tool_context_unavailable':'context_unavailable'):'authorization_ended';
     await finishDreamActivity(db,claim,authorized?'failed':'cancelled',{
-      reason:authorized?(phase==='tools_prepare'?'tool_context_unavailable':'context_unavailable'):'authorization_ended',phase,
-      total_tokens:0,cost:null,activities:[],
+      reason,phase,total_tokens:0,reported_cost:null,activities:[],
     },clock());
-    return {status:authorized?'context_unavailable':'authorization_ended'};
+    return {status:reason};
   }
 }
 
