@@ -137,14 +137,15 @@ export async function claimDreamTide(db,cid,{now=Date.now(),currentModelId,busy=
     if(count.n>=extraLimit)return null;
   }
   const claimId=crypto.randomUUID();
+  const initial=config.execution?JSON.stringify({phase:'claimed',phase_at:now,limits:{token_budget:config.execution.tokenBudget,tool_budget:config.execution.toolBudget,request_limit:arm.device_request_limit??null}}):null;
   // Unique slot and partial unique active index enforce atomic claim.
   // Other admission statements check this ledger in the same D1 write.
-  const r=await stmt(db,`INSERT OR IGNORE INTO dream_tide_runs(conversation_id,slot_key,local_day,kind,arm_revision,claim_id,model_id,status,started_at,updated_at)
-    SELECT ?,?,?,?,?,?,?,'running',?,? WHERE EXISTS(${liveWindow})
+  const r=await stmt(db,`INSERT OR IGNORE INTO dream_tide_runs(conversation_id,slot_key,local_day,kind,arm_revision,claim_id,model_id,status,started_at,updated_at,result_json)
+    SELECT ?,?,?,?,?,?,?,'running',?,?,? WHERE EXISTS(${liveWindow})
     AND EXISTS(SELECT 1 FROM dream_tide_arms WHERE conversation_id=? AND revision=? AND enabled=1 AND model_id=? AND extra_id IS ? AND extra_at IS ?)
     AND NOT EXISTS(SELECT 1 FROM chat_reply_runs WHERE conversation_id=? AND status='running')
     AND NOT EXISTS(SELECT 1 FROM chat_single_runs WHERE conversation_id=?)`,
-    cid,candidate.key,candidate.day,candidate.kind,arm.revision,claimId,arm.model_id,now,now,cid,cid,arm.revision,arm.model_id,arm.extra_id,arm.extra_at,cid,cid).run();
+    cid,candidate.key,candidate.day,candidate.kind,arm.revision,claimId,arm.model_id,now,now,initial,cid,cid,arm.revision,arm.model_id,arm.extra_id,arm.extra_at,cid,cid).run();
   if(!changed(r))return null;
   return {conversationId:cid,claimId,revision:arm.revision,modelId:arm.model_id,...candidate};
 }
