@@ -895,7 +895,8 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   width: min(680px, 100%);
-  max-height: min(82svh, 720px);
+  max-height: min(82dvh, 720px);
+  min-height: 0;
   margin: 0 auto;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
@@ -939,7 +940,11 @@
 }
 
 .window-context-scroll {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
   gap: 10px;
   padding: 10px 12px calc(14px + var(--safe-bottom));
   overflow-y: auto;
@@ -947,7 +952,8 @@
 }
 
 .window-context-card {
-  overflow: hidden;
+  flex: 0 0 auto;
+  min-width: 0;
   border-radius: 18px;
   background: color-mix(in srgb, var(--surface-soft) 82%, var(--bg));
 }
@@ -964,7 +970,7 @@
 
 .window-context-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 40px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
@@ -972,7 +978,7 @@
 
 .window-context-row + .window-context-row,
 .window-context-link {
-  border-top: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+  border-top: 0;
 }
 
 .window-context-copy strong,
@@ -990,11 +996,28 @@
 
 .window-context-copy small,
 .window-context-link small {
-  margin-top: 2px;
+  margin-top: 3px;
   color: var(--muted);
-  font-size: 9.5px;
-  line-height: 1.42;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
+.window-context-copy, .window-context-link { min-width:0; white-space:normal; overflow-wrap:anywhere; }
+.window-context-row:has(.window-context-lock) { grid-template-columns: minmax(0,1fr) auto auto; }
+.window-context-row .window-context-switch { justify-self: end; }
+.window-context-scroll > * { flex-shrink: 0; }
+.window-context-card input:not([type="checkbox"]):not([type="radio"]) { min-width:0; max-width:100%; box-sizing:border-box; border:0; border-radius:12px; background:var(--surface); color:var(--text); padding:8px 10px; font:inherit; }
+.window-context-number { padding:10px 12px; }
+.window-context-number > label { display:grid; grid-template-columns:minmax(0,1fr) minmax(124px,44%); align-items:center; gap:8px; }
+.window-context-number > label > strong { overflow-wrap:anywhere; }
+.window-context-number input[type="number"] { width:100%; min-height:36px; font-size:13px; appearance:textfield; }
+.window-context-number input::-webkit-inner-spin-button, .window-context-number input::-webkit-outer-spin-button { appearance:none; margin:0; }
+.window-context-number small { margin-top:5px; }
+.window-context-editor { padding:12px; }
+.window-context-editor textarea { display:block; box-sizing:border-box; width:100%; min-width:0; min-height:116px; margin:8px 0; padding:12px; border:0; border-radius:13px; background:var(--surface); color:var(--text); font:inherit; font-size:13px; line-height:1.65; resize:vertical; }
+@media (max-width:330px) { .window-context-number > label { grid-template-columns:minmax(0,1fr); } }
+.window-context-card :is(input,textarea,button):focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 
 .window-context-row:disabled {
   cursor: default;
