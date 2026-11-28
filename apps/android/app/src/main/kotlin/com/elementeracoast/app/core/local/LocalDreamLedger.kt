@@ -24,6 +24,10 @@ internal object LocalDreamSchedule {
     fun day(at:Long,zone:String)=Instant.ofEpochMilli(at).atZone(ZoneId.of(zone)).toLocalDate().toString()
     private fun minute(at:Long,zone:String)=Instant.ofEpochMilli(at).atZone(ZoneId.of(zone)).toLocalTime().let{it.hour*60+it.minute}
     private fun minute(value:String)=LocalTime.parse(value).let{it.hour*60+it.minute}
+    fun withScheduleIdentity(next:DreamConfig,previous:DreamConfig?):DreamConfig {
+        val epoch=if(previous!=null&&(previous.dailyTime!=next.dailyTime||previous.timeZone!=next.timeZone))UUID.randomUUID().toString()else previous?.scheduleEpoch
+        return next.copy(scheduleEpoch=epoch)
+    }
     fun candidate(settings:DreamSettings,used:Set<String>,now:Long):LocalDreamSlot?{
         val c=settings.config?:return null
         val armed=settings.armedAt?:return null
@@ -75,9 +79,7 @@ internal class LocalDreamLedger(private val store:LocalPersistence){
         if(arm&&(!enableAllowed||!request.confirmExecution||(if(plan)planRevision==null||!request.confirmPlanSoftBudget||request.planRequestLimit !in 1..2147483646 else !model.startsWith("local:")||'/' !in model)))return@readConsistent null
         // Only an explicit clock/zone edit creates a new daily schedule identity.
         // Reauthorization, unchanged saves, and budget edits cannot replay a slot.
-        val previous=old.config
-        val scheduleEpoch=if(previous!=null&&(previous.dailyTime!=cfg.dailyTime||previous.timeZone!=cfg.timeZone))UUID.randomUUID().toString()else previous?.scheduleEpoch
-        val next=DreamSettings(revision=if(arm&&plan)requireNotNull(planRevision)else UUID.randomUUID().toString(),enabled=arm,config=cfg.copy(scheduleEpoch=scheduleEpoch),modelId=model,armedAt=if(arm)now else null)
+        val next=DreamSettings(revision=if(arm&&plan)requireNotNull(planRevision)else UUID.randomUUID().toString(),enabled=arm,config=LocalDreamSchedule.withScheduleIdentity(cfg,old.config),modelId=model,armedAt=if(arm)now else null)
         save(s,cid,next);next
     }
     private fun authorized(s:LocalPersistence,c:Claim,h:JsonObject):Boolean{
