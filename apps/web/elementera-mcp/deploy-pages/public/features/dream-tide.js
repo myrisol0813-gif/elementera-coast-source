@@ -18,6 +18,30 @@ const mediaLink=(cid,claim,t)=>{
 };
 const section=(title,body)=>'<section class="feature-group"><h2>'+h(title)+'</h2><div class="feature-card dream-tide-card">'+body+'</div></section>';
 const stamp=v=>Number.isFinite(v)?new Date(v).toLocaleString():'未记录';
+ 
+const safeCode=v=>typeof v==='string'&&/^[A-Za-z0-9_.:/-]{1,180}$/.test(v)?v:'未确认';
+const num=v=>Number.isSafeInteger(v)?String(v):'未确认';
+const phaseLabels={claimed:'已认领',context:'准备上下文',tools_prepare:'准备工具',claim_response_ready:'服务端已准备认领回执，手机接收未确认',device_received:'手机已收到认领回执',request_prepare:'准备模型请求',request_reserved:'已预留请求，送达尚未确认',provider_wait:'等待模型回执',step_delivery:'交付模型响应',tool_dispatch:'执行工具',step_recorded:'请求及工具结果已记录',finish:'收尾'};
+const reasonLabels={ended:'正常结束',heartbeat_expired:'超过回收期限未取得活动更新',context_unavailable:'上下文准备失败',tool_context_unavailable:'工具准备失败',plan_request_timeout:'模型请求超时',plan_network_error:'网络连接异常',plan_response_decode_error:'响应解析失败',plan_soft_budget_exhausted:'剩余软预算不足',plan_step_or_soft_budget_limit:'套餐请求次数或软预算达到上限',authorization_ended:'授权已改变',authorization_or_task_ended:'授权或执行任务中止'};
+function activityDiagnostic(r){
+  const d=r.result||{},steps=r.steps||[],tools=r.tools||[],limits=d.limits||{};
+  const lines=['执行模式：在线','活动 ID：'+safeCode(r.claim_id),'模型：'+safeCode(r.model_id),'状态：'+(names[r.status]||safeCode(r.status)),'认领时间：'+stamp(r.started_at),'阶段：'+(phaseLabels[d.phase]||safeCode(d.phase))];
+  for(const [label,v] of [['阶段更新时间',d.phase_at],['最近心跳',d.heartbeat_at],['最近记录更新',r.updated_at],['回收前最后更新',d.last_activity_at],['回收时间',d.recovered_at]])if(Number.isSafeInteger(v))lines.push(label+'：'+stamp(v));else if(label==='最近心跳')lines.push(label+'：未记录');
+  if(d.reason)lines.push('结束原因：'+(reasonLabels[d.reason]||safeCode(d.reason))+' · '+safeCode(d.reason));else if(r.status!=='running')lines.push('结束原因：未确认（旧记录可能没有诊断）');
+  const known=steps.map(s=>s.receipt?.usage?.total_tokens).filter(v=>Number.isSafeInteger(v)&&v>=0);
+  lines.push('已确认请求 token 合计：'+(Number.isSafeInteger(d.confirmed_tokens)?d.confirmed_tokens:known.length?known.reduce((a,b)=>a+b,0):'未确认')+' / '+num(limits.token_budget),'已预留请求：'+steps.length+' / '+num(limits.request_limit),'已记录工具：'+tools.length+' / '+num(limits.tool_budget));
+  for(const s of steps){
+    lines.push('请求 '+(Number.isSafeInteger(s.step_index)?s.step_index+1:'?')+' · '+(names[s.status]||safeCode(s.status))+' · token '+num(s.receipt?.usage?.total_tokens),'  预留：'+stamp(s.started_at)+' · 回执：'+stamp(s.finished_at));
+    if(s.receipt?.finish_reason)lines.push('  结束标记：'+safeCode(s.receipt.finish_reason));
+    if(s.receipt?.error_type)lines.push('  错误：'+safeCode(s.receipt.error_type));
+    if(Number.isInteger(s.receipt?.http_status))lines.push('  HTTP：'+s.receipt.http_status);
+  }
+  for(const t of tools)lines.push('工具：'+(toolNames[t.tool_name]||safeCode(t.tool_name))+' · '+(names[t.status]||safeCode(t.status))+' · '+stamp(t.started_at)+' → '+stamp(t.finished_at));
+  if(steps.some(s=>s.status==='claimed'||s.status==='failed'))lines.push('存在未确认或失败请求，可能已消耗额度；不会自动重放。');
+  if(['failed','interrupted','cancelled'].includes(r.status)&&tools.some(t=>t.status==='completed'))lines.push('部分成功：已完成的工具与作品保留。');
+  return lines.join('\n');
+}
+
 const query=(path,cid,offset=0)=>BASE+path+'?'+new URLSearchParams({conversation_id:cid,limit:'20',offset:String(offset)});
 const post=(path,data)=>requestJson(BASE+path,{method:'POST',body:JSON.stringify(data)});
 export function createDreamTideViews({router,chat,toast}){
@@ -72,14 +96,18 @@ export function createDreamTideViews({router,chat,toast}){
     const d=await requestJson(query('/activity',cid,mediaId?0:activityOffset)+(mediaId?'&media_id='+encodeURIComponent(mediaId):''));
     const body=d.items.map(r=>section(stamp(r.started_at)+' · '+(r.kind==='daily'?'固定唤醒':'额外唤醒'),
       '<p>'+h(names[r.status]||r.status)+'</p><p class="feature-note">'+h(r.model_id)+'</p>'+
-      (r.result?.reason?'<p class="feature-note">活动回执：'+h(r.result.reason)+'</p>':'')+
+      (r.result?.reason?'<p class="feature-note">活动回执：'+h((reasonLabels[r.result.reason]||safeCode(r.result.reason))+' · '+safeCode(r.result.reason))+'</p>':r.status!=='running'?'<p class="feature-note">结束原因未确认（旧记录可能没有诊断）</p>':'')+
+      (r.result?.phase?'<p class="feature-note">阶段：'+h(phaseLabels[r.result.phase]||safeCode(r.result.phase))+'</p>':'')+
+      (r.status==='running'?'<p class="feature-note">最近心跳：'+h(stamp(r.result?.heartbeat_at))+'</p>':'')+
+      (['failed','interrupted','cancelled'].includes(r.status)&&r.tools.some(t=>t.status==='completed')?'<p class="feature-note">部分成功 · 已完成的工具与作品保留</p>':'')+
+      '<details class="dream-diagnostic"><summary>展开详细回执</summary><pre class="feature-note" style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:12px">'+h(activityDiagnostic(r))+'</pre>'+button('复制脱敏诊断','copy-diagnostic')+'</details>'+
       '<p class="feature-note">总 token：'+h(r.result?.total_tokens??'未确认')+' · 供应商报告成本：'+h(r.result?.reported_cost==null?'未确认':'USD '+r.result.reported_cost)+'</p>'+
       r.tools.map(t=>'<p class="feature-note">'+h((toolNames[t.tool_name]||t.tool_name)+' · '+(names[t.status]||t.status)+(Number.isInteger(t.receipt?.count)?' · '+t.receipt.count+' 轮':''))+'</p>'+mediaLink(cid,r.claim_id,t)).join('')+
       (r.result?.extra_scheduled?'<p class="feature-note">已保存额外预约。</p>':'')+
       r.steps.map(s=>'<p class="feature-note">'+h(Array.isArray(s.receipt?.image_readback_accepted)?'图像回读请求已获得响应 · '+s.receipt.image_readback_accepted.length+' 张':Array.isArray(s.receipt?.image_readback_unconfirmed)?'图像回读请求结果未确认 · '+s.receipt.image_readback_unconfirmed.length+' 张':'')+'</p>').filter(x=>x!=='<p class="feature-note"></p>').join('')+
       (r.steps.some(s=>s.status==='claimed')?'<p class="feature-note">存在未确认请求，不会自动重放。</p>':''))).join('');
     return page('活动记录',(mediaId?'<p class="feature-note">作品来源 · '+h(mediaId)+'</p>':'')+(body||'<p class="feature-note">'+(mediaId?'未找到对应的活动记录。':'还没有活动记录。')+'</p>')+
-      (mediaId?button('查看全部活动','activity'):(activityOffset?button('上一页','activity-prev'):'')+(d.nextOffset!==null?button('下一页','activity-next'):'')));
+      button('刷新活动记录','refresh-activity')+(mediaId?button('查看全部活动','activity'):(activityOffset?button('上一页','activity-prev'):'')+(d.nextOffset!==null?button('下一页','activity-next'):'')));
   });
   const value=id=>q('#'+id)?.value??'';
   const checked=id=>q('#'+id)?.checked===true;
@@ -87,10 +115,16 @@ export function createDreamTideViews({router,chat,toast}){
   async function handle(name,target){
     const cid=pinned();
     if(!cid||cid!==current())return toast('窗口已切换，请从当前窗口重新打开自主唤醒。');
+    if(name==='refresh-activity')return router.refresh();
     if(name==='open')return open(cid);
     if(name==='notes'){notesOffset=0;return router.open('dream-tide-notes',{conversationId:cid});}
     if(name==='activity'){activityOffset=0;return router.open('dream-tide-activity',{conversationId:cid});}
     if(name==='notes-prev'||name==='notes-next'){notesOffset=Math.max(0,notesOffset+(name.endsWith('next')?20:-20));return router.refresh();}
+    if(name==='copy-diagnostic'){
+      const text=target.closest('.dream-diagnostic')?.querySelector('pre')?.textContent;
+      if(!text)return toast('诊断不存在');
+      try{await navigator.clipboard.writeText(text);toast('已复制脱敏诊断');}catch{toast('复制未完成，请选择诊断文字手动复制。');}return;
+    }
     if(name==='activity-prev'||name==='activity-next'){activityOffset=Math.max(0,activityOffset+(name.endsWith('next')?20:-20));return router.refresh();}
     if(busy)return;busy=true;
     try{
