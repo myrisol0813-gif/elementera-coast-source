@@ -17,7 +17,7 @@ export function createTools({ storage, router, toast, memory }) {
     const settings = storage.read().runControl;
     const current = ['streamingEnabled', 'worldbookEnabled'].includes(name) ? Boolean(settings[name]) : settings[name];
     const options = choices[name].map(([value, label]) => `<label class="choice-pill"><input type="radio" name="${name}" data-input="tools:setting" value="${escapeAttribute(value)}" ${String(current) === String(value) ? 'checked' : ''}><span>${escapeHtml(label)}</span></label>`).join('');
-    return `<div class="control-item"><h3>${escapeHtml(title)}</h3><div class="choice-list">${options}</div>${note ? `<p>${escapeHtml(note)}</p>` : ''}</div>`;
+    return `<div class="control-item"><h3>${escapeHtml(title)}</h3><div class="coast-segments">${options}</div>${note ? `<p>${escapeHtml(note)}</p>` : ''}</div>`;
   }
 
   function numberRow(name, title, min, max, step, note, changeName = '') {
@@ -29,9 +29,9 @@ export function createTools({ storage, router, toast, memory }) {
 
   function budgetRow() {
     const automatic = Number(storage.read().runControl.contextBudget) === 0;
-    return `<div class="control-item"><h3>上下文 token budget</h3><div class="choice-list">
-      <button type="button" class="choice-pill" aria-pressed="${automatic}" data-action="tools:budget-auto">自动${automatic ? ' · 当前' : ''}</button>
-      <button type="button" class="choice-pill" aria-pressed="${!automatic}" data-action="tools:budget-manual">手动${!automatic ? ' · 当前' : ''}</button>
+    return `<div class="control-item"><h3>上下文 token budget</h3><div class="coast-segments">
+      <button type="button" aria-pressed="${automatic}" data-action="tools:budget-auto">自动${automatic ? ' · 当前' : ''}</button>
+      <button type="button" aria-pressed="${!automatic}" data-action="tools:budget-manual">手动${!automatic ? ' · 当前' : ''}</button>
       </div><p>自动：依据模型目录容量预留输出与工具空间；未知容量使用 18000 的舒服区间，不代表模型真实上限。</p></div>`
       + (automatic ? '' : numberRow('contextBudget', '手动预算', CONTEXT_BUDGET_MIN, null, 100, '最小1800，无固定应用上限；已知目录容量时按估算输入范围分配。', 'context-budget'));
   }
